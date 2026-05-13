@@ -24,6 +24,8 @@ from slowquant.molecularintegrals.integralfunctions import DHF_one_electron_tran
 # qWF imports:
 from qiskit_aer.primitives import Sampler
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
+from slowquant.qiskit_interface.generalized_circuit_wavefunction import GeneralizedWaveFunctionCircuit
+from slowquant.qiskit_interface.generalized_interface import QuantumInterface
 
 
 # qWF global settings:
@@ -38,80 +40,74 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # PySCF
     mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
     mol.build()
-    #X2C
-    uhf = scf.UHF(mol)
-    uhf.chkfile = "/home/annika4ee/SlowQuant/uhf_guess.chk"
-    uhf.scf()
-    uhf.kernel()
-
-    nmo = uhf.mo_coeff[0].shape[1]
-
-    # small random anti-Hermitian
-    epsilon = 0.0  # controls "step size"
-    X = np.random.randn(nmo, nmo) + 1j*np.random.randn(nmo, nmo)
-    A = epsilon * (X - X.conj().T)/2  # make anti-Hermitian
-    # unitary
-    U_small = expm(A)
-    c_guess = (uhf.mo_coeff[0] @ U_small, uhf.mo_coeff[1] @ U_small)
-
-    # load original chkfile content (optional)
-    data = chkfile.load("/home/annika4ee/SlowQuant/uhf_guess.chk",'scf')
-
-    # overwrite the MO coefficients
-    data['mo_coeff'] = c_guess
-
-    # dump everything back into a new chkfile
-    chkfile.dump('/home/annika4ee/SlowQuant/uhf_guess.chk','scf', data)
-
+    
 
     mf = scf.GHF(mol)
-    #mf.chkfile = '/home/annika4ee/SlowQuant/uhf_guess.chk'
-
-    # Change initial guess:
-    #mf.init_guess = "chkfile"
     mf.conv_tol = 1e-8        # Energy convergence (Hartree)
     mf.conv_tol_grad = 1e-8   # Optional: gradient convergence
     mf.max_cycle = 1000
 
     mf.scf()
     mf.kernel()
-    c=np.array(mf.mo_coeff,dtype=complex)
+    coeff =np.array(mf.mo_coeff,dtype=complex)
 
 
 
     h_core = mol.intor("int1e_kin") + mol.intor("int1e_nuc")
-    h_1e = mol.intor("int1e_kin")
-    h_nuc = mol.intor("int1e_nuc")
     g_eri = mol.intor("int2e")
-    dip_int = mol.intor("int1e_r")
-    #mc = mcscf.CASCI(mf, active_space[1], active_space[0])
-
-    # mc = mcscf.UCASCI(mf, active_space[1], active_space[0])
-    # # Slowquant
+   
 
     # small random anti-Hermitian
     eps = 0.005  # controls "step size"
-    X_anti = np.random.randn(c.shape[0],c.shape[0]) + 1j*np.random.randn(c.shape[0],c.shape[0])
+    X_anti = np.random.randn(coeff.shape[0],coeff.shape[0]) + 1j*np.random.randn(coeff.shape[0],coeff.shape[0])
     A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian
 
     U_step = expm(A_mat)
 
-    c_u = c @ U_step
+    coeff_u = coeff @ U_step
 
 
-    print(np.round(c.real,3))
+    # WF = GeneralizedWaveFunctionUPS(
+    #     mol.nelectron,
+    #     active_space,
+    #     c,
+    #     h_core,
+    #     g_eri,
+    #     "fuccsd",
+    #     {"n_layers": 1, "is_spin_conserving" : False},
+    #     include_active_kappa=True,
+    # )
 
+    QI = QuantumInterface(
+        sampler,
+        "fUCCSD", # Ansatz
+        mapper,
+        ansatz_options={"n_layers": 1, "is_spin_conserving" : False},
+        shots = 50000,
+        ISA=False, # default is false
+        do_M_mitigation=False, # default is false
+        do_M_ansatz0=False, # default is false
+        do_postselection=False, # default is false
+    )
 
-    WF = GeneralizedWaveFunctionUPS(
+    qWF = GeneralizedWaveFunctionCircuit(
         mol.nelectron,
-        active_space,
-        c,
+        ((1, 1), 4),
+        coeff,
         h_core,
         g_eri,
-        "fuccsd",
-        {"n_layers": 1, "is_spin_conserving" : False},
-        include_active_kappa=True,
+        QI,
+        include_active_kappa = True,
     )
+
+
+    qWF._calc_energy_elec()
+
+    #.run_wf_optimization_1step("bfgs", orbital_optimization=True)
+
+
+
+
 
 
 

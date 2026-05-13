@@ -43,7 +43,6 @@ def single_excitation_generalized(
     num_orbs: int,
     qc: QuantumCircuit,
     theta: Parameter | ParameterExpression,
-    phi: Parameter | ParameterExpression,
     mapper: FermionicMapper,
 ) -> QuantumCircuit:
     """Get single excitation circuit.
@@ -60,7 +59,7 @@ def single_excitation_generalized(
         Single excitation circuit.
     """
     if isinstance(mapper, JordanWignerMapper):
-        qc = _single_excitation_efficient_generalized(a, i, num_orbs, qc, theta, phi)
+        qc = _single_excitation_efficient_generalized(a, i, num_orbs, qc, theta)
     else:
         qc = _single_excitation_trotter(i, a, num_orbs, qc, theta, mapper)
     return qc
