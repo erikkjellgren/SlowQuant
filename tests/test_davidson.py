@@ -38,13 +38,13 @@ def test_lih_naive_explicit():
     threshold = 10 ** (-5)
 
     # naive
-    LR_naive = naive.LinearResponse(WF, excitations="SD")
-    LR_naive._construct_hessian_metric_blocks()
+    LR = naive.LinearResponse(WF, excitations="SD")
+    LR._construct_hessian_metric_blocks()
 
-    A = LR_naive.A
-    B = LR_naive.B
-    Sigma = LR_naive.Sigma
-    Delta = LR_naive.Delta
+    A = LR.A
+    B = LR.B
+    Sigma = LR.Sigma
+    Delta = LR.Delta
 
     def right_transform(trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         Ab = A @ trial
@@ -74,6 +74,23 @@ def test_lih_naive_explicit():
         ]
     )
     assert np.allclose(eigvals, solutions, atol=threshold)
+
+    LR.normed_response_vectors = eigvecs
+    LR.Z_q_normed = LR.normed_response_vectors[: len(LR.q_ops), :]
+    LR.Z_G_normed = LR.normed_response_vectors[len(LR.q_ops) : len(LR.q_ops) + len(LR.G_ops), :]
+    LR.Y_q_normed = LR.normed_response_vectors[len(LR.q_ops) + len(LR.G_ops) : 2 * len(LR.q_ops) + len(LR.G_ops), :]
+    LR.Y_G_normed = LR.normed_response_vectors[2 * len(LR.q_ops) + len(LR.G_ops) :, :]
+    LR.excitation_energies = eigvals
+    LR.get_oscillator_strength()
+
+    solutions = np.array(
+        [
+            0.049796,
+            0.241266,
+            0.241266,
+        ]
+    )
+    assert np.allclose(LR.oscillator_strengths, solutions, atol=threshold)
 
 def test_lih_naive():
     """Test LiH energies for naive q LR methods."""
@@ -97,8 +114,8 @@ def test_lih_naive():
     threshold = 10 ** (-5)
 
     # naive
-    LR_naive = naive.LinearResponse(WF, excitations="SD")
-    LR_naive.calc_excitation_energies(3, {"max_iterations": 50, "tolerance": 1e-8})
+    LR = naive.LinearResponse(WF, excitations="SD")
+    LR.calc_excitation_energies(3, {"max_iterations": 50, "tolerance": 1e-8})
 
     solutions = np.array(
         [
@@ -107,7 +124,18 @@ def test_lih_naive():
             0.17886086,
         ]
     )
-    assert np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)
+    assert np.allclose(LR.excitation_energies, solutions, atol=threshold)
+
+    LR.get_oscillator_strength()
+
+    solutions = np.array(
+        [
+            0.049796,
+            0.241266,
+            0.241266,
+        ]
+    )
+    assert np.allclose(LR.oscillator_strengths, solutions, atol=threshold)
 
 def test_lih_projected_explicit():
     """Test LiH energies for projected q LR methods."""
@@ -131,13 +159,13 @@ def test_lih_projected_explicit():
     threshold = 10 ** (-5)
 
     # naive
-    LR_naive = projected.LinearResponse(WF, excitations="SD")
-    LR_naive._construct_hessian_metric_blocks()
+    LR = projected.LinearResponse(WF, excitations="SD")
+    LR._construct_hessian_metric_blocks()
 
-    A = LR_naive.A
-    B = LR_naive.B
-    Sigma = LR_naive.Sigma
-    Delta = LR_naive.Delta
+    A = LR.A
+    B = LR.B
+    Sigma = LR.Sigma
+    Delta = LR.Delta
 
     def right_transform(trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         Ab = A @ trial
@@ -167,6 +195,23 @@ def test_lih_projected_explicit():
         ]
     )
     assert np.allclose(eigvals, solutions, atol=threshold)
+
+    LR.normed_response_vectors = eigvecs
+    LR.Z_q_normed = LR.normed_response_vectors[: len(LR.q_ops), :]
+    LR.Z_G_normed = LR.normed_response_vectors[len(LR.q_ops) : len(LR.q_ops) + len(LR.G_ops), :]
+    LR.Y_q_normed = LR.normed_response_vectors[len(LR.q_ops) + len(LR.G_ops) : 2 * len(LR.q_ops) + len(LR.G_ops), :]
+    LR.Y_G_normed = LR.normed_response_vectors[2 * len(LR.q_ops) + len(LR.G_ops) :, :]
+    LR.excitation_energies = eigvals
+    LR.get_oscillator_strength()
+
+    solutions = np.array(
+        [
+            0.049799,
+            0.241266,
+            0.241266,
+        ]
+    )
+    assert np.allclose(LR.oscillator_strengths, solutions, atol=threshold)
 
 def test_lih_projected():
     """Test LiH energies for projected q LR methods."""
@@ -190,8 +235,8 @@ def test_lih_projected():
     threshold = 10 ** (-5)
 
     # naive
-    LR_naive = projected.LinearResponse(WF, excitations="SD")
-    LR_naive.calc_excitation_energies(3, {"max_iterations": 50, "tolerance": 1e-8})
+    LR = projected.LinearResponse(WF, excitations="SD")
+    LR.calc_excitation_energies(3, {"max_iterations": 50, "tolerance": 1e-8})
 
     solutions = np.array(
         [
@@ -200,7 +245,18 @@ def test_lih_projected():
             0.17886086,
         ]
     )
-    assert np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)
+    assert np.allclose(LR.excitation_energies, solutions, atol=threshold)
+
+    LR.get_oscillator_strength()
+
+    solutions = np.array(
+        [
+            0.049799,
+            0.241266,
+            0.241266,
+        ]
+    )
+    assert np.allclose(LR.oscillator_strengths, solutions, atol=threshold)
 
 def test_lih_allprojected_explicit():
     """Test LiH energies for projected q LR methods."""
@@ -224,13 +280,13 @@ def test_lih_allprojected_explicit():
     threshold = 10 ** (-5)
 
     # naive
-    LR_naive = allprojected.LinearResponse(WF, excitations="SD")
-    LR_naive._construct_hessian_metric_blocks()
+    LR = allprojected.LinearResponse(WF, excitations="SD")
+    LR._construct_hessian_metric_blocks()
 
-    A = LR_naive.A
-    B = LR_naive.B
-    Sigma = LR_naive.Sigma
-    Delta = LR_naive.Delta
+    A = LR.A
+    B = LR.B
+    Sigma = LR.Sigma
+    Delta = LR.Delta
 
     def right_transform(trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         Ab = A @ trial
@@ -261,6 +317,23 @@ def test_lih_allprojected_explicit():
     )
     assert np.allclose(eigvals, solutions, atol=threshold)
 
+    LR.normed_response_vectors = eigvecs
+    LR.Z_q_normed = LR.normed_response_vectors[: len(LR.q_ops), :]
+    LR.Z_G_normed = LR.normed_response_vectors[len(LR.q_ops) : len(LR.q_ops) + len(LR.G_ops), :]
+    LR.Y_q_normed = LR.normed_response_vectors[len(LR.q_ops) + len(LR.G_ops) : 2 * len(LR.q_ops) + len(LR.G_ops), :]
+    LR.Y_G_normed = LR.normed_response_vectors[2 * len(LR.q_ops) + len(LR.G_ops) :, :]
+    LR.excitation_energies = eigvals
+    LR.get_oscillator_strength()
+
+    solutions = np.array(
+        [
+            0.049950,
+            0.250975,
+            0.250975,
+        ]
+    )
+    assert np.allclose(LR.oscillator_strengths, solutions, atol=threshold)
+
 def test_lih_allprojected():
     """Test LiH energies for projected q LR methods."""
     SQobj = sq.SlowQuant()
@@ -283,8 +356,8 @@ def test_lih_allprojected():
     threshold = 10 ** (-5)
 
     # naive
-    LR_naive = allprojected.LinearResponse(WF, excitations="SD")
-    LR_naive.calc_excitation_energies(3, {"max_iterations": 50, "tolerance": 1e-8})
+    LR = allprojected.LinearResponse(WF, excitations="SD")
+    LR.calc_excitation_energies(3, {"max_iterations": 50, "tolerance": 1e-8})
 
     solutions = np.array(
         [
@@ -293,4 +366,15 @@ def test_lih_allprojected():
             0.18092743,
         ]
     )
-    assert np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)
+    assert np.allclose(LR.excitation_energies, solutions, atol=threshold)
+
+    LR.get_oscillator_strength()
+
+    solutions = np.array(
+        [
+            0.049950,
+            0.250975,
+            0.250975,
+        ]
+    )
+    assert np.allclose(LR.oscillator_strengths, solutions, atol=threshold)
