@@ -6,7 +6,7 @@ from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperat
 from slowquant.unitary_coupled_cluster.operators import (
     G1, G1_generalized,
     G2, G2_generalized,
-    G3
+    G3, G4
 )
 from slowquant.unitary_coupled_cluster.util import UpsStructure ##AE
 from slowquant.unitary_coupled_cluster.operator_state_algebra import bitcount
@@ -662,7 +662,7 @@ def generalized_construct_ups_state_test_erik(
     ):
         if abs(theta) < 10**-28:
             continue
-        if exc_type in ("single", "double", "triple"):
+        if exc_type in ("single", "double", "triple", "quadruple"):
             # Create T matrix
             if exc_type == "single":
                 (i, a) = np.array(exc_indices) + 2 * offset
@@ -673,6 +673,9 @@ def generalized_construct_ups_state_test_erik(
             elif exc_type == "triple":
                 (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
                 T = G3(i, j, k, a, b, c, False)
+            elif exc_type == "quadruple":
+                (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
+                T = G4(i, j, k, a, b, c, False)
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
             if dagger:
@@ -797,7 +800,7 @@ def generalized_propagate_unitary_test_anna(
     offset = ci_info.space_extension_offset
     if abs(theta) < 1e-12: # OBS!!! was 1e-14 AE CHANGED!!
         return np.copy(state)
-    if exc_type in ("single", "double", "triple"):
+    if exc_type in ("single", "double", "triple", "quadruple"):
         # Create T matrix
         if exc_type == "single":
             (i, a) = np.array(exc_indices) + 2 * offset
@@ -811,6 +814,10 @@ def generalized_propagate_unitary_test_anna(
             (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
             T = G3(i, j, k, a, b, c, False)
             T_dag = G3(i, j, k, a, b, c, True)
+        elif exc_type == "quadruple": #AE
+            (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
+            T = G4(i, j, k, l, a, b, c, d, False)
+            T_dag = G4(i, j, k, l, a, b, c, d, True)
 
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
@@ -890,7 +897,8 @@ def generalized_get_grad_action(
         "single",
         "double",
         "triple"
-    ):
+        "quadruple"
+        ):
         # Create T matrix
         if exc_type == "single":
             (i, a) = np.array(exc_indices) + 2 * offset
@@ -901,6 +909,9 @@ def generalized_get_grad_action(
         elif exc_type == "triple":
             (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
             T = G3(i, j, k, a, b, c, False)
+        elif exc_type == "quadruple":
+            (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
+            T = G3(i, j, k, l, a, b, c, d, False)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         theta = thetas[idx]

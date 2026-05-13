@@ -29,7 +29,7 @@ from slowquant.unitary_coupled_cluster.generalized_operators import (
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 
 
-class WaveFunctionCircuit:
+class GeneralizedWaveFunctionCircuit:
     def __init__(
         self,
         num_elec: int,
@@ -189,9 +189,14 @@ class WaveFunctionCircuit:
                 self.kappa_spin_idx.append((P, Q))
         # Setup Qiskit stuff
         self.QI = quantum_interface
-        self.QI.construct_circuit(
-            2 * self.num_active_spin_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta)
+        self.QI.construct_circuit(self.active_occ_spin_idx_shifted,
+            self.active_unocc_spin_idx_shifted,
+            2 * self.num_active_spin_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta) #AE
         )
+
+        self._thetas_real = [0.0] * self.QI.circuit.num_parameters #AE
+        self._thetas_imag = [0.0] * self.QI.circuit.num_parameters #AE
+
 
     @property
     def kappa_real(self) -> list[float]:
@@ -217,7 +222,7 @@ class WaveFunctionCircuit:
         if isinstance(self._kappa_real, np.ndarray):
             self._kappa_real = self._kappa_real.tolist()
         if isinstance(self._kappa_imag, np.ndarray):
-            self._kappa_img = self._kappa_imag.tolist()
+            self._kappa_imag = self._kappa_imag.tolist() #AE img ændret til imag??
         # Move current expansion point.
         self._c_mo = self.c_mo
         self._kappa_real_old = self.kappa_real
@@ -323,8 +328,12 @@ class WaveFunctionCircuit:
         if isinstance(self._thetas_real, np.ndarray):
             self._thetas_real = self._thetas_real.tolist()
         if isinstance(self._thetas_imag, np.ndarray):
-            self._thetas_img = self._thetas_imag.tolist()
-        self.QI.parameters = (np.array(self.thetas_real) + 1.0j * np.array(self.thetas_imag)).tolist()
+            self._thetas_imag = self._thetas_imag.tolist() #AE ændret img to imag??
+        # self.QI.parameters = (np.array(self.thetas_real) + 1.0j * np.array(self.thetas_imag)).tolist() #AE
+        # self.QI.parameters = np.concatenate(
+        #                                     [np.array(self.thetas_real), np.array(self.thetas_imag)]
+        #                                 ).tolist() #AE added + AE real+imag attempt
+        # self.QI.parameters = np.asarray(self.thetas_real).tolist() #Test only real AE
 
     def change_primitive(self, primitive: BaseSamplerV1 | BaseSamplerV2, verbose: bool = True) -> None:
         """Change the primitive expectation value calculator.
