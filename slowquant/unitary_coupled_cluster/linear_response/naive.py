@@ -656,22 +656,22 @@ class LinearResponse(LinearResponseBaseClass):
         prec_sigma = np.zeros(num_q + num_G)
 
         if len(self.q_ops) != 0:
-        # Exact q diagonal
-        prec_A[:num_q] = get_orbital_hessian_diagonal(
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_no_activeactive_idx,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.rdm1,
-            self.wf.rdm2,
-        )
-        prec_sigma[:num_q] = get_orbital_metric_diagonal(
-            self.wf.kappa_no_activeactive_idx,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.rdm1,
-        )
+            # Exact q diagonal
+            prec_A[:num_q] = get_orbital_hessian_diagonal(
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.kappa_no_activeactive_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.rdm1,
+                self.wf.rdm2,
+            )
+            prec_sigma[:num_q] = get_orbital_metric_diagonal(
+                self.wf.kappa_no_activeactive_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.rdm1,
+            )
         # Exact G diagonal
         H00_ket = propagate_state([self.H_0i_0a], self.wf.ci_coeffs, *self.index_info)
         for i, GI in enumerate(self.G_ops):
@@ -715,6 +715,55 @@ class LinearResponse(LinearResponseBaseClass):
             )
 
         return prec_A, prec_sigma
+
+    def property_gradient(self, integral: np.ndarray) -> np.ndarray:
+        """Calculate top half of the property gradient.
+        Bottom half can be found through conjugation and sign change.
+
+        Args:
+            integral: MO integral for which to calculate the gradient.
+
+        Returns:
+            Gradient of property.
+        """
+        num_q = len(self.q_ops)
+        num_G = len(self.G_ops)
+        num_ops = num_q + num_G
+        gradient = np.zeros((num_ops))
+        if num_q != 0:
+            gradient[:num_q] = get_orbital_rotation_gradient(
+                integral,
+                None,
+                self.wf.kappa_no_activeactive_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.rdm1,
+                self.wf.rdm2,
+            )
+        op = one_elec_op_0i_0a(
+            integral,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+        )
+        op_ket = propagate_state([op], self.wf.ci_coeffs, *self.index_info)
+        for i, GI in enumerate(self.G_ops):
+            GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
+            GId_ket = propagate_state([GI.dagger], self.wf.ci_coeffs, *self.index_info)
+            # <0| op Gs |0>
+            gradient[num_q + i] += expectation_value(
+                op_ket,
+                [],
+                GI_ket,
+                *self.index_info,
+            )
+            # - <0| Gs op |0>
+            gradient[num_q + i] -= expectation_value(
+                GId_ket,
+                [],
+                op_ket,
+                *self.index_info,
+            )
+        return gradient.reshape(-1, 1)
 
     def get_transition_dipole(self) -> np.ndarray:
         """Calculate transition dipole moment.

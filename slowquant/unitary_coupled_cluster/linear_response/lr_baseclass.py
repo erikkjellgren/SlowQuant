@@ -1,6 +1,7 @@
 import numpy as np
 import scipy
 
+from slowquant.molecularintegrals.integralfunctions import one_electron_integral_transform
 from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.operators import (
@@ -120,6 +121,19 @@ class LinearResponseBaseClass:
 
         Args:
             trial: Trial vectors.
+        """
+        raise NotImplementedError
+
+
+    def property_gradient(self, integral: np.ndarray) -> np.ndarray:
+        """Calculate gradient of property.
+
+        Args:
+            trial: Trial vectors.
+            integral: Integral matrix.
+
+        Returns:
+            Gradient of property.
         """
         raise NotImplementedError
 

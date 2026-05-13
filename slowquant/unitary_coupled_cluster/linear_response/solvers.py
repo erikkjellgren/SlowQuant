@@ -28,6 +28,8 @@ class Davidson:
         tolerance: float,
         n_roots: int,
         max_reduced_space: int | None = None,
+        frequency: float | None = None,
+        property_gradient: np.ndarray | None = None,
         is_silent: bool = False,
     ) -> tuple[np.ndarray, np.ndarray]:
         """
@@ -40,6 +42,8 @@ class Davidson:
             tolerance: Convergence tolerance.
             n_roots: Number of lowest eigenpairs to compute.
             max_reduced_space: Maximum dimension of the reduced space before a restart (default 8*n_roots).
+            frequency: Frequency for the linear response calculation.
+            property_gradient: The property gradient.
             is_silent: Suppress progress output.
 
         Returns:
@@ -67,7 +71,13 @@ class Davidson:
         if not is_silent:
             print(f" Iteration | Time [s] | Max. residual norm | Subspace size | Roots ...")
 
-        start_guess = np.zeros((dim, n_roots))
+        if property_gradient is not None and frequency is not None:
+            start_guess = np.vstack((
+                property_gradient / diag.reshape(-1, 1),
+                - property_gradient.conj() / diag.reshape(-1, 1)
+            ))
+        else:
+            start_guess = np.zeros((dim, n_roots), dtype=np.float64)
         start_guess[np.argsort(diag)[:n_roots], np.arange(n_roots)] = 1.0
         start_guess = np.vstack((start_guess, start_guess))
         trial = self._orthonormalize(start_guess)
@@ -81,7 +91,7 @@ class Davidson:
                 self._reset_reduced_space(trial, right_transformed_vectors)
             else:
             self._add_iteration_data(trial, right_transformed_vectors)
-            omega, X, R = self._compute_residual_vectors(n_roots)
+            omega, X, R = self._compute_residual_vectors(n_roots, frequency, property_gradient)
             converged, res_norms = self._check_convergence(R, tolerance)
 
             if converged:
@@ -90,7 +100,7 @@ class Davidson:
                     print()
                 return omega, X
 
-            trial = self._update_trial_vectors(omega, R, preconditioner)
+            trial = self._update_trial_vectors(omega, R, preconditioner, frequency)
             trial = self._remove_converged(trial, res_norms, tolerance)
             trial = self._project_trial_vectors(trial)
             trial = self._remove_linear_dependencies(trial)
@@ -184,7 +194,7 @@ class Davidson:
         """Add trial and right transformed matrices for the current iteration to the arrays."""
 
     @abstractmethod
-    def _compute_residual_vectors(self, n_roots: int) -> tuple[np.ndarray, np.ndarray, tuple[np.ndarray, ...]]:
+    def _compute_residual_vectors(self, n_roots: int, frequency: float | None, property_gradient: np.ndarray | None) -> tuple[np.ndarray, np.ndarray, tuple[np.ndarray, ...]]:
         """Compute residual vectors for the given Ritz vectors and values."""
 
     @staticmethod
@@ -194,7 +204,7 @@ class Davidson:
 
     @staticmethod
     @abstractmethod
-    def _update_trial_vectors(omega: np.ndarray, R: tuple[np.ndarray, ...], preconditioner: tuple[np.ndarray, ...]) -> np.ndarray:
+    def _update_trial_vectors(omega: np.ndarray, R: tuple[np.ndarray, ...], preconditioner: tuple[np.ndarray, ...], frequency: float | None) -> np.ndarray:
         """Update trial vectors using the residuals and the diagonal preconditioner."""
 
     @abstractmethod
@@ -211,6 +221,8 @@ class UnpairedDavidson(Davidson):
     """Subspace matrix A @ b*"""
     _tau: np.typing.NDArray[np.complexfloating]
     """Subspace matrix Sigma @ b"""
+    _property_gradient: np.typing.NDArray[np.complexfloating]
+    """Property gradient."""
 
     def _setup_right_transformed_arrays(self) -> None:
         """Setup arrays to store right transformed vectors."""
@@ -245,7 +257,7 @@ class UnpairedDavidson(Davidson):
             self._sigma = np.hstack((self._sigma, sigma))
             self._tau = np.hstack((self._tau, tau))
 
-    def _compute_residual_vectors(self, n_roots: int) -> tuple[np.ndarray, np.ndarray, tuple[np.ndarray]]:
+    def _compute_residual_vectors(self, n_roots: int, frequency: float | None, property_gradient: np.ndarray | None) -> tuple[np.ndarray, np.ndarray, tuple[np.ndarray]]:
         """Compute residual vectors for the given Ritz vectors and values."""
 
         E = self._trial.conj().T @ self._sigma
@@ -287,12 +299,13 @@ class UnpairedDavidson(Davidson):
         return all(res_norms <= tolerance), res_norms
 
     @staticmethod
-    def _update_trial_vectors(omega: np.ndarray, R: tuple[np.ndarray, ...], preconditioner: tuple[np.ndarray, ...]) -> np.ndarray:
+    def _update_trial_vectors(omega: np.ndarray, R: tuple[np.ndarray, ...], preconditioner: tuple[np.ndarray, ...], frequency: float | None) -> np.ndarray:
         """Update trial vectors using the residuals and the diagonal preconditioner."""
         diagonal_A, diagonal_Sigma = preconditioner
         _R, *_ = R
+        o = omega if frequency is None else np.array([frequency])
 
-        contribution = diagonal_A.reshape(-1, 1) - diagonal_Sigma.reshape(-1, 1) @ omega.reshape(1, -1)
+        contribution = diagonal_A.reshape(-1, 1) - diagonal_Sigma.reshape(-1, 1) @ o.reshape(1, -1)
         denominator = - np.ones_like(_R)
         # Check if any of the contributions are close to zero to avoid division by zero, if so skip the division for that contribution
         if not np.any(np.isclose(contribution, 0)):
@@ -312,8 +325,9 @@ class PairedDavidson(Davidson):
     """
 
     _sigma_plus: np.typing.NDArray[np.complexfloating]
-    """Subspace matrix A @ b + B @ b*"""
+    """Subspace matrix A @ b+ + B @ b+*"""
     _sigma_minus: np.typing.NDArray[np.complexfloating]
+    """Subspace matrix A @ b- - B @ b-*"""
     _tau_plus: np.typing.NDArray[np.complexfloating]
     """Subspace matrix Sigma @ b-"""
     _tau_minus: np.typing.NDArray[np.complexfloating]
@@ -374,7 +388,7 @@ class PairedDavidson(Davidson):
             self._tau_plus = np.hstack((self._tau_plus, tau_plus))
             self._tau_minus = np.hstack((self._tau_minus, tau_minus))
 
-    def _compute_residual_vectors(self, n_roots: int) -> tuple[np.ndarray, np.ndarray, tuple[np.ndarray, np.ndarray]]:
+    def _compute_residual_vectors(self, n_roots: int, frequency: float | None, property_gradient: np.ndarray | None) -> tuple[np.ndarray, np.ndarray, tuple[np.ndarray, np.ndarray]]:
         """Compute residual vectors for the given Ritz vectors and values."""
 
         def _split_vector(vector: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -398,7 +412,16 @@ class PairedDavidson(Davidson):
             [np.zeros_like(S_minus), S_minus.T],
             [S_minus, np.zeros_like(S_minus)]
         ])
-
+        if frequency is not None and property_gradient is not None:
+            bV = np.vstack((
+                2 * np.imag(trial_plus.conj().T @ property_gradient),
+                - 2 * np.real(trial_minus.conj().T @ property_gradient),
+            ))
+            # Complex numbers currently don't work with FermionicOperator:
+            bV = np.real(bV)
+            x = scipy.linalg.solve(E - frequency * S, bV).reshape(-1, n_roots)
+            omega = np.array([frequency])
+        else:
         # Solve the generalized eigenvalue problem E v = omega S v
         eigval, eigvec = scipy.linalg.eig(E, S)
         eigval, eigvec = _real_eigvals(eigval, eigvec, n_roots)
@@ -421,6 +444,14 @@ class PairedDavidson(Davidson):
 
         R_plus = self._sigma_plus @ x_plus - self._tau_plus @ x_minus * omega
         R_minus = self._sigma_minus @ x_minus - self._tau_minus @ x_plus * omega
+        if frequency is not None and property_gradient is not None:
+            V = np.vstack((property_gradient, -property_gradient.conj()))
+            omega = (X.T @ V).reshape(-1)
+            if np.iscomplex(frequency):
+                R_plus += property_gradient
+            if np.isreal(frequency):
+                R_minus += property_gradient
+
         norm = np.sqrt(np.abs(np.diag(
             x_minus.T @ S_minus @ x_plus + x_plus.T @ S_minus.T @ x_minus
         )))
@@ -442,10 +473,11 @@ class PairedDavidson(Davidson):
         return all(res_norms <= tolerance), res_norms
 
     @staticmethod
-    def _update_trial_vectors(omega: np.ndarray, R: tuple[np.ndarray, ...], preconditioner: tuple[np.ndarray, ...]) -> np.ndarray:
+    def _update_trial_vectors(omega: np.ndarray, R: tuple[np.ndarray, ...], preconditioner: tuple[np.ndarray, ...], frequency: float | None) -> np.ndarray:
         """Update trial vectors using the residuals and the diagonal preconditioner."""
         diagonal_A, diagonal_Sigma = preconditioner
         R_plus, R_minus = R
+        o = omega if frequency is None else np.array([frequency])
 
         plus_contribution = diagonal_A.reshape(-1, 1) + diagonal_Sigma.reshape(-1, 1) * o.reshape(1, -1)
         minus_contribution = diagonal_A.reshape(-1, 1) - diagonal_Sigma.reshape(-1, 1) * o.reshape(1, -1)
@@ -461,6 +493,10 @@ class PairedDavidson(Davidson):
         new_trial_minus = denominator * (
             diagonal_A.reshape(-1, 1) * R_minus + diagonal_Sigma.reshape(-1, 1) * R_plus * o.reshape(1, -1)
         )
+        # For excitation energies we can add these together, for frequencies we need to keep them separate
+        if frequency is None:
+            new_trial_plus += new_trial_minus
+            new_trial_minus = new_trial_plus
         new_trial = np.vstack((new_trial_plus, new_trial_minus))
         return new_trial
 
