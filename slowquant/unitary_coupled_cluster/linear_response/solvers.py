@@ -347,7 +347,7 @@ class PairedDavidson(Davidson):
     def _print_citation(self) -> None:
         """Print the citation for the Davidson method."""
         super()._print_citation()
-        print("Davidson solver for paired eigenvalue problems (J. Chem. Phys. 150, 174121 (2019))")
+        print("Davidson solver for paired eigenvalue problems (J. Chem. Phys. 118, 522-536 (2003))")
 
     @staticmethod
     def _orthonormalize(trial: np.ndarray) -> np.ndarray:
