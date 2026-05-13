@@ -144,6 +144,15 @@ def test_lih_naive():
     )
     assert np.allclose(LR.oscillator_strengths, solutions, atol=threshold)
 
+    dp = LR.linear_response_function(
+        0.0,
+        "dipole polarizability",
+        {"max_iterations": 50, "tolerance": 1e-8},
+    )
+    pol = - np.diag(dp[0].T @ dp[1])
+    solutions = np.array([1.14653565e+01, 2.27660517e+01, 2.27660517e+01])
+    assert np.allclose(pol, solutions, atol=threshold)
+
 def test_lih_projected_explicit():
     """Test LiH energies for projected q LR methods."""
     SQobj = sq.SlowQuant()
@@ -272,6 +281,15 @@ def test_lih_projected():
     )
     assert np.allclose(LR.oscillator_strengths, solutions, atol=threshold)
 
+    dp = LR.linear_response_function(
+        0.0,
+        "dipole polarizability",
+        {"max_iterations": 50, "tolerance": 1e-8},
+    )
+    pol = - np.diag(dp[0].T @ dp[1])
+    solutions = np.array([1.14660417e+01, 2.27660517e+01, 2.27660517e+01])
+    assert np.allclose(pol, solutions, atol=threshold)
+
 def test_lih_allprojected_explicit():
     """Test LiH energies for projected q LR methods."""
     SQobj = sq.SlowQuant()
@@ -399,3 +417,12 @@ def test_lih_allprojected():
         ]
     )
     assert np.allclose(LR.oscillator_strengths, solutions, atol=threshold)
+
+    dp = LR.linear_response_function(
+        0.0,
+        "dipole polarizability",
+        {"max_iterations": 50, "tolerance": 1e-8},
+    )
+    pol = - np.diag(dp[0].T @ dp[1])
+    solutions = np.array([1.14667275e+01, 2.31867596e+01, 2.31867596e+01])
+    assert np.allclose(pol, solutions, atol=threshold)
