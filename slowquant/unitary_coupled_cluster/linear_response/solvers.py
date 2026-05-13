@@ -439,14 +439,16 @@ def one_index_transform(K: np.ndarray, h_mo: np.ndarray, g_mo: np.ndarray) -> tu
     """
     inv_sqrt_2 = 1 / np.sqrt(2)
     h = np.einsum("pt,tq->pq", h_mo, K) - np.einsum("tq,pt->pq", h_mo, K)
+    h *= inv_sqrt_2
+
+    if g_mo is None:
+        return h, np.array(())
 
     g = (
         np.einsum("ptrs,tq->pqrs", g_mo, K)
         - np.einsum("tqrs,pt->pqrs", g_mo, K)
     )
     g += np.einsum("pqrs->rspq", g)
-
-    h *= inv_sqrt_2
     g *= inv_sqrt_2
 
     return h, g
@@ -454,7 +456,7 @@ def one_index_transform(K: np.ndarray, h_mo: np.ndarray, g_mo: np.ndarray) -> tu
 @nb.jit(nopython=True)
 def get_orbital_rotation_gradient(
     h_int: np.ndarray,
-    g_int: np.ndarray,
+    g_int: np.ndarray | None,
     q_idx: list[tuple[int, int]] | np.ndarray,
     num_inactive_orbs: int,
     num_active_orbs: int,
@@ -486,6 +488,8 @@ def get_orbital_rotation_gradient(
             gradient[idx] += h_int[u, p] * RDM1(t, p, num_inactive_orbs, num_active_orbs, rdm1)
             gradient[idx] -= h_int[p, t] * RDM1(p, u, num_inactive_orbs, num_active_orbs, rdm1)
         # 2e contribution
+        if g_int is None:
+            continue
         for p in range(num_inactive_orbs + num_active_orbs):
             for q in range(num_inactive_orbs + num_active_orbs):
                 for r in range(num_inactive_orbs + num_active_orbs):
@@ -499,7 +503,8 @@ def get_orbital_rotation_gradient(
 
 @nb.jit(nopython=True)
 def get_orbital_metric_block(
-    q_idx: list[tuple[int, int]] | np.ndarray,
+    q1_idx: list[tuple[int, int]] | np.ndarray,
+    q2_idx: list[tuple[int, int]] | np.ndarray,
     trial: np.ndarray,
     num_inactive_orbs: int,
     num_active_orbs: int,
@@ -508,10 +513,12 @@ def get_orbital_metric_block(
     r"""Calculate the Sigma matrix orbital-orbital block.
 
     .. math::
-        \Sum_{tu}\Sigma_{pq,tu}^{\hat{q},\hat{q}} = \left<0\left|\left[\hat{q}_{pq}^\dagger,\hat{q}_{tu}\right]\right|0\right>
+        \Sum_{tu}\Sigma_{pq,tu}^{\hat{q}_1,\hat{q}_2} = \left<0\left|\left[\hat{q}_{1,pq}^\dagger,\hat{q}_{2,tu}\right]\right|0\right>
 
     Args:
-        q_idx: Orbital rotation parameter indices in spatial basis.
+        q1_idx: First set of orbital rotation parameter indices in spatial basis.
+        q2_idx: Second set of orbital rotation parameter indices in spatial basis.
+        trial: Trial vectors.
         num_inactive_orbs: Number of inactive orbitals in spatial basis.
         num_active_orbs: Number of active orbitals in spatial basis.
         rdm1: Active part of 1-RDM.
@@ -519,13 +526,13 @@ def get_orbital_metric_block(
     Returns:
         Sigma matrix orbital-orbital block.
     """
-    sigma = np.zeros(len(q_idx))
-    for idx1, (u, t) in enumerate(q_idx):
-        for idx2, (p, q) in enumerate(q_idx):
-            if p == u:
-                sigma[idx1] += RDM1(t, q, num_inactive_orbs, num_active_orbs, rdm1) * trial[idx2]
+    sigma = np.zeros(len(q1_idx))
+    for idx1, (p, q) in enumerate(q1_idx):
+        for idx2, (t, u) in enumerate(q2_idx):
             if t == q:
-                sigma[idx1] -= RDM1(p, u, num_inactive_orbs, num_active_orbs, rdm1) * trial[idx2]
+                sigma[idx1] += RDM1(p, u, num_inactive_orbs, num_active_orbs, rdm1) * trial[idx2]
+            if p == u:
+                sigma[idx1] -= RDM1(t, q, num_inactive_orbs, num_active_orbs, rdm1) * trial[idx2]
     return - 0.5 * sigma
 
 @nb.jit(nopython=True)

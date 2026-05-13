@@ -249,6 +249,7 @@ class LinearResponse(LinearResponseBaseClass):
                     sigma_minus[i, root] += val
                 # <0| [qid, qs] |0>
                 val = get_orbital_metric_block(
+                    self.wf.kappa_no_activeactive_idx_dagger,
                     self.wf.kappa_no_activeactive_idx,
                     trial[:, root],
                     self.wf.num_inactive_orbs,

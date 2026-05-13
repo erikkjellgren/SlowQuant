@@ -282,6 +282,7 @@ class LinearResponse(LinearResponseBaseClass):
                 # Sigma_qq @ b_q
                 # <0| [qid, qs] |0>
                 tau_minus[:num_q, root] += get_orbital_metric_block(
+                    self.wf.kappa_no_activeactive_idx_dagger,
                     self.wf.kappa_no_activeactive_idx,
                     trial[:, root],
                     self.wf.num_inactive_orbs,
