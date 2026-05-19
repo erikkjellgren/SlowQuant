@@ -225,8 +225,6 @@ class UnpairedDavidson(Davidson):
     """Subspace matrix A @ b*"""
     _tau: np.typing.NDArray[np.complexfloating]
     """Subspace matrix Sigma @ b"""
-    _property_gradient: np.typing.NDArray[np.complexfloating]
-    """Property gradient."""
 
     def _setup_right_transformed_arrays(self) -> None:
         """Setup arrays to store right transformed vectors."""
@@ -267,31 +265,40 @@ class UnpairedDavidson(Davidson):
         E = self._trial.conj().T @ self._sigma
         S = self._trial.conj().T @ self._tau
 
-        # Solve the generalized eigenvalue problem E v = omega S v
-        eigval, eigvec = scipy.linalg.eig(E, S)
-        eigval, eigvec = _real_eigvals(eigval, eigvec, n_roots)
+        if frequency is not None and property_gradient is not None:
+            bV = self._trial.conj().T @ property_gradient
+            # TODO: Complex numbers currently don't work with FermionicOperator:
+            bV = np.real(bV)
+            x = scipy.linalg.solve(E - frequency * S, bV).reshape(-1, n_roots)
+            omega = np.array([frequency])
+        else:
+            # Solve the generalized eigenvalue problem E v = omega S v
+            eigval, eigvec = scipy.linalg.eig(E, S)
+            eigval, eigvec = _real_eigvals(eigval, eigvec, n_roots)
 
-        # Take positive eigenvalues and sort them
-        sorting = eigval > 0
-        eigval = eigval[sorting]
-        eigvec = eigvec[:, sorting]
-        sorting = np.argsort(eigval)
-        eigval = eigval[sorting]
-        eigvec = eigvec[:, sorting]
+            # Take positive eigenvalues and sort them
+            sorting = eigval > 0
+            eigval = eigval[sorting]
+            eigvec = eigvec[:, sorting]
+            sorting = np.argsort(eigval)
+            eigval = eigval[sorting]
+            eigvec = eigvec[:, sorting]
 
-        # Extract the lowest n_roots eigenvalues and corresponding eigenvectors
-        omega = np.real(eigval[:n_roots])
-        x = eigvec[:, :n_roots]
+            # Extract the lowest n_roots eigenvalues and corresponding eigenvectors
+            omega = np.real(eigval[:n_roots])
+            x = eigvec[:, :n_roots]
 
         # Compute Ritz vectors (X) and residuals (R)
         norm = np.sqrt(np.abs(np.diag(
             x.T @ S @ x
         )))
-        x /= norm
-        X = self._trial @ x
+        norm[np.isclose(norm, 0)] = 1
+        X = self._trial @ x / norm
 
         # tau_plus = tau_minus
         R = self._sigma @ x - self._tau @ x * omega
+        if frequency is not None and property_gradient is not None:
+            R -= property_gradient
 
         return omega, X, (R, )
 
@@ -312,8 +319,8 @@ class UnpairedDavidson(Davidson):
         contribution = diagonal_A.reshape(-1, 1) - diagonal_Sigma.reshape(-1, 1) @ o.reshape(1, -1)
         denominator = - np.ones_like(_R)
         # Check if any of the contributions are close to zero to avoid division by zero, if so skip the division for that contribution
-        if not np.any(np.isclose(contribution, 0)):
-            denominator /= contribution
+        contribution[np.isclose(contribution, 0)] = 1
+        denominator /= contribution
         new_trial = denominator * _R
         return new_trial
 
