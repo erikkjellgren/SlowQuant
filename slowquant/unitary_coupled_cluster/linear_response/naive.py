@@ -36,6 +36,7 @@ class LinearResponse(LinearResponseBaseClass):
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
+            triplet: If the linear response should be triplet spin-adapted.
         """
         super().__init__(wave_function, excitations, triplet)
 

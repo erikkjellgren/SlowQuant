@@ -44,7 +44,7 @@ class LinearResponseBaseClass:
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
-            triplet: If the linear response should be triplet spin-adapted
+            triplet: If the linear response should be triplet spin-adapted.
         """
         self.wf = wave_function
         if isinstance(self.wf, WaveFunctionUCC):
