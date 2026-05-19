@@ -30,7 +30,7 @@ class quantumLRBaseClass:
         self,
         wf: WaveFunctionCircuit,
         excitations: str,
-        triplet: bool,
+        triplet: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
