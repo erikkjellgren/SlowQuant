@@ -9,12 +9,15 @@ from slowquant.unitary_coupled_cluster.operators import (
     G6,
     G1_sa,
     G2_sa,
+    G1_tsa,
+    G2_tsa,
     hamiltonian_0i_0a,
     hamiltonian_1i_1a,
 )
 from slowquant.unitary_coupled_cluster.util import (
     iterate_t1_sa,
     iterate_t2_sa,
+    iterate_t2_tsa,
     iterate_t3,
     iterate_t4,
     iterate_t5,
@@ -27,12 +30,14 @@ class quantumLRBaseClass:
         self,
         wf: WaveFunctionCircuit,
         excitations: str,
+        triplet: bool,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wf: Wavefunction object.
             excitations: Which excitation orders to include in response.
+            triplet: If the linear response should be triplet spin-adapted
         """
         self.wf = wf
         # Create operators
@@ -45,12 +50,22 @@ class quantumLRBaseClass:
         self.q_ops = []
         excitations = excitations.lower()
 
+        self.triplet = triplet
+        if not self.triplet: # singlet spin-adaptation
+            G1 = G1_sa
+            iterate_t2 = iterate_t2_sa
+            G2 = G2_sa
+        else: # triplet spin-adaptation
+            G1 = G1_tsa
+            iterate_t2 = iterate_t2_tsa
+            G2 = G2_tsa
+
         if "s" in excitations:
             for a, i, _ in iterate_t1_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
-                self.G_ops.append(G1_sa(i, a))
+                self.G_ops.append(G1(i, a))
         if "d" in excitations:
-            for a, i, b, j, _, op_type in iterate_t2_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
-                self.G_ops.append(G2_sa(i, j, a, b, op_type))
+            for a, i, b, j, _, op_type in iterate_t2(self.wf.active_occ_idx, self.wf.active_unocc_idx):
+                self.G_ops.append(G2(i, j, a, b, op_type))
         if "t" in excitations:
             for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
                 self.G_ops.append(G3(i, j, k, a, b, c))
@@ -71,7 +86,7 @@ class quantumLRBaseClass:
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
         # q
         for p, q in wf.kappa_no_activeactive_idx:
-            self.q_ops.append(G1_sa(p, q))
+            self.q_ops.append(G1(p, q))
 
         num_parameters = len(self.q_ops) + len(self.G_ops)
         self.num_params = num_parameters

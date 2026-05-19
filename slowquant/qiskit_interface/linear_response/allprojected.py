@@ -10,7 +10,7 @@ from slowquant.qiskit_interface.linear_response.lr_baseclass import (
 )
 from slowquant.qiskit_interface.util import Clique
 from slowquant.unitary_coupled_cluster.density_matrix import (
-    get_orbital_response_property_gradient,
+    get_orbital_response_property_gradient_response,
 )
 from slowquant.unitary_coupled_cluster.operators import (
     hamiltonian_2i_2a,
@@ -409,7 +409,7 @@ class quantumLR(quantumLRBaseClass):
             q_part_y = 0.0
             q_part_z = 0.0
             if self.num_q != 0:
-                q_part_x = get_orbital_response_property_gradient(
+                q_part_x = get_orbital_response_property_gradient_response(
                     mux,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
@@ -419,7 +419,7 @@ class quantumLR(quantumLRBaseClass):
                     state_number,
                     number_excitations,
                 )
-                q_part_y = get_orbital_response_property_gradient(
+                q_part_y = get_orbital_response_property_gradient_response(
                     muy,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
@@ -429,7 +429,7 @@ class quantumLR(quantumLRBaseClass):
                     state_number,
                     number_excitations,
                 )
-                q_part_z = get_orbital_response_property_gradient(
+                q_part_z = get_orbital_response_property_gradient_response(
                     muz,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
