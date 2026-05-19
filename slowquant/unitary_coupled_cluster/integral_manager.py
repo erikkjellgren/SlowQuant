@@ -9,6 +9,7 @@ from slowquant.SlowQuant import SlowQuant
 class IntegralManager:
     __slots__ = (
         "_electric_dipole",
+        "_magnetic_dipole",
         "_electron_electron_repulsion",
         "_h_ao",
         "_kinetic_energy",
@@ -27,6 +28,7 @@ class IntegralManager:
         self._nuclear_electron_attraction: np.ndarray | None = None
         self._electron_electron_repulsion: np.ndarray | None = None
         self._electric_dipole: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
+        self._magnetic_dipole: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
         self._h_ao: np.ndarray | None = None
 
     @property
@@ -109,6 +111,21 @@ class IntegralManager:
             raise ValueError("Got unknown integral object, {type(self.int_obj)}")
         self._electric_dipole = dipole_integrals
         return dipole_integrals
+
+    @property
+    def magnetic_dipole(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Magnetic dipole integrals."""
+        if isinstance(self._magnetic_dipole, tuple):
+            return self._magnetic_dipole
+        if isinstance(self.int_obj, SlowQuant):
+            raise ValueError("Integral magnetic_dipole is not implemented through SlowQuant, please use PySCF")
+        elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
+            x, y, z = self.int_obj.intor("int1e_cg_irxp", comp=3)
+            magnetic_dipole_integral = (x, y, z)
+        else:
+            raise ValueError("Got unknown integral object, {type(self.int_obj)}")
+        self._magnetic_dipole = magnetic_dipole_integral
+        return magnetic_dipole_integral
 
     @property
     def h_ao(self) -> np.ndarray:
