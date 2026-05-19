@@ -1,5 +1,5 @@
 import pyscf
-import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.naive as naivelr
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
@@ -28,7 +28,7 @@ def get_polarisability(geometry, basis, active_space, charge=0, unit='bohr'):
     print("Energy elec", WF.energy_elec)
 
     # Singlet Linear Response
-    LR = naive.LinearResponse(WF, excitations="SD")
+    LR = naivelr.LinearResponse(WF, excitations="SD")
     alpha = LR.get_polarisability()
 
     print(f'Polarisabilities:\n \t xx: {alpha[0,0]:.4f} \t yy: {alpha[1,1]:.4f} \t zz: {alpha[2,2]:.4f}')
@@ -47,9 +47,9 @@ def test_H2_sto3g_naive():
     thresh = 10**-4
 
     # Check excitation energies - reference dalton mcscf
-    assert abs(alpha[0] - 2.775271948863) < thresh
-    assert abs(alpha[1] - 0.0) < thresh
-    assert abs(alpha[2] - 0.0) < thresh
+    assert abs(alpha[0,0] - 2.775271948863) < thresh
+    assert abs(alpha[1,1] - 0.0) < thresh
+    assert abs(alpha[2,2] - 0.0) < thresh
 
 
 def test_LiH_sto3g_naive():
@@ -63,9 +63,9 @@ def test_LiH_sto3g_naive():
     thresh = 10**-2
 
     # Check excitation energies - reference dalton mcscf
-    assert abs(alpha[0] - 0.5238650005008) < thresh
-    assert abs(alpha[1] - 20.01552907544) < thresh
-    assert abs(alpha[2] - 20.01552907544) < thresh
+    assert abs(alpha[0,0] - 0.5238650005008) < thresh
+    assert abs(alpha[1,1] - 20.01552907544) < thresh
+    assert abs(alpha[2,2] - 20.01552907544) < thresh
 
 
 def test_H10_sto3g_naive():
@@ -88,6 +88,6 @@ def test_H10_sto3g_naive():
     thresh = 10**-3
 
     # Check excitation energies - reference dalton mcscf
-    assert abs(alpha[0] - 72.343635) < thresh
-    assert abs(alpha[1] - 0.0) < thresh
-    assert abs(alpha[2] - 0.0) < thresh
+    assert abs(alpha[0,0] - 72.343635) < thresh
+    assert abs(alpha[1,1] - 0.0) < thresh
+    assert abs(alpha[2,2] - 0.0) < thresh

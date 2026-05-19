@@ -490,7 +490,7 @@ def get_orbital_response_vector_norm(
 
 
 @nb.jit(nopython=True)
-def get_orbital_response_property_gradient(
+def get_orbital_response_property_gradient_response(
     x_mo: np.ndarray,
     kappa_idx: np.ndarray,
     num_inactive_orbs: int,
@@ -500,7 +500,7 @@ def get_orbital_response_property_gradient(
     state_number: int,
     number_excitations: int,
 ) -> float:
-    r"""Calculate the orbital part of property gradient.
+    r"""Calculate the orbital part of property gradient time the response vector.
 
     .. math::
         P^{\hat{q}} = \sum_k\left<0\left|\left[\hat{O}_{k},\hat{X}\right]\right|0\right>
@@ -516,7 +516,7 @@ def get_orbital_response_property_gradient(
         number_excitations: Total number of excitations.
 
     Returns:
-        Orbital part of property gradient.
+        Orbital part of property gradient times the response vector.
     """
     prop_grad = 0
     for i, (m, n) in enumerate(kappa_idx):
@@ -739,14 +739,14 @@ def get_triplet_orbital_response_hessian_block(
 
 
 @nb.jit(nopython=True)
-def get_orbital_response_static_property_gradient(
+def get_orbital_response_property_gradient(
     mo: np.ndarray,
     kappa_idx: list[tuple[int, int]],
     num_inactive_orbs: int,
     num_active_orbs: int,
     rdm1: np.array,
 ) -> np.ndarray:
-    r"""Calculate the orbital part of static property gradient.
+    r"""Calculate the orbital part of property gradient.
 
     .. math::
         P^{\hat{q}} = \frac{1}{\sqrt{2}}\sum_{p}\left(x_{np}\Gamma^{[1]}_{mp} - x_{pm}\Gamma^{[1]}_{pn}\right)
@@ -759,7 +759,7 @@ def get_orbital_response_static_property_gradient(
        rdm1: Active part of 1-RDM
 
     Returns:
-        Orbital part of static property gradient.
+        Orbital part of property gradient.
     """
     prop_grad = np.zeros((len(kappa_idx), len(mo)))
     for idx, (n, m) in enumerate(kappa_idx):

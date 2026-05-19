@@ -4,8 +4,7 @@ from pyscf.data import nist
 import pyscf
 from scipy.linalg import solve
 
-import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
-import slowquant.unitary_coupled_cluster.linear_response.naive_triplet as naive_t
+import slowquant.unitary_coupled_cluster.linear_response.naive as naivelr
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
@@ -106,7 +105,7 @@ def get_sscc(geometry, basis, active_space, charge=0, unit='bohr'):
         dso[k,:,:] += a11 - a11.trace() * np.eye(3)
 
     # Singlet Linear Response
-    LR = naive.LinearResponse(WF, excitations="SD")
+    LR = naivelr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
 
     # PSO
@@ -124,7 +123,7 @@ def get_sscc(geometry, basis, active_space, charge=0, unit='bohr'):
         pso[k,:,:] -= np.einsum('ix,iy->xy', d1[i], h1[j])
 
     # Triplet Linear Response
-    LR = naive_t.LinearResponse(WF, excitations="SD")
+    LR = naivelr.LinearResponse(WF, excitations="SD", triplet=True)
     LR.calc_excitation_energies()
 
     # FC
@@ -148,7 +147,9 @@ def get_sscc(geometry, basis, active_space, charge=0, unit='bohr'):
         mol.set_rinv_origin(mol.atom_coord(i))
         a01p = mol.intor('int1e_sa01sp', 12).reshape(3, 4, mol.nao, mol.nao) * nist.G_ELECTRON / 4
         h1ao = -(a01p[:,:3] + a01p[:,:3].transpose(0,1,3,2))
-        property_gradient = LR.get_property_gradient(h1ao)
+        in_shape = h1ao.shape[:-2]
+        h1ao = h1ao.reshape(-1, mol.nao, mol.nao)
+        property_gradient = LR.get_property_gradient(h1ao).reshape(-1, *in_shape)
         h1.append(property_gradient)
         d1.append(solve(LR.hessian, property_gradient))
 

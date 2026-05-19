@@ -33,6 +33,7 @@ class LinearResponse(LinearResponseBaseClass):
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
+        triplet: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
@@ -40,7 +41,7 @@ class LinearResponse(LinearResponseBaseClass):
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
         """
-        super().__init__(wave_function, excitations)
+        super().__init__(wave_function, excitations, triplet)
         # Overwrite Superclass
         ci_info = get_indexing_extended(
             self.wf.num_inactive_orbs,

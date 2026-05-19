@@ -1,7 +1,5 @@
 import numpy as np
 import scipy
-import pyscf
-from slowquant.SlowQuant import SlowQuant
 
 from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
@@ -12,9 +10,10 @@ from slowquant.unitary_coupled_cluster.operators import (
     G6,
     G1_sa,
     G2_sa,
+    G1_tsa,
+    G2_tsa,
     hamiltonian_0i_0a,
     hamiltonian_1i_1a,
-    hamiltonian_2i_2a,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
@@ -23,6 +22,7 @@ from slowquant.unitary_coupled_cluster.util import (
     UpsStructure,
     iterate_t1_sa,
     iterate_t2_sa,
+    iterate_t2_tsa,
     iterate_t3,
     iterate_t4,
     iterate_t5,
@@ -37,12 +37,14 @@ class LinearResponseBaseClass:
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
+        triplet: bool,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
+            triplet: If the linear response should be triplet spin-adapted
         """
         self.wf = wave_function
         if isinstance(self.wf, WaveFunctionUCC):
@@ -64,12 +66,22 @@ class LinearResponseBaseClass:
         self.q_ops: list[FermionicOperator] = []
         excitations = excitations.lower()
 
+        self.triplet = triplet
+        if not self.triplet: # singlet spin-adaptation
+            G1 = G1_sa
+            iterate_t2 = iterate_t2_sa
+            G2 = G2_sa
+        else: # triplet spin-adaptation
+            G1 = G1_tsa
+            iterate_t2 = iterate_t2_tsa
+            G2 = G2_tsa
+
         if "s" in excitations:
             for a, i, _ in iterate_t1_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
-                self.G_ops.append(G1_sa(i, a))
+                self.G_ops.append(G1(i, a))
         if "d" in excitations:
-            for a, i, b, j, _, op_type in iterate_t2_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
-                self.G_ops.append(G2_sa(i, j, a, b, op_type))
+            for a, i, b, j, _, op_type in iterate_t2(self.wf.active_occ_idx, self.wf.active_unocc_idx):
+                self.G_ops.append(G2(i, j, a, b, op_type))
         if "t" in excitations:
             for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
                 self.G_ops.append(G3(i, j, k, a, b, c))
@@ -89,7 +101,7 @@ class LinearResponseBaseClass:
             ):
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
         for p, q in self.wf.kappa_no_activeactive_idx:
-            self.q_ops.append(G1_sa(p, q))
+            self.q_ops.append(G1(p, q))
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters))
@@ -108,13 +120,6 @@ class LinearResponseBaseClass:
             self.wf.g_mo,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
-        )
-        self.H_2i_2a = hamiltonian_2i_2a(
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
         )
 
     def calc_excitation_energies(self) -> None:

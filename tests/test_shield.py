@@ -2,7 +2,7 @@ import numpy as np
 from pyscf.data import nist
 import pyscf
 
-import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.naive as naivelr
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.molecularintegrals.integralfunctions import one_electron_integral_transform
 from slowquant.unitary_coupled_cluster.operators import one_elec_op_0i_0a
@@ -51,7 +51,7 @@ def get_shield(geometry, basis, active_space, charge=0, unit='bohr'):
         dia[i,:,:] = dia_i - dia_i.trace() * np.eye(3)
 
     # Paramagnetic term
-    LR = naive.LinearResponse(WF, excitations="SD")
+    LR = naivelr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     para = LR.get_paramagnetic_shielding()
 
