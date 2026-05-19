@@ -421,7 +421,7 @@ class PairedDavidson(Davidson):
                 2 * np.imag(trial_plus.conj().T @ property_gradient),
                 - 2 * np.real(trial_minus.conj().T @ property_gradient),
             ))
-            # Complex numbers currently don't work with FermionicOperator:
+            # TODO: Complex numbers currently don't work with FermionicOperator:
             bV = np.real(bV)
             x = scipy.linalg.solve(E - frequency * S, bV).reshape(-1, n_roots)
             omega = np.array([frequency])
@@ -444,7 +444,7 @@ class PairedDavidson(Davidson):
 
         # Compute Ritz vectors (X) and residuals (R)
         x_plus, x_minus = _split_vector(x)
-        X = np.vstack((trial_plus @ x_plus + trial_minus @ x_minus, trial_plus @ x_plus - trial_minus @ x_minus))
+        X = np.vstack((trial_plus @ x_plus + trial_minus @ x_minus, (trial_plus @ x_plus - trial_minus @ x_minus).conj()))
 
         R_plus = self._sigma_plus @ x_plus - self._tau_plus @ x_minus * omega
         R_minus = self._sigma_minus @ x_minus - self._tau_minus @ x_plus * omega

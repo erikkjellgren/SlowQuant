@@ -152,7 +152,7 @@ class LinearResponseBaseClass:
             property_gradient = np.hstack([property_gradient_x, property_gradient_y, property_gradient_z])
             full_gradient = np.vstack((
                 property_gradient.reshape(len(property_gradient), -1),
-                -property_gradient.reshape(len(property_gradient), -1)
+                -property_gradient.conj().reshape(len(property_gradient), -1)
             ))
         else:
             raise ValueError(f"Unknown property {lr_property} for linear response function.")
