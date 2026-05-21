@@ -6,7 +6,7 @@ from slowquant.unitary_coupled_cluster.linear_response import generalized_naive
 from slowquant.qiskit_interface.generalized_circuit_wavefunction import GeneralizedWaveFunctionCircuit
 from qiskit_aer.primitives import Sampler
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
-from slowquant.qiskit_interface.interface import QuantumInterface
+from slowquant.qiskit_interface.generalized_interface import QuantumInterface
 import slowquant.qiskit_interface.linear_response.naive as q_naive
 
 
