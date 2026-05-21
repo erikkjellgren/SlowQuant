@@ -189,7 +189,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     nmo = uhf.mo_coeff[0].shape[1]
 
     # small random anti-Hermitian
-    epsilon = 0.0  # controls "step size"
+    epsilon = 0.1  # controls "step size"
     X = np.random.randn(nmo, nmo) + 1j*np.random.randn(nmo, nmo)
     A = epsilon * (X - X.conj().T)/2  # make anti-Hermitian
     # unitary
@@ -207,10 +207,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
     mf = scf.GHF(mol)
-    #mf.chkfile = '/home/annika4ee/SlowQuant/uhf_guess.chk'
+    mf.chkfile = '/home/annika4ee/SlowQuant/uhf_guess.chk'
 
     # Change initial guess:
-    #mf.init_guess = "chkfile"
+    mf.init_guess = "chkfile"
     mf.conv_tol = 1e-8        # Energy convergence (Hartree)
     mf.conv_tol_grad = 1e-8   # Optional: gradient convergence
     mf.max_cycle = 1000
@@ -241,15 +241,16 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     c_u = c @ U_step
 
 
-    print(np.round(c.real,3))
+    #print(np.round(c.real,3))
 
 
     WF = GeneralizedWaveFunctionUPS(
-        mol.nelectron,
+        #mol.nelectron,
         active_space,
         c,
-        h_core,
-        g_eri,
+        #h_core,
+        #g_eri,
+        mol,
         "fuccsd",
         {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
@@ -259,38 +260,38 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print(mf.energy_elec()[0])
 
 
-    H = generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo, WF.num_spin_orbs)
+    # H = generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo, WF.num_spin_orbs)
 
-    threshold = 1e-15
+    # threshold = 1e-15
 
-    mask1 = (np.abs(c.real - WF._c_mo.real) <= threshold) & (np.abs(c.imag - WF._c_mo.imag) <= threshold)
+    # mask1 = (np.abs(c.real - WF._c_mo.real) <= threshold) & (np.abs(c.imag - WF._c_mo.imag) <= threshold)
 
-    mask2 = (np.abs(c.real - WF.c_mo.real) <= threshold) & (np.abs(c.imag - WF.c_mo.imag) <= threshold)
+    # mask2 = (np.abs(c.real - WF.c_mo.real) <= threshold) & (np.abs(c.imag - WF.c_mo.imag) <= threshold)
 
-    #print(mask1, "\n\n")
-    #print(mask2, "\n\n")
+    # #print(mask1, "\n\n")
+    # #print(mask2, "\n\n")
 
-    test_energy = generalized_expectation_value_energy(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
+    # test_energy = generalized_expectation_value_energy(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
 
-    mask1 = (np.abs(c.real - WF._c_mo.real) <= threshold) & (np.abs(c.imag - WF._c_mo.imag) <= threshold)
+    # mask1 = (np.abs(c.real - WF._c_mo.real) <= threshold) & (np.abs(c.imag - WF._c_mo.imag) <= threshold)
 
-    mask2 = (np.abs(c.real - WF.c_mo.real) <= threshold) & (np.abs(c.imag - WF.c_mo.imag) <= threshold)
+    # mask2 = (np.abs(c.real - WF.c_mo.real) <= threshold) & (np.abs(c.imag - WF.c_mo.imag) <= threshold)
 
-    #print(mask1, "\n\n")
-    #print(mask2, "\n\n")
+    # #print(mask1, "\n\n")
+    # #print(mask2, "\n\n")
 
-    print(test_energy)
+    # print(test_energy)
 
-    E_tester = get_electronic_energy_generalized(
-                WF.h_mo,
-                WF.g_mo,
-                WF.num_inactive_spin_orbs,
-                WF.num_active_spin_orbs,
-                WF.rdm1,
-                WF.rdm2,
-            )
+    # E_tester = get_electronic_energy_generalized(
+    #             WF.h_mo,
+    #             WF.g_mo,
+    #             WF.num_inactive_spin_orbs,
+    #             WF.num_active_spin_orbs,
+    #             WF.rdm1,
+    #             WF.rdm2,
+    #         )
     
-    print(E_tester)
+    # print(E_tester)
 
 
     print("Nr. of kappas:", len(WF.kappa_spin_idx))
@@ -390,7 +391,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
                             print(WF.kappa_spin_idx[i-len(WF.kappa_spin_idx)],WF.kappa_spin_idx[j-len(WF.kappa_spin_idx)])'''
 
 
-    #WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
     #WF.do_adapt(["S","D"])
 
     #print(WF.ups_layout.excitation_indices)
@@ -452,9 +453,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print(exp_value_gradient_nonsplit)'''
 
 
-    #LR = generalized_naive.LinearResponse(WF, excitations="SD")
-    #LR.calc_excitation_energies()
-    #print(LR.excitation_energies)
+    LR = generalized_naive.LinearResponse(WF, excitations="SD")
+    LR.calc_excitation_energies()
+    print(LR.excitation_energies)
     #print(np.round(LR.get_transition_dipole(dip_int).real,5))
     #print(LR.get_oscillator_strengths(dip_int))
 
@@ -490,7 +491,7 @@ def h3():
     basis = "631-g"
     #basis = "sto-6g"
     #basis = ""
-    active_space = ((2, 1), 12)
+    active_space = ((2, 1), 6)
     #active_space = (2, 4)
     charge = 0
     spin = 1
@@ -586,7 +587,7 @@ def HBr():
     
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-h2()
+h3()
 
 
 # h2o()

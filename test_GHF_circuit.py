@@ -28,11 +28,6 @@ from slowquant.qiskit_interface.generalized_circuit_wavefunction import Generali
 from slowquant.qiskit_interface.generalized_interface import QuantumInterface
 
 
-# qWF global settings:
-sampler = Sampler()
-mapper = JordanWignerMapper()
-
-
 
 def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     """.........."""
@@ -49,7 +44,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     mf.scf()
     mf.kernel()
-    coeff =np.array(mf.mo_coeff,dtype=complex)
+
+
+    coeff = np.array(mf.mo_coeff,dtype=complex)
 
 
 
@@ -67,23 +64,20 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     coeff_u = coeff @ U_step
 
 
-    # WF = GeneralizedWaveFunctionUPS(
-    #     mol.nelectron,
-    #     active_space,
-    #     c,
-    #     h_core,
-    #     g_eri,
-    #     "fuccsd",
-    #     {"n_layers": 1, "is_spin_conserving" : False},
-    #     include_active_kappa=True,
-    # )
+    WF = GeneralizedWaveFunctionUPS(
+        active_space,
+        coeff,
+        mol,
+        "fuccsd",
+        ansatz_options = {"n_layers": 1, "is_spin_conserving" : False},
+        include_active_kappa=True,
+    )
 
     QI = QuantumInterface(
-        sampler,
+        Sampler(run_options={"shots": None}),
         "fUCCSD", # Ansatz
-        mapper,
-        ansatz_options={"n_layers": 1, "is_spin_conserving" : False},
-        shots = 50000,
+        JordanWignerMapper(),
+        ansatz_options = {"n_layers": 1, "is_spin_conserving" : False},
         ISA=False, # default is false
         do_M_mitigation=False, # default is false
         do_M_ansatz0=False, # default is false
@@ -92,18 +86,34 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     qWF = GeneralizedWaveFunctionCircuit(
         mol.nelectron,
-        ((1, 1), 4),
-        coeff,
+        active_space,
+        WF.c_mo,
         h_core,
         g_eri,
         QI,
         include_active_kappa = True,
     )
 
+    #print(WF.ups_layout.excitation_indices)
 
-    qWF._calc_energy_elec()
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True)
 
-    #.run_wf_optimization_1step("bfgs", orbital_optimization=True)
+    print(np.round(WF.thetas_real,10))
+    print(np.round(WF.thetas_imag,10))
+    
+    qWF.set_thetas(WF.thetas_real, WF.thetas_imag)
+
+    print(np.round(qWF.thetas_real,10))
+    print(np.round(qWF.thetas_imag,10))
+
+    print("oo-UCCSD Quantum", qWF.energy_elec)
+
+    print("oo-UCCSD Classical", WF._energy_elec)
+
+    print("HF Classical", mf.energy_elec()[0])
+
+    qWF.run_wf_optimization_1step("bfgs", orbital_optimization=True)
+
 
 
 
@@ -138,10 +148,10 @@ def h3():
                   H  1.000000   0.000000       0.000000;
                   H  0.500000   0.8660254038   0.000000"""
     #basis = "cc-pvdz"
-    basis = "631-g"
-    #basis = "sto-6g"
+    #basis = "631-g"
+    basis = "sto-6g"
     #basis = ""
-    active_space = ((2, 1), 12)
+    active_space = ((2, 1), 6)
     #active_space = (2, 4)
     charge = 0
     spin = 1
@@ -162,7 +172,7 @@ def LiH():
     #basis = "cc-pvdz"
     #basis = "631-g"
     basis = "sto-3g"
-    active_space = ((1, 1), 8)
+    active_space = ((1, 1), 4)
     #active_space = (2, 4)
     charge = 0
     spin = 0
@@ -237,5 +247,5 @@ def HBr():
     
 # Run simulation:
 
-h2()
+LiH()
 

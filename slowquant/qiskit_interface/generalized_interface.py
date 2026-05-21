@@ -234,19 +234,19 @@ class QuantumInterface:
             raise ValueError(f"Unknown ansatz: {self.ansatz}")
 
         # Check that R parameter for gradient is consistent with the paramter names.
-        if len(self.grad_param_R) == 0:
+        if len(self.grad_param_R_r) == 0:
             for par in self.circuit.parameters:
                 # Default value two
-                self.grad_param_R[str(par)] = 2
-        if len(self.grad_param_R) != len(self.circuit.parameters):
+                self.grad_param_R_r[str(par)] = 2
+        if (len(self.grad_param_R_phi) + len(self.grad_param_R_r)) != len(self.circuit.parameters):
             raise ValueError(
-                f"Number of elements in grad_param_R, {len(self.grad_param_R)}, does not match number of parameters, {len(self.circuit.parameters)}"
+                f"Number of elements in grad_param_R, {len(self.grad_param_R_r)}, does not match number of parameters, {len(self.circuit.parameters)}"
             )
         self.param_names = [str(x) for x in self.circuit.parameters]
         for name in self.param_names:
-            if name not in self.grad_param_R.keys():
+            if name not in self.grad_param_R_r.keys() and name not in self.grad_param_R_phi:
                 raise ValueError(
-                    f"Got parameter name, {name}, that is not in grad_param_R, {self.grad_param_R}"
+                    f"Got parameter name, {name}, that is not in grad_param_R_r or grad_param_r_phi, {self.grad_param_R_r}{self.grad_param_R_phi}"
                 )
 
         if not hasattr(self, "_parameters"):
