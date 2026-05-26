@@ -1,39 +1,6 @@
 import pyscf
-import slowquant.unitary_coupled_cluster.linear_response.naive as naivelr
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
-
-
-def get_polarisability(geometry, basis, active_space, charge=0, unit='bohr'):
-    """
-    Calculate the polarisability
-    """
-    # PySCF
-    mol = pyscf.M(atom=geometry, basis=basis, charge=charge, unit=unit)
-    rhf = mol.RHF().run()
-    mo_coeff = rhf.mo_coeff
-
-    # SlowQuant
-    WF = WaveFunctionUCC(
-        active_space,
-        mo_coeff,
-        mol,
-        "SD",
-    )
-
-    # Optimize WF
-    if active_space[1] == mol.nao:
-        WF.run_wf_optimization_1step('SLSQP', False)
-    else:
-        WF.run_wf_optimization_1step('SLSQP', True)
-    print("Energy elec", WF.energy_elec)
-
-    # Singlet Linear Response
-    LR = naivelr.LinearResponse(WF, excitations="SD")
-    alpha = LR.get_polarisability()
-
-    print(f'Polarisabilities:\n \t xx: {alpha[0,0]:.4f} \t yy: {alpha[1,1]:.4f} \t zz: {alpha[2,2]:.4f}')
-
-    return alpha
+from slowquant.unitary_coupled_cluster.properties import properties
 
 
 def test_H2_sto3g_naive():
@@ -42,7 +9,22 @@ def test_H2_sto3g_naive():
     """
     geometry = """H  0.0   0.0  0.0;
             H  0.74  0.0  0.0;"""
-    alpha = get_polarisability(geometry, basis='sto-3g', active_space=(2,2), unit='angstrom')
+    # PySCF
+    mol = pyscf.M(atom=geometry, basis='sto-3g', unit='angstrom')
+    rhf = mol.RHF().run()
+    mo_coeff = rhf.mo_coeff
+
+    # SlowQuant
+    WF = WaveFunctionUCC(
+        (2,2),
+        mo_coeff,
+        mol,
+        "SD",
+    )
+    WF.run_wf_optimization_1step('SLSQP', False)
+
+    prop = properties(WF)
+    alpha = prop.get_polarisability()
 
     thresh = 10**-4
 
@@ -58,7 +40,22 @@ def test_LiH_sto3g_naive():
     """
     geometry = """H  0.0   0.0  0.0;
             Li  0.8  0.0  0.0;"""
-    alpha = get_polarisability(geometry, basis='sto-3g', active_space=(2,2), unit='angstrom')
+        # PySCF
+    mol = pyscf.M(atom=geometry, basis='sto-3g', unit='angstrom')
+    rhf = mol.RHF().run()
+    mo_coeff = rhf.mo_coeff
+
+    # SlowQuant
+    WF = WaveFunctionUCC(
+        (2,2),
+        mo_coeff,
+        mol,
+        "SD",
+    )
+    WF.run_wf_optimization_1step('SLSQP', True)
+
+    prop = properties(WF)
+    alpha = prop.get_polarisability()
 
     thresh = 10**-2
 
@@ -83,7 +80,22 @@ def test_H10_sto3g_naive():
            H 11.2  0.0  0.0;
            H 12.6  0.0  0.0;"""
 
-    alpha = get_polarisability(geometry, basis='sto-3g', active_space=(2,2), unit='bohr')
+    # PySCF
+    mol = pyscf.M(atom=geometry, basis='sto-3g', unit='bohr')
+    rhf = mol.RHF().run()
+    mo_coeff = rhf.mo_coeff
+
+    # SlowQuant
+    WF = WaveFunctionUCC(
+        (2,2),
+        mo_coeff,
+        mol,
+        "SD",
+    )
+    WF.run_wf_optimization_1step('SLSQP', True)
+
+    prop = properties(WF)
+    alpha = prop.get_polarisability()
 
     thresh = 10**-3
 

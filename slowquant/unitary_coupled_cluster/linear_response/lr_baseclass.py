@@ -122,34 +122,48 @@ class LinearResponseBaseClass:
             self.wf.num_active_orbs,
         )
 
+        self._hessian = None
+        self._metric = None
+
+    @property
+    def hessian(self) -> np.ndarray:
+        if self._hessian is None:
+            size = len(self.A)
+            self._hessian = np.zeros((size * 2, size * 2))
+            self._hessian[:size, :size] = self.A
+            self._hessian[:size, size:] = self.B
+            self._hessian[size:, :size] = self.B
+            self._hessian[size:, size:] = self.A
+
+            (
+            hess_eigval,
+            _,
+            ) = np.linalg.eig(self.hessian)
+            print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
+            if np.abs(np.min(hess_eigval)) < 10**-8:
+                print("WARNING: Small eigenvalue in Hessian")
+            elif np.min(hess_eigval) < 0:
+                raise ValueError("Negative eigenvalue in Hessian.")
+
+        return self._hessian
+    
+    @property
+    def metric(self) -> np.ndarray:
+        if self._metric is None:
+            size = len(self.Sigma)
+            self._metric = np.zeros((size * 2, size * 2))
+            self._metric[:size, :size] = self.Sigma
+            self._metric[:size, size:] = self.Delta
+            self._metric[size:, :size] = self.Delta
+            self._metric[size:, size:] = self.Sigma
+
+            print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}")
+
+        return self._metric
+
     def calc_excitation_energies(self) -> None:
         """Calculate excitation energies."""
         size = len(self.A)
-        E2 = np.zeros((size * 2, size * 2))
-        E2[:size, :size] = self.A
-        E2[:size, size:] = self.B
-        E2[size:, :size] = self.B
-        E2[size:, size:] = self.A
-        (
-            hess_eigval,
-            _,
-        ) = np.linalg.eig(E2)
-        print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
-        if np.abs(np.min(hess_eigval)) < 10**-8:
-            print("WARNING: Small eigenvalue in Hessian")
-        elif np.min(hess_eigval) < 0:
-            raise ValueError("Negative eigenvalue in Hessian.")
-
-        S = np.zeros((size * 2, size * 2))
-        S[:size, :size] = self.Sigma
-        S[:size, size:] = self.Delta
-        S[size:, :size] = -self.Delta
-        S[size:, size:] = -self.Sigma
-        print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}")
-
-        self.hessian = E2
-        self.metric = S
-
         eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)
         sorting = np.argsort(eigval)
         self.excitation_energies = np.real(eigval[sorting][size:])
@@ -253,48 +267,3 @@ class LinearResponseBaseClass:
             osc_str = f"{osc_strength:1.6f}"
             output += f"{str(i + 1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
         return output
-
-    def get_polarisability(self, freq=0) -> np.ndarray:
-        """Calculate the frequency dependent polarisability tensor.
-
-        Returns:
-            Polarisability tensor.
-        """
-        if not hasattr(self, "hessian") or not hasattr(self, "metric"):
-            self.calc_excitation_energies()
-        
-        prop_grad = self.get_property_gradient(self.wf.int_gen.electric_dipole)
-        response = scipy.linalg.solve(self.hessian - freq * self.metric, prop_grad)
-        
-        return np.einsum('ix,iy->xy', prop_grad, response)
-    
-    def get_paramagnetic_shielding(self) -> np.ndarray:
-        """Calculate the paramagnetic shielding tensor of each nuclei.
-
-        Returns:
-            Paramagnetic shielding tensor for each nuclei.
-        """
-        if not hasattr(self, "hessian"):
-            self.calc_excitation_energies()
-
-        atoms = self.wf.int_gen.atom_coordinates
-        para_shield = np.zeros((len(atoms), 3, 3))
-
-        for i in range(len(atoms)):
-            origin = atoms[i,:]
-            
-            # PSO
-            property_gradient = self.get_property_gradient(
-                self.wf.int_gen.orbital_paramagnetic(origin)
-                )
-            response_vector = scipy.linalg.solve(self.hessian, property_gradient)
-
-            # Anguar Momentum
-            property_gradient = self.get_property_gradient(
-                self.wf.int_gen.angular_momentum(origin)
-                )
-            
-            # Paramagnetic shielding tensor
-            para_shield[i,:,:] -= np.einsum('ix,iy->xy', response_vector, property_gradient)
-
-        return para_shield
