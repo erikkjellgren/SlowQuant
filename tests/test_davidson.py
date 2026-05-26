@@ -1,4 +1,5 @@
 # type: ignore
+import pyscf
 import numpy as np
 
 import slowquant.SlowQuant as sq
@@ -101,19 +102,20 @@ def test_lih_naive_explicit():
 
 def test_lih_naive():
     """Test LiH energies for naive q LR methods."""
-    SQobj = sq.SlowQuant()
-    SQobj.set_molecule(
-        """Li   0.0           0.0  0.0;
-        H   1.67  0.0  0.0;""",
-        distance_unit="angstrom",
-    )
-    SQobj.set_basis_set("sto-3g")
-    SQobj.init_hartree_fock()
-    SQobj.hartree_fock.run_restricted_hartree_fock()
+    molecule = f"""Li   0.0  0.0  0.0;
+            H   1.67  0.0  0.0;"""
+    mol = pyscf.gto.M(
+            atom = molecule,
+            basis = "sto3g",
+            unit = "angstrom"
+        )
+    hf = mol.RHF(verbose=0).run()
+    mp2 = pyscf.mp.MP2(hf).run(verbose=0)
+    _, mo_coeffs = pyscf.mcscf.addons.make_natural_orbitals(mp2)
     WF = WaveFunctionUCC(
         (2, 2),
-        SQobj.hartree_fock.mo_coeff,
-        SQobj,
+        mo_coeffs,
+        mol,
         "SD",
     )
     WF.run_wf_optimization_1step("L-BFGS-B", True)
@@ -144,13 +146,30 @@ def test_lih_naive():
     )
     assert np.allclose(LR.oscillator_strengths, solutions, atol=threshold)
 
-    dp = LR.linear_response_function(
+    lr = LR.linear_response_function(
         0.0,
         "dipole polarizability",
         {"max_iterations": 50, "tolerance": 1e-8},
     )
-    pol = - np.diag(dp[0].T @ dp[1])
-    solutions = np.array([1.14653565e+01, 2.27660517e+01, 2.27660517e+01])
+    pol = - lr[0].T @ lr[1]
+    solutions = np.array([
+        [1.14644209e+01, 0, 0],
+        [0, 2.27655113e+01, 0],
+        [0, 0, 2.27655113e+01]
+    ])
+    assert np.allclose(pol, solutions, atol=threshold)
+
+    lr = LR.linear_response_function(
+        1.0,
+        "optical rotation",
+        {"max_iterations": 50, "tolerance": 1e-8},
+    )
+    pol = - 1j * lr[0].T @ lr[1]
+    solutions = np.array([
+        [0, 0, 0],
+        [0, 0, -2.53196664e+00+0j],
+        [0, 2.53196664e+00+0j, 0]
+    ])
     assert np.allclose(pol, solutions, atol=threshold)
 
 def test_lih_projected_explicit():
@@ -238,19 +257,20 @@ def test_lih_projected_explicit():
 
 def test_lih_projected():
     """Test LiH energies for projected q LR methods."""
-    SQobj = sq.SlowQuant()
-    SQobj.set_molecule(
-        """Li   0.0           0.0  0.0;
-        H   1.67  0.0  0.0;""",
-        distance_unit="angstrom",
-    )
-    SQobj.set_basis_set("sto-3g")
-    SQobj.init_hartree_fock()
-    SQobj.hartree_fock.run_restricted_hartree_fock()
+    molecule = f"""Li   0.0  0.0  0.0;
+            H   1.67  0.0  0.0;"""
+    mol = pyscf.gto.M(
+            atom = molecule,
+            basis = "sto3g",
+            unit = "angstrom"
+        )
+    hf = mol.RHF(verbose=0).run()
+    mp2 = pyscf.mp.MP2(hf).run(verbose=0)
+    _, mo_coeffs = pyscf.mcscf.addons.make_natural_orbitals(mp2)
     WF = WaveFunctionUCC(
         (2, 2),
-        SQobj.hartree_fock.mo_coeff,
-        SQobj,
+        mo_coeffs,
+        mol,
         "SD",
     )
     WF.run_wf_optimization_1step("L-BFGS-B", True)
@@ -281,13 +301,30 @@ def test_lih_projected():
     )
     assert np.allclose(LR.oscillator_strengths, solutions, atol=threshold)
 
-    dp = LR.linear_response_function(
+    lr = LR.linear_response_function(
         0.0,
         "dipole polarizability",
         {"max_iterations": 50, "tolerance": 1e-8},
     )
-    pol = - np.diag(dp[0].T @ dp[1])
-    solutions = np.array([1.14660417e+01, 2.27660517e+01, 2.27660517e+01])
+    pol = - lr[0].T @ lr[1]
+    solutions = np.array([
+        [1.14652201e+01, 0, 0],
+        [0, 2.27656154e+01, 0],
+        [0, 0, 2.27656154e+01]
+    ])
+    assert np.allclose(pol, solutions, atol=threshold)
+
+    lr = LR.linear_response_function(
+        1.0,
+        "optical rotation",
+        {"max_iterations": 50, "tolerance": 1e-8},
+    )
+    pol = - 1j * lr[0].T @ lr[1]
+    solutions = np.array([
+        [0, 0, 0],
+        [0, 0, -2.53196759e+00+0j],
+        [0, 2.53196759e+00+0j, 0]
+    ])
     assert np.allclose(pol, solutions, atol=threshold)
 
 def test_lih_allprojected_explicit():
@@ -375,19 +412,20 @@ def test_lih_allprojected_explicit():
 
 def test_lih_allprojected():
     """Test LiH energies for projected q LR methods."""
-    SQobj = sq.SlowQuant()
-    SQobj.set_molecule(
-        """Li   0.0           0.0  0.0;
-        H   1.67  0.0  0.0;""",
-        distance_unit="angstrom",
-    )
-    SQobj.set_basis_set("sto-3g")
-    SQobj.init_hartree_fock()
-    SQobj.hartree_fock.run_restricted_hartree_fock()
+    molecule = f"""Li   0.0  0.0  0.0;
+            H   1.67  0.0  0.0;"""
+    mol = pyscf.gto.M(
+            atom = molecule,
+            basis = "sto3g",
+            unit = "angstrom"
+        )
+    hf = mol.RHF(verbose=0).run()
+    mp2 = pyscf.mp.MP2(hf).run(verbose=0)
+    _, mo_coeffs = pyscf.mcscf.addons.make_natural_orbitals(mp2)
     WF = WaveFunctionUCC(
         (2, 2),
-        SQobj.hartree_fock.mo_coeff,
-        SQobj,
+        mo_coeffs,
+        mol,
         "SD",
     )
     WF.run_wf_optimization_1step("L-BFGS-B", True)
@@ -418,11 +456,28 @@ def test_lih_allprojected():
     )
     assert np.allclose(LR.oscillator_strengths, solutions, atol=threshold)
 
-    dp = LR.linear_response_function(
+    lr = LR.linear_response_function(
         0.0,
         "dipole polarizability",
         {"max_iterations": 50, "tolerance": 1e-8},
     )
-    pol = - np.diag(dp[0].T @ dp[1])
-    solutions = np.array([1.14667275e+01, 2.31867596e+01, 2.31867596e+01])
+    pol = - lr[0].T @ lr[1]
+    solutions = np.array([
+        [1.14659073e+01, 0, 0],
+        [0, 2.31862033e+01, 0],
+        [0, 0, 2.31862033e+01]
+    ])
+    assert np.allclose(pol, solutions, atol=threshold)
+
+    lr = LR.linear_response_function(
+        1.0,
+        "optical rotation",
+        {"max_iterations": 50, "tolerance": 1e-8},
+    )
+    pol = - 1j * lr[0].T @ lr[1]
+    solutions = np.array([
+        [0, 0, 0],
+        [0, 0, -2.56644246e+00+0j],
+        [0, 2.56644246e+00+0j, 0]
+    ])
     assert np.allclose(pol, solutions, atol=threshold)
