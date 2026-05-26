@@ -330,7 +330,7 @@ class LinearResponse(LinearResponseBaseClass):
                         tH00m_ket,
                         *self.index_info,
                     )
-                    # 0.5 <0| GId [qsd, H] |0>
+                    # 0.5 h <0| GId [qsd, H] |0>
                     sigma_plus[num_q + i, root] -= 0.5 * expectation_value(
                         GI_ket,
                         [],
@@ -369,14 +369,14 @@ class LinearResponse(LinearResponseBaseClass):
                         [qdH],
                         Gsm_ket,
                         *self.index_info,
-                    ).conjugate()
-                    # 0.5 <0| Gsd, [qid, H] |0>
+                    )
+                    # - 0.5 <0| Gsd, [qid, H] |0>
                     sigma_plus[i, root] -= 0.5 * expectation_value(
                         Gsp_ket,
                         [qdH],
                         self.wf.ci_coeffs,
                         *self.index_info,
-                    )
+                    ).conjugate()
                     sigma_minus[i, root] += 0.5 * expectation_value(
                         Gsm_ket,
                         [qdH],
@@ -633,19 +633,9 @@ class LinearResponse(LinearResponseBaseClass):
                 # <0| Gd mux |0>
                 exp_Gmux = expectation_value(G_ket, [], mux_ket, *self.index_info)
                 # <0| Gd muy |0>
-                exp_Gmuy = expectation_value(
-                    G_ket,
-                    [],
-                    muy_ket,
-                    *self.index_info,
-                )
+                exp_Gmuy = expectation_value(G_ket, [], muy_ket, *self.index_info)
                 # <0| Gd muz |0>
-                exp_Gmuz = expectation_value(
-                    G_ket,
-                    [],
-                    muz_ket,
-                    *self.index_info,
-                )
+                exp_Gmuz = expectation_value(G_ket, [], muz_ket, *self.index_info)
 
                 g_part_x += self.Z_G_normed[i, state_number] * exp_G * exp_mux
                 g_part_x -= self.Z_G_normed[i, state_number] * exp_Gmux

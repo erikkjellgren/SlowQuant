@@ -131,9 +131,10 @@ class LinearResponseBaseClass:
             frequency: Frequency to calculate response function at.
             lr_property: Property for which to calculate the response function.
                 Dipole Polarizability can be calculated by setting lr_property to "dipole polarizability" or "dp".
+                Optical Rotation can be calculated by setting lr_property to "optical rotation" or "or".
             solver_settings: Settings for the Davidson solver:
                 max_iteration: Maximum number of iterations. Default is 100.
-                tolerance: Convergence tolerance. Default is 1e-8.
+                tolerance: Convergence tolerance. Default is 1e-4.
                 max_reduced_space: Maximum size of the reduced space. Default is 8 times number of roots for the lr_property.
                 is_silent: Whether to print convergence information. Default is False.
                 _start_guess: Optional starting guess for the response vector. Default is None.
@@ -154,6 +155,22 @@ class LinearResponseBaseClass:
                 property_gradient.reshape(len(property_gradient), -1),
                 -property_gradient.conj().reshape(len(property_gradient), -1)
             ))
+        elif lr_property.lower() in ("optical rotation", "or"):
+            title_string = f"Calculating optical rotation at frequency {frequency} a.u."
+            integrals = self.wf.int_gen.magnetic_dipole
+            property_gradient_x = 1j * self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[0]))
+            property_gradient_y = 1j * self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[1]))
+            property_gradient_z = 1j * self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[2]))
+            property_gradient = np.hstack([property_gradient_x, property_gradient_y, property_gradient_z])
+            full_gradient = np.vstack((
+                property_gradient.reshape(len(property_gradient), -1),
+                -property_gradient.conj().reshape(len(property_gradient), -1)
+            ))
+            integrals = self.wf.int_gen.electric_dipole
+            property_gradient_x = self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[0]))
+            property_gradient_y = self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[1]))
+            property_gradient_z = self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[2]))
+            property_gradient = np.hstack([property_gradient_x, property_gradient_y, property_gradient_z])
         else:
             raise ValueError(f"Unknown property {lr_property} for linear response function.")
 
@@ -168,7 +185,7 @@ class LinearResponseBaseClass:
                 self._right_transform,
                 preconditioner,
                 max_iteration=solver_settings.get("max_iteration", 100),
-                tolerance=solver_settings.get("tolerance", 1e-8),
+                tolerance=solver_settings.get("tolerance", 1e-4),
                 n_roots=n_roots,
                 max_reduced_space=solver_settings.get("max_reduced_space", n_roots * 8),
                 frequency=frequency,
@@ -184,8 +201,7 @@ class LinearResponseBaseClass:
         """Calculate gradient of property.
 
         Args:
-            trial: Trial vectors.
-            integral: Integral matrix.
+            integral: MO integral for which to calculate the gradient.
 
         Returns:
             Gradient of property.

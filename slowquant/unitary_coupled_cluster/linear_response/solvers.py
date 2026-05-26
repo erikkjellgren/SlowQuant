@@ -424,9 +424,9 @@ class PairedDavidson(Davidson):
             [S_minus, np.zeros_like(S_minus)]
         ])
         if frequency is not None and property_gradient is not None:
-            bV = np.vstack((
+            bV = - np.vstack((
                 2 * np.imag(trial_plus.conj().T @ property_gradient),
-                - 2 * np.real(trial_minus.conj().T @ property_gradient),
+                2 * np.real(trial_minus.conj().T @ property_gradient),
             ))
             # TODO: Complex numbers currently don't work with FermionicOperator:
             bV = np.real(bV)
@@ -463,11 +463,12 @@ class PairedDavidson(Davidson):
             if np.isreal(frequency):
                 R_minus += property_gradient
 
-        norm = np.sqrt(np.abs(np.diag(
-            x_minus.T @ S_minus @ x_plus + x_plus.T @ S_minus.T @ x_minus
-        )))
-        norm[np.isclose(norm, 0)] = 1
-        X /= norm
+        if frequency is None or property_gradient is None:
+            norm = np.sqrt(np.abs(np.diag(
+                x_minus.T @ S_minus @ x_plus + x_plus.T @ S_minus.T @ x_minus
+            )))
+            norm[np.isclose(norm, 0)] = 1
+            X /= norm
 
         return omega, X, (R_plus, R_minus)
 
