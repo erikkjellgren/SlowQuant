@@ -1,6 +1,6 @@
 import networkx as nx
 import numpy as np
-from qiskit import QuantumCircuit
+from qiskit.circuit import QuantumCircuit
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import CouplingMap, PassManager
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
