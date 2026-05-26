@@ -1,5 +1,6 @@
 import pyscf
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
+from slowquant.unitary_coupled_cluster.linear_response import naive
 from slowquant.unitary_coupled_cluster.properties import properties
 
 
@@ -23,7 +24,7 @@ def test_H2_sto3g_naive():
     )
     WF.run_wf_optimization_1step('SLSQP', False)
 
-    prop = properties(WF)
+    prop = properties(WF, property_options={"lr_formulation": naive})
     alpha = prop.get_polarisability()
 
     thresh = 10**-4
@@ -54,7 +55,7 @@ def test_LiH_sto3g_naive():
     )
     WF.run_wf_optimization_1step('SLSQP', True)
 
-    prop = properties(WF)
+    prop = properties(WF, property_options={"lr_formulation": naive})
     alpha = prop.get_polarisability()
 
     thresh = 10**-2
@@ -94,7 +95,7 @@ def test_H10_sto3g_naive():
     )
     WF.run_wf_optimization_1step('SLSQP', True)
 
-    prop = properties(WF)
+    prop = properties(WF, property_options={"lr_formulation": naive})
     alpha = prop.get_polarisability()
 
     thresh = 10**-3
@@ -103,3 +104,7 @@ def test_H10_sto3g_naive():
     assert abs(alpha[0,0] - 72.343635) < thresh
     assert abs(alpha[1,1] - 0.0) < thresh
     assert abs(alpha[2,2] - 0.0) < thresh
+
+test_H2_sto3g_naive()
+test_LiH_sto3g_naive()
+test_H10_sto3g_naive()

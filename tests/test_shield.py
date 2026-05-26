@@ -62,7 +62,7 @@ def test_LiH_sto3g_naive():
     )
     WF.run_wf_optimization_1step('SLSQP', True)
 
-    prop = properties(WF)
+    prop = properties(WF, property_options={"excitations": "SD", "lr_formulation": naive})
     dia, para = prop.get_nuclear_shielding_tensor()
 
     thresh = 10**-3
@@ -70,3 +70,6 @@ def test_LiH_sto3g_naive():
     # Check shielding constant - reference dalton mcscf
     assert abs(38.7983 - np.trace(dia[0,:,:] + para[0,:,:]) / 3) < thresh
     assert abs(72.9730 - np.trace(dia[1,:,:] + para[1,:,:]) / 3) < thresh
+
+test_H2_sto3g_naive()
+test_LiH_sto3g_naive()

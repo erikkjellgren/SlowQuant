@@ -2,6 +2,7 @@ import numpy as np
 import pyscf
 
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
+from slowquant.unitary_coupled_cluster.linear_response import naive
 from slowquant.unitary_coupled_cluster.properties import properties
 
 def test_H2_sto3g_naive():
@@ -27,7 +28,7 @@ def test_H2_sto3g_naive():
     )
     WF.run_wf_optimization_1step('SLSQP', False)
 
-    prop = properties(WF)
+    prop = properties(WF, property_options={"lr_formulation": naive})
     dso, pso, fc, sd = prop.get_spin_spin_coupling_constant()
     total = dso + pso + fc + sd
 
@@ -60,7 +61,7 @@ def test_LiH_sto3g_naive():
     )
     WF.run_wf_optimization_1step('SLSQP', True)
 
-    prop = properties(WF)
+    prop = properties(WF, property_options={"lr_formulation": naive})
     dso, pso, fc, sd = prop.get_spin_spin_coupling_constant()
     total = dso + pso + fc + sd
     
