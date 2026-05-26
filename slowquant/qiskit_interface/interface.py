@@ -163,9 +163,9 @@ class QuantumInterface:
 
         # State prep circuit
         if isinstance(self.ansatz, QuantumCircuit):
-            print(
-                "QI was initialized with a custom QuantumCircuit object. This is assumed to be the Ansatz (without state preparation circuit)"
-            )
+            self.state_circuit: QuantumCircuit = QuantumCircuit(
+                self.ansatz.num_qubits
+            )  # empty state as custom circuit is passed
             self.circuit = self.ansatz
         elif isinstance(self.ansatz, str):
             if (

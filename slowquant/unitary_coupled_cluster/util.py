@@ -1,6 +1,8 @@
 from collections.abc import Generator, Sequence
 from typing import Any
 
+import numpy as np
+
 
 def iterate_t1_sa(
     active_occ_idx: Sequence[int],
