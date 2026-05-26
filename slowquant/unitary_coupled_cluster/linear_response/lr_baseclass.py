@@ -379,3 +379,50 @@ class LinearResponseBaseClass:
             osc_str = f"{osc_strength:1.6f}"
             output += f"{str(i + 1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
         return output
+
+    def get_rotational_strength(self) -> np.ndarray:
+        r"""Calculate rotational strength.
+
+        .. math::
+            R_n = \left<0\left|\hat{\mu}\right|n\left>\cdot\left<n\left|\hat{m}\right|0\left>
+
+        Returns:
+            Rotational Strength.
+        """
+        electric_transition_dipoles = self.get_transition_dipole(self.wf.int_gen.electric_dipole)
+        magnetic_transition_dipoles = -self.get_transition_dipole(self.wf.int_gen.magnetic_dipole)
+        rot_strs = np.zeros(len(electric_transition_dipoles))
+        for idx, (electric_transition_dipole, magnetic_transition_dipole) in enumerate(
+            zip(electric_transition_dipoles, magnetic_transition_dipoles)
+        ):
+            rot_strs[idx] = (
+                electric_transition_dipole[0] * magnetic_transition_dipole[0]
+                + electric_transition_dipole[1] * magnetic_transition_dipole[1]
+                + electric_transition_dipole[2] * magnetic_transition_dipole[2]
+            )
+        self.rotational_strengths = rot_strs
+        return rot_strs
+
+    def get_formatted_rotational_strength(self) -> str:
+        """Create table of excitation energies and rotational strengths.
+
+        Returns:
+            Nicely formatted table.
+        """
+        if not hasattr(self, "rotational_strengths"):
+            raise ValueError(
+                "Rotational strengths have not been calculated. Run get_rotational_strength() first."
+            )
+
+        output = (
+            "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Rotational strengths\n"
+        )
+
+        for i, (exc_energy, rot_strength) in enumerate(
+            zip(self.excitation_energies, self.rotational_strengths)
+        ):
+            exc_str = f"{exc_energy:2.6f}"
+            exc_str_ev = f"{exc_energy * 27.2114079527:3.6f}"
+            rot_str = f"{rot_strength:1.6f}"
+            output += f"{str(i + 1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {rot_str.center(20)}\n"
+        return output
