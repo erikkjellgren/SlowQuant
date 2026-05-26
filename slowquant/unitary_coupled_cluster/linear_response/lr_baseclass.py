@@ -322,8 +322,11 @@ class LinearResponseBaseClass:
 
         return norms
 
-    def get_transition_dipole(self) -> np.ndarray:
+    def get_transition_dipole(self, dipole_integrals: tuple[np.ndarray, np.ndarray, np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
+
+        Args:
+            dipole_integrals: Dipole integrals in MO basis.
 
         Returns:
             Transition dipole moment.
@@ -339,7 +342,7 @@ class LinearResponseBaseClass:
         Returns:
             Oscillator Strength.
         """
-        transition_dipoles = self.get_transition_dipole()
+        transition_dipoles = self.get_transition_dipole(self.wf.int_gen.electric_dipole)
         osc_strs = np.zeros(len(transition_dipoles))
         for idx, (excitation_energy, transition_dipole) in enumerate(
             zip(self.excitation_energies, transition_dipoles)

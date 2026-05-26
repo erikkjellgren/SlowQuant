@@ -551,13 +551,12 @@ class LinearResponse(LinearResponseBaseClass):
             )
         return gradient.reshape(-1, 1)
 
-    def get_transition_dipole(self) -> np.ndarray:
+    def get_transition_dipole(self, dipole_integrals: tuple[np.ndarray, np.ndarray, np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
 
         Returns:
             Transition dipole moment.
         """
-        dipole_integrals = self.wf.int_gen.electric_dipole
         number_excitations = len(self.excitation_energies)
         num_ops = len(self.q_ops) + len(self.G_ops)
         mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
