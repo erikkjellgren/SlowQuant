@@ -56,6 +56,9 @@ class WaveFunctionHCBCircuit:
         self.active_idx = []
         self.active_occ_idx = []
         self.active_unocc_idx = []
+        self.active_idx_shifted = []
+        self.active_occ_idx_shifted = []
+        self.active_unocc_idx_shifted = []
         self.num_orbs = len(self.int_gen.kinetic_energy)
         self.num_active_elec_pair = 0
         self.num_active_orbs = 0
@@ -92,6 +95,15 @@ class WaveFunctionHCBCircuit:
             else:
                 self.virtual_idx.append(i)
                 self.num_virtual_orbs += 1
+        # Make shifted indices
+        if len(self.active_idx) != 0:
+            active_shift = np.min(self.active_idx)
+            for active_idx in self.active_idx:
+                self.active_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_occ_idx:
+                self.active_occ_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_unocc_idx:
+                self.active_unocc_idx_shifted.append(active_idx - active_shift)
         # Find non-redundant kappas
         self._kappa = []
         kappa_idx = []
@@ -124,7 +136,12 @@ class WaveFunctionHCBCircuit:
         self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
         # Setup Qiskit stuff
         self.QI = quantum_interface
-        self.QI.construct_circuit(self.num_active_orbs, self.num_active_elec_pair)
+        self.QI.construct_circuit(
+            self.active_occ_idx_shifted,
+            self.active_unocc_idx_shifted,
+            self.num_active_orbs,
+            self.num_active_elec_pair,
+        )
 
     @property
     def kappa(self) -> list[float]:
@@ -252,7 +269,12 @@ class WaveFunctionHCBCircuit:
 
     def _reconstruct_circuit(self) -> None:
         """Construct circuit again."""
-        self.QI.construct_circuit(self.num_active_orbs, self.num_active_elec_pair)
+        self.QI.construct_circuit(
+            self.active_occ_idx_shifted,
+            self.active_unocc_idx_shifted,
+            self.num_active_orbs,
+            self.num_active_elec_pair,
+        )
 
     @property
     def rdm1(self) -> np.ndarray:

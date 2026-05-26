@@ -2,12 +2,14 @@ import numpy as np
 from qiskit.circuit import Parameter, ParameterExpression, QuantumCircuit
 from qiskit.circuit.library import PauliEvolutionGate
 from qiskit.quantum_info import Pauli
+from qiskit_nature.second_q.circuit.library import HartreeFock
 from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
 from slowquant.qiskit_interface.util import f2q
 from slowquant.unitary_coupled_cluster.operators import a_op_spin
+from slowquant.unitary_coupled_cluster.util import UpsStructure
 
 
 def single_excitation(
@@ -453,3 +455,67 @@ def _sa_single_excitation_trotter(
     qc = _single_excitation_trotter(2 * i, 2 * a, num_orbs, qc, theta, mapper)
     qc = _single_excitation_trotter(2 * i + 1, 2 * a + 1, num_orbs, qc, theta, mapper)
     return qc
+
+
+def upslayout2circuit(
+    upslayout: UpsStructure, num_orbs: int, mapper: FermionicMapper
+) -> tuple[QuantumCircuit, dict[str, int]]:
+    """Convert a unitary product state wavefunction to a circuit representation.
+
+    Args:
+        upslayout: Unitary product state layout.
+        num_orbs: Number of spatial orbitals.
+        mapper: Fermionic to qubit mapper.
+
+    Returns:
+        Qiskit circuit representation of wavefunction.
+    """
+    grad_param_R = {}
+    idx = 0
+    qc = HartreeFock(num_orbs, (0, 0), mapper)  # empty circuit with qubit number based on mapper
+    for exc_type, exc_indices in zip(upslayout.excitation_operator_type, upslayout.excitation_indices):
+        if exc_type == "single":
+            (i, a) = exc_indices
+            qc = single_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
+            grad_param_R[f"p{idx:09d}"] = 2
+            idx += 1
+        elif exc_type == "double":
+            (i, j, a, b) = exc_indices
+            qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
+            grad_param_R[f"p{idx:09d}"] = 2
+            idx += 1
+        elif exc_type == "sa_single":
+            (i, a) = exc_indices
+            qc = sa_single_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
+            grad_param_R[f"p{idx:09d}"] = 4
+            idx += 1
+        else:
+            raise ValueError(f"Got unknown excitation type: {exc_type}")
+    return qc, grad_param_R
+
+
+def hcb_upslayout2circuit(
+    upslayout: UpsStructure,
+    num_orbs: int,
+) -> tuple[QuantumCircuit, dict[str, int]]:
+    """Convert a unitary product state wavefunction to a circuit representation.
+
+    Args:
+        upslayout: Unitary product state layout.
+        num_orbs: Number of spatial orbitals.
+
+    Returns:
+        Qiskit circuit representation of wavefunction.
+    """
+    grad_param_R = {}
+    idx = 0
+    qc = QuantumCircuit(num_orbs)  # empty circuit with qubit number
+    for exc_type, exc_indices in zip(upslayout.excitation_operator_type, upslayout.excitation_indices):
+        if exc_type == "hcb_double":
+            (i, a) = exc_indices
+            qc = hcb_double_excitation(i, a, qc, Parameter(f"p{idx:09d}"))
+            grad_param_R[f"p{idx:09d}"] = 2
+            idx += 1
+        else:
+            raise ValueError(f"Got unknown excitation type: {exc_type}")
+    return qc, grad_param_R

@@ -158,20 +158,22 @@ class WaveFunctionHCBUPS:
         self.ci_coeffs = np.copy(self.csf_coeffs)
         # Construct UPS Structure
         self.ups_layout = UpsStructure()
-        if ansatz.lower() == "fuccpd":
-            self.ansatz_options["HCBD"] = True
+        if ansatz.lower() in ("fucc", "fuccpd", "fuccgpd"):
+            if ansatz.lower() == "fuccpd":
+                self.ansatz_options["HCBD"] = True
+            elif ansatz.lower() == "fuccpd":
+                self.ansatz_options["HCBGD"] = True
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        elif ansatz.lower() == "fuccgpd":
-            self.ansatz_options["HCBGD"] = True
-            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        elif ansatz.lower() == "fucc":
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+            self.ups_layout.create_fUCC(
+                self.active_occ_idx_shifted,
+                self.active_unocc_idx_shifted,
+                [],
+                [],
+                self.num_active_orbs,
+                self.ansatz_options,
+            )
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()

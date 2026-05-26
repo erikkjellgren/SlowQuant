@@ -17,7 +17,7 @@ from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import PassManager
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 
-from slowquant.qiskit_interface.custom_ansatz import HCBfUCC
+from slowquant.qiskit_interface.operators_circuits import hcb_upslayout2circuit
 from slowquant.qiskit_interface.util import (
     Clique,
     MitigationFlags,
@@ -30,6 +30,7 @@ from slowquant.qiskit_interface.util import (
     to_CBS_measurement,
 )
 from slowquant.unitary_coupled_cluster.hardcoreboson_operator import HardcorebosonOperator
+from slowquant.unitary_coupled_cluster.util import UpsStructure
 
 
 class HCBQuantumInterface:
@@ -70,6 +71,7 @@ class HCBQuantumInterface:
         if ansatz_options is None:
             ansatz_options = {}
         allowed_ansatz = (
+            "fucc",
             "fuccpd",
             "fuccgpd",
             "hf",
@@ -110,7 +112,13 @@ class HCBQuantumInterface:
         self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
         self._M_shots = None  # define a separate number of shots for M
 
-    def construct_circuit(self, num_orbs: int, num_elec_pair: int) -> None:
+    def construct_circuit(
+        self,
+        occ_idx: list[int],
+        unocc_idx: list[int],
+        num_orbs: int,
+        num_elec_pair: int,
+    ) -> None:
         """Construct qiskit circuit.
 
         Args:
@@ -141,20 +149,34 @@ class HCBQuantumInterface:
                 "QI was initialized with a custom QuantumCircuit object. This is assumed to be the Ansatz (without state preparation circuit)"
             )
             self.circuit = self.ansatz
-        elif self.ansatz.lower() == "fuccpd":
-            self.ansatz_options["HCBD"] = True
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = HCBfUCC(num_orbs, self.num_elec_pair, self.ansatz_options)
-        elif self.ansatz.lower() == "fuccgpd":
-            self.ansatz_options["HCBGD"] = True
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = HCBfUCC(num_orbs, self.num_elec_pair, self.ansatz_options)
+        elif isinstance(self.ansatz, UpsStructure):
+            self.circuit, self.grad_param_R = hcb_upslayout2circuit(self.ansatz, self.num_orbs)
+        elif isinstance(self.ansatz, str):
+            ups_layout = UpsStructure()
+            if self.ansatz.lower() in ("fucc", "fuccpd", "fuccgpd"):
+                if self.ansatz.lower() == "fuccpd":
+                    self.ansatz_options["HCBD"] = True
+                elif self.ansatz.lower() == "fuccpd":
+                    self.ansatz_options["HCBGD"] = True
+                if "n_layers" not in self.ansatz_options.keys():
+                    # default option
+                    self.ansatz_options["n_layers"] = 1
+                ups_layout.create_fUCC(
+                    occ_idx,
+                    unocc_idx,
+                    [],
+                    [],
+                    num_orbs,
+                    self.ansatz_options,
+                )
+            elif self.ansatz.lower() == "hf":
+                if len(self.ansatz_options) != 0:
+                    raise ValueError(f"No options available for HF got {self.ansatz_options}")
+            else:
+                raise ValueError(f"Unknown ansatz: {self.ansatz}")
+            self.circuit, self.grad_param_R = hcb_upslayout2circuit(ups_layout, self.num_orbs)
         else:
-            raise ValueError(f"Unknown ansatz: {self.ansatz}")
+            raise TypeError(f"Unknown ansatz type: {type(self.ansatz)}")
 
         # Check that R parameter for gradient is consistent with the paramter names.
         if len(self.grad_param_R) == 0:

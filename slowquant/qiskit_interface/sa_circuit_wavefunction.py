@@ -5,7 +5,7 @@ from functools import partial
 import numpy as np
 import pyscf
 import scipy
-from qiskit import QuantumCircuit
+from qiskit.circuit import QuantumCircuit
 from qiskit.primitives import BaseEstimatorV1, BaseEstimatorV2, BaseSamplerV1, BaseSamplerV2
 
 from slowquant.molecularintegrals.integralfunctions import (
@@ -69,6 +69,10 @@ class WaveFunctionSACircuit:
         self.active_spin_idx_shifted = []
         self.active_occ_spin_idx_shifted = []
         self.active_unocc_spin_idx_shifted = []
+        self.active_idx_shifted = []
+        self.active_occ_idx_shifted = []
+        self.active_unocc_idx_shifted = []
+        self.num_elec = self.int_gen.num_elec
         self.num_spin_orbs = 2 * len(self.int_gen.kinetic_energy)
         self.num_orbs = len(self.int_gen.kinetic_energy)
         self.num_active_elec = cas[0]
@@ -108,14 +112,6 @@ class WaveFunctionSACircuit:
             else:
                 self.virtual_spin_idx.append(i)
                 self.num_virtual_spin_orbs += 1
-        if len(self.active_spin_idx) != 0:
-            active_shift = np.min(self.active_spin_idx)
-            for active_idx in self.active_spin_idx:
-                self.active_spin_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_occ_spin_idx:
-                self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_unocc_spin_idx:
-                self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
         self.num_active_orbs = self.num_active_spin_orbs // 2
         self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
@@ -140,6 +136,23 @@ class WaveFunctionSACircuit:
         for idx in self.active_unocc_spin_idx:
             if idx // 2 not in self.active_unocc_idx:
                 self.active_unocc_idx.append(idx // 2)
+        # Make shifted indices
+        if len(self.active_spin_idx) != 0:
+            active_shift = np.min(self.active_spin_idx)
+            for active_idx in self.active_spin_idx:
+                self.active_spin_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_occ_spin_idx:
+                self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_unocc_spin_idx:
+                self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
+        if len(self.active_idx) != 0:
+            active_shift = np.min(self.active_idx)
+            for active_idx in self.active_idx:
+                self.active_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_occ_idx:
+                self.active_occ_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_unocc_idx:
+                self.active_unocc_idx_shifted.append(active_idx - active_shift)
         # Find non-redundant kappas
         self._kappa = []
         kappa_idx = []
@@ -187,7 +200,12 @@ class WaveFunctionSACircuit:
         # Setup Qiskit stuff
         self.QI = quantum_interface
         self.QI.construct_circuit(
-            self.num_active_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta)
+            self.active_occ_idx_shifted,
+            self.active_unocc_idx_shifted,
+            self.active_occ_spin_idx_shifted,
+            self.active_unocc_spin_idx_shifted,
+            self.num_active_orbs,
+            (self.num_active_elec_alpha, self.num_active_elec_beta),
         )
 
     @property
@@ -319,7 +337,12 @@ class WaveFunctionSACircuit:
     def _reconstruct_circuit(self) -> None:
         """Construct circuit again."""
         self.QI.construct_circuit(
-            self.num_active_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta)
+            self.active_occ_idx_shifted,
+            self.active_unocc_idx_shifted,
+            self.active_occ_spin_idx_shifted,
+            self.active_unocc_spin_idx_shifted,
+            self.num_active_orbs,
+            (self.num_active_elec_alpha, self.num_active_elec_beta),
         )
 
     @property

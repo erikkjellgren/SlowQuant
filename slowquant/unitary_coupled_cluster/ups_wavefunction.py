@@ -87,6 +87,8 @@ class WaveFunctionUPS:
         self._energy_elec: float | None = None
         self.ansatz_options = ansatz_options
         self.num_energy_evals = 0
+        # Used when converting to circuit wavefunction.
+        self._include_active_kappa = include_active_kappa
         # Construct spin orbital spaces and indices
         active_space = []
         orbital_counter = 0
@@ -215,41 +217,51 @@ class WaveFunctionUPS:
         self.ci_coeffs = np.copy(self.csf_coeffs)
         # Construct UPS Structure
         self.ups_layout = UpsStructure()
-        if ansatz.lower() == "tups":
-            self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
-        elif ansatz.lower() == "qnp":
-            self.ansatz_options["do_qnp"] = True
-            self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
-        elif ansatz.lower() == "fuccsd":
-            self.ansatz_options["S"] = True
-            self.ansatz_options["D"] = True
+        if ansatz.lower() in ("tups", "qnp"):
+            if ansatz.lower() == "tups":
+                self.ansatz_options["do_tups"] = True
+            elif ansatz.lower() == "qnp":
+                self.ansatz_options["do_qnp"] = True
+            self.ups_layout.create_tiled(self.num_active_orbs, self.ansatz_options)
+        elif ansatz.lower() in ("fucc", "fuccsd", "ksafupccgsd", "fuccpd", "safuccsd"):
+            if ansatz.lower() == "fuccsd":
+                self.ansatz_options["S"] = True
+                self.ansatz_options["D"] = True
+            elif ansatz.lower() == "ksafupccgsd":
+                self.ansatz_options["SAGS"] = True
+                self.ansatz_options["GpD"] = True
+            elif ansatz.lower() == "fuccspd":
+                self.ansatz_options["pD"] = True
+            elif ansatz.lower() == "safuccspd":
+                self.ansatz_options["SAS"] = True
+                self.ansatz_options["SAD"] = True
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        elif ansatz.lower() == "ksafupccgsd":
-            self.ansatz_options["SAGS"] = True
-            self.ansatz_options["GpD"] = True
-            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        elif ansatz.lower() == "sdsfuccsd":
-            self.ansatz_options["D"] = True
+            self.ups_layout.create_fUCC(
+                self.active_occ_idx_shifted,
+                self.active_unocc_idx_shifted,
+                self.active_occ_spin_idx_shifted,
+                self.active_unocc_spin_idx_shifted,
+                self.num_active_orbs,
+                self.ansatz_options,
+            )
+        elif ansatz.lower() in ("sdsfuccsd", "ksasdsfupccgsd"):
+            if ansatz.lower() == "sdsfuccsd":
+                self.ansatz_options["D"] = True
+            elif ansatz.lower() == "ksasdsfupccgsd":
+                self.ansatz_options["GpD"] = True
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.ups_layout.create_SDSfUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        elif ansatz.lower() == "ksasdsfupccgsd":
-            self.ansatz_options["GpD"] = True
-            self.ups_layout.create_SDSfUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        elif ansatz.lower() == "fucc":
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        elif ansatz.lower() == "sdsfucc":
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.ups_layout.create_SDSfUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+            self.ups_layout.create_SDSfUCC(
+                self.active_occ_idx_shifted,
+                self.active_unocc_idx_shifted,
+                self.active_occ_spin_idx_shifted,
+                self.active_unocc_spin_idx_shifted,
+                self.num_active_orbs,
+                self.ansatz_options,
+            )
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
