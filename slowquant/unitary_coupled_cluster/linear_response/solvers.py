@@ -517,38 +517,6 @@ class PairedDavidson(Davidson):
         self._trial = self._orthonormalize(trial)
         self._sigma_plus, self._sigma_minus, self._tau_plus, self._tau_minus = right_transformed_vectors
 
-def one_index_transform(K: np.ndarray, h_mo: np.ndarray, g_mo: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray]:
-    r"""One index transformation of the Hamiltonian.
-
-    .. math::
-        \sum_\mu [\hat{H}, \kappa_\mu \hat{q}_\mu^\dagger + h \kappa_\mu^* \hat{q}_\mu] = \hat{\tilde{H}}_h, h \in {+1, -1}
-
-    Args:
-        K: Orbital rotation parameters (h=\pm 1).
-        num_orbs: Number of spatial orbitals.
-        h_mo: One-electron integrals in molecular orbital basis.
-        g_mo: Two-electron integrals in molecular orbital basis.
-
-    Returns:
-        One index transformed h_{h} (h=\pm1)
-        One index transformed g_{h} (h=\pm1)
-    """
-    inv_sqrt_2 = 1 / np.sqrt(2)
-    h = np.einsum("pt,tq->pq", h_mo, K) - np.einsum("tq,pt->pq", h_mo, K)
-    h *= inv_sqrt_2
-
-    if g_mo is None:
-        return h, np.array(())
-
-    g = (
-        np.einsum("ptrs,tq->pqrs", g_mo, K)
-        - np.einsum("tqrs,pt->pqrs", g_mo, K)
-    )
-    g += np.einsum("pqrs->rspq", g)
-    g *= inv_sqrt_2
-
-    return h, g
-
 def _real_eigvals(
         w: np.typing.NDArray[np.complexfloating],
         v: np.typing.NDArray[np.complexfloating],

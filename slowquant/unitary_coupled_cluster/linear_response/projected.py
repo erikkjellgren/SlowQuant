@@ -3,6 +3,7 @@ import numpy as np
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
+    one_index_transform,
 )
 from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient_response,
@@ -17,9 +18,6 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
     LinearResponseBaseClass,
-)
-from slowquant.unitary_coupled_cluster.linear_response.solvers import (
-    one_index_transform,
 )
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     expectation_value,
