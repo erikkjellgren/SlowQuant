@@ -211,6 +211,7 @@ def fUCC(
     grad_param_R_r = {}
     grad_param_R_phi = {}
     idx = 0
+    idx2 = 0
     #AE start
     if "is_spin_conserving" in ansatz_options.keys():
         is_spin_conserving = ansatz_options["is_spin_conserving"]
@@ -226,11 +227,12 @@ def fUCC(
     for _ in range(n_layers):
         if do_S:
             for a, i in iterate_t1(occ_spin_idx, unocc_spin_idx, is_spin_conserving=is_spin_conserving):
-                qc = single_excitation_generalized(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
-                grad_param_R_r[f"p{idx:09d}"] = 2
-                grad_param_R_phi[f"p{idx:09d}"] = 2
+                qc = single_excitation_generalized(i, a, num_orbs, qc, Parameter(f"norm{idx:09d}"), Parameter(f"phi{idx:09d}"), mapper)
+                grad_param_R_r[f"norm{idx:09d}"] = 2
+                grad_param_R_phi[f"phi{idx:09d}"] = 2
                 # Insert extra grad_param_R for phi AWE
                 idx += 1
+                idx2 += 1
         if do_SAS:
             for a, i, _ in iterate_t1_sa(occ, unocc):
                 qc = sa_single_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
@@ -246,11 +248,12 @@ def fUCC(
             None
         if do_D:
             for a, i, b, j in iterate_t2(occ_spin_idx, unocc_spin_idx, is_spin_conserving=is_spin_conserving):
-                qc = double_excitation_generalized(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
-                grad_param_R_r[f"p{idx:09d}"] = 2
-                grad_param_R_phi[f"p{idx:09d}"] = 4
+                qc = double_excitation_generalized(i, j, a, b, num_orbs, qc, Parameter(f"norm{idx:09d}"), Parameter(f"phi{idx:09d}"), mapper)
+                grad_param_R_r[f"norm{idx:09d}"] = 2
+                grad_param_R_phi[f"phi{idx:09d}"] = 4
                 # Insert extra grad_param_R for phi AWE
                 idx += 1
+                idx2 +=1
         if do_pD:
             for a, i, b, j in iterate_pair_t2(occ, unocc):
                 qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)

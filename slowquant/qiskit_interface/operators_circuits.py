@@ -6,7 +6,7 @@ from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
-from slowquant.qiskit_interface.util import f2q
+from slowquant.qiskit_interface.util import f2q, f2q_spin
 from slowquant.unitary_coupled_cluster.operators import a_op_spin
 
 
@@ -43,6 +43,7 @@ def single_excitation_generalized(
     num_orbs: int,
     qc: QuantumCircuit,
     theta: Parameter | ParameterExpression,
+    phi: Parameter | ParameterExpression,
     mapper: FermionicMapper,
 ) -> QuantumCircuit:
     """Get single excitation circuit.
@@ -59,7 +60,7 @@ def single_excitation_generalized(
         Single excitation circuit.
     """
     if isinstance(mapper, JordanWignerMapper):
-        qc = _single_excitation_efficient_generalized(a, i, num_orbs, qc, theta)
+        qc = _single_excitation_efficient_generalized(a, i, num_orbs, qc, theta, phi)
     else:
         qc = _single_excitation_trotter(i, a, num_orbs, qc, theta, mapper)
     return qc
@@ -212,7 +213,7 @@ def _single_excitation_efficient(
 
 
 def _single_excitation_efficient_generalized(
-    k: int, i: int, num_orbs: int, qc: QuantumCircuit, theta_complex: Parameter | ParameterExpression
+    k: int, i: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression, phi: Parameter | ParameterExpression
 ) -> QuantumCircuit:
     r"""Exact circuit for single excitation.
 
@@ -234,12 +235,18 @@ def _single_excitation_efficient_generalized(
     Returns:
         Single excitation circuit.
     """
-    phi = np.arccos(theta_complex.real)
-    theta = np.sqrt(theta_complex.real**2 + theta_complex.imag**2)
+    #print("Efficient")
+    #print(i,k)
+    # phi = np.arccos(theta_complex.real)
+    # theta = np.sqrt(theta_complex.real**2 + theta_complex.imag**2)
+
+    # print(theta)
+    # print(phi)
 
 
-    k = f2q(k, num_orbs)
-    i = f2q(i, num_orbs)
+    #k = f2q_spin(k, num_orbs)
+    #i = f2q_spin(i, num_orbs)
+    #print(i,k)
     if k <= i:
         raise ValueError(f"k={k}, must be larger than i={i}")
     if k - 1 == i:
@@ -412,7 +419,7 @@ def _double_excitation_efficient(
 
 
 def _double_excitation_efficient_generalized(
-    k: int, l: int, i: int, j: int, num_orbs: int, qc: QuantumCircuit, theta_complex: Parameter | ParameterExpression
+    k: int, l: int, i: int, j: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression, phi: Parameter | ParameterExpression
 ) -> QuantumCircuit:
     r"""Exact circuit for double excitation.
 
@@ -437,8 +444,8 @@ def _double_excitation_efficient_generalized(
         Double excitation circuit.
     """
 
-    phi = np.arccos(theta_complex.real)
-    theta = np.sqrt(theta_complex.real**2 + theta_complex.imag**2)
+    # phi = np.arccos(theta_complex.real)
+    # theta = np.sqrt(theta_complex.real**2 + theta_complex.imag**2)
 
 
     if k < i or k < j:
@@ -463,15 +470,15 @@ def _double_excitation_efficient_generalized(
         n_alpha += 1
     else:
         n_beta += 1
-    if n_alpha % 2 != 0 or n_beta % 2 != 0:
-        raise ValueError("Operator only implemented for spin conserving operators.")
+    # if n_alpha % 2 != 0 or n_beta % 2 != 0:
+    #     raise ValueError("Operator only implemented for spin conserving operators.")
     fac = 1
     if k % 2 == l % 2 and k % 2 == 0 and i % 2 != 0:
         fac *= -1
-    k = f2q(k, num_orbs)
-    l = f2q(l, num_orbs)
-    i = f2q(i, num_orbs)
-    j = f2q(j, num_orbs)
+    #k = f2q_spin(k, num_orbs)
+    #l = f2q_spin(l, num_orbs)
+    #i = f2q_spin(i, num_orbs)
+    #j = f2q_spin(j, num_orbs)
     if k > l:
         l, k = k, l
         fac *= -1

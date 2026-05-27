@@ -916,6 +916,35 @@ def f2q(i: int, num_orbs: int) -> int:
         return i // 2
     return i // 2 + num_orbs
 
+def f2q_spin(i: int, num_orbs: int) -> int:
+    r"""Convert fermionic index to qubit index.
+
+    The fermionic index is assumed to follow the convention,
+
+    .. math::
+        \left|0_\alpha 0_\beta 1_\alpha 1_\beta ... N_\alpha N_\beta\right>
+
+    The qubit index follows,
+
+    .. math::
+       \left|0_\alpha 1_\alpha ... N_\alpha 0_\beta 1_\beta ... N_\beta\right>
+
+    This function assumes Jordan-Wigner mapping.
+
+    Args:
+        i: Fermionic index.
+        num_orbs: Number of spatial orbitals.
+
+    Returns:
+        Qubit index.
+    """
+
+    num_orbs = num_orbs // 2
+
+    if i % 2 == 0:
+        return i // 2
+    return i // 2 + num_orbs
+
 
 def get_determinant_superposition_reference(
     det1: str, det2: str, num_orbs: int, mapper: JordanWignerMapper
