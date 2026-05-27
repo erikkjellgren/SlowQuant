@@ -561,3 +561,180 @@ def get_orbital_response_hessian_block(
                                 p, q, r, u, num_inactive_orbs, num_active_orbs, rdm1, rdm2
                             )
     return 1 / 2 * A1e + 1 / 4 * A2e
+
+@nb.jit(nopython=True)
+def get_orbital_gradient_response_right_transformed(
+    h_int: np.ndarray,
+    g_int: np.ndarray | None,
+    q_idx: list[tuple[int, int]] | np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    rdm1: np.ndarray,
+    rdm2: np.ndarray,
+) -> np.ndarray:
+    r"""Calculate the orbital gradient.
+
+    .. math::
+        g_{tu}^{\hat{q}} = \left<0\left|\left[\hat{q}_{tu},\hat{H}\right]\right|0\right>
+
+    Args:
+        h_int: One-electron integrals in MO in Hamiltonian.
+        g_int: Two-electron integrals in MO in Hamiltonian.
+        q_idx: Orbital rotation parameter indices in spatial basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        rdm1: Active part of 1-RDM.
+        rdm2: Active part of 2-RDM.
+
+    Returns:
+        Orbital gradient.
+    """
+    inv_sqrt_2 = 1 / np.sqrt(2)
+    gradient = np.zeros(len(q_idx))
+    for idx, (t, u) in enumerate(q_idx):
+        # 1e contribution
+        for p in range(num_inactive_orbs + num_active_orbs):
+            gradient[idx] += h_int[u, p] * RDM1(t, p, num_inactive_orbs, num_active_orbs, rdm1)
+            gradient[idx] -= h_int[p, t] * RDM1(p, u, num_inactive_orbs, num_active_orbs, rdm1)
+        # 2e contribution
+        if g_int is None:
+            continue
+        for p in range(num_inactive_orbs + num_active_orbs):
+            for q in range(num_inactive_orbs + num_active_orbs):
+                for r in range(num_inactive_orbs + num_active_orbs):
+                    gradient[idx] += g_int[u, p, q, r] * RDM2(
+                        t, p, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                    )
+                    gradient[idx] -= g_int[p, q, r, t] * RDM2(
+                        p, q, r, u, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                    )
+    return inv_sqrt_2 * gradient
+
+@nb.jit(nopython=True)
+def get_orbital_response_metric_sigma_right_transformed(
+    q1_idx: list[tuple[int, int]] | np.ndarray,
+    q2_idx: list[tuple[int, int]] | np.ndarray,
+    trial: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    rdm1: np.ndarray,
+) -> np.ndarray:
+    r"""Calculate the Sigma matrix orbital-orbital block.
+
+    .. math::
+        \Sum_{tu}\Sigma_{pq,tu}^{\hat{q}_1,\hat{q}_2} = \left<0\left|\left[\hat{q}_{1,pq}^\dagger,\hat{q}_{2,tu}\right]\right|0\right>
+
+    Args:
+        q1_idx: First set of orbital rotation parameter indices in spatial basis.
+        q2_idx: Second set of orbital rotation parameter indices in spatial basis.
+        trial: Trial vectors.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        rdm1: Active part of 1-RDM.
+
+    Returns:
+        Sigma matrix orbital-orbital block.
+    """
+    sigma = np.zeros(len(q1_idx))
+    for idx1, (p, q) in enumerate(q1_idx):
+        for idx2, (t, u) in enumerate(q2_idx):
+            if t == q:
+                sigma[idx1] += RDM1(p, u, num_inactive_orbs, num_active_orbs, rdm1) * trial[idx2]
+            if p == u:
+                sigma[idx1] -= RDM1(t, q, num_inactive_orbs, num_active_orbs, rdm1) * trial[idx2]
+    return - 0.5 * sigma
+
+@nb.jit(nopython=True)
+def get_orbital_hessian_diagonal(
+    h: np.ndarray,
+    g: np.ndarray,
+    q_idx: list[tuple[int, int]] | np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    rdm1: np.ndarray,
+    rdm2: np.ndarray,
+) -> np.ndarray:
+    r"""Calculate the diagonal of the A matrix orbital-orbital block.
+
+    .. math::
+        A_{pq,pq}^{\hat{q},\hat{q}} = \left<0\left|\left[\hat{q}_{pq}^\dagger,\left[\hat{H},\hat{q}_{pq}\right]\right]\right|0\right>
+
+    Args:
+        h: One-electron integrals in MO in Hamiltonian.
+        g: Two-electron integrals in MO in Hamiltonian.
+        q_idx: Orbital rotation parameter indices in spatial basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        rdm1: Active part of 1-RDM.
+        rdm2: Active part of 2-RDM.
+
+    Returns:
+        Diagonal of the A matrix orbital-orbital block.
+    """
+    diagonal = np.zeros(len(q_idx))
+    for idx1, (t, u) in enumerate(q_idx):
+        # 1e contribution
+        diagonal[idx1] += h[t, t] * RDM1(u, u, num_inactive_orbs, num_active_orbs, rdm1)
+        diagonal[idx1] += h[u, u] * RDM1(t, t, num_inactive_orbs, num_active_orbs, rdm1)
+        for p in range(num_inactive_orbs + num_active_orbs):
+            diagonal[idx1] -= h[t, p] * RDM1(t, p, num_inactive_orbs, num_active_orbs, rdm1)
+            diagonal[idx1] -= h[p, u] * RDM1(p, u, num_inactive_orbs, num_active_orbs, rdm1)
+        # 2e contribution
+        for p in range(num_inactive_orbs + num_active_orbs):
+            for q in range(num_inactive_orbs + num_active_orbs):
+                diagonal[idx1] += g[t, t, p, q] * RDM2(
+                    u, u, p, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                )
+                diagonal[idx1] -= g[t, p, u, q] * RDM2(
+                    u, p, t, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                )
+                diagonal[idx1] += g[t, p, q, t] * RDM2(
+                    u, p, q, u, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                )
+                diagonal[idx1] += g[u, u, p, q] * RDM2(
+                    t, t, p, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                )
+                diagonal[idx1] += g[p, u, u, q] * RDM2(
+                    p, t, t, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                )
+                diagonal[idx1] -= g[p, u, q, t] * RDM2(
+                    p, t, q, u, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                )
+        for p in range(num_inactive_orbs + num_active_orbs):
+            for q in range(num_inactive_orbs + num_active_orbs):
+                for r in range(num_inactive_orbs + num_active_orbs):
+                    diagonal[idx1] -= g[t, p, q, r] * RDM2(
+                        t, p, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                    )
+                    diagonal[idx1] -= g[p, u, q, r] * RDM2(
+                        p, u, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                    )
+    return 0.5 * diagonal
+
+@nb.jit(nopython=True)
+def get_orbital_metric_diagonal(
+    q_idx: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    rdm1: np.ndarray,
+) -> np.ndarray:
+    r"""Calculate the diagonal of the Sigma matrix orbital-orbital block.
+
+    .. math::
+        \Sigma_{pq,pq}^{\hat{q},\hat{q}} = \left<0\left|\left[\hat{q}_{pq}^\dagger,\hat{q}_{pq}\right]\right|0\right>
+
+    Args:
+        q_idx: Orbital rotation parameter indices in spatial basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        rdm1: Active part of 1-RDM.
+
+    Returns:
+        Diagonal of the sigma matrix orbital-orbital block.
+    """
+    diagonal = np.zeros(len(q_idx))
+    for idx1, (p, q) in enumerate(q_idx):
+        diagonal[idx1] += RDM1(p, p, num_inactive_orbs, num_active_orbs, rdm1)
+        diagonal[idx1] -= RDM1(q, q, num_inactive_orbs, num_active_orbs, rdm1)
+    diagonal *= 0.5
+    return diagonal

@@ -9,16 +9,16 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_response_hessian_block,
     get_orbital_response_metric_sigma,
     get_orbital_response_property_gradient,
+    get_orbital_gradient_response_right_transformed,
+    get_orbital_response_metric_sigma_right_transformed,
+    get_orbital_hessian_diagonal,
+    get_orbital_metric_diagonal,
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
     LinearResponseBaseClass,
 )
 from slowquant.unitary_coupled_cluster.linear_response.solvers import (
-    get_orbital_rotation_gradient,
-    get_orbital_metric_block,
-    get_orbital_hessian_diagonal,
-    get_orbital_metric_diagonal,
     one_index_transform,
 )
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
@@ -321,8 +321,8 @@ class LinearResponse(LinearResponseBaseClass):
                 tH00m_ket = propagate_state([tH00_minus], self.wf.ci_coeffs, *self.index_info)
 
                 # (A+B)_qq @ b_q
-                # <0| [GId, H, qs + qsd] |0>
-                sigma_plus[:num_q, root] += get_orbital_rotation_gradient(
+                # <0| [qid, H, qs + qsd] |0>
+                sigma_plus[:num_q, root] += get_orbital_gradient_response_right_transformed(
                     h_plus,
                     g_plus,
                     self.wf.kappa_no_activeactive_idx_dagger,
@@ -332,8 +332,8 @@ class LinearResponse(LinearResponseBaseClass):
                     self.wf.rdm2,
                 )
                 # (A-B)_qq @ b_q
-                # <0| [GId, H, qs - qsd] |0>
-                sigma_minus[:num_q, root] += get_orbital_rotation_gradient(
+                # <0| [qid, H, qs - qsd] |0>
+                sigma_minus[:num_q, root] += get_orbital_gradient_response_right_transformed(
                     h_minus,
                     g_minus,
                     self.wf.kappa_no_activeactive_idx,
@@ -344,7 +344,7 @@ class LinearResponse(LinearResponseBaseClass):
                 )
                 # Sigma_qq @ b_q
                 # <0| [qid, qs] |0>
-                tau_plus[:num_q, root] += get_orbital_metric_block(
+                tau_plus[:num_q, root] += get_orbital_response_metric_sigma_right_transformed(
                     self.wf.kappa_no_activeactive_idx_dagger,
                     self.wf.kappa_no_activeactive_idx,
                     trial[num_ops:, root],
@@ -352,7 +352,7 @@ class LinearResponse(LinearResponseBaseClass):
                     self.wf.num_active_orbs,
                     self.wf.rdm1,
                 )
-                tau_minus[:num_q, root] += get_orbital_metric_block(
+                tau_minus[:num_q, root] += get_orbital_response_metric_sigma_right_transformed(
                     self.wf.kappa_no_activeactive_idx_dagger,
                     self.wf.kappa_no_activeactive_idx,
                     trial[:num_ops, root],
@@ -738,7 +738,7 @@ class LinearResponse(LinearResponseBaseClass):
         num_ops = num_q + num_G
         gradient = np.zeros((num_ops))
         if num_q != 0:
-            gradient[:num_q] = get_orbital_rotation_gradient(
+            gradient[:num_q] = get_orbital_gradient_response_right_transformed(
                 integral,
                 None,
                 self.wf.kappa_no_activeactive_idx,
