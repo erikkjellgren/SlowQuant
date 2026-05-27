@@ -421,6 +421,12 @@ class LinearResponse(LinearResponseBaseClass):
         prec_A = np.zeros(num_q + num_G)
         prec_sigma = np.zeros(num_q + num_G)
 
+        F_0i_0a = one_elec_op_0i_0a(
+            self.wf.F_mo,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+        )
+
         if len(self.q_ops) != 0:
             # Approximate q diagonal
             prec_A[:num_q] = get_orbital_hessian_diagonal(
@@ -439,12 +445,12 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.num_active_orbs,
                 self.wf.rdm1,
             )
-        # Exact G diagonal
         for i, GI in enumerate(self.G_ops):
             GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
+            # Approximate G diagonal
             prec_A[i + num_q] += expectation_value(
                 GI_ket,
-                [self.H_0i_0a],
+                [F_0i_0a],
                 GI_ket,
                 *self.index_info,
             )
@@ -457,6 +463,7 @@ class LinearResponse(LinearResponseBaseClass):
             prec_A[i + num_q] -= self.wf.energy_elec * GIGI_expect
             prec_A[i + num_q] += self.wf.energy_elec * self._G_expect[i]**2
             prec_A[i + num_q] -= self._G_expect[i] * self._HG_expect[i]
+            # Exact G diagonal
             prec_sigma[i + num_q] += GIGI_expect
             prec_sigma[i + num_q] -= self._G_expect[i]**2
 

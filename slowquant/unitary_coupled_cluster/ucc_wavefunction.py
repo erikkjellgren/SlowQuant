@@ -337,6 +337,15 @@ class WaveFunctionUCC:
         return self._g_mo
 
     @property
+    def F_mo(self) -> np.ndarray:
+        """Get Fock matrix in MO basis.
+
+        Returns:
+            Fock matrix in MO basis.
+        """
+        return self.h_mo + np.einsum("pqrs,rs->pq", self.g_mo, self.rdm1) - 0.5 * np.einsum("prsq,rs->pq", self.g_mo, self.rdm1)
+
+    @property
     def rdm1(self) -> np.ndarray:
         """Calculate one-electron reduced density matrix in the active space.
 
