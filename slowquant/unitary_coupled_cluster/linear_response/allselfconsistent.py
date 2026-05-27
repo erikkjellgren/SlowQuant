@@ -97,7 +97,7 @@ class LinearResponse(LinearResponseBaseClass):
         print("qs", len(self.q_ops))
         grad = np.zeros(2 * len(self.q_ops))
         print("WARNING!")
-        print("Gradient working equations not implemented for state transfer q operators")
+        print("Gradient working equations not implemented for self consistent q operators")
         if len(grad) != 0:
             print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:

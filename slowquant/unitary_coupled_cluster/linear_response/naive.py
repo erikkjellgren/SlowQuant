@@ -456,7 +456,7 @@ class LinearResponse(LinearResponseBaseClass):
             transition_dipoles[state_number, 2] = q_part_z + transition_dipole_z
         return transition_dipoles
 
-    def get_property_gradient(self, property_integrals: np.ndarray) -> np.ndarray:
+    def get_property_gradient(self, property_integrals: np.ndarray | tuple[np.ndarray]) -> np.ndarray:
         """Calculate property gradient.
 
         Args:
