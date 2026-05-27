@@ -882,6 +882,11 @@ class WaveFunctionUPS:
                 raise ValueError(
                     "Cannot use RotoSolve together with orbital optimization in the one-step solver."
                 )
+        if orbital_optimization and len(self.kappa) == 0:
+            print(
+                "WARNING: No orbital optimization performed, because there are no orbital rotation parameters."
+            )
+            orbital_optimization = False
 
         print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #")
         if orbital_optimization:
