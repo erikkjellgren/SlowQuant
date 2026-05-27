@@ -370,6 +370,19 @@ class WaveFunctionSAUPS:
         return self._g_mo
 
     @property
+    def F_mo(self) -> np.ndarray:
+        """Get Fock matrix in MO basis.
+
+        Returns:
+            Fock matrix in MO basis.
+        """
+        rdm1 = np.zeros((self.num_orbs, self.num_orbs))
+        act_slice = slice(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs)
+        rdm1[: self.num_inactive_orbs, : self.num_inactive_orbs] = 2.0 * np.eye(self.num_inactive_orbs)
+        rdm1[act_slice, act_slice] = self.rdm1
+        return self.h_mo + np.einsum("pqrs,rs->pq", self.g_mo, rdm1) - 0.5 * np.einsum("prsq,rs->pq", self.g_mo, rdm1)
+
+    @property
     def rdm1(self) -> np.ndarray:
         """Calculate one-electron reduced density matrix in the active space.
 
