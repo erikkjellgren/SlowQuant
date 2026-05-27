@@ -896,7 +896,7 @@ def generalized_get_grad_action(
     if exc_type in (
         "single",
         "double",
-        "triple"
+        "triple",
         "quadruple"
         ):
         # Create T matrix
