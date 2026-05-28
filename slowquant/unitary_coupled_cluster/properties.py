@@ -84,57 +84,6 @@ class properties():
                 triplet=True
                 )
         return self._LR_triplet
-    
-    def get_oscillator_strength(self) -> np.ndarray:
-        r"""Calculate oscillator strength.
-
-        .. math::
-            f_n = \frac{2}{3}e_n\left|\left<0\left|\hat{\mu}\right|n\right>\right|^2
-
-        Returns:
-            Oscillator Strength.
-        """
-        if not hasattr(self.LR_singlet, "excitation_energies"):
-            self.LR_singlet.calc_excitation_energies()
-
-        osc_strs = np.zeros(len(self.LR_singlet.excitation_energies))
-        prop_grad = self.LR_singlet.get_property_gradient(self.wf.int_gen.electric_dipole)
-
-        for idx, excitation_energy in enumerate(
-            self.LR_singlet.excitation_energies
-            ):
-            osc_strs[idx] = (
-                2
-                / 3
-                * excitation_energy
-                * (np.dot(prop_grad[:,0], self.LR_singlet.normed_response_vectors[:,idx]) ** 2  
-                   + np.dot(prop_grad[:,1], self.LR_singlet.normed_response_vectors[:,idx]) ** 2  
-                   + np.dot(prop_grad[:,2], self.LR_singlet.normed_response_vectors[:,idx]) ** 2)
-            )
-        self.oscillator_strengths = osc_strs
-        return osc_strs
-
-    def get_formatted_oscillator_strength(self) -> str:
-        """Create table of excitation energies and oscillator strengths.
-
-        Returns:
-            Nicely formatted table.
-        """
-        if not hasattr(self, "oscillator_strengths"):
-            self.get_oscillator_strength()
-
-        output = (
-            "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n"
-        )
-
-        for i, (exc_energy, osc_strength) in enumerate(
-            zip(self.LR_singlet.excitation_energies, self.oscillator_strengths)
-        ):
-            exc_str = f"{exc_energy:2.6f}"
-            exc_str_ev = f"{exc_energy * 27.2114079527:3.6f}"
-            osc_str = f"{osc_strength:1.6f}"
-            output += f"{str(i + 1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
-        return output
 
     def get_polarisability(self, freq=0) -> np.ndarray:
         """Calculate the frequency dependent polarisability tensor.
