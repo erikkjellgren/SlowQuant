@@ -320,7 +320,6 @@ class LinearResponse(LinearResponseBaseClass):
                         [],
                         E_ket,
                         *self.index_info_extended,
-                        #do_unsafe=True
                     )
                     # - < 0 | E U q | CSF >
                     val -= expectation_value(
@@ -328,7 +327,6 @@ class LinearResponse(LinearResponseBaseClass):
                         [],
                         Uq_ket,
                         *self.index_info_extended,
-                        #do_unsafe=True
                     )
                     V[idx, :] += mo[:, p, q] * val
 

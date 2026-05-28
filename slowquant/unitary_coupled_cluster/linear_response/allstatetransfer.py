@@ -17,6 +17,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
 )
 from slowquant.unitary_coupled_cluster.operators import (
     Epq,
+    Tpq,
     hamiltonian_2i_2a,
     one_elec_op_0i_0a,
     one_elec_op_1i_1a,
@@ -75,7 +76,10 @@ class LinearResponse(LinearResponseBaseClass):
         self.ci_coeffs = propagate_state(["U"], self.csf_coeffs, *self.index_info_extended)
         self.q_ops: list[FermionicOperator] = []
         for i, a in self.wf.kappa_hf_like_idx:
-            op = 2 ** (-1 / 2) * Epq(a, i)
+            if not self.triplet:
+                op = 2 ** (-1 / 2) * Epq(a, i)
+            else:
+                op = 2 ** (-1 / 2) * Tpq(a, i)
             self.q_ops.append(op)
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
@@ -182,129 +186,68 @@ class LinearResponse(LinearResponseBaseClass):
                 if i == j:
                     self.Sigma[i + idx_shift, j + idx_shift] = 1
 
-    def get_transition_dipole(self) -> np.ndarray:
-        """Calculate transition dipole moment.
+    def get_property_gradient(self, property_integrals: np.ndarray | tuple[np.ndarray]) -> np.ndarray:
+        """Calculate property gradient.
+
+        Args:
+            property_integrals: Integrals in AO basis.
 
         Returns:
-            Transition dipole moment.
+            Property gradient.
         """
-        dipole_integrals = self.wf.int_gen.electric_dipole
-        mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
-        muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
-        muz = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[2])
-        mux_op_G = one_elec_op_0i_0a(
-            mux,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        muy_op_G = one_elec_op_0i_0a(
-            muy,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        muz_op_G = one_elec_op_0i_0a(
-            muz,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        mux_op_q = one_elec_op_1i_1a(
-            mux, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs
-        )
-        muy_op_q = one_elec_op_1i_1a(
-            muy, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs
-        )
-        muz_op_q = one_elec_op_1i_1a(
-            muz, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs
-        )
-        transition_dipoles = np.zeros((len(self.normed_response_vectors[0]), 3))
-        for state_number in range(len(self.normed_response_vectors[0])):
-            q_part_x = 0.0
-            q_part_y = 0.0
-            q_part_z = 0.0
-            for i, q in enumerate(self.q_ops):
-                q_part_x -= self.Z_q_normed[i, state_number] * expectation_value(
-                    self.ci_coeffs,
-                    [mux_op_q, "U", q],
-                    self.csf_coeffs,
-                    *self.index_info_extended,
-                    do_unsafe=True,  # type: ignore
+        size_mo = self.wf.num_inactive_orbs + self.wf.num_active_orbs + self.wf.num_virtual_orbs
+        num_mo = len(property_integrals)
+        mo = np.zeros((num_mo, size_mo, size_mo))
+        for i, ao in enumerate(property_integrals):
+            mo[i, :, :] += one_electron_integral_transform(self.wf.c_mo, ao)
+
+        idx_shift_q = len(self.q_ops)
+        V = np.zeros((len(self.q_ops + self.G_ops), num_mo))
+        
+        if not self.triplet:
+            pq = Epq
+        else:
+            pq = Tpq
+
+        for idx, q in enumerate(self.q_ops):
+            Uq_ket = propagate_state(["U", q], self.csf_coeffs, *self.index_info_extended)
+            for p in range(self.wf.num_inactive_orbs + self.wf.num_active_orbs + self.wf.num_virtual_orbs):
+                for q in range(self.wf.num_inactive_orbs + self.wf.num_active_orbs + self.wf.num_virtual_orbs):
+                    Ed_ket = propagate_state([pq(q, p)], self.ci_coeffs, *self.index_info_extended)
+                    # - < 0 | E U q | CSF >
+                    val = - expectation_value(
+                        Ed_ket,
+                        [],
+                        Uq_ket,
+                        *self.index_info_extended,
+                    )
+                    V[idx, :] += mo[:, p, q] * val
+
+        for idx, G in enumerate(self.G_ops):
+            UG_ket = propagate_state(["U", G], self.csf_coeffs, *self.index_info_extended)
+            # Inactive part
+            for i in range(self.wf.num_inactive_orbs):
+                Ed_ket = propagate_state([pq(i, i)], self.ci_coeffs, *self.index_info_extended) 
+                # - < 0 | E U G | CSF >
+                val = - expectation_value(
+                    Ed_ket, 
+                    [], 
+                    UG_ket, 
+                    *self.index_info_extended
                 )
-                q_part_x += self.Y_q_normed[i, state_number] * expectation_value(
-                    self.csf_coeffs,
-                    [q.dagger, "Ud", mux_op_q],
-                    self.ci_coeffs,
-                    *self.index_info_extended,
-                    do_unsafe=True,  # type: ignore
-                )
-                q_part_y -= self.Z_q_normed[i, state_number] * expectation_value(
-                    self.ci_coeffs,
-                    [muy_op_q, "U", q],
-                    self.csf_coeffs,
-                    *self.index_info_extended,
-                    do_unsafe=True,  # type: ignore
-                )
-                q_part_y += self.Y_q_normed[i, state_number] * expectation_value(
-                    self.csf_coeffs,
-                    [q.dagger, "Ud", muy_op_q],
-                    self.ci_coeffs,
-                    *self.index_info_extended,
-                    do_unsafe=True,  # type: ignore
-                )
-                q_part_z -= self.Z_q_normed[i, state_number] * expectation_value(
-                    self.ci_coeffs,
-                    [muz_op_q, "U", q],
-                    self.csf_coeffs,
-                    *self.index_info_extended,
-                    do_unsafe=True,  # type: ignore
-                )
-                q_part_z += self.Y_q_normed[i, state_number] * expectation_value(
-                    self.csf_coeffs,
-                    [q.dagger, "Ud", muz_op_q],
-                    self.ci_coeffs,
-                    *self.index_info_extended,
-                    do_unsafe=True,  # type: ignore
-                )
-            g_part_x = 0.0
-            g_part_y = 0.0
-            g_part_z = 0.0
-            for i, G in enumerate(self.G_ops):
-                g_part_x -= self.Z_G_normed[i, state_number] * expectation_value(
-                    self.ci_coeffs,
-                    [mux_op_G, "U", G],
-                    self.csf_coeffs,
-                    *self.index_info_extended,
-                )
-                g_part_x += self.Y_G_normed[i, state_number] * expectation_value(
-                    self.csf_coeffs,
-                    [G.dagger, "Ud", mux_op_G],
-                    self.ci_coeffs,
-                    *self.index_info_extended,
-                )
-                g_part_y -= self.Z_G_normed[i, state_number] * expectation_value(
-                    self.ci_coeffs,
-                    [muy_op_G, "U", G],
-                    self.csf_coeffs,
-                    *self.index_info_extended,
-                )
-                g_part_y += self.Y_G_normed[i, state_number] * expectation_value(
-                    self.csf_coeffs,
-                    [G.dagger, "Ud", muy_op_G],
-                    self.ci_coeffs,
-                    *self.index_info_extended,
-                )
-                g_part_z -= self.Z_G_normed[i, state_number] * expectation_value(
-                    self.ci_coeffs,
-                    [muz_op_G, "U", G],
-                    self.csf_coeffs,
-                    *self.index_info_extended,
-                )
-                g_part_z += self.Y_G_normed[i, state_number] * expectation_value(
-                    self.csf_coeffs,
-                    [G.dagger, "Ud", muz_op_G],
-                    self.ci_coeffs,
-                    *self.index_info_extended,
-                )
-            transition_dipoles[state_number, 0] = q_part_x + g_part_x
-            transition_dipoles[state_number, 1] = q_part_y + g_part_y
-            transition_dipoles[state_number, 2] = q_part_z + g_part_z
-        return transition_dipoles
+                V[idx + idx_shift_q, :] += mo[:, i, i] * val
+            # Active part
+            for p in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):
+                for q in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):
+                    Ed_ket = propagate_state([pq(q, p)], self.ci_coeffs, *self.index_info_extended)
+                    # - < 0 | E U G | CSF >
+                    val = - expectation_value(
+                        Ed_ket, 
+                        [], 
+                        UG_ket, 
+                        *self.index_info_extended
+                    )
+                    V[idx + idx_shift_q, :] += mo[:, p, q] * val
+        if np.allclose(mo, mo.transpose(0, -1, -2)):
+            return np.vstack((V, -1 * V))
+        return np.vstack((V, V))
