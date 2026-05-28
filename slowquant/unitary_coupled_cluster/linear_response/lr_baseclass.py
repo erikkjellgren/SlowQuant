@@ -138,7 +138,7 @@ class LinearResponseBaseClass:
             (
             hess_eigval,
             _,
-            ) = np.linalg.eig(self.hessian)
+            ) = np.linalg.eig(self._hessian)
             print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
             if np.abs(np.min(hess_eigval)) < 10**-8:
                 print("WARNING: Small eigenvalue in Hessian")
@@ -154,8 +154,8 @@ class LinearResponseBaseClass:
             self._metric = np.zeros((size * 2, size * 2))
             self._metric[:size, :size] = self.Sigma
             self._metric[:size, size:] = self.Delta
-            self._metric[size:, :size] = self.Delta
-            self._metric[size:, size:] = self.Sigma
+            self._metric[size:, :size] = -self.Delta
+            self._metric[size:, size:] = -self.Sigma
 
             print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}")
 
@@ -213,14 +213,6 @@ class LinearResponseBaseClass:
 
         return norms
 
-    def get_transition_dipole(self) -> np.ndarray:
-        """Calculate transition dipole moment.
-
-        Returns:
-            Transition dipole moment.
-        """
-        raise NotImplementedError
-
     def get_oscillator_strength(self) -> np.ndarray:
         r"""Calculate oscillator strength.
 
@@ -230,16 +222,20 @@ class LinearResponseBaseClass:
         Returns:
             Oscillator Strength.
         """
-        transition_dipoles = self.get_transition_dipole()
-        osc_strs = np.zeros(len(transition_dipoles))
-        for idx, (excitation_energy, transition_dipole) in enumerate(
-            zip(self.excitation_energies, transition_dipoles)
-        ):
+
+        osc_strs = np.zeros(len(self.excitation_energies))
+        prop_grad = self.get_property_gradient(self.wf.int_gen.electric_dipole)
+
+        for idx, excitation_energy in enumerate(
+            self.excitation_energies
+            ):
             osc_strs[idx] = (
                 2
                 / 3
                 * excitation_energy
-                * (transition_dipole[0] ** 2 + transition_dipole[1] ** 2 + transition_dipole[2] ** 2)
+                * (np.dot(prop_grad[:,0], self.normed_response_vectors[:,idx]) ** 2  
+                   + np.dot(prop_grad[:,1], self.normed_response_vectors[:,idx]) ** 2  
+                   + np.dot(prop_grad[:,2], self.normed_response_vectors[:,idx]) ** 2)
             )
         self.oscillator_strengths = osc_strs
         return osc_strs
