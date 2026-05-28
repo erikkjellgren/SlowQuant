@@ -76,7 +76,7 @@ def do_product_extended_normal_ordering(
         nondagger2_set: Right-side non-dagger idx set.
 
     Returns:
-        Creation string, annihilation string, and, phase.
+        Creation string, annihilation string, and phase.
     """
     if nondagger1_set.isdisjoint(dagger2_set):
         # No index overlap between non-dagger left-side and dagger right-side.
@@ -95,7 +95,7 @@ def do_product_extended_normal_ordering(
             # sort the dagger part
             dagger_list = [*fermistring1[0], *fermistring2[0]]
             # Doing insertion sort, left-side part is already sorted.
-            # Hence not starting from 1.
+            # Hence we start sorting with the first index in fermistring2.
             for i in range(len(fermistring1[0]), len(dagger_list)):
                 j = i
                 while j > 0 and dagger_list[j] > dagger_list[j - 1]:
@@ -105,7 +105,7 @@ def do_product_extended_normal_ordering(
             # sort non-dagger part
             nondagger_list = [*fermistring1[1], *fermistring2[1]]
             # Doing insertion sort, left-side part is already sorted.
-            # Hence not starting from 1.
+            # Hence we start sorting with the first index in fermistring2.
             for i in range(len(fermistring1[1]), len(nondagger_list)):
                 j = i
                 while j > 0 and nondagger_list[j] > nondagger_list[j - 1]:
@@ -143,7 +143,7 @@ def do_product_extended_normal_ordering(
                 # sort the dagger part
                 dagger_list = [*fermistring1[0], *dagger_tmp]
                 # Doing insertion sort, left-side part is already sorted.
-                # Hence not starting from 1.
+                # Hence we start sorting with the first index in fermistring2.
                 for i in range(len(fermistring1[0]), len(dagger_list)):
                     j = i
                     while j > 0 and dagger_list[j] > dagger_list[j - 1]:
@@ -153,7 +153,7 @@ def do_product_extended_normal_ordering(
                 # sort non-dagger part
                 nondagger_list = [*nondagger_tmp, *fermistring2[1]]
                 # Doing insertion sort, left-side part is already sorted.
-                # Hence not starting from 1.
+                # Hence we start sorting with the first index in fermistring2.
                 for i in range(len(nondagger_tmp), len(nondagger_list)):
                     j = i
                     while j > 0 and nondagger_list[j] > nondagger_list[j - 1]:
@@ -174,8 +174,7 @@ def do_product_extended_normal_ordering_rankreduction(
     """Generate all fermistrings from the product of two fermistrings with the assumption of rank reduction.
 
     Takes as input two fermistrings that are already assumed to be sorted.
-    If a1 has no index overlap with c2, then strings are sorted as follows, then rank reduction cannot happen,
-    and the term is skipped.
+    If a1 has no index overlap with c2, then rank reduction cannot happen and the term is skipped
 
     If the annihilation part of fermstring1 has index overlap with the creation part of fermistring2,
     then strings are sorted as follows,
@@ -197,7 +196,7 @@ def do_product_extended_normal_ordering_rankreduction(
         nondagger2_set: Right-side non-dagger idx set.
 
     Returns:
-        Creation string, annihilation string, and, phase.
+        Creation string, annihilation string, and phase.
     """
     do_reduction = True
     if nondagger1_set.isdisjoint(dagger2_set):
@@ -332,7 +331,7 @@ class FermionicOperator:
             raise ValueError(f"Could not assign operator of {type(annihilation_operator)}.")
 
     def operator_sets(self, key: tuple[tuple[int, ...], tuple[int, ...]]) -> tuple[set[int], set[int]]:
-        """Get set represtion of fermionic string.
+        """Get set representation of fermionic string.
 
         Args:
             key: Fermionic string.
