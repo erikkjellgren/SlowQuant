@@ -166,28 +166,6 @@ class QuantumInterface:
             self.state_circuit: QuantumCircuit = QuantumCircuit(
                 self.ansatz.num_qubits
             )  # empty state as custom circuit is passed
-        elif self.ansatz == "tUPS" and "do_pp" in self.ansatz_options.keys() and self.ansatz_options["do_pp"]:
-            # HF in pp-tUPS ordering
-            if not isinstance(self.mapper, JordanWignerMapper):
-                raise ValueError(f"pp-tUPS only implemented for JW mapper, got: {type(self.mapper)}")
-            if np.sum(num_elec) != num_orbs:
-                raise ValueError(
-                    f"pp-tUPS only implemented for number of electrons and number of orbitals being the same, got: ({np.sum(num_elec)}, {num_orbs}), (elec, orbs)"
-                )
-            self.state_circuit = QuantumCircuit(2 * num_orbs)
-            for p in range(0, 2 * num_orbs):
-                if p % 2 == 0:
-                    self.state_circuit.x(p)
-        else:
-            self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
-        self.num_qubits = self.state_circuit.num_qubits
-
-        # Ansatz Circuit
-        if isinstance(self.ansatz, QuantumCircuit):
-            print(
-                "QI was initialized with a custom QuantumCircuit object. This is assumed to be the Ansatz (without state preparation circuit)"
-            )
-            self.circuit = self.ansatz
         elif isinstance(self.ansatz, str):
             if (
                 self.ansatz.lower() == "tups"
