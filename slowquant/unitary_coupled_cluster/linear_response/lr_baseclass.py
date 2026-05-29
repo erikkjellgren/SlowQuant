@@ -107,6 +107,7 @@ class LinearResponseBaseClass:
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
         )
+        self._linear_response_vectors: dict[tuple[str, float], tuple[np.ndarray, float]] = {}
 
     def _construct_hessian_metric_blocks(self):
         """Construct Hessian and metric blocks."""
@@ -130,22 +131,32 @@ class LinearResponseBaseClass:
         Args:
             frequency: Frequency to calculate response function at.
             lr_property: Property for which to calculate the response function.
-                Dipole Polarizability can be calculated by setting lr_property to "dipole polarizability" or "dp".
-                Optical Rotation can be calculated by setting lr_property to "optical rotation" or "or".
+                Dipole Polarizability can be calculated by setting lr_property to "dipole polarizability".
+                Optical Rotation can be calculated by setting lr_property to "optical rotation".
             solver_settings: Settings for the Davidson solver:
                 max_iteration: Maximum number of iterations. Default is 100.
                 tolerance: Convergence tolerance. Default is 1e-4.
-                max_reduced_space: Maximum size of the reduced space. Default is 8 times number of roots for the lr_property.
+                max_reduced_space: Maximum size of the reduced space. Default is 1000.
                 is_silent: Whether to print convergence information. Default is False.
                 _start_guess: Optional starting guess for the response vector. Default is None.
 
         Returns:
             Linear response function at given frequency.
         """
+        # Set solver defaults
         if solver_settings is None:
             solver_settings = {}
-        if lr_property.lower() in ("dipole polarizability", "dp"):
-            title_string = f"Calculating dipole polarizability at frequency {frequency} a.u."
+        solver_settings.setdefault("max_iteration", 100)
+        solver_settings.setdefault("tolerance", 1e-4)
+        solver_settings.setdefault("max_reduced_space", 1000)
+        solver_settings.setdefault("is_silent", False)
+        solver_settings.setdefault("_start_guess", None)
+
+        print()
+        print(f"Calculating {lr_property.lower()} at frequency {frequency} a.u.")
+
+        # Calculate property gradients
+        if lr_property.lower() in ("dipole polarizability"):
             integrals = self.wf.int_gen.electric_dipole
             property_gradient_x = self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[0]))
             property_gradient_y = self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[1]))
@@ -155,8 +166,7 @@ class LinearResponseBaseClass:
                 property_gradient.reshape(len(property_gradient), -1),
                 -property_gradient.conj().reshape(len(property_gradient), -1)
             ))
-        elif lr_property.lower() in ("optical rotation", "or"):
-            title_string = f"Calculating optical rotation at frequency {frequency} a.u."
+        elif lr_property.lower() in ("optical rotation"):
             integrals = self.wf.int_gen.magnetic_dipole
             property_gradient_x = 1j * self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[0]))
             property_gradient_y = 1j * self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[1]))
@@ -166,17 +176,35 @@ class LinearResponseBaseClass:
                 property_gradient.reshape(len(property_gradient), -1),
                 -property_gradient.conj().reshape(len(property_gradient), -1)
             ))
+        else:
+            raise ValueError(f"Unknown property {lr_property} for linear response function.")
+
+        # Check if response vectors are already calculated for this property and frequency
+        # Optical rotation only requires the solution of the response equation with the electric dipole property gradient
+        cached = None
+        if lr_property.lower() in ("dipole polarizability", "optical rotation"):
+            cached = self._linear_response_vectors.get(("dipole polarizability", frequency))
+
+        if cached is not None:
+            response_vectors, tolerance = cached
+            print("Using cached response vectors.")
+            return response_vectors, full_gradient
+
+        # Calculate response vectors by solving linear response function
+        # For optical rotation we need to calculate the electric dipole property gradient
+        if lr_property.lower() in ("optical rotation",):
             integrals = self.wf.int_gen.electric_dipole
             property_gradient_x = self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[0]))
             property_gradient_y = self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[1]))
             property_gradient_z = self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[2]))
             property_gradient = np.hstack([property_gradient_x, property_gradient_y, property_gradient_z])
-        else:
-            raise ValueError(f"Unknown property {lr_property} for linear response function.")
+        response_vectors = self._solve_linear_response_function(frequency, solver_settings, property_gradient)
+        if lr_property.lower() in ("dipole polarizability", "optical rotation"):
+            self._linear_response_vectors[("dipole polarizability", frequency)] = (response_vectors, solver_settings["tolerance"])
 
-        print()
-        print(title_string)
+        return response_vectors, full_gradient
 
+    def _solve_linear_response_function(self, frequency: float, solver_settings: dict, property_gradient: np.ndarray):
         n_roots = property_gradient.shape[-1]
         preconditioner = self._compute_preconditioner()
         solver = PairedDavidson()
@@ -184,18 +212,18 @@ class LinearResponseBaseClass:
             solver.solve(
                 self._right_transform,
                 preconditioner,
-                max_iteration=solver_settings.get("max_iteration", 100),
-                tolerance=solver_settings.get("tolerance", 1e-4),
+                max_iteration=solver_settings["max_iteration"],
+                tolerance=solver_settings["tolerance"],
                 n_roots=n_roots,
-                max_reduced_space=solver_settings.get("max_reduced_space", n_roots * 8),
+                max_reduced_space=solver_settings["max_reduced_space"],
                 frequency=frequency,
                 property_gradient=property_gradient,
-                is_silent=solver_settings.get("is_silent", False),
-                _start_guess=solver_settings.get("_start_guess", None),
+                is_silent=solver_settings["is_silent"],
+                _start_guess=solver_settings["_start_guess"],
             )
         )
 
-        return response_vectors, full_gradient
+        return response_vectors
 
     def property_gradient(self, integral: np.ndarray) -> np.ndarray:
         """Calculate gradient of property.
