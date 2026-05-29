@@ -162,22 +162,18 @@ class LinearResponseBaseClass:
             property_gradient_y = self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[1]))
             property_gradient_z = self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[2]))
             property_gradient = np.hstack([property_gradient_x, property_gradient_y, property_gradient_z])
-            full_gradient = np.vstack((
-                property_gradient.reshape(len(property_gradient), -1),
-                -property_gradient.conj().reshape(len(property_gradient), -1)
-            ))
         elif lr_property.lower() in ("optical rotation"):
             integrals = self.wf.int_gen.magnetic_dipole
             property_gradient_x = 1j * self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[0]))
             property_gradient_y = 1j * self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[1]))
             property_gradient_z = 1j * self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[2]))
             property_gradient = np.hstack([property_gradient_x, property_gradient_y, property_gradient_z])
-            full_gradient = np.vstack((
-                property_gradient.reshape(len(property_gradient), -1),
-                -property_gradient.conj().reshape(len(property_gradient), -1)
-            ))
         else:
             raise ValueError(f"Unknown property {lr_property} for linear response function.")
+        full_gradient = np.vstack((
+            property_gradient.reshape(len(property_gradient), -1),
+            -property_gradient.conj().reshape(len(property_gradient), -1)
+        ))
 
         # Check if response vectors are already calculated for this property and frequency
         # Optical rotation only requires the solution of the response equation with the electric dipole property gradient
