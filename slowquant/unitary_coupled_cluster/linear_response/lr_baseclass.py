@@ -183,8 +183,16 @@ class LinearResponseBaseClass:
 
         if cached is not None:
             response_vectors, tolerance = cached
-            print("Using cached response vectors.")
-            return response_vectors, full_gradient
+            if tolerance <= solver_settings["tolerance"]:
+                print("Using cached response vectors.")
+                return response_vectors, full_gradient
+            print("Cached response vectors do not meet the required tolerance. Recalculating response vectors using previous as start guess.")
+            upper = response_vectors[: response_vectors.shape[0] // 2, :]
+            lower = response_vectors[response_vectors.shape[0] // 2 :, :]
+            start_guess = np.zeros_like(response_vectors)
+            start_guess[: response_vectors.shape[0] // 2, :] = upper + lower
+            start_guess[response_vectors.shape[0] // 2 :, :] = upper - lower
+            solver_settings["_start_guess"] = start_guess
 
         # Calculate response vectors by solving linear response function
         # For optical rotation we need to calculate the electric dipole property gradient
