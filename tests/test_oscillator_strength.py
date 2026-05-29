@@ -57,7 +57,6 @@ def test_H2_631g_naive():
     assert abs(osc_strengths[4] - 0.0421) < thresh
     assert abs(osc_strengths[5] - 0.0) < thresh
 
-
 def test_LiH_sto3g_naive():
     """Test LiH Sto-3G naive LR oscialltor strength."""
     # Slowquant Object with parameters and setup
@@ -617,7 +616,7 @@ def test_LiH_sto3g_allSC():
     WF.run_wf_optimization_1step("BFGS", True)
 
     # Linear Response
-    LR = allstatetransfer.LinearResponse(
+    LR = allselfconsistent.LinearResponse(
         WF,
         excitations="SD",
     )
@@ -652,6 +651,3 @@ def test_LiH_sto3g_allSC():
     assert abs(osc_strengths[6] - 0.12944289) < thresh
     assert abs(osc_strengths[7] - 0.12944289) < thresh
     assert abs(osc_strengths[8] - 0.04646674) < thresh
-
-test_H2_631g_SC()
-test_LiH_sto3g_SC()
