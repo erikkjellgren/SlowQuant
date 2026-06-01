@@ -19,8 +19,6 @@ from slowquant.unitary_coupled_cluster.operators import (
     Epq,
     Tpq,
     hamiltonian_2i_2a,
-    one_elec_op_0i_0a,
-    one_elec_op_1i_1a,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
@@ -303,17 +301,17 @@ class LinearResponse(LinearResponseBaseClass):
         V = np.zeros((len(self.q_ops + self.G_ops), num_mo))
         
         if not self.triplet:
-            pq = Epq
+            E = Epq
         else:
-            pq = Tpq
+            E = Tpq
 
         for idx, q in enumerate(self.q_ops):
             Uq_ket = propagate_state(["U", q], self.csf_coeffs, *self.index_info_extended)
             Uqd_ket = propagate_state(["U", q.dagger], self.csf_coeffs, *self.index_info_extended)
-            for p in range(self.wf.num_inactive_orbs + self.wf.num_active_orbs + self.wf.num_virtual_orbs):
-                for q in range(self.wf.num_inactive_orbs + self.wf.num_active_orbs + self.wf.num_virtual_orbs):
-                    E_ket = propagate_state([pq(p,q)], self.ci_coeffs, *self.index_info_extended)
-                    Ed_ket = propagate_state([pq(q,p)], self.ci_coeffs, *self.index_info_extended)
+            for m in range(self.wf.num_inactive_orbs + self.wf.num_active_orbs + self.wf.num_virtual_orbs):
+                for n in range(self.wf.num_inactive_orbs + self.wf.num_active_orbs + self.wf.num_virtual_orbs):
+                    E_ket = propagate_state([E(m, n)], self.ci_coeffs, *self.index_info_extended)
+                    Ed_ket = propagate_state([E(n, m)], self.ci_coeffs, *self.index_info_extended)
                     # < CSF | q Ud E | 0 >
                     val = expectation_value(
                         Uqd_ket,
@@ -328,14 +326,14 @@ class LinearResponse(LinearResponseBaseClass):
                         Uq_ket,
                         *self.index_info_extended,
                     )
-                    V[idx, :] += mo[:, p, q] * val
+                    V[idx, :] += mo[:, m, n] * val
 
         for idx, G in enumerate(self.G_ops):
             UG_ket = propagate_state(["U", G], self.csf_coeffs, *self.index_info_extended)
             UGd_ket = propagate_state(["U", G.dagger], self.csf_coeffs, *self.index_info_extended)
             # Inactive part
             for i in range(self.wf.num_inactive_orbs):
-                E_ket = propagate_state([pq(i, i)], self.ci_coeffs, *self.index_info_extended) 
+                E_ket = propagate_state([E(i, i)], self.ci_coeffs, *self.index_info_extended) 
                 # < CSF | G Ud E | 0 >
                 val = expectation_value(
                     UGd_ket, 
@@ -352,12 +350,10 @@ class LinearResponse(LinearResponseBaseClass):
                 ) 
                 V[idx + idx_shift_q, :] += mo[:, i, i] * val
             # Active part
-            for p in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):
-                for q in range(
-                    self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs
-                ):
-                    E_ket = propagate_state([pq(p, q)], self.ci_coeffs, *self.index_info_extended)
-                    Ed_ket = propagate_state([pq(q, p)], self.ci_coeffs, *self.index_info_extended)
+            for v in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):
+                for w in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):
+                    E_ket = propagate_state([E(v, w)], self.ci_coeffs, *self.index_info_extended)
+                    Ed_ket = propagate_state([E(w, v)], self.ci_coeffs, *self.index_info_extended)
                     # < CSF | G Ud E | 0 >
                     val = expectation_value(
                         UGd_ket, 
@@ -372,7 +368,7 @@ class LinearResponse(LinearResponseBaseClass):
                         UG_ket, 
                         *self.index_info_extended
                     )
-                    V[idx + idx_shift_q, :] += mo[:, p, q] * val
+                    V[idx + idx_shift_q, :] += mo[:, v, w] * val
         if np.allclose(mo, mo.transpose(0, -1, -2)):
             return np.vstack((V, -1 * V))
         return np.vstack((V, V))

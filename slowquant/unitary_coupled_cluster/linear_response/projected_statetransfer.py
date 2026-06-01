@@ -5,7 +5,7 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient_response,
-    get_orbital_response_property_gradient_response,
+    get_orbital_response_property_gradient,
 )
 from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
     LinearResponseBaseClass,
@@ -16,7 +16,8 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
 )
 from slowquant.unitary_coupled_cluster.operators import (
     hamiltonian_2i_2a,
-    one_elec_op_0i_0a,
+    Epq,
+    Tpq,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
@@ -146,126 +147,66 @@ class LinearResponse(LinearResponseBaseClass):
                 if i == j:
                     self.Sigma[i + idx_shift, j + idx_shift] = 1
 
-    def get_transition_dipole(self) -> np.ndarray:
-        """Calculate transition dipole moment.
+    def get_property_gradient(self, property_integrals: np.ndarray | tuple[np.ndarray]) -> np.ndarray:
+        """Calculate property gradient.
+
+        Args:
+            property_integrals: Integrals in AO basis.
 
         Returns:
-            Transition dipole moment.
+            Property gradient.
         """
-        number_excitations = len(self.excitation_energies)
-        dipole_integrals = self.wf.int_gen.electric_dipole
-        mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
-        muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
-        muz = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[2])
-        mux_op = one_elec_op_0i_0a(
-            mux,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        muy_op = one_elec_op_0i_0a(
-            muy,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        muz_op = one_elec_op_0i_0a(
-            muz,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        Udmuxd_ket = propagate_state(["Ud", mux_op.dagger], self.wf.ci_coeffs, *self.index_info)
-        Udmuyd_ket = propagate_state(["Ud", muy_op.dagger], self.wf.ci_coeffs, *self.index_info)
-        Udmuzd_ket = propagate_state(["Ud", muz_op.dagger], self.wf.ci_coeffs, *self.index_info)
-        Udmux_ket = propagate_state(["Ud", mux_op], self.wf.ci_coeffs, *self.index_info)
-        Udmuy_ket = propagate_state(["Ud", muy_op], self.wf.ci_coeffs, *self.index_info)
-        Udmuz_ket = propagate_state(["Ud", muz_op], self.wf.ci_coeffs, *self.index_info)
-        transition_dipoles = np.zeros((len(self.normed_response_vectors[0]), 3))
-        for state_number in range(len(self.normed_response_vectors[0])):
-            q_part_x = 0.0
-            q_part_y = 0.0
-            q_part_z = 0.0
-            if len(self.q_ops) != 0:
-                q_part_x = get_orbital_response_property_gradient_response(
-                    mux,
-                    self.wf.kappa_no_activeactive_idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.rdm1,
-                    self.normed_response_vectors,
-                    state_number,
-                    number_excitations,
+        size_mo = self.wf.num_inactive_orbs + self.wf.num_active_orbs + self.wf.num_virtual_orbs
+        num_mo = len(property_integrals)
+        mo = np.zeros((num_mo, size_mo, size_mo))
+        for i, ao in enumerate(property_integrals):
+            mo[i, :, :] += one_electron_integral_transform(self.wf.c_mo, ao)
+
+        idx_shift_q = len(self.q_ops)
+        V = np.zeros((len(self.q_ops + self.G_ops), num_mo))
+
+        if len(self.q_ops) != 0:
+            # Orbital response part
+            V[:idx_shift_q, :] = get_orbital_response_property_gradient(
+                mo,
+                self.wf.kappa_no_activeactive_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.rdm1,
+            )
+        
+        if not self.triplet:
+            E = Epq
+        else:
+            E = Tpq
+
+        for idx, G in enumerate(self.G_ops):
+            UG_ket = propagate_state(["U",G], self.wf.csf_coeffs, *self.index_info)
+            # Inactive part
+            for i in range(self.wf.num_inactive_orbs):
+                Ed_ket = propagate_state([E(i, i)], self.wf.ci_coeffs, *self.index_info) 
+                # - < 0 | E U G | CSF >
+                val = - expectation_value(
+                    Ed_ket, 
+                    [], 
+                    UG_ket, 
+                    *self.index_info
                 )
-                q_part_y = get_orbital_response_property_gradient_response(
-                    muy,
-                    self.wf.kappa_no_activeactive_idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.rdm1,
-                    self.normed_response_vectors,
-                    state_number,
-                    number_excitations,
-                )
-                q_part_z = get_orbital_response_property_gradient_response(
-                    muz,
-                    self.wf.kappa_no_activeactive_idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.rdm1,
-                    self.normed_response_vectors,
-                    state_number,
-                    number_excitations,
-                )
-            g_part_x = 0.0
-            g_part_y = 0.0
-            g_part_z = 0.0
-            for i, G in enumerate(self.G_ops):
-                G_ket = propagate_state(
-                    [G],
-                    self.wf.csf_coeffs,
-                    *self.index_info,
-                )
-                # -Z * <0| mux U G | CSF>
-                g_part_x -= self.Z_G_normed[i, state_number] * expectation_value(
-                    Udmuxd_ket,
-                    [],
-                    G_ket,
-                    *self.index_info,
-                )
-                # Y * <0| Gd Ud mux | CSF>
-                g_part_x += self.Y_G_normed[i, state_number] * expectation_value(
-                    G_ket,
-                    [],
-                    Udmux_ket,
-                    *self.index_info,
-                )
-                # -Z * <0| muy U G | CSF>
-                g_part_y -= self.Z_G_normed[i, state_number] * expectation_value(
-                    Udmuyd_ket,
-                    [],
-                    G_ket,
-                    *self.index_info,
-                )
-                # Y * <0| Gd Ud muy | CSF>
-                g_part_y += self.Y_G_normed[i, state_number] * expectation_value(
-                    G_ket,
-                    [],
-                    Udmuy_ket,
-                    *self.index_info,
-                )
-                # -Z * <0| muz U G | CSF>
-                g_part_z -= self.Z_G_normed[i, state_number] * expectation_value(
-                    Udmuzd_ket,
-                    [],
-                    G_ket,
-                    *self.index_info,
-                )
-                # Y * <0| Gd Ud muz | CSF>
-                g_part_z += self.Y_G_normed[i, state_number] * expectation_value(
-                    G_ket,
-                    [],
-                    Udmuz_ket,
-                    *self.index_info,
-                )
-            transition_dipoles[state_number, 0] = q_part_x + g_part_x
-            transition_dipoles[state_number, 1] = q_part_y + g_part_y
-            transition_dipoles[state_number, 2] = q_part_z + g_part_z
-        return transition_dipoles
+                V[idx + idx_shift_q, :] += mo[:, i, i] * val
+            # Active part
+            for v in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):
+                for w in range(
+                    self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs
+                ):
+                    Ed_ket = propagate_state([E(w, v)], self.wf.ci_coeffs, *self.index_info)
+                    # - < 0 | E U G | CSF >
+                    val = - expectation_value(
+                        Ed_ket, 
+                        [], 
+                        UG_ket, 
+                        *self.index_info
+                    )
+                    V[idx + idx_shift_q, :] += mo[:, v, w] * val
+        if np.allclose(mo, mo.transpose(0, -1, -2)):
+            return np.vstack((V, -1 * V))
+        return np.vstack((V, V))

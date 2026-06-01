@@ -338,37 +338,63 @@ class LinearResponse(LinearResponseBaseClass):
             )
         
         if not self.triplet:
-            pq = Epq
+            E = Epq
         else:
-            pq = Tpq
+            E = Tpq
 
         for idx, G in enumerate(self.G_ops):
             G_ket = propagate_state([G], self.wf.ci_coeffs, *self.index_info)
             # Inactive part
             for i in range(self.wf.num_inactive_orbs):
-                E_ket = propagate_state([pq(i, i)], self.wf.ci_coeffs, *self.index_info) 
+                E_ket = propagate_state([E(i, i)], self.wf.ci_coeffs, *self.index_info) 
                 # < 0 | E | 0 > * < 0 | G | 0 >
                 val = (
-                    expectation_value(self.wf.ci_coeffs, [], E_ket, *self.index_info) 
-                    * expectation_value(self.wf.ci_coeffs, [], G_ket, *self.index_info)
-                    )
+                    expectation_value(
+                        self.wf.ci_coeffs, 
+                        [], 
+                        E_ket, 
+                        *self.index_info
+                    ) 
+                    * expectation_value(
+                        self.wf.ci_coeffs, 
+                        [], 
+                        G_ket, 
+                        *self.index_info
+                    ))
                 # - < 0 | E G | 0 >
-                val -= expectation_value(E_ket, [], G_ket, *self.index_info) # E_ket = Ed_ket for E(i,i)
+                val -= expectation_value(
+                    E_ket, # E_ket = Ed_ket for E(i,i)
+                    [], 
+                    G_ket, 
+                    *self.index_info
+                ) 
                 V[idx + idx_shift_q, :] += mo[:, i, i] * val
             # Active part
-            for p in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):
-                for q in range(
-                    self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs
-                ):
-                    Ed_ket = propagate_state([pq(q, p)], self.wf.ci_coeffs, *self.index_info)
+            for v in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):
+                for w in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):
+                    Ed_ket = propagate_state([E(w, v)], self.wf.ci_coeffs, *self.index_info)
                     # < 0 | E | 0 > * < 0 | G | 0 >
                     val = (
-                        expectation_value(Ed_ket, [], self.wf.ci_coeffs, *self.index_info) 
-                        * expectation_value(self.wf.ci_coeffs, [], G_ket, *self.index_info)
-                        )
+                        expectation_value(
+                            Ed_ket, 
+                            [], 
+                            self.wf.ci_coeffs, 
+                            *self.index_info
+                        ) 
+                        * expectation_value(
+                            self.wf.ci_coeffs, 
+                            [], 
+                            G_ket, 
+                            *self.index_info
+                        ))
                     # - < 0 | E G | 0 >
-                    val -= expectation_value(Ed_ket, [], G_ket, *self.index_info)
-                    V[idx + idx_shift_q, :] += mo[:, p, q] * val
+                    val -= expectation_value(
+                        Ed_ket, 
+                        [], 
+                        G_ket, 
+                        *self.index_info
+                    )
+                    V[idx + idx_shift_q, :] += mo[:, v, w] * val
         if np.allclose(mo, mo.transpose(0, -1, -2)):
             return np.vstack((V, -1 * V))
         return np.vstack((V, V))

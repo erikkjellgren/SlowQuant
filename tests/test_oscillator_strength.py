@@ -2,10 +2,12 @@ import numpy as np
 
 import slowquant.SlowQuant as sq
 from slowquant.unitary_coupled_cluster.linear_response import (
+    allprojected,
     allselfconsistent,
     allstatetransfer,
     naive,
     projected,
+    projected_statetransfer,
     selfconsistent,
     statetransfer,
 )
@@ -56,6 +58,7 @@ def test_H2_631g_naive():
     assert abs(osc_strengths[3] - 0.0311) < thresh
     assert abs(osc_strengths[4] - 0.0421) < thresh
     assert abs(osc_strengths[5] - 0.0) < thresh
+
 
 def test_LiH_sto3g_naive():
     """Test LiH Sto-3G naive LR oscialltor strength."""
@@ -146,7 +149,6 @@ def test_H2_631g_proj():
     thresh = 10**-4
 
     # Check excitation energies
-    print("Check excitation energies")
     assert abs(LR.excitation_energies[0] - 0.574413) < thresh
     assert abs(LR.excitation_energies[1] - 1.043177) < thresh
     assert abs(LR.excitation_energies[2] - 1.139481) < thresh
@@ -441,6 +443,123 @@ def test_LiH_sto3g_SC():
     assert abs(osc_strengths[12] - 0.003907) < thresh
 
 
+def test_H2_631g_allproj():
+    """Test of oscialltor strength for all-projected LR with working equations."""
+    # Slowquant Object with parameters and setup
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """H  0.0   0.0  0.0;
+            H  0.74  0.0  0.0;""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("6-31G")
+    # HF
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    # OO-UCCSD
+    WF = WaveFunctionUCC(
+        (2, 2),
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
+        "SD",
+    )
+    WF.run_wf_optimization_1step("BFGS", True)
+
+    # Linear Response
+    LR = allprojected.LinearResponse(
+        WF,
+        excitations="SD",
+    )
+    LR.calc_excitation_energies()
+
+    thresh = 10**-4
+
+    # Check excitation energies
+    assert abs(LR.excitation_energies[0] - 0.57549309) < thresh
+    assert abs(LR.excitation_energies[1] - 1.04824448) < thresh
+    assert abs(LR.excitation_energies[2] - 1.14842879) < thresh
+    assert abs(LR.excitation_energies[3] - 1.48434251) < thresh
+    assert abs(LR.excitation_energies[4] - 1.96225079) < thresh
+    assert abs(LR.excitation_energies[5] - 2.59296189) < thresh
+
+    # Get oscillator strength for each excited state
+    osc_strengths = LR.get_oscillator_strength()
+    assert abs(osc_strengths[0] - 0.646005715) < thresh
+    assert abs(osc_strengths[1] - 0.0) < thresh
+    assert abs(osc_strengths[2] - 0.0) < thresh
+    assert abs(osc_strengths[3] - 4.68927085e-02) < thresh
+    assert abs(osc_strengths[4] - 2.07917839e-02) < thresh
+    assert abs(osc_strengths[5] - 0.0) < thresh
+
+
+def test_LiH_sto3g_allproj():
+    """Test LiH STO-3G all-projected LR oscialltor strength."""
+    # Slowquant Object with parameters and setup
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """Li  0.0  0.0  0.0;
+            H 1.67 0.0 0.0;""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("sto-3g")
+    # HF
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    # OO-UCCSD
+    WF = WaveFunctionUCC(
+        (2, 2),
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
+        "SD",
+    )
+    WF.run_wf_optimization_1step("BFGS", True)
+
+    # Linear Response
+    LR = allprojected.LinearResponse(
+        WF,
+        excitations="SD",
+    )
+    LR.calc_excitation_energies()
+
+    thresh = 10**-3
+
+    # Check excitation energies
+    solutions = np.array(
+        [
+            0.12973325,
+            0.18092772,
+            0.18092772,
+            0.60537673,
+            0.64747507,
+            0.74982736,
+            0.74982736,
+            1.00424791,
+            2.07489682,
+            2.13720681,
+            2.13720681,
+            2.45601762,
+            2.95607806,]
+    )
+
+    assert np.allclose(LR.excitation_energies, solutions, atol=thresh)
+
+    # Get oscillator strength for each excited state
+    osc_strengths = LR.get_oscillator_strength()
+    assert abs(osc_strengths[0] - 0.04994788) < thresh
+    assert abs(osc_strengths[1] - 0.25097391) < thresh
+    assert abs(osc_strengths[2] - 0.25097391) < thresh
+    assert abs(osc_strengths[3] - 0.16147543) < thresh
+    assert abs(osc_strengths[4] - 0.16109274) < thresh
+    assert abs(osc_strengths[5] - 0.01834264) < thresh
+    assert abs(osc_strengths[6] - 0.01834264) < thresh
+    assert abs(osc_strengths[7] - 0.00672061) < thresh
+    assert abs(osc_strengths[8] - 0.06322828) < thresh
+    assert abs(osc_strengths[9] - 0.13384300) < thresh
+    assert abs(osc_strengths[10] - 0.13384300) < thresh
+    assert abs(osc_strengths[11] - 0.04662360) < thresh
+    assert abs(osc_strengths[12] - 0.00381938) < thresh
+
+
 def test_H2_631g_allST():
     """Test of oscialltor strength for all-statetransfer LR with working equations."""
     # Slowquant Object with parameters and setup
@@ -586,7 +705,6 @@ def test_H2_631g_allSC():
 
     # Get oscillator strength for each excited state
     osc_strengths = LR.get_oscillator_strength()
-    print(osc_strengths)
     assert abs(osc_strengths[0] - 0.638731917) < thresh
     assert abs(osc_strengths[1] - 0.0) < thresh
     assert abs(osc_strengths[2] - 6.63456989e-02) < thresh
@@ -651,3 +769,121 @@ def test_LiH_sto3g_allSC():
     assert abs(osc_strengths[6] - 0.12944289) < thresh
     assert abs(osc_strengths[7] - 0.12944289) < thresh
     assert abs(osc_strengths[8] - 0.04646674) < thresh
+
+
+def test_H2_631g_projST():
+    """Test of oscialltor strength for projected-statetransfer LR with working equations."""
+    # Slowquant Object with parameters and setup
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """H  0.0   0.0  0.0;
+            H  0.74  0.0  0.0;""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("6-31G")
+    # HF
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    # OO-UCCSD
+    WF = WaveFunctionUCC(
+        (2, 2),
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
+        "SD",
+    )
+    WF.run_wf_optimization_1step("BFGS", True)
+
+    # Linear Response
+    LR = projected_statetransfer.LinearResponse(
+        WF,
+        excitations="SD",
+    )
+    LR.calc_excitation_energies()
+
+    thresh = 10**-4
+
+    # Check excitation energies
+    assert abs(LR.excitation_energies[0] - 0.57549309) < thresh
+    assert abs(LR.excitation_energies[1] - 1.04824448) < thresh
+    assert abs(LR.excitation_energies[2] - 1.14842879) < thresh
+    assert abs(LR.excitation_energies[3] - 1.48434251) < thresh
+    assert abs(LR.excitation_energies[4] - 1.96225079) < thresh
+    assert abs(LR.excitation_energies[5] - 2.59296189) < thresh
+
+    # Get oscillator strength for each excited state
+    osc_strengths = LR.get_oscillator_strength()
+    assert abs(osc_strengths[0] - 0.646005715) < thresh
+    assert abs(osc_strengths[1] - 0.0) < thresh
+    assert abs(osc_strengths[2] - 0.0) < thresh
+    assert abs(osc_strengths[3] - 4.68927085e-02) < thresh
+    assert abs(osc_strengths[4] - 2.07917839e-02) < thresh
+    assert abs(osc_strengths[5] - 0.0) < thresh
+
+
+def test_LiH_sto3g_projST():
+    """Test LiH STO-3G projected-statetransfer LR oscialltor strength."""
+    # Slowquant Object with parameters and setup
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """Li  0.0  0.0  0.0;
+            H 1.67 0.0 0.0;""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("sto-3g")
+    # HF
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    # OO-UCCSD
+    WF = WaveFunctionUCC(
+        (2, 2),
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
+        "SD",
+    )
+    WF.run_wf_optimization_1step("BFGS", True)
+
+    # Linear Response
+    LR = projected_statetransfer.LinearResponse(
+        WF,
+        excitations="SD",
+    )
+    LR.calc_excitation_energies()
+
+    thresh = 10**-3
+
+    # Check excitation energies
+    solutions = np.array(
+        [
+            0.12973325,
+            0.18092772,
+            0.18092772,
+            0.60537673,
+            0.64747507,
+            0.74982736,
+            0.74982736,
+            1.00424791,
+            2.07489682,
+            2.13720681,
+            2.13720681,
+            2.45601762,
+            2.95607806,]
+    )
+
+    assert np.allclose(LR.excitation_energies, solutions, atol=thresh)
+
+    # Get oscillator strength for each excited state
+    osc_strengths = LR.get_oscillator_strength()
+    assert abs(osc_strengths[0] - 0.04994788) < thresh
+    assert abs(osc_strengths[1] - 0.25097391) < thresh
+    assert abs(osc_strengths[2] - 0.25097391) < thresh
+    assert abs(osc_strengths[3] - 0.16147543) < thresh
+    assert abs(osc_strengths[4] - 0.16109274) < thresh
+    assert abs(osc_strengths[5] - 0.01834264) < thresh
+    assert abs(osc_strengths[6] - 0.01834264) < thresh
+    assert abs(osc_strengths[7] - 0.00672061) < thresh
+    assert abs(osc_strengths[8] - 0.06322828) < thresh
+    assert abs(osc_strengths[9] - 0.13384300) < thresh
+    assert abs(osc_strengths[10] - 0.13384300) < thresh
+    assert abs(osc_strengths[11] - 0.04662360) < thresh
+    assert abs(osc_strengths[12] - 0.00381938) < thresh
+
