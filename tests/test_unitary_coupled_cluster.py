@@ -182,7 +182,7 @@ def test_h2_sto3g_uccsd_lr() -> None:
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 1.015738) < 10**-4
     assert abs(LR.excitation_energies[1] - 1.719504) < 10**-4
-    transition_dipoles = LR.get_transition_dipole()
+    transition_dipoles = LR.get_transition_dipole(LR.wf.int_gen.electric_dipole)
     assert abs(abs(transition_dipoles[0, 2]) - 1.1440534325680685) < 10**-4
     assert abs(transition_dipoles[1, 2] - 0.0) < 10**-4
 
