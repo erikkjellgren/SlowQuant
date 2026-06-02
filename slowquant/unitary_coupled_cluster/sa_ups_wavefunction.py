@@ -244,6 +244,8 @@ class WaveFunctionSAUPS:
         # Construct UPS Structure
         self.ups_layout = UpsStructure()
         if ansatz.lower() in ("tups", "qnp"):
+            if self.ansatz_options.get("do_pp"):
+                raise ValueError("perfect pairing is not supported for Ansatz in SA UPS wave functions.")
             if ansatz.lower() == "tups":
                 self.ansatz_options["do_tups"] = True
             elif ansatz.lower() == "qnp":

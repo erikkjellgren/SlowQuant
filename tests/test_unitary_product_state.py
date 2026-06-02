@@ -361,7 +361,7 @@ def test_saups_h3_3states_threaded() -> None:
 
 def test_pptUPS_h2o() -> None:
     """Test pptUPS on H2O(4,4)."""
-    # Define molecule: square H2O
+    # Define molecule: H2O
     atom = """O   0.0  0.0           0.1035174918;
         H   0.0  0.7955612117 -0.4640237459;
         H   0.0 -0.7955612117 -0.4640237459;"""

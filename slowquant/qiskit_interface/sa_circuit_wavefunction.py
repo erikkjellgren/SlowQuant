@@ -199,6 +199,8 @@ class WaveFunctionSACircuit:
         self.states = states
         # Setup Qiskit stuff
         self.QI = quantum_interface
+        if self.QI.ansatz_options.get("do_pp"):
+            raise ValueError("perfect pairing is not supported for Ansatz in SA UPS wave functions.")
         self.QI.construct_circuit(
             self.active_occ_idx_shifted,
             self.active_unocc_idx_shifted,
