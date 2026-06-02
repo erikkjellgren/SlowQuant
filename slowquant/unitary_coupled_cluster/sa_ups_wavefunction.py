@@ -122,6 +122,8 @@ class WaveFunctionSAUPS:
             else:
                 self.virtual_spin_idx.append(i)
                 self.num_virtual_spin_orbs += 1
+        if self.num_active_elec % 2 != 0:
+            raise ValueError("Number of active electrons has to be even")
         self.num_active_elec_alpha = self.num_active_elec // 2
         self.num_active_elec_beta = self.num_active_elec // 2
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2

@@ -76,6 +76,8 @@ class WaveFunctionSACircuit:
         self.num_spin_orbs = 2 * len(self.int_gen.kinetic_energy)
         self.num_orbs = len(self.int_gen.kinetic_energy)
         self.num_active_elec = cas[0]
+        if self.num_active_elec % 2 != 0:
+            raise ValueError("Number of active electrons has to be even")
         self.num_active_elec_alpha = self.num_active_elec // 2
         self.num_active_elec_beta = self.num_active_elec // 2
         self.num_active_spin_orbs = 0
