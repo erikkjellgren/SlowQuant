@@ -1155,7 +1155,7 @@ class WaveFunctionCircuit:
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             for i in range(len(parameters[num_kappa:])):
                 R = self.QI.grad_param_R[self.QI.param_names[i]]
-                e_vals_grad = _get_energy_evals_for_grad(H, self.QI, parameters, i, R)
+                e_vals_grad = _get_energy_evals_for_grad(H, self.QI, parameters[num_kappa:], i, R)
                 grad = 0.0
                 for j, mu in enumerate(list(range(1, 2 * R + 1))):
                     x_mu = (2 * mu - 1) / (2 * R) * np.pi
