@@ -190,7 +190,7 @@ class QuantumInterface:
                     pp_det += "1"
                     spin_orb += 1
                     elec_count -= 1
-            print("perfect-pairing determinant found as:", pp_det)
+            print("State preparation: perfect-pairing determinant found as:", pp_det)
             if len(pp_det) != self.num_spin_orbs or pp_det.count("1") != (
                 self.num_elec[0] + self.num_elec[1]
             ):

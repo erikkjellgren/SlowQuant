@@ -38,6 +38,7 @@ class WaveFunctionCircuit:
         integral_generator: SlowQuant | pyscf.gto.mole.Mole,
         quantum_interface: QuantumInterface,
         include_active_kappa: bool = False,
+        force_no_pp_mos: bool = False,
     ) -> None:
         """Initialize circuit based UPS wave function.
 
@@ -48,6 +49,7 @@ class WaveFunctionCircuit:
             integral_generator: Integral generator object.
             quantum_interface: QuantumInterface.
             include_active_kappa: Include active-active orbital rotations.
+            force_no_pp_mos: Switch of pp rotation of MOs even if do_pp is requested in QI.
         """
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
@@ -191,7 +193,11 @@ class WaveFunctionCircuit:
         self.kappa_redundant_idx = np.array(kappa_redundant_idx, dtype=int)
         self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
         # Re-order MOs for perfect pairing
-        if "do_pp" in quantum_interface.ansatz_options.keys() and quantum_interface.ansatz_options["do_pp"]:
+        if (
+            "do_pp" in quantum_interface.ansatz_options.keys()
+            and quantum_interface.ansatz_options["do_pp"]
+            and not force_no_pp_mos
+        ):
             hf_det = "1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec)
             # Obtain pp determinant
             pp_det = ""
@@ -213,7 +219,7 @@ class WaveFunctionCircuit:
                     pp_det += "1"
                     spin_orb += 1
                     elec_count -= 1
-            print("perfect-pairing determinant found as:", pp_det)
+            print("MO rotations: perfect-pairing determinant found as:", pp_det)
             if len(pp_det) != self.num_active_spin_orbs or pp_det.count("1") != self.num_active_elec:
                 raise ValueError("Perfect pairing determinant violates orbital or electron numbers")
 
