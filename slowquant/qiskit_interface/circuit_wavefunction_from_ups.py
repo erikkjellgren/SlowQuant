@@ -65,6 +65,7 @@ def circuit_wavefunction_from_ups(
             ups_wf.int_gen.int_obj,
             QI,
             include_active_kappa=ups_wf._include_active_kappa,
+            force_no_pp_mos=True,  # passed MOs are already in pp form.
         )
         wf.thetas = ups_wf.thetas
         return wf
