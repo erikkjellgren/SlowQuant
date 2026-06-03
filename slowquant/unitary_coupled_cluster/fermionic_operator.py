@@ -76,43 +76,67 @@ def do_product_extended_normal_ordering(
         nondagger2_set: Right-side non-dagger idx set.
 
     Returns:
-        Creation string, annihilation string, and, phase.
+        Creation string, annihilation string, and phase.
     """
     if nondagger1_set.isdisjoint(dagger2_set):
         # No index overlap between non-dagger left-side and dagger right-side.
-        is_zero = False
         if not dagger1_set.isdisjoint(dagger2_set):
             # Same index creation operator.
-            is_zero = True
+            return
         elif not nondagger1_set.isdisjoint(nondagger2_set):
             # Same index annihilation operator.
-            is_zero = True
-        if not is_zero:
-            phase = 1
-            if len(fermistring1[1]) % 2 != 0 and len(fermistring2[0]) % 2 != 0:
-                # Only phase change if both are an odd lenght.
-                phase *= -1
-            # sort the dagger part
-            dagger_list = [*fermistring1[0], *fermistring2[0]]
-            # Doing insertion sort, left-side part is already sorted.
-            # Hence not starting from 1.
-            for i in range(len(fermistring1[0]), len(dagger_list)):
-                j = i
-                while j > 0 and dagger_list[j] > dagger_list[j - 1]:
-                    dagger_list[j], dagger_list[j - 1] = dagger_list[j - 1], dagger_list[j]
-                    phase *= -1
-                    j -= 1
-            # sort non-dagger part
-            nondagger_list = [*fermistring1[1], *fermistring2[1]]
-            # Doing insertion sort, left-side part is already sorted.
-            # Hence not starting from 1.
-            for i in range(len(fermistring1[1]), len(nondagger_list)):
-                j = i
-                while j > 0 and nondagger_list[j] > nondagger_list[j - 1]:
-                    nondagger_list[j], nondagger_list[j - 1] = nondagger_list[j - 1], nondagger_list[j]
-                    phase *= -1
-                    j -= 1
-            yield (tuple(dagger_list), tuple(nondagger_list)), phase
+            return
+        phase = 1
+        if len(fermistring1[1]) % 2 != 0 and len(fermistring2[0]) % 2 != 0:
+            # Only phase change if both are an odd lenght.
+            phase *= -1
+        # Sort the dagger part
+        dagger_list = []
+        # Left and right are already sorted, so can do linear scale merging
+        left_list = fermistring1[0]
+        right_list = fermistring2[0]
+        left_len = len(left_list)
+        right_len = len(right_list)
+        left = 0
+        right = 0
+        # Linear-time merge using local variables and a bound-checked loop
+        while left < left_len and right < right_len:
+            if left_list[left] > right_list[right]:
+                dagger_list.append(left_list[left])
+                left += 1
+            else:
+                dagger_list.append(right_list[right])
+                phase *= (-1) ** (left_len - left)
+                right += 1
+        # Add remainders (use extend to avoid extra concatenation overhead)
+        if left < left_len:
+            dagger_list.extend(left_list[left:])
+        elif right < right_len:
+            dagger_list.extend(right_list[right:])
+        # Sort non-dagger part
+        nondagger_list = []
+        # Left and right are already sorted, so can do linear scale merging
+        left_list = fermistring1[1]
+        right_list = fermistring2[1]
+        left_len = len(left_list)
+        right_len = len(right_list)
+        left = 0
+        right = 0
+        # Linear-time merge using local variables and a bound-checked loop
+        while left < left_len and right < right_len:
+            if left_list[left] > right_list[right]:
+                nondagger_list.append(left_list[left])
+                left += 1
+            else:
+                nondagger_list.append(right_list[right])
+                phase *= (-1) ** (left_len - left)
+                right += 1
+        # Add remainders (use extend to avoid extra concatenation overhead)
+        if left < left_len:
+            nondagger_list.extend(left_list[left:])
+        elif right < right_len:
+            nondagger_list.extend(right_list[right:])
+        yield (tuple(dagger_list), tuple(nondagger_list)), phase
     else:
         overlap_idxs = nondagger1_set.intersection(dagger2_set)
         for k in range(0, len(overlap_idxs) + 1):
@@ -140,26 +164,52 @@ def do_product_extended_normal_ordering(
                 elif not nondagger_tmp_set.isdisjoint(nondagger2_set):
                     # Same index annihilation operator.
                     continue
-                # sort the dagger part
-                dagger_list = [*fermistring1[0], *dagger_tmp]
-                # Doing insertion sort, left-side part is already sorted.
-                # Hence not starting from 1.
-                for i in range(len(fermistring1[0]), len(dagger_list)):
-                    j = i
-                    while j > 0 and dagger_list[j] > dagger_list[j - 1]:
-                        dagger_list[j], dagger_list[j - 1] = dagger_list[j - 1], dagger_list[j]
-                        phase *= -1
-                        j -= 1
-                # sort non-dagger part
-                nondagger_list = [*nondagger_tmp, *fermistring2[1]]
-                # Doing insertion sort, left-side part is already sorted.
-                # Hence not starting from 1.
-                for i in range(len(nondagger_tmp), len(nondagger_list)):
-                    j = i
-                    while j > 0 and nondagger_list[j] > nondagger_list[j - 1]:
-                        nondagger_list[j], nondagger_list[j - 1] = nondagger_list[j - 1], nondagger_list[j]
-                        phase *= -1
-                        j -= 1
+                # Sort the dagger part
+                dagger_list = []
+                # Left and right are already sorted, so can do linear scale merging
+                left_list = fermistring1[0]
+                right_list = dagger_tmp
+                left_len = len(left_list)
+                right_len = len(right_list)
+                left = 0
+                right = 0
+                # Linear-time merge using local variables and a bound-checked loop
+                while left < left_len and right < right_len:
+                    if left_list[left] > right_list[right]:
+                        dagger_list.append(left_list[left])
+                        left += 1
+                    else:
+                        dagger_list.append(right_list[right])
+                        phase *= (-1) ** (left_len - left)
+                        right += 1
+                # Add remainders (use extend to avoid extra concatenation overhead)
+                if left < left_len:
+                    dagger_list.extend(left_list[left:])
+                elif right < right_len:
+                    dagger_list.extend(right_list[right:])
+                # Sort non-dagger part
+                nondagger_list = []
+                # Left and right are already sorted, so can do linear scale merging
+                left_list = nondagger_tmp
+                right_list = fermistring2[1]
+                left_len = len(left_list)
+                right_len = len(right_list)
+                left = 0
+                right = 0
+                # Linear-time merge using local variables and a bound-checked loop
+                while left < left_len and right < right_len:
+                    if left_list[left] > right_list[right]:
+                        nondagger_list.append(left_list[left])
+                        left += 1
+                    else:
+                        nondagger_list.append(right_list[right])
+                        phase *= (-1) ** (left_len - left)
+                        right += 1
+                # Add remainders (use extend to avoid extra concatenation overhead)
+                if left < left_len:
+                    nondagger_list.extend(left_list[left:])
+                elif right < right_len:
+                    nondagger_list.extend(right_list[right:])
                 yield (tuple(dagger_list), tuple(nondagger_list)), phase
 
 
@@ -174,8 +224,7 @@ def do_product_extended_normal_ordering_rankreduction(
     """Generate all fermistrings from the product of two fermistrings with the assumption of rank reduction.
 
     Takes as input two fermistrings that are already assumed to be sorted.
-    If a1 has no index overlap with c2, then strings are sorted as follows, then rank reduction cannot happen,
-    and the term is skipped.
+    If a1 has no index overlap with c2, then rank reduction cannot happen and the term is skipped
 
     If the annihilation part of fermstring1 has index overlap with the creation part of fermistring2,
     then strings are sorted as follows,
@@ -197,7 +246,7 @@ def do_product_extended_normal_ordering_rankreduction(
         nondagger2_set: Right-side non-dagger idx set.
 
     Returns:
-        Creation string, annihilation string, and, phase.
+        Creation string, annihilation string, and phase.
     """
     do_reduction = True
     if nondagger1_set.isdisjoint(dagger2_set):
@@ -232,26 +281,52 @@ def do_product_extended_normal_ordering_rankreduction(
                 elif not nondagger_tmp_set.isdisjoint(nondagger2_set):
                     # Same index annihilation operator.
                     continue
-                # sort the dagger part
-                dagger_list = [*fermistring1[0], *dagger_tmp]
-                # Doing insertion sort, left-side part is already sorted.
-                # Hence not starting from 1.
-                for i in range(len(fermistring1[0]), len(dagger_list)):
-                    j = i
-                    while j > 0 and dagger_list[j] > dagger_list[j - 1]:
-                        dagger_list[j], dagger_list[j - 1] = dagger_list[j - 1], dagger_list[j]
-                        phase *= -1
-                        j -= 1
-                # sort non-dagger part
-                nondagger_list = [*nondagger_tmp, *fermistring2[1]]
-                # Doing insertion sort, left-side part is already sorted.
-                # Hence not starting from 1.
-                for i in range(len(nondagger_tmp), len(nondagger_list)):
-                    j = i
-                    while j > 0 and nondagger_list[j] > nondagger_list[j - 1]:
-                        nondagger_list[j], nondagger_list[j - 1] = nondagger_list[j - 1], nondagger_list[j]
-                        phase *= -1
-                        j -= 1
+                # Sort the dagger part
+                dagger_list = []
+                # Left and right are already sorted, so can do linear scale merging
+                left_list = fermistring1[0]
+                right_list = dagger_tmp
+                left_len = len(left_list)
+                right_len = len(right_list)
+                left = 0
+                right = 0
+                # Linear-time merge using local variables and a bound-checked loop
+                while left < left_len and right < right_len:
+                    if left_list[left] > right_list[right]:
+                        dagger_list.append(left_list[left])
+                        left += 1
+                    else:
+                        dagger_list.append(right_list[right])
+                        phase *= (-1) ** (left_len - left)
+                        right += 1
+                # Add remainders (use extend to avoid extra concatenation overhead)
+                if left < left_len:
+                    dagger_list.extend(left_list[left:])
+                elif right < right_len:
+                    dagger_list.extend(right_list[right:])
+                # Sort non-dagger part
+                nondagger_list = []
+                # Left and right are already sorted, so can do linear scale merging
+                left_list = nondagger_tmp
+                right_list = fermistring2[1]
+                left_len = len(left_list)
+                right_len = len(right_list)
+                left = 0
+                right = 0
+                # Linear-time merge using local variables and a bound-checked loop
+                while left < left_len and right < right_len:
+                    if left_list[left] > right_list[right]:
+                        nondagger_list.append(left_list[left])
+                        left += 1
+                    else:
+                        nondagger_list.append(right_list[right])
+                        phase *= (-1) ** (left_len - left)
+                        right += 1
+                # Add remainders (use extend to avoid extra concatenation overhead)
+                if left < left_len:
+                    nondagger_list.extend(left_list[left:])
+                elif right < right_len:
+                    nondagger_list.extend(right_list[right:])
                 yield (tuple(dagger_list), tuple(nondagger_list)), phase
 
 
@@ -332,7 +407,7 @@ class FermionicOperator:
             raise ValueError(f"Could not assign operator of {type(annihilation_operator)}.")
 
     def operator_sets(self, key: tuple[tuple[int, ...], tuple[int, ...]]) -> tuple[set[int], set[int]]:
-        """Get set represtion of fermionic string.
+        """Get set representation of fermionic string.
 
         Args:
             key: Fermionic string.

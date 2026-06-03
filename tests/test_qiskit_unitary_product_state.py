@@ -8,7 +8,9 @@ import slowquant.qiskit_interface.linear_response.selfconsistent as selfconsiste
 import slowquant.qiskit_interface.linear_response.statetransfer as statetransferqc
 import slowquant.SlowQuant as sq
 from slowquant.qiskit_interface.circuit_wavefunction import WaveFunctionCircuit
+from slowquant.qiskit_interface.circuit_wavefunction_from_ups import circuit_wavefunction_from_ups
 from slowquant.qiskit_interface.interface import QuantumInterface
+from slowquant.unitary_coupled_cluster.sa_ups_wavefunction import WaveFunctionSAUPS
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
 
@@ -480,3 +482,68 @@ def test_h2_statetransfer_lr() -> None:
     assert abs(qlr.excitation_energies[1] - 1.620427) < 10**-4
     assert abs(qlr.oscillator_strengths[0] - 0.868501) < 10**-4
     assert abs(qlr.oscillator_strengths[1] - 0.0) < 10**-4
+
+
+def test_convert_ups_to_circuit() -> None:
+    """Test fUCC convert UPS wavefunction to circuit wavefunction."""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """Li 0.0           0.0  0.0;
+           H  1.6717072740  0.0  0.0;""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("STO-3G")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    WF = WaveFunctionUPS(
+        (2, 2),
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
+        "fUCCSD",
+        include_active_kappa=True,
+    )
+    WF.run_wf_optimization_1step("BFGS", True)
+    mapper = JordanWignerMapper()
+    primitive = Sampler(run_options={"shots": None})
+    qWF = circuit_wavefunction_from_ups(WF, primitive, mapper)
+    assert abs(WF.energy_elec - qWF.energy_elec) < 10**-10
+
+
+def test_convert_saups_to_circuit() -> None:
+    """Test tUPS convert SAUPS wavefunction to SA circuit wavefunction."""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """H   -0.45  -0.3897114317  0.0;
+           H   0.45  -0.3897114317  0.0;
+           H   0.0  0.3897114317  0.0;""",
+        distance_unit="angstrom",
+        molecular_charge=1,
+    )
+    SQobj.set_basis_set("STO-3G")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    WF = WaveFunctionSAUPS(
+        (2, 3),
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
+        (
+            [
+                [1],
+                [2 ** (-1 / 2), -(2 ** (-1 / 2))],
+                [2 ** (-1 / 2), -(2 ** (-1 / 2))],
+            ],
+            [
+                ["110000"],
+                ["100100", "011000"],
+                ["100001", "010010"],
+            ],
+        ),
+        "tUPS",
+        ansatz_options={"n_layers": 2, "skip_last_singles": True},
+        include_active_kappa=True,
+    )
+    WF.run_wf_optimization_2step("BFGS", True)
+    mapper = JordanWignerMapper()
+    primitive = Sampler(run_options={"shots": None})
+    qWF = circuit_wavefunction_from_ups(WF, primitive, mapper)
+    assert abs(WF.sa_energy - qWF.sa_energy) < 10**-10
