@@ -1,4 +1,5 @@
 # type: ignore
+import numba as nb
 import numpy as np
 
 import slowquant.SlowQuant as sq
@@ -284,3 +285,75 @@ def test_SA_sa_doubles() -> None:
     )
     WF.run_wf_optimization_1step("BFGS")
     assert abs(WF.energy_states[0] - -8.874521029611891) < 10**-8
+
+
+def test_ups_water_44_threaded() -> None:
+    """Test a larger active space."""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """O   0.0  0.0           0.1035174918;
+    H   0.0  0.7955612117 -0.4640237459;
+    H   0.0 -0.7955612117 -0.4640237459;""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("STO-3G")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    nb.set_num_threads(2)
+    WF = WaveFunctionUPS(
+        (4, 4),
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
+        "fUCCSD",
+        ansatz_options={},
+        include_active_kappa=True,
+    )
+    WF.run_wf_optimization_1step("SLSQP", True)
+    assert abs(WF.energy_elec - -83.97256228053688) < 10**-8
+    nb.set_num_threads(1)
+
+
+def test_saups_h3_3states_threaded() -> None:
+    """Test a system where the subspace is not everything."""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """H   -0.45  -0.3897114317  0.0;
+           H   0.45  -0.3897114317  0.0;
+           H   0.0  0.3897114317  0.0;""",
+        distance_unit="angstrom",
+        molecular_charge=1,
+    )
+    SQobj.set_basis_set("STO-3G")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+
+    nb.set_num_threads(2)
+    WF = WaveFunctionSAUPS(
+        (2, 3),
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
+        (
+            [
+                [1],
+                [2 ** (-1 / 2), -(2 ** (-1 / 2))],
+                [2 ** (-1 / 2), -(2 ** (-1 / 2))],
+            ],
+            [
+                ["110000"],
+                ["100100", "011000"],
+                ["100001", "010010"],
+            ],
+        ),
+        "tUPS",
+        ansatz_options={"n_layers": 2, "skip_last_singles": True},
+        include_active_kappa=True,
+    )
+
+    WF.run_wf_optimization_2step("BFGS", True)
+
+    assert abs(WF.excitation_energies[0] - 0.838466) < 10**-6
+    assert abs(WF.excitation_energies[1] - 0.838466) < 10**-6
+    osc = WF.get_oscillator_strenghts()
+    assert abs(osc[0] - 0.7569) < 10**-3
+    assert abs(osc[1] - 0.7569) < 10**-3
+    nb.set_num_threads(1)
