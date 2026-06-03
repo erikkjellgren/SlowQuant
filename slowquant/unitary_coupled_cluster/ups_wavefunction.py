@@ -215,6 +215,7 @@ class WaveFunctionUPS:
         self.csf_coeffs = np.zeros(self.num_det)
 
         hf_det = "1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec)
+        self._pp = False
         if (
             ansatz.lower() == "tups"
             and "do_pp" in self.ansatz_options.keys()
@@ -255,6 +256,7 @@ class WaveFunctionUPS:
 
             # Assign weight to reference
             self.csf_coeffs[self.ci_info.det2idx[int(pp_det, 2)]] = 1
+            self._pp = True
         else:
             self.csf_coeffs[self.ci_info.det2idx[int(hf_det, 2)]] = 1
             self._c_mo = mo_coeffs

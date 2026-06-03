@@ -44,13 +44,16 @@ def circuit_wavefunction_from_ups(
     Returns:
         Circuit wavefunction.
     """
+    ansatz_options = None
+    if hasattr(ups_wf, "_pp") and ups_wf._pp:
+        ansatz_options = {"do_pp": True}
     QI = QuantumInterface(
         primitive=primitive,
         ansatz=ups_wf.ups_layout,
         mapper=mapper,
         ISA=ISA,
         pass_manager_options=pass_manager_options,
-        ansatz_options=None,
+        ansatz_options=ansatz_options,
         shots=shots,
         max_shots_per_run=max_shots_per_run,
         do_M_mitigation=do_M_mitigation,
