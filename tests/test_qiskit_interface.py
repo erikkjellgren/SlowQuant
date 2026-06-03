@@ -327,7 +327,7 @@ def test_LiH_oscillator_strength() -> None:
         QI,
     )
 
-    qWF.run_wf_optimization_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", True, tol=10**-8)
 
     # naive LR with QSQ
     qLR_naive = q_naive.quantumLR(qWF, "SD")

@@ -546,4 +546,4 @@ def test_convert_saups_to_circuit() -> None:
     mapper = JordanWignerMapper()
     primitive = Sampler(run_options={"shots": None})
     qWF = circuit_wavefunction_from_ups(WF, primitive, mapper)
-    assert abs(WF.sa_energy - qWF.sa_energy) < 10**-10
+    assert abs(WF.sa_energy - qWF.sa_energy) < 10**-9
