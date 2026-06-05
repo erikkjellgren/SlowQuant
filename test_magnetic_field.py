@@ -276,9 +276,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # ZORA SOC Hamiltonian:
 
-    h_core_pyscf_1dim = mol.intor('int1e_kin') + mol.intor('int1e_nuc')
+    # h_core_pyscf_1dim = mol.intor('int1e_kin') + mol.intor('int1e_nuc')
 
-    h_core_pyscf = np.kron(np.eye(2), h_core_pyscf_1dim)
+    # h_core_pyscf = np.kron(np.eye(2), h_core_pyscf_1dim)
 
     #H_zora= read_zora_so("Cl_so.zora_so")
 
@@ -328,13 +328,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # The -0.5 matches DIRAC's COMFACTOR = -Bz/2 = -0.0005
     hcore0 = mf.get_hcore()                             # real (2*nao, 2*nao)
     hcoreB = hcore0.astype(complex)
-    hcoreB += -0.5 * Bz * Lz_spinor                    # orbital Zeeman
+    hcoreB += -0.5 * Bz * Lz_spinor                     # orbital Zeeman
     hcoreB += H_dia                                     # diamagnetic
 
-    #mf.get_hcore = lambda *args: hcoreB
-
-
-
+    mf.get_hcore = lambda *args: hcoreB
 
 
 
@@ -378,9 +375,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         #c_u,
         c_MO,
         #h_core,
-        h_core_pyscf,
+        #h_core_pyscf,
         #h_core_tot,
-        #hcoreB,
+        hcoreB,
         g_eri,
         "fuccsd",
         {"n_layers": 0, "is_spin_conserving" : False},

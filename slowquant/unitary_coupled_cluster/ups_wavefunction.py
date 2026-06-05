@@ -252,6 +252,19 @@ class WaveFunctionUPS:
                 self.active_unocc_spin_idx_shifted,
                 self.num_active_orbs,
                 self.ansatz_options,
+                )
+        elif ansatz.lower() == "fuccd":
+            self.ansatz_options["D"] = True
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
+            self.ups_layout.create_fUCC(
+                self.active_occ_idx_shifted,
+                self.active_unocc_idx_shifted,
+                self.active_occ_spin_idx_shifted,
+                self.active_unocc_spin_idx_shifted,
+                self.num_active_orbs,
+                self.ansatz_options,
             )
         elif ansatz.lower() == "ksafupccgsd":
             self.ansatz_options["SAGS"] = True

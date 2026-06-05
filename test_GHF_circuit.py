@@ -4,6 +4,7 @@ from pyscf import mcscf, scf, gto, x2c
 from scipy.stats import unitary_group
 from pyscf.lib import chkfile
 from scipy.linalg import expm
+import matplotlib
 
 
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
@@ -23,10 +24,136 @@ from slowquant.molecularintegrals.integralfunctions import DHF_one_electron_tran
 
 # qWF imports:
 from qiskit_aer.primitives import Sampler
-from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
+from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper, InterleavedQubitMapper
 from slowquant.qiskit_interface.generalized_circuit_wavefunction import GeneralizedWaveFunctionCircuit
 from slowquant.qiskit_interface.generalized_interface import QuantumInterface
+from qiskit_nature.second_q.operators import FermionicOp
+from qiskit.quantum_info import SparsePauliOp
 
+# The customized mappper:     conserves orbital ordering from PySCF
+class DirectJordanWignerMapper(JordanWignerMapper):
+    """
+    JW mapper that preserves spinor index ordering exactly.
+    Bypasses Qiskit Nature's alpha/beta blocked reordering.
+    """
+
+    def map(self, op: FermionicOp, *, register_length=None) -> SparsePauliOp:
+        n = op.num_spin_orbitals
+        result = SparsePauliOp.from_list([('I' * n, 0.0)])
+
+        for term, coeff in op.items():
+            if not term:  # empty string = identity
+                result += SparsePauliOp.from_list([('I' * n, coeff)])
+                continue
+            pauli = self._jw_term(term, n)
+            result += coeff * pauli
+
+        return result.simplify()
+
+    def _jw_term(self, term, n):
+        pauli = SparsePauliOp.from_list([('I' * n, 1.0)])
+        for op_str in term.split(' '):
+            action, idx = op_str.split('_')
+            pauli = pauli @ self._jw_single(action, int(idx), n)  # no permutation
+        return pauli
+
+    def _jw_single(self, action, idx, n):
+        """a†_idx or a_idx via JW, direct index."""
+        z_string = 'I' * (n - idx - 1) + 'Z' * idx  # Z on all qubits below idx
+        if action == '+':
+            x_part = 'I' * (n - idx - 1) + 'X' + z_string[n - idx:]
+            y_part = 'I' * (n - idx - 1) + 'Y' + z_string[n - idx:]
+            # a†_i = 0.5 * (X - iY) * Z...Z
+            return SparsePauliOp.from_list([(
+                'I' * (n - idx - 1) + 'X' + 'Z' * idx, 0.5),
+                ('I' * (n - idx - 1) + 'Y' + 'Z' * idx, -0.5j)
+            ])
+        else:  # '-'
+            return SparsePauliOp.from_list([(
+                'I' * (n - idx - 1) + 'X' + 'Z' * idx, 0.5),
+                ('I' * (n - idx - 1) + 'Y' + 'Z' * idx, 0.5j)
+            ])
+        
+        
+class DirectJordanWignerMapper_new(JordanWignerMapper):
+    """
+    Jordan–Wigner mapper preserving the exact PySCF spin-orbital ordering.
+
+    No alpha/beta regrouping.
+    Orbital i -> qubit i directly.
+    """
+
+    def map(self, op: FermionicOp, *, register_length=None) -> SparsePauliOp:
+        n = op.num_spin_orbitals
+
+        result = SparsePauliOp.from_list([("I" * n, 0.0)])
+
+        for term, coeff in op.items():
+
+            # identity term
+            if term == "":
+                result += SparsePauliOp.from_list([("I" * n, coeff)])
+                continue
+
+            mapped = self._map_term(term, n)
+            result += coeff * mapped
+
+        return result.simplify()
+
+    def _map_term(self, term: str, n: int) -> SparsePauliOp:
+        """
+        Map a product like '+_0 -_1'.
+        """
+        op = SparsePauliOp.from_list([("I" * n, 1.0)])
+
+        for tok in term.split():
+            action, idx = tok.split("_")
+            idx = int(idx)
+
+            op = op @ self._single_jw(action, idx, n)
+
+        return op
+
+    def _single_jw(self, action: str, idx: int, n: int) -> SparsePauliOp:
+        """
+        Direct JW transform for one fermionic operator.
+
+        a†_i = 1/2 (X_i - iY_i) Z_0 ... Z_{i-1}
+        a_i  = 1/2 (X_i + iY_i) Z_0 ... Z_{i-1}
+
+        Qiskit Pauli strings are little-endian:
+        rightmost char = qubit 0
+        """
+
+        x_label = ["I"] * n
+        y_label = ["I"] * n
+
+        # parity string on lower qubits
+        for q in range(idx):
+            x_label[n - 1 - q] = "Z"
+            y_label[n - 1 - q] = "Z"
+
+        # operator on target qubit
+        x_label[n - 1 - idx] = "X"
+        y_label[n - 1 - idx] = "Y"
+
+        x_label = "".join(x_label)
+        y_label = "".join(y_label)
+
+        if action == "+":
+            return SparsePauliOp.from_list([
+                (x_label, 0.5),
+                (y_label, -0.5j),
+            ])
+
+        elif action == "-":
+            return SparsePauliOp.from_list([
+                (x_label, 0.5),
+                (y_label, 0.5j),
+            ])
+
+        else:
+            raise ValueError(f"Invalid fermionic action: {action}")
 
 
 def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
@@ -55,7 +182,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
    
 
     # small random anti-Hermitian
-    eps = 0.005  # controls "step size"
+    eps = 0.1  # controls "step size"
     X_anti = np.random.randn(coeff.shape[0],coeff.shape[0]) + 1j*np.random.randn(coeff.shape[0],coeff.shape[0])
     A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian
 
@@ -64,20 +191,55 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     coeff_u = coeff @ U_step
 
 
+    #print(np.round(coeff.real, 2))
+
+
+
     WF = GeneralizedWaveFunctionUPS(
         active_space,
-        coeff,
+        coeff_u,
         mol,
-        "fuccsd",
-        ansatz_options = {"n_layers": 1, "is_spin_conserving" : False},
+        "fUCCD",
+        ansatz_options = {"n_layers": 0, "is_spin_conserving" : True},
         include_active_kappa=True,
     )
+
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True)
+
+    WF2 = GeneralizedWaveFunctionUPS(
+        active_space,
+        WF.c_mo,
+        mol,
+        "fUCCSD",
+        ansatz_options = {"n_layers": 1, "is_spin_conserving" : True},
+        include_active_kappa=True,
+    )
+
+    WF3 = GeneralizedWaveFunctionUPS(
+        active_space,
+        WF.c_mo,
+        mol,
+        "fUCCSD",
+        ansatz_options = {"n_layers": 1, "is_spin_conserving" : True},
+        include_active_kappa=True,
+    )
+
+    WF2.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True)
+
+    WF3.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True)
+
+    # Setting the correct mapper:    The problem is that we do NOT have perfectly interleaved orbital ordering
+    # base_mapper = JordanWignerMapper()
+    # mapper = InterleavedQubitMapper(base_mapper)
+    # mapper = DirectJordanWignerMapper_new()
+    mapper = JordanWignerMapper()
+
 
     QI = QuantumInterface(
         Sampler(run_options={"shots": None}),
         "fUCCSD", # Ansatz
-        JordanWignerMapper(),
-        ansatz_options = {"n_layers": 1, "is_spin_conserving" : False},
+        mapper,
+        ansatz_options = {"n_layers": 1, "is_spin_conserving" : True},
         ISA=False, # default is false
         do_M_mitigation=False, # default is false
         do_M_ansatz0=False, # default is false
@@ -87,32 +249,49 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     qWF = GeneralizedWaveFunctionCircuit(
         mol.nelectron,
         active_space,
-        WF.c_mo,
+        WF3.c_mo,
         h_core,
         g_eri,
         QI,
         include_active_kappa = True,
     )
 
-    #print(WF.ups_layout.excitation_indices)
-
-    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True)
-
-    print(np.round(WF.thetas_real,10))
-    print(np.round(WF.thetas_imag,10))
+    #clean = [tuple(int(y) for y in x) for x in WF3.ups_layout.excitation_indices]
+    #print("idx from classical excitaion operators:", clean)
     
-    qWF.set_thetas(WF.thetas_real, WF.thetas_imag)
 
-    print(np.round(qWF.thetas_real,10))
-    print(np.round(qWF.thetas_imag,10))
+    #qWF.set_thetas_initial(WF2.thetas_real, WF2.thetas_imag)
+    qWF.set_thetas_initial(WF3.thetas_real, WF3.thetas_imag)
 
-    print("oo-UCCSD Quantum", qWF.energy_elec)
+    #qWF.set_thetas_initial(np.add(WF2.thetas_real, 0.002), np.add(WF2.thetas_imag, 0.002))
 
-    print("oo-UCCSD Classical", WF._energy_elec)
+    print("real components of thetas     :", np.round(WF3.thetas_real,3))
+    print("imaginary components of thetas:", np.round(WF3.thetas_imag,3))
 
-    print("HF Classical", mf.energy_elec()[0])
+    print("norm of thetas:", np.round(qWF.thetas_real,10))
+    print("phi of thetas :", np.round(qWF.thetas_imag,10))
 
-    qWF.run_wf_optimization_1step("bfgs", orbital_optimization=True)
+
+    print("HF Classical PySCF        :", mf.energy_elec()[0])
+
+    print("HF Classical WF           :", WF.energy_elec)
+
+    print("oo-UCCSD Classical        :", WF2.energy_elec)
+
+    print("oo-UCCSD Classical no active kappa:", WF3.energy_elec)
+
+    print("oo-UCCSD Quantum          :", qWF.energy_elec)
+
+    
+    fig = qWF.QI.circuit.draw("mpl")
+    fig.savefig("circuit_GHF.png")
+
+    #print("param_names:", qWF.QI.param_names)
+
+    qWF.run_wf_optimization_1step("bfgs", orbital_optimization=True, tol=1e-6)
+
+    print("norm of thetas:", np.round(qWF.thetas_real,10))
+    print("phi of thetas :", np.round(qWF.thetas_imag,10))
 
 
 
@@ -125,8 +304,8 @@ def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
     #basis = "cc-pvdz"
-    #basis = "631-g"
-    basis = "sto-3g"
+    basis = "631-g"
+    #basis = "sto-3g"
     #basis = "sto-6g"
     active_space = ((1, 1), 4)
     #active_space = (2, 4)
@@ -244,8 +423,21 @@ def HBr():
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
-    
+
+def HF():
+    geometry = """H  0.0   0.0  0.91680;
+        F  0.0  0.0  0.0 """
+    basis = 'sto-3g'
+    active_space = ((1,1), 4) #spin orbitaler or spinor basis
+    # active_space = ((2,2), 6) #spin orbitaler or spinor basis
+    # active_space = (2, 4)
+    charge = 0
+    spin = 1
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )  
+
 # Run simulation:
 
-LiH()
+h2()
 

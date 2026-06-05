@@ -6,7 +6,7 @@ from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
-from slowquant.qiskit_interface.util import f2q, f2q_spin
+from slowquant.qiskit_interface.util import f2q
 from slowquant.unitary_coupled_cluster.operators import a_op_spin
 
 
@@ -40,7 +40,7 @@ def single_excitation(
 def single_excitation_generalized(
     i: int,
     a: int,
-    num_orbs: int,
+    num_spin_orbs: int,
     qc: QuantumCircuit,
     theta: Parameter | ParameterExpression,
     phi: Parameter | ParameterExpression,
@@ -59,10 +59,14 @@ def single_excitation_generalized(
     Returns:
         Single excitation circuit.
     """
-    if isinstance(mapper, JordanWignerMapper):
-        qc = _single_excitation_efficient_generalized(a, i, num_orbs, qc, theta, phi)
-    else:
-        qc = _single_excitation_trotter(i, a, num_orbs, qc, theta, mapper)
+    #qc = _single_excitation_efficient_generalized(a, i, num_spin_orbs, qc, theta, phi)
+    qc = _single_excitation_trotter_generalized(i, a, num_spin_orbs, qc, theta, phi, mapper)
+
+    # if isinstance(mapper, JordanWignerMapper):
+    #     qc = _single_excitation_efficient_generalized(a, i, num_orbs, qc, theta, phi)
+    # else:
+    #     qc = _single_excitation_trotter_generalized(i, a, num_orbs, qc, theta, phi, mapper)
+
     return qc
 
 
@@ -91,10 +95,12 @@ def double_excitation(
     Returns:
         Single excitation circuit.
     """
+
     if isinstance(mapper, JordanWignerMapper):
         qc = _double_excitation_efficient(a, b, i, j, num_orbs, qc, theta)
     else:
         qc = _double_excitation_trotter(i, j, a, b, num_orbs, qc, theta, mapper)
+
     return qc
 
 def double_excitation_generalized(
@@ -123,10 +129,14 @@ def double_excitation_generalized(
     Returns:
         Single excitation circuit.
     """
-    if isinstance(mapper, JordanWignerMapper):
-        qc = _double_excitation_efficient_generalized(a, b, i, j, num_orbs, qc, theta, phi)
-    else:
-        qc = _double_excitation_trotter(i, j, a, b, num_orbs, qc, theta, mapper)
+    #qc = _double_excitation_efficient_generalized(a, b, i, j, num_orbs, qc, theta, phi)
+    qc = _double_excitation_trotter_generalized(i, j, a, b, num_orbs, qc, theta, phi, mapper)
+
+    # if isinstance(mapper, JordanWignerMapper):
+    #     qc = _double_excitation_efficient_generalized(a, b, i, j, num_orbs, qc, theta, phi)
+    # else:
+    #     qc = _double_excitation_trotter(i, j, a, b, num_orbs, qc, theta, phi, mapper)
+
     return qc
 
 
@@ -213,7 +223,7 @@ def _single_excitation_efficient(
 
 
 def _single_excitation_efficient_generalized(
-    k: int, i: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression, phi: Parameter | ParameterExpression
+    k: int, i: int, num_spin_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression, phi: Parameter | ParameterExpression
 ) -> QuantumCircuit:
     r"""Exact circuit for single excitation.
 
@@ -235,23 +245,99 @@ def _single_excitation_efficient_generalized(
     Returns:
         Single excitation circuit.
     """
-    #print("Efficient")
-    #print(i,k)
-    # phi = np.arccos(theta_complex.real)
-    # theta = np.sqrt(theta_complex.real**2 + theta_complex.imag**2)
 
-    # print(theta)
-    # print(phi)
+    num_orbs = num_spin_orbs // 2
 
+    k_q = f2q(k, num_orbs)
+    i_q = f2q(i, num_orbs)
 
-    #k = f2q_spin(k, num_orbs)
-    #i = f2q_spin(i, num_orbs)
-    #print(i,k)
+    # Complex parameter correction: 
+    qc.rz(-phi/4, k_q) 
+    qc.rz(phi/4, i_q) 
+
     if k <= i:
         raise ValueError(f"k={k}, must be larger than i={i}")
     if k - 1 == i:
-        qc.rz(phi/4, k) #vi mangler at definere phi
-        qc.rz(-phi/4, i) #vi mangler at definere phi
+
+
+        # Excitation:
+        qc.rz(np.pi / 2, i_q)
+        qc.rx(np.pi / 2, i_q)
+        qc.rx(np.pi / 2, k_q)
+        qc.cx(i_q, k_q)
+        qc.rx(theta, i_q)
+        qc.rz(theta, k_q)
+        qc.cx(i_q, k_q)
+        qc.rx(-np.pi / 2, k_q)
+        qc.rx(-np.pi / 2, i_q)
+        qc.rz(-np.pi / 2, i_q)
+ 
+    else:
+        # CNOT ladder:
+        qc.cx(k_q, i_q)
+        for t in range(k - 2, i, -1):
+            qc.cx(f2q(t + 1, num_orbs), f2q(t, num_orbs))
+
+        # Excitation:
+        # Surrounding CZ:
+        qc.cz(f2q(i + 1, num_orbs), k_q)
+
+        # Equivalent to CRz for 2*theta: 
+        qc.ry(theta, k_q)
+        qc.cx(i_q, k_q)
+        qc.ry(-theta, k_q)
+        qc.cx(i_q, k_q)
+
+        # Surrounding CZ:
+        qc.cz(f2q(i + 1, num_orbs), k_q)
+
+        # CNOT ladder
+        for t in range(i + 1, k - 1):
+            qc.cx(f2q(t + 1, num_orbs), f2q(t, num_orbs))
+        qc.cx(k_q, i_q)
+
+    # Complex parameter correction: 
+    qc.rz(phi/4, k_q) 
+    qc.rz(-phi/4, i_q) 
+
+
+    return qc
+
+def _single_excitation_efficient_generalized_test(
+    a: int, j: int, num_spin_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression, phi: Parameter | ParameterExpression
+) -> QuantumCircuit:
+    r"""Exact circuit for single excitation.
+
+    Implementation of the following operator,
+
+    .. math::
+       \boldsymbol{U} = \exp\left(\theta\hat{a}^\dagger_k\hat{a}_i\right)
+
+    #. 10.1103/PhysRevA.102.062612, Fig. 3 and Fig. 8
+    #. 10.1038/s42005-021-00730-0, Fig. 1
+
+    Args:
+        k: Weakly occupied spin orbital index.
+        i: Strongly occupied spin orbital index.
+        num_orbs: Number of spatial orbitals.
+        qc: Quantum circuit.
+        theta: Circuit parameter.
+
+    Returns:
+        Single excitation circuit.
+    """
+    num_orbs = num_spin_orbs // 2
+
+    k = f2q(a, num_orbs)
+    i = f2q(j, num_orbs)
+
+    qc.rz(-phi/4, k) 
+    qc.rz(phi/4, i) 
+
+
+    if k <= i:
+        raise ValueError(f"k={k}, must be larger than i={i}")
+    if k - 1 == i:
         qc.rz(np.pi / 2, i)
         qc.rx(np.pi / 2, i)
         qc.rx(np.pi / 2, k)
@@ -262,11 +348,7 @@ def _single_excitation_efficient_generalized(
         qc.rx(-np.pi / 2, k)
         qc.rx(-np.pi / 2, i)
         qc.rz(-np.pi / 2, i)
-        qc.rz(-phi/4, k) #vi mangler at definere phi
-        qc.rz(phi/4, i) #vi mangler at definere phi  
     else:
-        qc.rz(phi/4, k) #vi mangler at definere phi
-        qc.rz(-phi/4, i) #vi mangler at definere phi
         qc.cx(k, i)
         for t in range(k - 2, i, -1):
             qc.cx(t + 1, t)
@@ -279,8 +361,11 @@ def _single_excitation_efficient_generalized(
         for t in range(i + 1, k - 1):
             qc.cx(t + 1, t)
         qc.cx(k, i)
-        qc.rz(-phi/4, k) #vi mangler at definere phi
-        qc.rz(phi/4, i) #vi mangler at definere phi  
+
+
+    qc.rz(phi/4, k) 
+    qc.rz(-phi/4, i) 
+
     return qc
 
 def _double_excitation_efficient(
@@ -333,6 +418,8 @@ def _double_excitation_efficient(
     if n_alpha % 2 != 0 or n_beta % 2 != 0:
         raise ValueError("Operator only implemented for spin conserving operators.")
     fac = 1
+
+
     if k % 2 == l % 2 and k % 2 == 0 and i % 2 != 0:
         fac *= -1
     k = f2q(k, num_orbs)
@@ -443,114 +530,178 @@ def _double_excitation_efficient_generalized(
     Returns:
         Double excitation circuit.
     """
-
-    # phi = np.arccos(theta_complex.real)
-    # theta = np.sqrt(theta_complex.real**2 + theta_complex.imag**2)
-
-
     if k < i or k < j:
         raise ValueError(f"Operator only implemented for k, {k}, larger than i, {i}, and j, {j}")
     if l < i or l < j:
         raise ValueError(f"Operator only implemented for l, {l}, larger than i, {i}, and j, {j}")
-    n_alpha = 0
-    n_beta = 0
-    if i % 2 == 0:
-        n_alpha += 1
-    else:
-        n_beta += 1
-    if j % 2 == 0:
-        n_alpha += 1
-    else:
-        n_beta += 1
-    if k % 2 == 0:
-        n_alpha += 1
-    else:
-        n_beta += 1
-    if l % 2 == 0:
-        n_alpha += 1
-    else:
-        n_beta += 1
-    # if n_alpha % 2 != 0 or n_beta % 2 != 0:
-    #     raise ValueError("Operator only implemented for spin conserving operators.")
+    
     fac = 1
-    if k % 2 == l % 2 and k % 2 == 0 and i % 2 != 0:
+
+    if k % 2 == l % 2 and k % 2 == 0 and i % 2 != 0 and j % 2 != 0:
         fac *= -1
-    #k = f2q_spin(k, num_orbs)
-    #l = f2q_spin(l, num_orbs)
-    #i = f2q_spin(i, num_orbs)
-    #j = f2q_spin(j, num_orbs)
-    if k > l:
-        l, k = k, l
+
+    if k % 2 == l % 2 and k % 2 != 0 and i % 2 == 0 and j % 2 == 0:
         fac *= -1
-    if i > j:
-        j, i = i, j
+
+    if k % 2 == l % 2 and i % 2 != j % 2:
         fac *= -1
-    if l < j:
-        l, j = j, l
+
+    if k % 2 != l % 2 and i % 2 == j % 2:
         fac *= -1
-    if k < i:
-        k, i = i, k
+    
+    
+    # if k > l:
+    #     l, k = k, l
+    #     fac *= -1
+    # if i > j:
+    #     j, i = i, j
+    #     fac *= -1
+    # if l < j:
+    #     l, j = j, l
+    #     fac *= -1
+    # if k < i:
+    #     k, i = i, k
+    #     fac *= -1
+
+
+
+    k_q = f2q(k, num_orbs // 2)
+    l_q = f2q(l, num_orbs // 2)
+    i_q = f2q(i, num_orbs // 2)
+    j_q = f2q(j, num_orbs // 2)
+
+
+    # qs = [k_q, l_q, j_q, i_q]
+
+    # for a in range(4):
+    #     for b in range(a + 1, 4):
+    #         if qs[a] > qs[b]:
+    #             fac *= -1
+
+
+
+    
+    # ---- fermionic canonical ordering (THIS is the key fix) ----
+
+    ## Sort creation operator indices (k, l) -> canonical order (smaller, larger)
+    # if k_q > l_q:
+    #     l_q, k_q = k_q, l_q
+    #     fac *= -1
+
+    # # Sort annihilation operator indices (i, j) -> canonical order (smaller, larger)  
+    # if i_q > j_q:
+    #     j_q, i_q = i_q, j_q
+    #     fac *= -1
+
+    # # Now ensure the pairs are ordered correctly relative to each other
+    # # Circuit requires l > k and j > i and the four indices sorted as i_z < k_z < j_z < l_z
+    # # (or whatever the sorted order is)
+    # # Additional sign from reordering the pairs themselves
+    # if l_q < j_q:
+    #     l_q, j_q = j_q, l_q
+    #     k_q, i_q = i_q, k_q
+    #     fac *= -1
+
+    # if k_q < i_q:
+    #     k_q, i_q = i_q, k_q
+    #     fac *= -1
+
+
+
+
+    if k_q > l_q:
+        l_q, k_q = k_q, l_q
         fac *= -1
+    if i_q > j_q:
+        j_q, i_q = i_q, j_q
+        fac *= -1
+
+    if l_q < j_q:
+        l_q, j_q = j_q, l_q
+        fac *= -1
+    if k_q < i_q:
+        k_q, i_q = i_q, k_q
+        fac *= -1
+
+
+    theta = theta*fac*2
+
     # cnot ladder is easier to implement if the indices are sorted.
-    i_z, k_z, j_z, l_z = np.sort((k, l, i, j))
-    theta = 2 * theta * fac
-
-    qc.rz(phi/4, k) #vi mangler at definere phi
-    qc.rz(phi/4, l) #vi mangler at definere phi
-    qc.rz(-phi/4, i) #vi mangler at definere phi
-    qc.rz(-phi/4, j) #vi mangler at definere phi
+    #i_z, k_z, j_z, l_z = np.sort((k, l, i, j))
+    i_z, k_z, j_z, l_z = np.sort((i_q, k_q, j_q, l_q))
+    #i_z, k_z, j_z, l_z = i_q, k_q, j_q, l_q
+    #i_z, k_z, j_z, l_z = i, k, j, l
 
 
-    qc.cx(l, k)
-    qc.cx(j, i)
-    qc.cx(l, j)
+    qc.rz(-phi/4, k_q) 
+    qc.rz(-phi/4, l_q)
+    qc.rz(phi/4, i_q) 
+    qc.rz(phi/4, j_q)
+
+
+    qc.cx(l_q, k_q)
+    qc.cx(j_q, i_q)
+    qc.cx(l_q, j_q)
+
+
+    # for t in range(l_z-2, k_z, -1):
+    #     qc.cx(f2q(t + 1, num_orbs // 2), f2q(t, num_orbs // 2))
+    
+    # for t in range(j_z-2, i_z, -1):
+    #     qc.cx(f2q(t + 1, num_orbs // 2), f2q(t , num_orbs // 2))
+
+    # qc.cz(f2q(l_z, num_orbs // 2), f2q(i_z + 1, num_orbs // 2))
 
     if l_z != j_z + 1:
         for t in range(i_z + 1, k_z - 1):
             qc.cx(t, t + 1)
-        if i_z + 1 != k_z:  # and j+1 != k and k-1 != j+1:
+        if i_z + 1 != k_z and j+1 != k and k-1 != j+1:
             qc.cx(k_z - 1, j_z + 1)
-        # if j+1 != k:
-        for t in range(j_z + 1, l_z - 1):
-            qc.cx(t, t + 1)
+        if j+1 != k:
+            for t in range(j_z + 1, l_z - 1):
+                qc.cx(t, t + 1)
         qc.cz(l_z, l_z - 1)
     elif i_z != k_z - 1:
         for t in range(i_z + 1, k_z - 1):
             qc.cx(t, t + 1)
         qc.cz(l_z, k_z - 1)
-    qc.x(k)
-    qc.x(i)
 
-    qc.ry(theta / 8, l)
-    qc.h(k)
-    qc.cx(l, k)
-    qc.ry(-theta / 8, l)
-    qc.h(i)
-    qc.cx(l, i)
-    qc.ry(theta / 8, l)
-    qc.cx(l, k)
-    qc.ry(-theta / 8, l)
-    qc.h(j)
-    qc.cx(l, j)
-    qc.ry(theta / 8, l)
-    qc.cx(l, k)
-    qc.ry(-theta / 8, l)
-    qc.cx(l, i)
-    qc.ry(theta / 8, l)
-    qc.h(i)
-    qc.cx(l, k)
-    qc.ry(-theta / 8, l)
-    qc.h(k)
-    qc.cx(l, j)
-    qc.h(j)
+    qc.x(k_q)
+    qc.x(i_q)
 
-    qc.x(k)
-    qc.x(i)
+    qc.ry(theta / 8, l_q)
+    qc.h(k_q)
+    qc.cx(l_q, k_q)
+    qc.ry(-theta / 8, l_q)
+    qc.h(i_q)
+    qc.cx(l_q, i_q)
+    qc.ry(theta / 8, l_q)
+    qc.cx(l_q, k_q)
+    qc.ry(-theta / 8, l_q)
+    qc.h(j_q)
+    qc.cx(l_q, j_q)
+    qc.ry(theta / 8, l_q)
+    qc.cx(l_q, k_q)
+    qc.ry(-theta / 8, l_q)
+    qc.cx(l_q, i_q)
+    qc.ry(theta / 8, l_q)
+    qc.h(i_q)
+    qc.cx(l_q, k_q)
+    qc.ry(-theta / 8, l_q)
+    qc.h(k_q)
+    qc.cx(l_q, j_q)
+    qc.h(j_q)
+
+    qc.x(k_q)
+    qc.x(i_q)
+
+
     if l_z != j_z + 1:
         qc.cz(l_z, l_z - 1)
-        for t in range(l_z - 1, j_z + 1, -1):
-            qc.cx(t - 1, t)
-        if i_z + 1 != k_z:
+        if j+1 != k:
+            for t in range(l_z - 1, j_z + 1, -1):
+                qc.cx(t - 1, t)
+        if i_z + 1 != k_z and j+1 != k and k-1 != j+1:
             qc.cx(k_z - 1, j_z + 1)
         for t in range(k_z - 1, i_z + 1, -1):
             qc.cx(t - 1, t)
@@ -558,15 +709,24 @@ def _double_excitation_efficient_generalized(
         qc.cz(l_z, k_z - 1)
         for t in range(k_z - 1, i_z + 1, -1):
             qc.cx(t - 1, t)
-    qc.cx(l, j)
-    qc.cx(l, k)
-    qc.cx(j, i)
 
+    # qc.cz(f2q(l_z, num_orbs // 2), f2q(i_z + 1, num_orbs // 2))
 
-    qc.rz(-phi/4, k) #vi mangler at definere phi
-    qc.rz(-phi/4, l) #vi mangler at definere phi
-    qc.rz(phi/4, i) #vi mangler at definere phi
-    qc.rz(phi/4, j) #vi mangler at definere phi
+    # for t in range(i_z + 1, j_z - 1):
+    #     qc.cx(f2q(t + 1, num_orbs // 2), f2q(t, num_orbs // 2))
+
+    # for t in range(k_z + 1, l_z - 1):
+    #     qc.cx(f2q(t + 1, num_orbs // 2), f2q(t, num_orbs // 2))
+
+    qc.cx(l_q, j_q)
+    qc.cx(l_q, k_q)
+    qc.cx(j_q, i_q)
+
+    qc.rz(phi/4, k_q) 
+    qc.rz(phi/4, l_q)
+    qc.rz(-phi/4, i_q) 
+    qc.rz(-phi/4, j_q)
+
     return qc
 
 
@@ -645,6 +805,61 @@ def _single_excitation_trotter(
         )
     return qc
 
+def _single_excitation_trotter_generalized(
+    i: int,
+    a: int,
+    num_spin_orbs: int,
+    qc: QuantumCircuit,
+    theta: Parameter | ParameterExpression,
+    phi: Parameter | ParameterExpression,
+    mapper: FermionicMapper,
+) -> QuantumCircuit:
+    """Get single excitation as a trotterized fermionic operator.
+
+    The Pauli string from the mapped fermionic operator are sorted
+    lexicographically to make the circuit shorter from gate cancelation.
+
+    Args:
+        i: Strongly occupied spin orbital index.
+        a: Weakly occupied spin orbital index.
+        num_orbs: Number of spatial orbitals.
+        qc: Quantum circuit.
+        theta: Circuit parameter.
+        mapper: Fermionic to qubit mapper.
+
+    Returns:
+        Trotterized fermionic single excitation circuit.
+    """
+    num_orbs = num_spin_orbs // 2
+
+    op = a_op_spin(a, True) * a_op_spin(i, False)
+    T = op - op.dagger
+    op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
+    ops = np.array([str(pauli) for pauli in op_mapped.paulis])
+    factors = np.array([(1.0j * x).real for x in op_mapped.coeffs])
+    sort_idx = np.argsort(ops)
+    ops = ops[sort_idx]
+    factors = factors[sort_idx]
+    num_qubits = qc.num_qubits
+
+    a = f2q(a, num_orbs)
+    i = f2q(i, num_orbs)
+
+
+    qc.rz(-phi/4, a) 
+    qc.rz(phi/4, i) 
+
+    for pauli, fac in zip(ops, factors):
+        qc.append(
+            PauliEvolutionGate(Pauli(pauli), fac * theta),
+            np.linspace(0, num_qubits - 1, num_qubits, dtype=int).tolist(),
+        )
+
+    qc.rz(phi/4, a) 
+    qc.rz(-phi/4, i) 
+
+    return qc
+
 
 def _double_excitation_trotter(
     i: int,
@@ -692,6 +907,81 @@ def _double_excitation_trotter(
             np.linspace(0, num_qubits - 1, num_qubits, dtype=int).tolist(),
         )
     return qc
+
+def _double_excitation_trotter_generalized(
+    i: int,
+    j: int,
+    a: int,
+    b: int,
+    num_spin_orbs: int,
+    qc: QuantumCircuit,
+    theta: Parameter | ParameterExpression,
+    phi: Parameter | ParameterExpression,
+    mapper: FermionicMapper,
+) -> QuantumCircuit:
+    """Get double excitation as a trotterized fermionic operator.
+
+    The Pauli string from the mapped fermionic operator are sorted
+    lexicographically to make the circuit shorter from gate cancellation.
+
+    Args:
+        i: Strongly occupied spin orbital index.
+        j: Strongly occupied spin orbital index.
+        a: Weakly occupied spin orbital index.
+        b: Weakly occupied spin orbital index.
+        num_orbs: Number of spatial orbitals.
+        qc: Quantum circuit.
+        theta: Circuit parameter.
+        mapper: Fermionic to qubit mapper.
+
+    Returns:
+        Trotterized fermionic double excitation circuit.
+    """
+    num_orbs = num_spin_orbs // 2
+
+    ops = []
+    factors = []
+    op = a_op_spin(a, True) * a_op_spin(b, True) * a_op_spin(j, False) * a_op_spin(i, False)
+    T = op - op.dagger
+    op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
+    ops = np.array([str(pauli) for pauli in op_mapped.paulis])
+    factors = np.array([(1.0j * x).real for x in op_mapped.coeffs])
+    sort_idx = np.argsort(ops)
+    ops = ops[sort_idx]
+    factors = factors[sort_idx]
+    num_qubits = qc.num_qubits
+
+    #print("idx inside _double_excitation_trotter_generalized before f2q:", i,j,a,b)
+
+    a = f2q(a, num_orbs)
+    b = f2q(b, num_orbs)
+    i = f2q(i, num_orbs)
+    j = f2q(j, num_orbs)
+
+    #print("idx inside _double_excitation_trotter_generalized after f2q:", i,j,a,b)
+
+
+    qc.rz(-phi/4, a) 
+    qc.rz(-phi/4, b)
+    qc.rz(phi/4, i) 
+    qc.rz(phi/4, j)
+
+
+    for pauli, fac in zip(ops, factors):
+
+        qc.append(
+            PauliEvolutionGate(Pauli(pauli), fac * theta),
+            np.linspace(0, num_qubits - 1, num_qubits, dtype=int).tolist(),
+        )
+
+    qc.rz(phi/4, a)
+    qc.rz(phi/4, b)
+    qc.rz(-phi/4, i)
+    qc.rz(-phi/4, j)
+
+
+    return qc
+
 
 
 def _sa_single_excitation_trotter(
