@@ -1,13 +1,11 @@
 import time
 import scipy
 import numpy as np
-import numba as nb
 
 from typing import Any
 from abc import abstractmethod
 from collections.abc import Callable
 
-from slowquant.unitary_coupled_cluster.density_matrix import RDM1, RDM2
 
 class Davidson:
     """Davidson solver for the standard eigenvalue problem.
@@ -74,14 +72,10 @@ class Davidson:
             print(f" Iteration | Time [s] | Max. residual norm | Subspace size | Roots ...")
 
         if property_gradient is not None and frequency is not None:
-            start_guess = np.vstack((
-                property_gradient / diag.reshape(-1, 1),
-                - property_gradient.conj() / diag.reshape(-1, 1)
-            ))
+            start_guess = property_gradient / diag.reshape(-1, 1)
         else:
             start_guess = np.zeros((dim, n_roots), dtype=np.float64)
             start_guess[np.argsort(diag)[:n_roots], np.arange(n_roots)] = 1.0
-            start_guess = np.vstack((start_guess, start_guess))
         trial = self._orthonormalize(start_guess)
         if _start_guess is not None:
             trial = _start_guess
@@ -295,7 +289,6 @@ class UnpairedDavidson(Davidson):
         norm[np.isclose(norm, 0)] = 1
         X = self._trial @ x / norm
 
-        # tau_plus = tau_minus
         R = self._sigma @ x - self._tau @ x * omega
         if frequency is not None and property_gradient is not None:
             R -= property_gradient
@@ -339,8 +332,6 @@ class PairedDavidson(Davidson):
     """Subspace matrix A @ b+ + B @ b+*"""
     _sigma_minus: np.typing.NDArray[np.complexfloating]
     """Subspace matrix A @ b- - B @ b-*"""
-    _tau_plus: np.typing.NDArray[np.complexfloating]
-    """Subspace matrix Sigma @ b-"""
     _tau_minus: np.typing.NDArray[np.complexfloating]
     """Subspace matrix Sigma @ b+"""
 
@@ -348,7 +339,6 @@ class PairedDavidson(Davidson):
         """Setup arrays to store right transformed vectors."""
         self._sigma_plus = np.array(())
         self._sigma_minus = np.array(())
-        self._tau_plus = np.array(())
         self._tau_minus = np.array(())
 
     def _print_citation(self) -> None:
@@ -359,44 +349,29 @@ class PairedDavidson(Davidson):
     @staticmethod
     def _orthonormalize(trial: np.ndarray) -> np.ndarray:
         """Orthogonalize columns of trial using QR and return Q with collapsed tiny columns removed."""
-        trial_plus = trial[:trial.shape[0] // 2, :]
-        trial_minus = trial[trial.shape[0] // 2:, :]
 
-        Q, R = np.linalg.qr(trial_plus)
+        Q, R = np.linalg.qr(trial)
         # remove near-zero columns (if any)
         diagR = np.abs(np.diag(R))
-        keep_plus = diagR > 1e-12
+        keep = diagR > 1e-12
 
-        Q, R = np.linalg.qr(trial_minus)
-        # remove near-zero columns (if any)
-        diagR = np.abs(np.diag(R))
-        keep_minus = diagR > 1e-12
-
-        keep = keep_plus & keep_minus
-        new_trial_plus = Q[:, keep]
-        new_trial_minus = Q[:, keep]
-
-        new_trial_plus /= np.linalg.norm(new_trial_plus, axis=0)
-        new_trial_minus /= np.linalg.norm(new_trial_minus, axis=0)
-
-        new_trial = np.vstack((new_trial_plus, new_trial_minus))
+        new_trial = Q[:, keep]
+        new_trial /= np.linalg.norm(new_trial, axis=0)
 
         return new_trial
 
     def _add_iteration_data(self, trial: np.ndarray, right_transformed_vectors: tuple[np.ndarray, ...]) -> None:
         """Add trial and right transformed matrices for the current iteration to the arrays."""
-        sigma_plus, sigma_minus, tau_plus, tau_minus = right_transformed_vectors
+        sigma_plus, sigma_minus, tau_minus = right_transformed_vectors
         if self._iteration == 1:
             self._trial = trial.copy()
             self._sigma_plus = sigma_plus.copy()
             self._sigma_minus = sigma_minus.copy()
-            self._tau_plus = tau_plus.copy()
             self._tau_minus = tau_minus.copy()
         else:
             self._trial = np.hstack((self._trial, trial))
             self._sigma_plus = np.hstack((self._sigma_plus, sigma_plus))
             self._sigma_minus = np.hstack((self._sigma_minus, sigma_minus))
-            self._tau_plus = np.hstack((self._tau_plus, tau_plus))
             self._tau_minus = np.hstack((self._tau_minus, tau_minus))
 
     def _compute_residual_vectors(self, n_roots: int, frequency: float | None, property_gradient: np.ndarray | None) -> tuple[np.ndarray, np.ndarray, tuple[np.ndarray, np.ndarray]]:
@@ -408,12 +383,10 @@ class PairedDavidson(Davidson):
             plus, minus = vector[:n, :], vector[n:, :]
             return plus, minus
 
-        trial_plus, trial_minus = _split_vector(self._trial)
-
-        E_plus = 2 * np.real(trial_plus.conj().T @ self._sigma_plus)
-        E_minus = 2 * np.real(trial_minus.conj().T @ self._sigma_minus)
+        E_plus = 2 * np.real(self._trial.conj().T @ self._sigma_plus)
+        E_minus = 2 * np.real(self._trial.conj().T @ self._sigma_minus)
         # S_plus = S_minus.T
-        S_minus = 2 * np.real(trial_minus.conj().T @ self._tau_minus)
+        S_minus = 2 * np.real(self._trial.conj().T @ self._tau_minus)
 
         E = np.block([
             [E_plus, np.zeros_like(E_minus)],
@@ -425,8 +398,8 @@ class PairedDavidson(Davidson):
         ])
         if frequency is not None and property_gradient is not None:
             bV = - np.vstack((
-                2 * np.imag(trial_plus.conj().T @ property_gradient),
-                2 * np.real(trial_minus.conj().T @ property_gradient),
+                2 * np.imag(self._trial.conj().T @ property_gradient),
+                2 * np.real(self._trial.conj().T @ property_gradient),
             ))
             # TODO: Complex numbers currently don't work with FermionicOperator:
             bV = np.real(bV)
@@ -451,9 +424,10 @@ class PairedDavidson(Davidson):
 
         # Compute Ritz vectors (X) and residuals (R)
         x_plus, x_minus = _split_vector(x)
-        X = np.vstack((trial_plus @ x_plus + trial_minus @ x_minus, (trial_plus @ x_plus - trial_minus @ x_minus).conj()))
+        X = np.vstack((self._trial @ (x_plus + x_minus), (self._trial @ (x_plus - x_minus)).conj()))
 
-        R_plus = self._sigma_plus @ x_plus - self._tau_plus @ x_minus * omega
+        # tau_plus = tau_minus
+        R_plus = self._sigma_plus @ x_plus - self._tau_minus @ x_minus * omega
         R_minus = self._sigma_minus @ x_minus - self._tau_minus @ x_plus * omega
         if frequency is not None and property_gradient is not None:
             V = np.vstack((property_gradient, -property_gradient.conj()))
@@ -491,31 +465,22 @@ class PairedDavidson(Davidson):
         R_plus, R_minus = R
         o = omega if frequency is None else np.array([frequency])
 
-        plus_contribution = diagonal_A.reshape(-1, 1) + diagonal_Sigma.reshape(-1, 1) * o.reshape(1, -1)
-        minus_contribution = diagonal_A.reshape(-1, 1) - diagonal_Sigma.reshape(-1, 1) * o.reshape(1, -1)
-        denominator = - np.ones_like(R_plus)
+        denominator = (
+            (diagonal_A.reshape(-1, 1) + diagonal_Sigma.reshape(-1, 1) * o.reshape(1, -1))
+            * (diagonal_A.reshape(-1, 1) - diagonal_Sigma.reshape(-1, 1) * o.reshape(1, -1))
+        )
         # Check if any of the contributions are close to zero to avoid division by zero, if so skip the division for that contribution
-        plus_contribution[np.isclose(plus_contribution, 0)] = 1
-        minus_contribution[np.isclose(minus_contribution, 0)] = 1
-        denominator /= plus_contribution
-        denominator /= minus_contribution
-        new_trial_plus = denominator * (
+        denominator[np.isclose(denominator, 0)] = 1
+        new_trial = - (
             diagonal_A.reshape(-1, 1) * R_plus + diagonal_Sigma.reshape(-1, 1) * R_minus * o.reshape(1, -1)
-        )
-        new_trial_minus = denominator * (
-            diagonal_A.reshape(-1, 1) * R_minus + diagonal_Sigma.reshape(-1, 1) * R_plus * o.reshape(1, -1)
-        )
-        # For excitation energies we can add these together, for frequencies we need to keep them separate
-        if frequency is None:
-            new_trial_plus += new_trial_minus
-            new_trial_minus = new_trial_plus
-        new_trial = np.vstack((new_trial_plus, new_trial_minus))
+            + diagonal_A.reshape(-1, 1) * R_minus + diagonal_Sigma.reshape(-1, 1) * R_plus * o.reshape(1, -1)
+        ) / denominator
         return new_trial
 
     def _reset_reduced_space(self, trial: np.ndarray, right_transformed_vectors: tuple[np.ndarray, ...]) -> None:
         """Reset the reduced space by keeping only the current Ritz vectors."""
         self._trial = self._orthonormalize(trial)
-        self._sigma_plus, self._sigma_minus, self._tau_plus, self._tau_minus = right_transformed_vectors
+        self._sigma_plus, self._sigma_minus, self._tau_minus = right_transformed_vectors
 
 def _real_eigvals(
         w: np.typing.NDArray[np.complexfloating],

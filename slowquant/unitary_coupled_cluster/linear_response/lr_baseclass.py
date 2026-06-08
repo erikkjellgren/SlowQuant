@@ -117,7 +117,7 @@ class LinearResponseBaseClass:
         """Compute preconditioner for Davidson solver."""
         raise NotImplementedError
 
-    def _right_transform(self, trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def _right_transform(self, trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Right transform for Davidson solver.
 
         Args:
@@ -189,10 +189,7 @@ class LinearResponseBaseClass:
             print("Cached response vectors do not meet the required tolerance. Recalculating response vectors using previous as start guess.")
             upper = response_vectors[: response_vectors.shape[0] // 2, :]
             lower = response_vectors[response_vectors.shape[0] // 2 :, :]
-            start_guess = np.zeros_like(response_vectors)
-            start_guess[: response_vectors.shape[0] // 2, :] = upper + lower
-            start_guess[response_vectors.shape[0] // 2 :, :] = upper - lower
-            solver_settings["_start_guess"] = start_guess
+            solver_settings["_start_guess"] = upper - lower
 
         # Calculate response vectors by solving linear response function
         # For optical rotation we need to calculate the electric dipole property gradient
