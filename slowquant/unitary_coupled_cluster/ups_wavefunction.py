@@ -262,6 +262,8 @@ class WaveFunctionUPS:
                 self.num_active_orbs,
                 self.ansatz_options,
             )
+        elif ansatz.lower() == "None":
+            pass
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
