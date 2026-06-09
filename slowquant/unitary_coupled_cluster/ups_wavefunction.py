@@ -262,7 +262,7 @@ class WaveFunctionUPS:
                 self.num_active_orbs,
                 self.ansatz_options,
             )
-        elif ansatz.lower() == "None":
+        elif ansatz.lower() == "none":
             print("UPS wave function with no Ansatz was chosen.")
         else: 
             raise ValueError(f"Got unknown ansatz, {ansatz}")
