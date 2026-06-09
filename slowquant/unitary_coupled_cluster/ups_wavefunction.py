@@ -263,8 +263,8 @@ class WaveFunctionUPS:
                 self.ansatz_options,
             )
         elif ansatz.lower() == "None":
-            pass
-        else:
+            print("UPS wave function with no Ansatz was chosen.")
+        else: 
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
 
