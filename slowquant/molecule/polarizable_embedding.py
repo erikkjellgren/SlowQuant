@@ -44,7 +44,7 @@ def read_potfile(filename: str) -> tuple[np.ndarray, dict[int, np.ndarray], np.n
                 if order == 2:
                     # unpack quadrupoles from packed index (xx, xy, xz, yy, yz, zz) -> (xx, xy, xz, yx, yy, yz, zx, zy, zz)
                     # and remove trace
-                    unpacked = np.zeros((num_multipoles, 9), dtype=np.float64)
+                    unpacked = np.zeros((num_sites, 9), dtype=np.float64)
                     quadrupoles = multipoles[2]
                     trace = quadrupoles[:, 0] + quadrupoles[:, 3] + quadrupoles[:, 5]
                     unpacked[:, 0] = quadrupoles[:, 0] - trace / 3  # xx
