@@ -125,7 +125,7 @@ class Davidson:
                else f'{o:<.4e}' + ' '}"
                for o, r in zip(omega, res_norms_plus)
             )
-        print(f" {self._iteration:^9} | {time.time() - self._start:^8.2f} | {max(res_norms_plus):^18.4e} | {self._trial.shape[1]:^13} | {roots}")
+        print(f" {self._iteration:^9} | {time.time() - self._start:^8.2f} | {max(res_norms_plus):^18.4e} | {2*self._trial.shape[1]:^13} | {roots}")
         self._start = time.time()
 
     @staticmethod
