@@ -248,86 +248,84 @@ def do_product_extended_normal_ordering_rankreduction(
     Returns:
         Creation string, annihilation string, and phase.
     """
-    do_reduction = True
     if nondagger1_set.isdisjoint(dagger2_set):
         # If there is no overlap in indices, then there can be no rank reduction.
         # The term can be skipped.
-        do_reduction = False
-    if do_reduction:
-        overlap_idxs = nondagger1_set.intersection(dagger2_set)
-        # k = 0, is the case without rank-reduction, this case does not contribute.
-        for k in range(1, len(overlap_idxs) + 1):
-            # Wick's theorem, can loop over all possible contractions.
-            for contract_idxs in itertools.combinations(overlap_idxs, k):
-                nondagger_tmp = list(fermistring1[1])
-                dagger_tmp = list(fermistring2[0])
-                phase = 1
-                for contract_idx in contract_idxs:
-                    nondagger_loc = nondagger_tmp.index(contract_idx)
-                    dagger_loc = dagger_tmp.index(contract_idx)
-                    # Get phase from moving nondagger to the right, and dagger to the left.
-                    phase *= 1 if (len(nondagger_tmp) - 1 - nondagger_loc + dagger_loc) % 2 == 0 else -1
-                    # Remove index (contraction)
-                    nondagger_tmp.pop(nondagger_loc)
-                    dagger_tmp.pop(dagger_loc)
-                if len(nondagger_tmp) % 2 == 1 and len(dagger_tmp) % 2 == 1:
-                    # Get phase from changing order of nondagger and dagger block.
-                    phase *= -1
-                dagger_tmp_set = set(dagger_tmp)
-                nondagger_tmp_set = set(nondagger_tmp)
-                if not dagger1_set.isdisjoint(dagger_tmp_set):
-                    # Same index creation operator.
-                    continue
-                elif not nondagger_tmp_set.isdisjoint(nondagger2_set):
-                    # Same index annihilation operator.
-                    continue
-                # Sort the dagger part
-                dagger_list = []
-                # Left and right are already sorted, so can do linear scale merging
-                left_list = fermistring1[0]
-                right_list = dagger_tmp
-                left_len = len(left_list)
-                right_len = len(right_list)
-                left = 0
-                right = 0
-                # Linear-time merge using local variables and a bound-checked loop
-                while left < left_len and right < right_len:
-                    if left_list[left] > right_list[right]:
-                        dagger_list.append(left_list[left])
-                        left += 1
-                    else:
-                        dagger_list.append(right_list[right])
-                        phase *= (-1) ** (left_len - left)
-                        right += 1
-                # Add remainders (use extend to avoid extra concatenation overhead)
-                if left < left_len:
-                    dagger_list.extend(left_list[left:])
-                elif right < right_len:
-                    dagger_list.extend(right_list[right:])
-                # Sort non-dagger part
-                nondagger_list = []
-                # Left and right are already sorted, so can do linear scale merging
-                left_list = nondagger_tmp
-                right_list = fermistring2[1]
-                left_len = len(left_list)
-                right_len = len(right_list)
-                left = 0
-                right = 0
-                # Linear-time merge using local variables and a bound-checked loop
-                while left < left_len and right < right_len:
-                    if left_list[left] > right_list[right]:
-                        nondagger_list.append(left_list[left])
-                        left += 1
-                    else:
-                        nondagger_list.append(right_list[right])
-                        phase *= (-1) ** (left_len - left)
-                        right += 1
-                # Add remainders (use extend to avoid extra concatenation overhead)
-                if left < left_len:
-                    nondagger_list.extend(left_list[left:])
-                elif right < right_len:
-                    nondagger_list.extend(right_list[right:])
-                yield (tuple(dagger_list), tuple(nondagger_list)), phase
+        return
+    overlap_idxs = nondagger1_set.intersection(dagger2_set)
+    # k = 0, is the case without rank-reduction, this case does not contribute.
+    for k in range(1, len(overlap_idxs) + 1):
+        # Wick's theorem, can loop over all possible contractions.
+        for contract_idxs in itertools.combinations(overlap_idxs, k):
+            nondagger_tmp = list(fermistring1[1])
+            dagger_tmp = list(fermistring2[0])
+            phase = 1
+            for contract_idx in contract_idxs:
+                nondagger_loc = nondagger_tmp.index(contract_idx)
+                dagger_loc = dagger_tmp.index(contract_idx)
+                # Get phase from moving nondagger to the right, and dagger to the left.
+                phase *= 1 if (len(nondagger_tmp) - 1 - nondagger_loc + dagger_loc) % 2 == 0 else -1
+                # Remove index (contraction)
+                nondagger_tmp.pop(nondagger_loc)
+                dagger_tmp.pop(dagger_loc)
+            if len(nondagger_tmp) % 2 == 1 and len(dagger_tmp) % 2 == 1:
+                # Get phase from changing order of nondagger and dagger block.
+                phase *= -1
+            dagger_tmp_set = set(dagger_tmp)
+            nondagger_tmp_set = set(nondagger_tmp)
+            if not dagger1_set.isdisjoint(dagger_tmp_set):
+                # Same index creation operator.
+                continue
+            elif not nondagger_tmp_set.isdisjoint(nondagger2_set):
+                # Same index annihilation operator.
+                continue
+            # Sort the dagger part
+            dagger_list = []
+            # Left and right are already sorted, so can do linear scale merging
+            left_list = fermistring1[0]
+            right_list = dagger_tmp
+            left_len = len(left_list)
+            right_len = len(right_list)
+            left = 0
+            right = 0
+            # Linear-time merge using local variables and a bound-checked loop
+            while left < left_len and right < right_len:
+                if left_list[left] > right_list[right]:
+                    dagger_list.append(left_list[left])
+                    left += 1
+                else:
+                    dagger_list.append(right_list[right])
+                    phase *= (-1) ** (left_len - left)
+                    right += 1
+            # Add remainders (use extend to avoid extra concatenation overhead)
+            if left < left_len:
+                dagger_list.extend(left_list[left:])
+            elif right < right_len:
+                dagger_list.extend(right_list[right:])
+            # Sort non-dagger part
+            nondagger_list = []
+            # Left and right are already sorted, so can do linear scale merging
+            left_list = nondagger_tmp
+            right_list = fermistring2[1]
+            left_len = len(left_list)
+            right_len = len(right_list)
+            left = 0
+            right = 0
+            # Linear-time merge using local variables and a bound-checked loop
+            while left < left_len and right < right_len:
+                if left_list[left] > right_list[right]:
+                    nondagger_list.append(left_list[left])
+                    left += 1
+                else:
+                    nondagger_list.append(right_list[right])
+                    phase *= (-1) ** (left_len - left)
+                    right += 1
+            # Add remainders (use extend to avoid extra concatenation overhead)
+            if left < left_len:
+                nondagger_list.extend(left_list[left:])
+            elif right < right_len:
+                nondagger_list.extend(right_list[right:])
+            yield (tuple(dagger_list), tuple(nondagger_list)), phase
 
 
 def commutator_multiply(A: FermionicOperator, B: FermionicOperator) -> FermionicOperator:
