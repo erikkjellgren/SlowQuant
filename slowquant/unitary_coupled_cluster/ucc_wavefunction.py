@@ -919,6 +919,12 @@ class WaveFunctionUCC:
         print(
             f"### Total parameters: {num_kappa + num_theta1 + num_theta2 + num_theta3 + num_theta4 + num_theta5 + num_theta6}\n"
         )
+        if orbital_optimization and len(self.kappa) == 0:
+            print(
+                "WARNING: No orbital optimization performed, because there are no orbital rotation parameters."
+            )
+            orbital_optimization = False
+
         print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
         if orbital_optimization:
             if len(self.thetas) > 0:
