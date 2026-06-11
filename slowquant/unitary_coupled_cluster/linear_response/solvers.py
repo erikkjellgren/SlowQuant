@@ -209,7 +209,7 @@ class Davidson:
     def _reset_reduced_space(self, trial: np.ndarray, right_transformed_vectors: tuple[np.ndarray, ...]) -> None:
         """Reset the reduced space by keeping only the current Ritz vectors."""
 
-class UnpairedDavidson(Davidson):
+class TDADavidson(Davidson):
     """Davidson solver for the unpaired eigenvalue problem arising in the CASSCF linear response equations under the Tamm-Dancoff approximation.
 
     J. Comput. Phys. 17, 87-94 (1975).
