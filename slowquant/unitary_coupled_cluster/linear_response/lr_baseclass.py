@@ -247,6 +247,7 @@ class LinearResponseBaseClass:
                 tolerance: Convergence tolerance. Default is 1e-4.
                 max_reduced_space: Maximum size of the reduced space. Default is 8*n_roots.
                 is_silent: Whether to print convergence information. Default is False.
+                _start_guess: Optional starting guess for the response vector. Default is None.
         """
         if n_roots <= 0:
             self._all_excitation_energies()
