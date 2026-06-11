@@ -271,7 +271,6 @@ def build_x2c_pc_operator(mf, mol, int_LL, int_SS, c, x2c=True, picture_change=T
 
 
 def build_x2c_pc_operator_efg(mf, mol, atom_idx, c, x2c=False, picture_change=False):
-
     with mol.with_rinv_origin(mol.atom_coord(atom_idx)):
         nao_c = mol.nao
 
@@ -526,11 +525,11 @@ def h5():
 # HI()
 # HBr()
 # oh_radical()
-# BeH()
+BeH()
 # h2o()
 # LiH()
 # HCl()
-HF()
+# HF()
 # h5()
 
 
