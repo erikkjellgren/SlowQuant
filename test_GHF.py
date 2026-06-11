@@ -525,10 +525,10 @@ def h5():
 # HI()
 # HBr()
 # oh_radical()
-# BeH()
+BeH()
 # h2o()
 # LiH()
-HCl()
+# HCl()
 # HF()
 # h5()
 
