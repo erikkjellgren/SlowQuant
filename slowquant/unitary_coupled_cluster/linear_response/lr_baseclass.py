@@ -244,7 +244,7 @@ class LinearResponseBaseClass:
             n_roots: Number of roots to calculate. If 0, calculate all roots.
             solver_settings: Settings for the Davidson solver:
                 max_iteration: Maximum number of iterations. Default is 100.
-                tolerance: Convergence tolerance. Default is 1e-8.
+                tolerance: Convergence tolerance. Default is 1e-4.
                 max_reduced_space: Maximum size of the reduced space. Default is 8*n_roots.
                 is_silent: Whether to print convergence information. Default is False.
         """
@@ -254,6 +254,11 @@ class LinearResponseBaseClass:
             solver = PairedDavidson()
             if solver_settings is None:
                 solver_settings = {}
+            solver_settings.setdefault("max_iteration", 100)
+            solver_settings.setdefault("tolerance", 1e-4)
+            solver_settings.setdefault("max_reduced_space", 8 * n_roots)
+            solver_settings.setdefault("is_silent", False)
+            solver_settings.setdefault("_start_guess", None)
 
             preconditioner = self._compute_preconditioner()
 
@@ -261,11 +266,12 @@ class LinearResponseBaseClass:
                 solver.solve(
                     self._right_transform,
                     preconditioner,
-                    max_iteration=solver_settings.get("max_iteration", 100),
-                    tolerance=solver_settings.get("tolerance", 1e-8),
+                    max_iteration=solver_settings["max_iteration"],
+                    tolerance=solver_settings["tolerance"],
                     n_roots=n_roots,
-                    max_reduced_space=solver_settings.get("max_reduced_space", 8*n_roots),
-                    is_silent=solver_settings.get("is_silent", False),
+                    max_reduced_space=solver_settings["max_reduced_space"],
+                    is_silent=solver_settings["is_silent"],
+                    _start_guess=solver_settings["_start_guess"],
                 )
             )
             self.Z_q_normed = self.normed_response_vectors[: len(self.q_ops), :]
