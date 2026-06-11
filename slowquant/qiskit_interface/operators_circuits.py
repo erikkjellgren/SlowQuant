@@ -252,8 +252,8 @@ def _single_excitation_efficient_generalized(
     i_q = f2q(i, num_orbs)
 
     # Complex parameter correction: 
-    qc.rz(-phi/4, k_q) 
-    qc.rz(phi/4, i_q) 
+    qc.rz(-phi/2, k_q) 
+    qc.rz(phi/2, i_q) 
 
     if k <= i:
         raise ValueError(f"k={k}, must be larger than i={i}")
@@ -297,8 +297,8 @@ def _single_excitation_efficient_generalized(
         qc.cx(k_q, i_q)
 
     # Complex parameter correction: 
-    qc.rz(phi/4, k_q) 
-    qc.rz(-phi/4, i_q) 
+    qc.rz(phi/2, k_q) 
+    qc.rz(-phi/2, i_q) 
 
 
     return qc
@@ -842,12 +842,15 @@ def _single_excitation_trotter_generalized(
     factors = factors[sort_idx]
     num_qubits = qc.num_qubits
 
+    # print("ops singles", ops)
+    # print("factors singles", factors)
+
     a = f2q(a, num_orbs)
     i = f2q(i, num_orbs)
 
 
-    qc.rz(-phi/4, a) 
-    qc.rz(phi/4, i) 
+    qc.rz(-phi/2, a) 
+    qc.rz(phi/2, i) 
 
     for pauli, fac in zip(ops, factors):
         qc.append(
@@ -855,8 +858,8 @@ def _single_excitation_trotter_generalized(
             np.linspace(0, num_qubits - 1, num_qubits, dtype=int).tolist(),
         )
 
-    qc.rz(phi/4, a) 
-    qc.rz(-phi/4, i) 
+    qc.rz(phi/2, a) 
+    qc.rz(-phi/2, i) 
 
     return qc
 
@@ -950,6 +953,9 @@ def _double_excitation_trotter_generalized(
     ops = ops[sort_idx]
     factors = factors[sort_idx]
     num_qubits = qc.num_qubits
+
+    # print("ops doubles", ops)
+    # print("factors doubles", factors)
 
     #print("idx inside _double_excitation_trotter_generalized before f2q:", i,j,a,b)
 
