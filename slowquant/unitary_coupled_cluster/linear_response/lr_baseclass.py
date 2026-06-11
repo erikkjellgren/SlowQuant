@@ -281,6 +281,7 @@ class LinearResponseBaseClass:
             self.Y_G_normed = self.normed_response_vectors[2 * len(self.q_ops) + len(self.G_ops) :, :]
 
     def _all_excitation_energies(self):
+        """Calculate all excitation energies by explicitly constructing the Hessian and metric matrices and solving the generalized eigenvalue problem."""
         self._construct_hessian_metric_blocks()
 
         size = len(self.A)
