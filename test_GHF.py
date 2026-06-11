@@ -528,8 +528,8 @@ def h5():
 # BeH()
 # h2o()
 # LiH()
-# HCl()
-HF()
+HCl()
+# HF()
 # h5()
 
 
