@@ -197,42 +197,14 @@ class LinearResponse(LinearResponseBaseClass):
                     UdHq_ket,
                     *self.index_info_extended,
                 )
-                # -1/2<0| H U Gd Ud q |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
-                        self.ci_coeffs,
-                        [self.H_1i_1a, "U", GI.dagger, "Ud", qJ],
-                        self.ci_coeffs,
-                        *self.index_info_extended,
-                        do_unsafe=True,  # type: ignore
-                    )
-                )
                 self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
                 # Make B
-                # - 1/2<CSF| Gd Ud qd H |0>
-                val = (
-                    -1
-                    / 2
-                    * expectation_value(
+                # - <CSF| Gd Ud qd H |0>
+                val = -expectation_value(
                         G_ket,
                         [],
                         UdqdH_ket,
                         *self.index_info_extended,
-                    )
-                )
-                # - 1/2<0| qd U Gd Ud H |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
-                        self.ci_coeffs,
-                        [qJ.dagger, "U", GI.dagger, "Ud", self.H_1i_1a],
-                        self.ci_coeffs,
-                        *self.index_info_extended,
-                        do_unsafe=True,  # type: ignore
-                    )
                 )
                 self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
         for j, GJ in enumerate(self.G_ops):

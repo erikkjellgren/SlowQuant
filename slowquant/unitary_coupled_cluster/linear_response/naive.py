@@ -160,27 +160,12 @@ class LinearResponse(LinearResponseBaseClass):
                     Hq_ket,
                     *self.index_info,
                 )
-                # - 1/2*<0| H q Gd |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
+                # - <0| H q Gd |0>
+                val -= expectation_value(
                         qdH_ket,
                         [],
                         Gd_ket,
                         *self.index_info,
-                    )
-                )
-                # - 1/2*<0| H Gd q |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [self.H_1i_1a * GI.dagger * qJ],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
                 )
                 self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
                 # Make B
@@ -191,27 +176,12 @@ class LinearResponse(LinearResponseBaseClass):
                     Gd_ket,
                     *self.index_info,
                 )
-                # - 1/2*<0| Gd qd H |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
+                # - <0| Gd qd H |0>
+                val -= expectation_value(
                         G_ket,
                         [],
                         qdH_ket,
                         *self.index_info,
-                    )
-                )
-                # - 1/2*<0| qd Gd H |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [qJ.dagger * GI.dagger * self.H_1i_1a],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
                 )
                 self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
         for j, GJ in enumerate(self.G_ops):

@@ -149,16 +149,12 @@ class LinearResponse(LinearResponseBaseClass):
                 )
                 self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = val
                 # Make B
-                # - 1/2<0| Gd qd H |0>
-                val = (
-                    -1
-                    / 2
-                    * expectation_value(
+                # - <0| Gd qd H |0>
+                val = expectation_value(
                         G_ket,
                         [],
                         qdH_ket,
                         *self.index_info,
-                    )
                 )
                 self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = val
         for j, GJ in enumerate(self.G_ops):

@@ -177,9 +177,7 @@ class quantumLR(quantumLRBaseClass):
                     )
                     # Make B
                     self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = (
-                        -1
-                        / 2
-                        * self.wf.QI.quantum_expectation_value(
+                        - self.wf.QI.quantum_expectation_value(
                             (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
                         )
                     )

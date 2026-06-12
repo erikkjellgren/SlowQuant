@@ -172,15 +172,8 @@ class quantumLR(quantumLRBaseClass):
                         self.wf.QI.quantum_expectation_value(
                             (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
                         )
-                        - 1
-                        / 2
-                        * self.wf.QI.quantum_expectation_value(
+                        - self.wf.QI.quantum_expectation_value(
                             (self.H_1i_1a * qJ * GI.dagger).get_folded_operator(*self.orbs)
-                        )
-                        - 1
-                        / 2
-                        * self.wf.QI.quantum_expectation_value(
-                            (self.H_1i_1a * GI.dagger * qJ).get_folded_operator(*self.orbs)
                         )
                     )
                     self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
@@ -189,15 +182,8 @@ class quantumLR(quantumLRBaseClass):
                         self.wf.QI.quantum_expectation_value(
                             (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs)
                         )
-                        - 1
-                        / 2
-                        * self.wf.QI.quantum_expectation_value(
+                        - self.wf.QI.quantum_expectation_value(
                             (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
-                        )
-                        - 1
-                        / 2
-                        * self.wf.QI.quantum_expectation_value(
-                            (qJ.dagger * GI.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
                         )
                     )
                     self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
