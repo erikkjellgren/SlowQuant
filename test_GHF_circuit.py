@@ -193,6 +193,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     #print(np.round(coeff.real, 2))
 
+    spin_cons = False
 
 
     WF = GeneralizedWaveFunctionUPS(
@@ -200,7 +201,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         coeff_u,
         mol,
         "fUCCD",
-        ansatz_options = {"n_layers": 0, "is_spin_conserving" : True},
+        ansatz_options = {"n_layers": 0, "is_spin_conserving" : spin_cons},
         include_active_kappa=True,
     )
 
@@ -211,7 +212,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.c_mo,
         mol,
         "fUCCSD",
-        ansatz_options = {"n_layers": 1, "is_spin_conserving" : True},
+        ansatz_options = {"n_layers": 1, "is_spin_conserving" : spin_cons},
         include_active_kappa=True,
     )
 
@@ -220,7 +221,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.c_mo,
         mol,
         "fUCCSD",
-        ansatz_options = {"n_layers": 1, "is_spin_conserving" : True},
+        ansatz_options = {"n_layers": 1, "is_spin_conserving" : spin_cons},
         include_active_kappa=True,
     )
 
@@ -239,7 +240,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         Sampler(run_options={"shots": None}),
         "fUCCSD", # Ansatz
         mapper,
-        ansatz_options = {"n_layers": 1, "is_spin_conserving" : True},
+        ansatz_options = {"n_layers": 1, "is_spin_conserving" : spin_cons},
         ISA=False, # default is false
         do_M_mitigation=False, # default is false
         do_M_ansatz0=False, # default is false
@@ -439,5 +440,5 @@ def HF():
 
 # Run simulation:
 
-h2()
+h3()
 

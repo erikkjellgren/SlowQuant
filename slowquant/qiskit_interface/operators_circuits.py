@@ -59,8 +59,8 @@ def single_excitation_generalized(
     Returns:
         Single excitation circuit.
     """
-    #qc = _single_excitation_efficient_generalized(a, i, num_spin_orbs, qc, theta, phi)
-    qc = _single_excitation_trotter_generalized(i, a, num_spin_orbs, qc, theta, phi, mapper)
+    qc = _single_excitation_efficient_generalized_test(a, i, num_spin_orbs, qc, theta, phi)
+    #qc = _single_excitation_trotter_generalized(i, a, num_spin_orbs, qc, theta, phi, mapper)
 
     # if isinstance(mapper, JordanWignerMapper):
     #     qc = _single_excitation_efficient_generalized(a, i, num_orbs, qc, theta, phi)
@@ -251,15 +251,25 @@ def _single_excitation_efficient_generalized(
     k_q = f2q(k, num_orbs)
     i_q = f2q(i, num_orbs)
 
-    # Complex parameter correction: 
+    # Fermionic idx changing:
+    fac = 1
+
+    if k_q < i_q:
+        fac = -1
+        k_q, i_q = i_q, k_q
+
+    theta = theta * fac
+
+
+    # Complex parameter correction:
     qc.rz(-phi/2, k_q) 
     qc.rz(phi/2, i_q) 
 
-    if k <= i:
+
+    if k_q <= i_q:
         raise ValueError(f"k={k}, must be larger than i={i}")
-    if k - 1 == i:
-
-
+    
+    if k_q - 1 == i_q:
         # Excitation:
         qc.rz(np.pi / 2, i_q)
         qc.rx(np.pi / 2, i_q)
@@ -271,16 +281,21 @@ def _single_excitation_efficient_generalized(
         qc.rx(-np.pi / 2, k_q)
         qc.rx(-np.pi / 2, i_q)
         qc.rz(-np.pi / 2, i_q)
- 
+
     else:
-        # CNOT ladder:
         qc.cx(k_q, i_q)
-        for t in range(k - 2, i, -1):
-            qc.cx(f2q(t + 1, num_orbs), f2q(t, num_orbs))
+
+        # CNOT ladder:
+        # for t in range(k - 2, i, -1):
+        #     qc.cx(f2q(t + 1, num_orbs), f2q(t, num_orbs))
+
+        for t in range(k_q - 2, i_q, -1):
+            qc.cx(t + 1, t)
 
         # Excitation:
         # Surrounding CZ:
-        qc.cz(f2q(i + 1, num_orbs), k_q)
+        # qc.cz(f2q(i + 1, num_orbs), k_q)
+        qc.cz(i_q + 1, k_q)
 
         # Equivalent to CRz for 2*theta: 
         qc.ry(theta, k_q)
@@ -289,14 +304,19 @@ def _single_excitation_efficient_generalized(
         qc.cx(i_q, k_q)
 
         # Surrounding CZ:
-        qc.cz(f2q(i + 1, num_orbs), k_q)
+        # qc.cz(f2q(i + 1, num_orbs), k_q)
+        qc.cz(i_q + 1, k_q)
 
         # CNOT ladder
-        for t in range(i + 1, k - 1):
-            qc.cx(f2q(t + 1, num_orbs), f2q(t, num_orbs))
-        qc.cx(k_q, i_q)
+        # for t in range(i + 1, k - 1):
+        #     qc.cx(f2q(t + 1, num_orbs), f2q(t, num_orbs))
 
-    # Complex parameter correction: 
+        for t in range(i_q + 1, k_q - 1):
+            qc.cx(t + 1, t)
+
+        qc.cx(k_q, i_q) 
+
+    # Complex parameter correction:
     qc.rz(phi/2, k_q) 
     qc.rz(-phi/2, i_q) 
 
@@ -331,12 +351,24 @@ def _single_excitation_efficient_generalized_test(
     k = f2q(a, num_orbs)
     i = f2q(j, num_orbs)
 
-    qc.rz(-phi/4, k) 
-    qc.rz(phi/4, i) 
+    k_o, i_o = k, i
+
+    qc.rz(-phi/2, k_o) 
+    qc.rz(phi/2, i_o) 
+
+
+    fac = 1
+
+    if k < i:
+        fac = -1
+        k, i = i, k
+
+    theta = theta * fac
 
 
     if k <= i:
         raise ValueError(f"k={k}, must be larger than i={i}")
+    
     if k - 1 == i:
         qc.rz(np.pi / 2, i)
         qc.rx(np.pi / 2, i)
@@ -363,8 +395,8 @@ def _single_excitation_efficient_generalized_test(
         qc.cx(k, i)
 
 
-    qc.rz(phi/4, k) 
-    qc.rz(-phi/4, i) 
+    qc.rz(phi/2, k_o) 
+    qc.rz(-phi/2, i_o) 
 
     return qc
 
