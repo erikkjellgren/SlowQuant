@@ -452,7 +452,7 @@ class LinearResponseBaseClass:
             )
 
         output = (
-            "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Rotational strengths\n"
+            "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Rotational strengths [a.u.] | Rotational strengths [1E-40 c.g.s.]\n"
         )
 
         for i, (exc_energy, rot_strength) in enumerate(
@@ -461,5 +461,6 @@ class LinearResponseBaseClass:
             exc_str = f"{exc_energy:2.6f}"
             exc_str_ev = f"{exc_energy * 27.2114079527:3.6f}"
             rot_str = f"{rot_strength:1.6f}"
-            output += f"{str(i + 1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {rot_str.center(20)}\n"
+            rot_str_cgs = f"{rot_strength*471.44:1.6f}"
+            output += f"{str(i + 1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {rot_str.center(27)} | {rot_str_cgs.center(35)}\n"
         return output
