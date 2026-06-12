@@ -69,7 +69,6 @@ def single_excitation_generalized(
 
     return qc
 
-
 def double_excitation(
     i: int,
     j: int,
@@ -129,8 +128,8 @@ def double_excitation_generalized(
     Returns:
         Single excitation circuit.
     """
-    #qc = _double_excitation_efficient_generalized(a, b, i, j, num_orbs, qc, theta, phi)
-    qc = _double_excitation_trotter_generalized(i, j, a, b, num_orbs, qc, theta, phi, mapper)
+    qc = _double_excitation_efficient_generalized_test(a, b, i, j, num_orbs, qc, theta, phi)
+    #qc = _double_excitation_trotter_generalized(i, j, a, b, num_orbs, qc, theta, phi, mapper)
 
     # if isinstance(mapper, JordanWignerMapper):
     #     qc = _double_excitation_efficient_generalized(a, b, i, j, num_orbs, qc, theta, phi)
@@ -537,6 +536,173 @@ def _double_excitation_efficient(
     return qc
 
 
+def _double_excitation_efficient_generalized_test(
+    k: int, l: int, i: int, j: int, num_spin_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression, phi: Parameter | ParameterExpression
+) -> QuantumCircuit:
+    r"""Exact circuit for double excitation.
+
+    Implementation of the following operator,
+
+    .. math::
+       \boldsymbol{U} = \exp\left(\theta\hat{a}^\dagger_k\hat{a}^\dagger_l\hat{a}_j\hat{a}_i\right)
+
+    #. 10.1103/PhysRevA.102.062612, Fig. 6, Fig. 7, and, Fig. 9
+    #. 10.1038/s42005-021-00730-0, Fig. 2
+
+    Args:
+        k: Weakly occupied spin orbital index.
+        l: Weakly occupied spin orbital index.
+        i: Strongly occupied spin orbital index.
+        j: Strongly occupied spin orbital index.
+        num_orbs: Number of spatial orbitals.
+        qc: Quantum circuit.
+        theta: Circuit parameter.
+
+    Returns:
+        Double excitation circuit.
+    """
+    num_orbs = num_spin_orbs // 2
+
+
+    k = f2q(k, num_orbs)
+    l = f2q(l, num_orbs)
+    i = f2q(i, num_orbs)
+    j = f2q(j, num_orbs)
+
+
+    # Saving original idx:
+    k_o, l_o, i_o, j_o = k, l, i, j
+
+
+    # Complex correction:
+    qc.rz(-phi/4, k_o) 
+    qc.rz(-phi/4, l_o)
+    qc.rz(phi/4, i_o) 
+    qc.rz(phi/4, j_o)
+
+
+
+    fac = 1
+
+    # if k % 2 == l % 2 and k % 2 == 0 and i % 2 != 0:
+    #     fac *= -1
+
+
+    # if k % 2 == l % 2 and k % 2 == 0 and i % 2 != 0 and j % 2 != 0:
+    #     fac *= -1
+
+    # if k % 2 == l % 2 and k % 2 != 0 and i % 2 == 0 and j % 2 == 0:
+    #     fac *= -1
+
+    # if k % 2 == l % 2 and i % 2 != j % 2:
+    #     fac *= -1
+
+    # if k % 2 != l % 2 and i % 2 == j % 2:
+    #     fac *= -1
+
+
+    if k > l:
+        l, k = k, l
+        fac *= -1
+    if i > j:
+        j, i = i, j
+        fac *= -1
+    if l < j:
+        l, j = j, l
+        fac *= -1
+    if k < i:
+        k, i = i, k
+        fac *= -1
+
+    # if l < i:
+    #     l, i = i, l
+    #     fac *= -1
+    # if k < j:
+    #     k, j = j, k
+    #     fac *= -1
+
+
+
+    # cnot ladder is easier to implement if the indices are sorted.
+    i_z, k_z, j_z, l_z = np.sort((k, l, i, j))
+    theta = 2 * theta * fac
+
+
+
+    qc.cx(l, k)
+    qc.cx(j, i)
+    qc.cx(l, j)
+
+    if l_z != j_z + 1:
+        for t in range(i_z + 1, k_z - 1):
+            qc.cx(t, t + 1)
+        if i_z + 1 != k_z:  # and j+1 != k and k-1 != j+1:
+            qc.cx(k_z - 1, j_z + 1)
+        # if j+1 != k:
+        for t in range(j_z + 1, l_z - 1):
+            qc.cx(t, t + 1)
+        qc.cz(l_z, l_z - 1)
+    elif i_z != k_z - 1:
+        for t in range(i_z + 1, k_z - 1):
+            qc.cx(t, t + 1)
+        qc.cz(l_z, k_z - 1)
+    qc.x(k)
+    qc.x(i)
+
+    qc.ry(theta / 8, l)
+    qc.h(k)
+    qc.cx(l, k)
+    qc.ry(-theta / 8, l)
+    qc.h(i)
+    qc.cx(l, i)
+    qc.ry(theta / 8, l)
+    qc.cx(l, k)
+    qc.ry(-theta / 8, l)
+    qc.h(j)
+    qc.cx(l, j)
+    qc.ry(theta / 8, l)
+    qc.cx(l, k)
+    qc.ry(-theta / 8, l)
+    qc.cx(l, i)
+    qc.ry(theta / 8, l)
+    qc.h(i)
+    qc.cx(l, k)
+    qc.ry(-theta / 8, l)
+    qc.h(k)
+    qc.cx(l, j)
+    qc.h(j)
+
+    qc.x(k)
+    qc.x(i)
+    if l_z != j_z + 1:
+        qc.cz(l_z, l_z - 1)
+        for t in range(l_z - 1, j_z + 1, -1):
+            qc.cx(t - 1, t)
+        if i_z + 1 != k_z:
+            qc.cx(k_z - 1, j_z + 1)
+        for t in range(k_z - 1, i_z + 1, -1):
+            qc.cx(t - 1, t)
+    elif i_z != k_z - 1:
+        qc.cz(l_z, k_z - 1)
+        for t in range(k_z - 1, i_z + 1, -1):
+            qc.cx(t - 1, t)
+    qc.cx(l, j)
+    qc.cx(l, k)
+    qc.cx(j, i)
+
+
+    # Complex correction:
+    qc.rz(phi/4, k_o) 
+    qc.rz(phi/4, l_o)
+    qc.rz(-phi/4, i_o) 
+    qc.rz(-phi/4, j_o)
+
+
+
+    return qc
+
+
+
 def _double_excitation_efficient_generalized(
     k: int, l: int, i: int, j: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression, phi: Parameter | ParameterExpression
 ) -> QuantumCircuit:
@@ -596,7 +762,6 @@ def _double_excitation_efficient_generalized(
     #     fac *= -1
 
 
-
     k_q = f2q(k, num_orbs // 2)
     l_q = f2q(l, num_orbs // 2)
     i_q = f2q(i, num_orbs // 2)
@@ -637,7 +802,6 @@ def _double_excitation_efficient_generalized(
     # if k_q < i_q:
     #     k_q, i_q = i_q, k_q
     #     fac *= -1
-
 
 
 

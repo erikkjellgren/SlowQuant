@@ -194,6 +194,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #print(np.round(coeff.real, 2))
 
     spin_cons = False
+    act_k = True
 
 
     WF = GeneralizedWaveFunctionUPS(
@@ -222,7 +223,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         mol,
         "fUCCSD",
         ansatz_options = {"n_layers": 1, "is_spin_conserving" : spin_cons},
-        include_active_kappa=True,
+        include_active_kappa=act_k,
     )
 
     WF2.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True)
@@ -254,7 +255,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         h_core,
         g_eri,
         QI,
-        include_active_kappa = True,
+        include_active_kappa = act_k,
     )
 
     #clean = [tuple(int(y) for y in x) for x in WF3.ups_layout.excitation_indices]
