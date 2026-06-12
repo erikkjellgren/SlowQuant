@@ -638,7 +638,14 @@ def test_custom() -> None:
     QI = QuantumInterface(sampler, qc, mapper, shots=None)
 
     # Construct circuit
-    QI.construct_circuit(2, (1, 1))
+    QI.construct_circuit(
+        qWF.active_occ_idx_shifted,
+        qWF.active_unocc_idx_shifted,
+        qWF.active_occ_spin_idx_shifted,
+        qWF.active_unocc_spin_idx_shifted,
+        qWF.num_active_orbs,
+        (qWF.num_active_elec_alpha, qWF.num_active_elec_beta),
+    )
 
     # Define parameters
     QI.parameters = qc_param
@@ -1203,3 +1210,29 @@ def test_variance() -> None:
     assert abs(qWF._calc_energy_elec() - -9.530550958752345) < 10**-6  # type: ignore
     assert abs(QI.quantum_variance(qWF._get_hamiltonian(), do_no_corr=True) - 0.08149072047975339) < 10**-6  # type: ignore
     assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.12548161863195212) < 10**-6  # type: ignore
+
+
+def test_upslayout_input() -> None:
+    """Test LiH UPS layout as ansatz input."""
+    atom = "Li .0 .0 .0; H .0 .0 1.672"
+    basis = "sto-3g"
+    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
+    rhf = pyscf.scf.RHF(mol).run()
+    WF = WaveFunctionUPS(
+        (2, 2),
+        rhf.mo_coeff,
+        mol,
+        "fUCCSD",
+    )
+    WF.run_wf_optimization_1step("BFGS", False)
+    sampler = SamplerAer()
+    mapper = ParityMapper(num_particles=(1, 1))
+    QI = QuantumInterface(sampler, WF.ups_layout, mapper)
+    qWF = WaveFunctionCircuit(
+        (2, 2),
+        WF.c_mo,
+        mol,
+        QI,
+    )
+    qWF.thetas = WF.thetas
+    assert abs(qWF.energy_elec - WF.energy_elec) < 10**-10

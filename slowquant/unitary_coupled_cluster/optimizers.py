@@ -75,7 +75,7 @@ class Optimizers:
             time_str = f"{time.time() - self._start:7.2f}"
             evals_str = ""
             if self.energy_eval_callback:
-                evals_str =  str(self.energy_eval_callback())
+                evals_str = str(self.energy_eval_callback())
             std_str = ""
             if self.std_callback is not None:
                 var = self.std_callback()
