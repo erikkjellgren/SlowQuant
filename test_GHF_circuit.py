@@ -263,15 +263,15 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     
 
     #qWF.set_thetas_initial(WF2.thetas_real, WF2.thetas_imag)
-    qWF.set_thetas_initial(WF3.thetas_real, WF3.thetas_imag)
+    #qWF.set_thetas_initial(WF3.thetas_real, WF3.thetas_imag)
 
-    #qWF.set_thetas_initial(np.add(WF2.thetas_real, 0.002), np.add(WF2.thetas_imag, 0.002))
+    qWF.set_thetas_initial(np.add(WF3.thetas_real, 0.002), np.add(WF3.thetas_imag, 0.002))
 
-    print("real components of thetas     :", np.round(WF3.thetas_real,10))
-    print("imaginary components of thetas:", np.round(WF3.thetas_imag,10))
+    #print("real components of thetas     :", np.round(WF3.thetas_real,10))
+    #print("imaginary components of thetas:", np.round(WF3.thetas_imag,10))
 
-    print("norm of thetas:", np.round(qWF.thetas_real,10))
-    print("phi of thetas :", np.round(qWF.thetas_imag,10))
+    #print("norm of thetas:", np.round(qWF.thetas_real,10))
+    #print("phi of thetas :", np.round(qWF.thetas_imag,10))
 
 
     print("HF Classical PySCF                :", mf.energy_elec()[0])
@@ -292,8 +292,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     qWF.run_wf_optimization_1step("bfgs", orbital_optimization=True, tol=1e-6)
 
-    print("norm of thetas:", np.round(qWF.thetas_real,10))
-    print("phi of thetas :", np.round(qWF.thetas_imag,10))
+    #print("norm of thetas:", np.round(qWF.thetas_real,10))
+    #print("phi of thetas :", np.round(qWF.thetas_imag,10))
 
 
 
@@ -441,5 +441,5 @@ def HF():
 
 # Run simulation:
 
-h3()
+h2()
 

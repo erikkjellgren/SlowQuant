@@ -1044,7 +1044,7 @@ class GeneralizedWaveFunctionCircuit:
             )  # Count energy measurements for all gradients
             # This count has not been updated AWE
 
-        print("Gradient theta      :", np.round(gradient[num_kappa:],3))
+        #print("Gradient theta      :", np.round(gradient[num_kappa:],3))
         #print("Gradient finite diff:", np.round(gradient_finite_diff[num_kappa:],3))
 
         #return gradient_finite_diff

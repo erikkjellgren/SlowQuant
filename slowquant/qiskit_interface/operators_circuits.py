@@ -59,7 +59,7 @@ def single_excitation_generalized(
     Returns:
         Single excitation circuit.
     """
-    qc = _single_excitation_efficient_generalized_test(a, i, num_spin_orbs, qc, theta, phi)
+    qc = _single_excitation_efficient_generalized(a, i, num_spin_orbs, qc, theta, phi)
     #qc = _single_excitation_trotter_generalized(i, a, num_spin_orbs, qc, theta, phi, mapper)
 
     # if isinstance(mapper, JordanWignerMapper):
@@ -128,7 +128,7 @@ def double_excitation_generalized(
     Returns:
         Single excitation circuit.
     """
-    qc = _double_excitation_efficient_generalized_test(a, b, i, j, num_orbs, qc, theta, phi)
+    qc = _double_excitation_efficient_generalized(a, b, i, j, num_orbs, qc, theta, phi)
     #qc = _double_excitation_trotter_generalized(i, j, a, b, num_orbs, qc, theta, phi, mapper)
 
     # if isinstance(mapper, JordanWignerMapper):
@@ -137,7 +137,6 @@ def double_excitation_generalized(
     #     qc = _double_excitation_trotter(i, j, a, b, num_orbs, qc, theta, phi, mapper)
 
     return qc
-
 
 def sa_single_excitation(
     i: int,
@@ -165,7 +164,6 @@ def sa_single_excitation(
     else:
         qc = _sa_single_excitation_trotter(i, a, num_orbs, qc, theta, mapper)
     return qc
-
 
 def _single_excitation_efficient(
     k: int, i: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression
@@ -220,8 +218,7 @@ def _single_excitation_efficient(
         qc.cx(k, i)
     return qc
 
-
-def _single_excitation_efficient_generalized(
+def _single_excitation_efficient_generalized_old(
     k: int, i: int, num_spin_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression, phi: Parameter | ParameterExpression
 ) -> QuantumCircuit:
     r"""Exact circuit for single excitation.
@@ -322,7 +319,7 @@ def _single_excitation_efficient_generalized(
 
     return qc
 
-def _single_excitation_efficient_generalized_test(
+def _single_excitation_efficient_generalized(
     a: int, j: int, num_spin_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression, phi: Parameter | ParameterExpression
 ) -> QuantumCircuit:
     r"""Exact circuit for single excitation.
@@ -352,10 +349,12 @@ def _single_excitation_efficient_generalized_test(
 
     k_o, i_o = k, i
 
+    # Complex correction:
     qc.rz(-phi/2, k_o) 
     qc.rz(phi/2, i_o) 
 
 
+    # Correcting for switching of idx using anti-commutator relations:
     fac = 1
 
     if k < i:
@@ -369,6 +368,7 @@ def _single_excitation_efficient_generalized_test(
         raise ValueError(f"k={k}, must be larger than i={i}")
     
     if k - 1 == i:
+        # Efficient single excitation:
         qc.rz(np.pi / 2, i)
         qc.rx(np.pi / 2, i)
         qc.rx(np.pi / 2, k)
@@ -380,20 +380,26 @@ def _single_excitation_efficient_generalized_test(
         qc.rx(-np.pi / 2, i)
         qc.rz(-np.pi / 2, i)
     else:
+        # CNOT ladder
         qc.cx(k, i)
         for t in range(k - 2, i, -1):
             qc.cx(t + 1, t)
+        
+        # Single excitation:
         qc.cz(i + 1, k)
         qc.ry(theta, k)
         qc.cx(i, k)
         qc.ry(-theta, k)
         qc.cx(i, k)
         qc.cz(i + 1, k)
+
+        # CNOT ladder
         for t in range(i + 1, k - 1):
             qc.cx(t + 1, t)
         qc.cx(k, i)
 
 
+    # Complex correction:
     qc.rz(phi/2, k_o) 
     qc.rz(-phi/2, i_o) 
 
@@ -535,8 +541,7 @@ def _double_excitation_efficient(
     qc.cx(j, i)
     return qc
 
-
-def _double_excitation_efficient_generalized_test(
+def _double_excitation_efficient_generalized(
     k: int, l: int, i: int, j: int, num_spin_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression, phi: Parameter | ParameterExpression
 ) -> QuantumCircuit:
     r"""Exact circuit for double excitation.
@@ -563,16 +568,13 @@ def _double_excitation_efficient_generalized_test(
     """
     num_orbs = num_spin_orbs // 2
 
-
     k = f2q(k, num_orbs)
     l = f2q(l, num_orbs)
     i = f2q(i, num_orbs)
     j = f2q(j, num_orbs)
 
-
     # Saving original idx:
     k_o, l_o, i_o, j_o = k, l, i, j
-
 
     # Complex correction:
     qc.rz(-phi/4, k_o) 
@@ -581,25 +583,8 @@ def _double_excitation_efficient_generalized_test(
     qc.rz(phi/4, j_o)
 
 
-
+    # Correction for swithing of idx using the anti-commutator relations:
     fac = 1
-
-    # if k % 2 == l % 2 and k % 2 == 0 and i % 2 != 0:
-    #     fac *= -1
-
-
-    # if k % 2 == l % 2 and k % 2 == 0 and i % 2 != 0 and j % 2 != 0:
-    #     fac *= -1
-
-    # if k % 2 == l % 2 and k % 2 != 0 and i % 2 == 0 and j % 2 == 0:
-    #     fac *= -1
-
-    # if k % 2 == l % 2 and i % 2 != j % 2:
-    #     fac *= -1
-
-    # if k % 2 != l % 2 and i % 2 == j % 2:
-    #     fac *= -1
-
 
     if k > l:
         l, k = k, l
@@ -614,21 +599,12 @@ def _double_excitation_efficient_generalized_test(
         k, i = i, k
         fac *= -1
 
-    # if l < i:
-    #     l, i = i, l
-    #     fac *= -1
-    # if k < j:
-    #     k, j = j, k
-    #     fac *= -1
-
-
 
     # cnot ladder is easier to implement if the indices are sorted.
     i_z, k_z, j_z, l_z = np.sort((k, l, i, j))
     theta = 2 * theta * fac
 
-
-
+    # CNOT ladder construction:
     qc.cx(l, k)
     qc.cx(j, i)
     qc.cx(l, j)
@@ -674,6 +650,9 @@ def _double_excitation_efficient_generalized_test(
 
     qc.x(k)
     qc.x(i)
+
+
+    # CNOT ladder construction:
     if l_z != j_z + 1:
         qc.cz(l_z, l_z - 1)
         for t in range(l_z - 1, j_z + 1, -1):
@@ -698,12 +677,9 @@ def _double_excitation_efficient_generalized_test(
     qc.rz(-phi/4, j_o)
 
 
-
     return qc
 
-
-
-def _double_excitation_efficient_generalized(
+def _double_excitation_efficient_generalized_old(
     k: int, l: int, i: int, j: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression, phi: Parameter | ParameterExpression
 ) -> QuantumCircuit:
     r"""Exact circuit for double excitation.
@@ -925,8 +901,6 @@ def _double_excitation_efficient_generalized(
 
     return qc
 
-
-
 def _sa_single_excitation_efficient(
     k: int, i: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression
 ) -> QuantumCircuit:
@@ -958,7 +932,6 @@ def _sa_single_excitation_efficient(
     qc = _single_excitation_efficient(2 * k, 2 * i, num_orbs, qc, theta)
     qc = _single_excitation_efficient(2 * k + 1, 2 * i + 1, num_orbs, qc, theta)
     return qc
-
 
 def _single_excitation_trotter(
     i: int,
@@ -1038,12 +1011,8 @@ def _single_excitation_trotter_generalized(
     factors = factors[sort_idx]
     num_qubits = qc.num_qubits
 
-    # print("ops singles", ops)
-    # print("factors singles", factors)
-
     a = f2q(a, num_orbs)
     i = f2q(i, num_orbs)
-
 
     qc.rz(-phi/2, a) 
     qc.rz(phi/2, i) 
@@ -1150,17 +1119,11 @@ def _double_excitation_trotter_generalized(
     factors = factors[sort_idx]
     num_qubits = qc.num_qubits
 
-    # print("ops doubles", ops)
-    # print("factors doubles", factors)
-
-    #print("idx inside _double_excitation_trotter_generalized before f2q:", i,j,a,b)
 
     a = f2q(a, num_orbs)
     b = f2q(b, num_orbs)
     i = f2q(i, num_orbs)
     j = f2q(j, num_orbs)
-
-    #print("idx inside _double_excitation_trotter_generalized after f2q:", i,j,a,b)
 
 
     qc.rz(-phi/4, a) 
