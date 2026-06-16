@@ -51,21 +51,24 @@ def test_lih_naive():
 
         sigma_plus = Ab + Bb
         sigma_minus = Ab - Bb
+        tau_plus = Sb
         tau_minus = Sb
-        return sigma_plus, sigma_minus, tau_minus
+        return sigma_plus, sigma_minus, tau_plus, tau_minus
 
     d = PairedDavidson()
     num_exc = 13
 
     start_guess = np.random.rand(A.shape[0], num_exc)
+    start_guess = np.vstack((start_guess, start_guess.conj()))
     trial = d._orthonormalize(start_guess)
 
-    sp, sm, tm = right_transform(trial)
+    sp, sm, tp, tm = right_transform(trial[:A.shape[0], :])
 
-    _sp, _sm, _tm = LR._right_transform(trial)
+    _sp, _sm, _tp, _tm = LR._right_transform(trial)
 
     assert np.allclose(sp, _sp, atol=1e-12)
     assert np.allclose(sm, _sm, atol=1e-12)
+    assert np.allclose(tp, _tp, atol=1e-12)
     assert np.allclose(tm, _tm, atol=1e-12)
 
 def test_lih_projected():
@@ -103,21 +106,24 @@ def test_lih_projected():
 
         sigma_plus = Ab + Bb
         sigma_minus = Ab - Bb
+        tau_plus = Sb
         tau_minus = Sb
-        return sigma_plus, sigma_minus, tau_minus
+        return sigma_plus, sigma_minus, tau_plus, tau_minus
 
     d = PairedDavidson()
     num_exc = 13
 
     start_guess = np.random.rand(A.shape[0], num_exc)
+    start_guess = np.vstack((start_guess, start_guess.conj()))
     trial = d._orthonormalize(start_guess)
 
-    sp, sm, tm = right_transform(trial)
+    sp, sm, tp, tm = right_transform(trial[:A.shape[0], :])
 
-    _sp, _sm, _tm = LR._right_transform(trial)
+    _sp, _sm, _tp, _tm = LR._right_transform(trial)
 
     assert np.allclose(sp, _sp, atol=1e-12)
     assert np.allclose(sm, _sm, atol=1e-12)
+    assert np.allclose(tp, _tp, atol=1e-12)
     assert np.allclose(tm, _tm, atol=1e-12)
 
 def test_lih_allprojected():
@@ -155,19 +161,22 @@ def test_lih_allprojected():
 
         sigma_plus = Ab + Bb
         sigma_minus = Ab - Bb
+        tau_plus = Sb
         tau_minus = Sb
-        return sigma_plus, sigma_minus, tau_minus
+        return sigma_plus, sigma_minus, tau_plus, tau_minus
 
     d = PairedDavidson()
     num_exc = 13
 
     start_guess = np.random.rand(A.shape[0], num_exc)
+    start_guess = np.vstack((start_guess, start_guess.conj()))
     trial = d._orthonormalize(start_guess)
 
-    sp, sm, tm = right_transform(trial)
+    sp, sm, tp, tm = right_transform(trial[:A.shape[0], :])
 
-    _sp, _sm, _tm = LR._right_transform(trial)
+    _sp, _sm, _tp, _tm = LR._right_transform(trial)
 
     assert np.allclose(sp, _sp, atol=1e-12)
     assert np.allclose(sm, _sm, atol=1e-12)
+    assert np.allclose(tp, _tp, atol=1e-12)
     assert np.allclose(tm, _tm, atol=1e-12)

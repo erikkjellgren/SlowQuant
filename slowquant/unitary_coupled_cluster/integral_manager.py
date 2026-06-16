@@ -120,7 +120,7 @@ class IntegralManager:
         if isinstance(self.int_obj, SlowQuant):
             raise ValueError("Integral magnetic_dipole is not implemented through SlowQuant, please use PySCF")
         elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
-            x, y, z = 0.5 * self.int_obj.intor("int1e_cg_irxp", comp=3)
+            x, y, z = self.int_obj.intor("int1e_cg_irxp", comp=3)
             magnetic_dipole_integral = (x, y, z)
         else:
             raise ValueError("Got unknown integral object, {type(self.int_obj)}")
