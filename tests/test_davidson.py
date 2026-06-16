@@ -47,7 +47,7 @@ def test_lih_naive_explicit():
     Sigma = LR.Sigma
     Delta = LR.Delta
 
-    def right_transform(trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def right_transform(trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         trial_plus = trial[: trial.shape[0] // 2]
         trial_minus = trial[trial.shape[0] // 2 :]
 
@@ -71,6 +71,7 @@ def test_lih_naive_explicit():
         max_iteration=50,
         tolerance=1e-8,
         n_roots=3,
+        max_reduced_space=1_000,
         # is_silent=True,
     )
 
@@ -124,7 +125,7 @@ def test_lih_naive():
 
     # naive
     LR = naive.LinearResponse(WF, excitations="SD")
-    LR.calc_excitation_energies(3, {"max_iterations": 50, "tolerance": 1e-8})
+    LR.calc_excitation_energies(3, {"max_iteration": 50, "tolerance": 1e-8, "max_reduced_space": 1_000})
 
     solutions = np.array(
         [
@@ -203,7 +204,7 @@ def test_lih_projected_explicit():
     Sigma = LR.Sigma
     Delta = LR.Delta
 
-    def right_transform(trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def right_transform(trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         trial_plus = trial[: trial.shape[0] // 2]
         trial_minus = trial[trial.shape[0] // 2 :]
 
@@ -227,6 +228,7 @@ def test_lih_projected_explicit():
         max_iteration=50,
         tolerance=1e-8,
         n_roots=3,
+        max_reduced_space=1_000,
         # is_silent=True,
     )
 
@@ -280,7 +282,7 @@ def test_lih_projected():
 
     # naive
     LR = projected.LinearResponse(WF, excitations="SD")
-    LR.calc_excitation_energies(3, {"max_iterations": 50, "tolerance": 1e-8})
+    LR.calc_excitation_energies(3, {"max_iteration": 50, "tolerance": 1e-8, "max_reduced_space": 1_000})
 
     solutions = np.array(
         [
@@ -358,7 +360,7 @@ def test_lih_allprojected_explicit():
     Sigma = LR.Sigma
     Delta = LR.Delta
 
-    def right_transform(trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def right_transform(trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         trial_plus = trial[: trial.shape[0] // 2]
         trial_minus = trial[trial.shape[0] // 2 :]
 
@@ -382,6 +384,7 @@ def test_lih_allprojected_explicit():
         max_iteration=50,
         tolerance=1e-8,
         n_roots=3,
+        max_reduced_space=1_000,
         # is_silent=True,
     )
 
@@ -435,7 +438,7 @@ def test_lih_allprojected():
 
     # naive
     LR = allprojected.LinearResponse(WF, excitations="SD")
-    LR.calc_excitation_energies(3, {"max_iterations": 50, "tolerance": 1e-8})
+    LR.calc_excitation_energies(3, {"max_iteration": 50, "tolerance": 1e-8, "max_reduced_space": 1_000})
 
     solutions = np.array(
         [
