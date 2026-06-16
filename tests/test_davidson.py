@@ -485,9 +485,3 @@ def test_lih_allprojected():
         [0, 2.56644246e+00+0j, 0]
     ])
     assert np.allclose(pol, solutions, atol=threshold)
-
-
-if __name__ == "__main__":
-    test_lih_naive()
-    # test_lih_projected()
-    # test_lih_allprojected()
