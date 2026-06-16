@@ -449,6 +449,13 @@ class PairedDavidson(Davidson):
 
         # Compute Ritz vectors (X) and residuals (R)
         x_plus, x_minus = _split_vector(x)
+        if frequency is None or property_gradient is None:
+            norm = np.sqrt(np.abs(np.diag(
+                x_minus.T @ S_minus @ x_plus + x_plus.T @ S_minus.T @ x_minus
+            )))
+            norm[np.isclose(norm, 0)] = 1
+            x_plus /= norm
+            x_minus /= norm
         X = np.vstack((trial_plus @ x_plus + trial_minus @ x_minus, (trial_plus @ x_plus - trial_minus @ x_minus).conj()))
 
         R_plus = self._sigma_plus @ x_plus - self._tau_plus @ x_minus * omega
@@ -461,12 +468,6 @@ class PairedDavidson(Davidson):
             if np.isreal(frequency):
                 R_minus += property_gradient
 
-        if frequency is None or property_gradient is None:
-            norm = np.sqrt(np.abs(np.diag(
-                x_minus.T @ S_minus @ x_plus + x_plus.T @ S_minus.T @ x_minus
-            )))
-            norm[np.isclose(norm, 0)] = 1
-            X /= norm
         return omega, X, (R_plus, R_minus)
 
     @staticmethod
