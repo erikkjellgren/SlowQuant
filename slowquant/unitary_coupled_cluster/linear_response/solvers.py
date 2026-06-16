@@ -86,15 +86,15 @@ class Davidson:
         for _ in range(max_iteration):
             self._iteration += 1
 
-            right_transformed_vectors = right_transform(trial)
-            if self._iteration > 1 and self._trial.shape[1] + trial.shape[1] > max_reduced_space:
+            if self._iteration > 1 and 2*self._trial.shape[1] + 2*trial.shape[1] > max_reduced_space:
                 if not is_silent:
                     print(f"Davidson iter {self._iteration+1:4d}: subspace dimension {self._trial.shape[1]+trial.shape[1]} exceeds max_red_space {max_reduced_space}, restarting with current Ritz vectors")
-                self._reset_reduced_space(trial, right_transformed_vectors)
+                self._reset_reduced_space(X, right_transform)  # type: ignore
             else:
+                right_transformed_vectors = right_transform(trial)
                 self._add_iteration_data(trial, right_transformed_vectors)
             omega, X, R = self._compute_residual_vectors(n_roots, frequency, property_gradient)
-            converged, res_norms = self._check_convergence(R, tolerance)
+            converged, res_norms = self._check_convergence(R, tolerance, n_roots)
 
             if converged:
                 if not is_silent:
@@ -201,7 +201,7 @@ class Davidson:
 
     @staticmethod
     @abstractmethod
-    def _check_convergence(R: tuple[np.ndarray, ...], tolerance: float) -> tuple[bool, np.ndarray]:
+    def _check_convergence(R: tuple[np.ndarray, ...], tolerance: float, n_roots: int) -> tuple[bool, np.ndarray]:
         """Check if the maximum residual norm is below the tolerance."""
 
     @staticmethod
@@ -210,7 +210,7 @@ class Davidson:
         """Update trial vectors using the residuals and the diagonal preconditioner."""
 
     @abstractmethod
-    def _reset_reduced_space(self, trial: np.ndarray, right_transformed_vectors: tuple[np.ndarray, ...]) -> None:
+    def _reset_reduced_space(self, trial: np.ndarray, right_transform: Callable[[np.ndarray], Any]) -> None:
         """Reset the reduced space by keeping only the current Ritz vectors."""
 
 class TDADavidson(Davidson):
@@ -300,11 +300,12 @@ class TDADavidson(Davidson):
         return omega, X, (R, )
 
     @staticmethod
-    def _check_convergence(R: tuple[np.ndarray, ...], tolerance: float) -> tuple[bool, np.ndarray]:
+    def _check_convergence(R: tuple[np.ndarray, ...], tolerance: float, n_roots: int) -> tuple[bool, np.ndarray]:
         """Check if the maximum residual norm is below the tolerance."""
         _R, *_ = R
         res_norms = np.linalg.norm(_R, axis=0)
-        return all(res_norms <= tolerance), res_norms
+        converged = all(res_norms <= tolerance) and len(res_norms) == n_roots
+        return converged, res_norms
 
     @staticmethod
     def _update_trial_vectors(omega: np.ndarray, R: tuple[np.ndarray, ...], preconditioner: tuple[np.ndarray, ...], frequency: float | None) -> np.ndarray:
@@ -321,10 +322,10 @@ class TDADavidson(Davidson):
         new_trial = denominator * _R
         return new_trial
 
-    def _reset_reduced_space(self, trial: np.ndarray, right_transformed_vectors: tuple[np.ndarray, ...]) -> None:
+    def _reset_reduced_space(self, trial: np.ndarray, right_transform: Callable[[np.ndarray], Any]) -> None:
         """Reset the reduced space by keeping only the current Ritz vectors."""
         self._trial = self._orthonormalize(trial)
-        self._sigma, self._tau = right_transformed_vectors
+        self._sigma, self._tau = right_transform(self._trial)
 
 class PairedDavidson(Davidson):
     """Davidson solver for the paired eigenvalue problem arising in the CASSCF linear response equations.
@@ -466,11 +467,10 @@ class PairedDavidson(Davidson):
             )))
             norm[np.isclose(norm, 0)] = 1
             X /= norm
-
         return omega, X, (R_plus, R_minus)
 
     @staticmethod
-    def _check_convergence(R: tuple[np.ndarray, ...], tolerance: float) -> tuple[bool, np.ndarray]:
+    def _check_convergence(R: tuple[np.ndarray, ...], tolerance: float, n_roots: int) -> tuple[bool, np.ndarray]:
         """Check if the maximum residual norm is below the tolerance."""
         R_plus, R_minus = R
         plus_norms = np.linalg.norm(R_plus, axis=0)
@@ -479,7 +479,8 @@ class PairedDavidson(Davidson):
             res_norms = plus_norms
         else:
             res_norms = minus_norms
-        return all(res_norms <= tolerance), res_norms
+        converged = all(res_norms <= tolerance) and len(res_norms) == n_roots
+        return converged, res_norms
 
     @staticmethod
     def _update_trial_vectors(omega: np.ndarray, R: tuple[np.ndarray, ...], preconditioner: tuple[np.ndarray, ...], frequency: float | None) -> np.ndarray:
@@ -500,10 +501,15 @@ class PairedDavidson(Davidson):
         new_trial = np.vstack((new_trial_plus, new_trial_minus))
         return new_trial
 
-    def _reset_reduced_space(self, trial: np.ndarray, right_transformed_vectors: tuple[np.ndarray, ...]) -> None:
+    def _reset_reduced_space(self, trial: np.ndarray, right_transform: Callable[[np.ndarray], Any]) -> None:
         """Reset the reduced space by keeping only the current Ritz vectors."""
-        self._trial = self._orthonormalize(trial)
-        self._sigma_plus, self._sigma_minus, self._tau_plus, self._tau_minus = right_transformed_vectors
+        upper = trial[: trial.shape[0] // 2, :]
+        lower = trial[trial.shape[0] // 2 :, :]
+        new_trial = np.zeros_like(trial)
+        new_trial[: trial.shape[0] // 2, :] = upper + lower
+        new_trial[trial.shape[0] // 2 :, :] = upper - lower
+        self._trial = self._orthonormalize(new_trial)
+        self._sigma_plus, self._sigma_minus, self._tau_plus, self._tau_minus = right_transform(self._trial)
 
 def _real_eigvals(
         w: np.typing.NDArray[np.complexfloating],
