@@ -122,6 +122,10 @@ class LinearResponseBaseClass:
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
         self.B = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
+
+        self.A_GG = np.zeros((len(self.G_ops), len(self.G_ops)), dtype=complex)
+        self.B_GG = np.zeros((len(self.G_ops), len(self.G_ops)), dtype=complex)
+
         self.Sigma = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
         self.Delta = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
         self.H_1i_1a = generalized_hamiltonian_1i_1a(

@@ -35,6 +35,8 @@ class Optimizers:
         energy_eval_callback: Callable[[], int] | None = None,
         maxls: int = 100,
         maxcor: int = 100,
+        bounds: list | None = None, 
+        gtol: float=10e-8
     ) -> None:
         """Initialize optimizer class.
 
@@ -56,6 +58,8 @@ class Optimizers:
         self.energy_eval_callback = energy_eval_callback
         self.maxls = maxls
         self.maxcor = maxcor
+        self.bounds = bounds
+        self.gtol = gtol
 
 
     def _print_progress(
@@ -105,7 +109,8 @@ class Optimizers:
                     method=self.method,
                     tol=self.tol,
                     callback=print_progress,
-                    options={"maxiter": self.maxiter, "disp": True, "maxls": self.maxls, "maxcor":self.maxcor},
+                    bounds=self.bounds,
+                    options={"maxiter": self.maxiter, "disp": True, "maxls": self.maxls, "maxcor":self.maxcor, "gtol":self.gtol},
                 )
             else:
                 res = scipy.optimize.minimize(

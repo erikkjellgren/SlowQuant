@@ -1131,7 +1131,7 @@ class GeneralizedWaveFunctionUPS:
                     self._kappa_real_old[i] = 0.0
                     self._kappa_imag_old[i] = 0.0
 
-
+                """
                 # Positronic
                 if not is_silent_subiterations:
                     print("--------Orbital optimization e-p")
@@ -1151,6 +1151,9 @@ class GeneralizedWaveFunctionUPS:
                     kappa_ee_optimization=False,
                 )
 
+                angle_bound = np.pi / 2
+                bounds_ep = [(-angle_bound, angle_bound) for _ in range(2 * len(self.kappa_spin_idx_ep))]
+
                 optimizer = Optimizers(
                     energy_ep,
                     #"SLSQP",
@@ -1160,8 +1163,10 @@ class GeneralizedWaveFunctionUPS:
                     tol=tol,
                     is_silent=is_silent_subiterations,
                     energy_eval_callback=lambda: self.num_energy_evals,
-                    maxls = 50,
-                    maxcor = 1,
+                    maxls = 10,
+                    maxcor = 10,
+                    bounds=bounds_ep,
+                    gtol = 1e-6,
                 )
 
                 self._old_opt_parameters = np.zeros(2 * len(self.kappa_spin_idx_ep), dtype=np.float64) + 10**20
@@ -1172,7 +1177,7 @@ class GeneralizedWaveFunctionUPS:
                     self._kappa_real_ep[i] = 0.0
                     self._kappa_imag_ep[i] = 0.0
                     self._kappa_real_old_ep[i] = 0.0
-                    self._kappa_imag_old_ep[i] = 0.0
+                    self._kappa_imag_old_ep[i] = 0.0"""
             else:
                 # If there is no orbital optimization, then the algorithm is already converged.
                 e_new = res.fun
@@ -1464,7 +1469,7 @@ class GeneralizedWaveFunctionUPS:
             # RDM is more expensive than evaluation of the Hamiltonian.
             # Thus only construct these if orbital-optimization is turned on,
             # since the RDMs will be reused in the oo gradient calculation.
-            E = -get_electronic_energy_generalized(
+            E = - get_electronic_energy_generalized(
                 self.h_mo_ep,
                 self.g_mo_ep,
                 self.num_spin_orbs_NES,
@@ -1538,7 +1543,7 @@ class GeneralizedWaveFunctionUPS:
                 self.rdm2,
             )
         if kappa_ep_optimization:
-            gradient[:num_kappa] = get_orbital_gradient_generalized_real_imag(
+            gradient[:num_kappa] = - get_orbital_gradient_generalized_real_imag(
                 self.h_mo_ep,
                 self.g_mo_ep,
                 self.kappa_spin_idx_ep,

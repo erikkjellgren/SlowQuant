@@ -492,6 +492,9 @@ class LinearResponse(LinearResponseBaseClass):
 
                 self.A[i + idx_shift, j + idx_shift] = val 
                 self.A[j + idx_shift, i + idx_shift] = val.conj()
+
+                self.A_GG[i, j] = val
+                self.A_GG[j, i] = val.conj()
                  
                 # Make B
                 # <0| GId H GJd |0>
@@ -525,6 +528,9 @@ class LinearResponse(LinearResponseBaseClass):
 
                 self.B[i + idx_shift, j + idx_shift] = val 
                 self.B[j + idx_shift, i + idx_shift] = val
+
+                self.B_GG[i, j] = val
+                self.B_GG[j, i] = val
                 # Make Sigma
                 # <0| GId GJ |0>
                 val = generalized_expectation_value(
@@ -571,7 +577,7 @@ class LinearResponse(LinearResponseBaseClass):
         print(f"Symmetry check of B: max|B - B.T| = "
             f"{np.max(np.abs(self.B - self.B.T)):.2e}")  
         
-                        
+        """                
         #print("H shape:", E2.shape)
         #print("sigma shape:", self.Sigma.shape)
         #print("H diagonal:", np.diag(E2).real)
@@ -610,8 +616,8 @@ class LinearResponse(LinearResponseBaseClass):
 #                 )
                 
 #         self.Delta = np.zeros((len(self.Sigma), len(self.Sigma))
-#         )  # Delta er defineret her fordi den ellers har forkert dimension i unrestricted_lr_baseclass.py
-
+#         )  # Delta er defineret her fordi den ellers har forkert dimension i unrestricted_lr_baseclass.py 
+"""
                 
 
                                 
@@ -1171,35 +1177,35 @@ class LinearResponse(LinearResponseBaseClass):
         B_mat     = np.zeros((num_parameters, num_parameters), dtype=complex)
 
         if len(self.q_ops_resp) != 0:
-            grad_test = get_orbital_gradient_response_real_imag(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.kappa_no_activeactive_spin_idx_resp,
-                self.wf.num_spin_orbs_NES,
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.rdm1,
-                self.wf.rdm2,
-            )
-            grad2_test = get_orbital_gradient_generalized_real_imag(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.kappa_no_activeactive_spin_idx_resp,
-                self.wf.num_spin_orbs_NES,
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.rdm1,
-                self.wf.rdm2,
-            )
-            print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad_test)), np.max(np.abs(grad_test)))
+            """
+        #     grad_test = get_orbital_gradient_response_real_imag(
+        #         self.wf.h_mo,
+        #         self.wf.g_mo,
+        #         self.wf.kappa_no_activeactive_spin_idx_resp,
+        #         self.wf.num_spin_orbs_NES,
+        #         self.wf.num_inactive_spin_orbs,
+        #         self.wf.num_active_spin_orbs,
+        #         self.wf.rdm1,
+        #         self.wf.rdm2,
+        #     )
+        #     grad2_test = get_orbital_gradient_generalized_real_imag(
+        #         self.wf.h_mo,
+        #         self.wf.g_mo,
+        #         self.wf.kappa_no_activeactive_spin_idx_resp,
+        #         self.wf.num_spin_orbs_NES,
+        #         self.wf.num_inactive_spin_orbs,
+        #         self.wf.num_active_spin_orbs,
+        #         self.wf.rdm1,
+        #         self.wf.rdm2,
+        #     )
+            #print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad_test)), np.max(np.abs(grad_test)))
 
-            print("gradient", np.round(grad_test,5))
-
-
-            print("idx, max(abs(grad2 orb)):", np.argmax(np.abs(grad2_test)), np.max(np.abs(grad_test)))
+            #print("gradient", np.round(grad_test,5))
 
 
-            A_mat[: len(self.wf.kappa_spin_idx_ep), : len(self.wf.kappa_spin_idx_ep)] = get_orbital_response_hessian_block(
+            #print("idx, max(abs(grad2 orb)):", np.argmax(np.abs(grad2_test)), np.max(np.abs(grad_test)))"""
+
+            A_mat[:len(self.wf.kappa_spin_idx_ep), :len(self.wf.kappa_spin_idx_ep)] = get_orbital_response_hessian_block(
                 self.wf.h_mo, self.wf.g_mo,
                 #self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
                 #self.wf.kappa_no_activeactive_spin_idx_resp,
@@ -1213,7 +1219,7 @@ class LinearResponse(LinearResponseBaseClass):
             A_mat[: len(self.wf.kappa_spin_idx_ep), len(self.wf.kappa_spin_idx_ep) : len(self.q_ops_resp)] = get_orbital_response_hessian_block(
                 self.wf.h_mo, self.wf.g_mo,
                 self.wf.kappa_spin_idx_ep_dagger,
-                self.wf.kappa_spin_idx,
+                self.wf.kappa_no_activeactive_spin_idx,
                 self.wf.num_spin_orbs_NES,
                 self.wf.num_inactive_spin_orbs,
                 self.wf.num_active_spin_orbs,
@@ -1221,7 +1227,7 @@ class LinearResponse(LinearResponseBaseClass):
             )
             A_mat[len(self.wf.kappa_spin_idx_ep) : len(self.q_ops_resp), : len(self.wf.kappa_spin_idx_ep)] = get_orbital_response_hessian_block(
                 self.wf.h_mo, self.wf.g_mo,
-                self.wf.kappa_spin_idx_dagger,
+                self.wf.kappa_no_activeactive_spin_idx_dagger,
                 self.wf.kappa_spin_idx_ep,
                 self.wf.num_spin_orbs_NES,
                 self.wf.num_inactive_spin_orbs,
@@ -1230,15 +1236,13 @@ class LinearResponse(LinearResponseBaseClass):
             )
             A_mat[len(self.wf.kappa_spin_idx_ep) : len(self.q_ops_resp), len(self.wf.kappa_spin_idx_ep) : len(self.q_ops_resp)] = get_orbital_response_hessian_block(
                 self.wf.h_mo, self.wf.g_mo,
-                self.wf.kappa_spin_idx_dagger,
-                self.wf.kappa_spin_idx,
+                self.wf.kappa_no_activeactive_spin_idx_dagger,
+                self.wf.kappa_no_activeactive_spin_idx,
                 self.wf.num_spin_orbs_NES,
                 self.wf.num_inactive_spin_orbs,
                 self.wf.num_active_spin_orbs,
                 self.wf.rdm1, self.wf.rdm2,
             )
-
-
 
             B_mat[: len(self.q_ops_resp), : len(self.q_ops_resp)] = get_orbital_response_hessian_block(
                 self.wf.h_mo, self.wf.g_mo,
@@ -1249,6 +1253,92 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.num_active_spin_orbs,
                 self.wf.rdm1, self.wf.rdm2,
             )
+        
+
+        H = generalized_hamiltonian_full_space(self.wf.h_mo, self.wf.g_mo, self.wf.num_spin_orbs)
+
+        idx_shift = len(self.q_ops_resp)
+
+        if len(self.q_ops_resp) != 0:                          
+            for j, qJ in enumerate(self.q_ops_resp):
+                Hq_ket = generalized_propagate_state([H * qJ], self.wf.ci_coeffs, *self.index_info) # do_unsafe=True
+                qdH_ket = generalized_propagate_state([qJ.dagger * H], self.wf.ci_coeffs, *self.index_info)
+                for i, GI in enumerate(self.G_ops):
+                    G_ket = generalized_propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
+                    Gd_ket = generalized_propagate_state([GI.dagger], self.wf.ci_coeffs, *self.index_info)
+                    # print("qG",i,j)
+                    # # Make A
+                    # <0| Gd H q |0>
+                    val = generalized_expectation_value(
+                        self.wf.ci_coeffs,
+                        [GI.dagger*H*qJ],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                    # - 1/2<0| H q Gd |0>
+                    val -= (
+                        1
+                        / 2
+                        * generalized_expectation_value(
+                            self.wf.ci_coeffs,
+                            [H*qJ*GI.dagger],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                    )
+                    # - 1/2<0| H Gd q |0>
+                    val -= (
+                        1
+                        / 2
+                        * generalized_expectation_value(
+                            self.wf.ci_coeffs,
+                            [H * GI.dagger * qJ],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                    )
+
+                    A_mat[i + idx_shift, j] = val
+                    A_mat[j, i + idx_shift] = val.conj()
+                    
+                    # Make B
+                    # <0| qd H Gd |0>
+                    val = generalized_expectation_value(
+                        self.wf.ci_coeffs,
+                        [qJ.dagger*H*GI.dagger],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                    # - 1/2*<0| Gd qd H |0>
+                    val -= (
+                        1
+                        / 2
+                        * generalized_expectation_value(
+                            self.wf.ci_coeffs,
+                            [GI.dagger*qJ.dagger*H],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                    )
+                    # - 1/2*<0| qd Gd H |0>
+                    val -= (
+                        1
+                        / 2
+                        * generalized_expectation_value(
+                            self.wf.ci_coeffs,
+                            [qJ.dagger * GI.dagger * H],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                    )
+
+                    B_mat[i + idx_shift, j] = val
+                    B_mat[j, i + idx_shift] = val
+
+
+
+        A_mat[len(self.q_ops_resp):, len(self.q_ops_resp):] = self.A_GG
+        B_mat[len(self.q_ops_resp):, len(self.q_ops_resp):] = self.B_GG
 
         size = len(A_mat)
         E2_mat = np.zeros((size * 2, size * 2), dtype=complex)
@@ -1256,6 +1346,8 @@ class LinearResponse(LinearResponseBaseClass):
         E2_mat[:size, size:] = B_mat
         E2_mat[size:, :size] = B_mat.conjugate()
         E2_mat[size:, size:] = A_mat.conjugate()
+
+
 
         print(f"Hermiticity check of the Hessian: max|E2 - E2†| = "
             f"{np.max(np.abs(E2_mat - E2_mat.conj().T)):.2e}") 
@@ -1266,6 +1358,21 @@ class LinearResponse(LinearResponseBaseClass):
         print(f"Symmetry check of B: max|B - B.T| = "
             f"{np.max(np.abs(B_mat - B_mat.T)):.2e}") 
         
+        # print(f"Hermiticity check of A q: max|A - A†| = "
+        #     f"{np.max(np.abs(A_mat[:len(self.q_ops_resp), :len(self.q_ops_resp)] - A_mat[:len(self.q_ops_resp), :len(self.q_ops_resp)].conj().T)):.2e}") 
+        
+        # print(f"Symmetry check of B q: max|B - B.T| = "
+        #     f"{np.max(np.abs(B_mat[:len(self.q_ops_resp), :len(self.q_ops_resp)] - B_mat[:len(self.q_ops_resp), :len(self.q_ops_resp)].T)):.2e}") 
+        
+        # print(f"Hermiticity check of A G: max|A - A†| = "
+        #     f"{np.max(np.abs(A_mat[len(self.q_ops_resp):, len(self.q_ops_resp):] - A_mat[len(self.q_ops_resp):, len(self.q_ops_resp):].conj().T)):.2e}") 
+        
+        # print(f"Symmetry check of B G: max|B - B.T| = "
+        #     f"{np.max(np.abs(B_mat[len(self.q_ops_resp):, len(self.q_ops_resp):] - B_mat[len(self.q_ops_resp):, len(self.q_ops_resp):].T)):.2e}") 
+        
+
+
+
 
         #s = A_mat.shape[0]//2
 
@@ -1274,12 +1381,12 @@ class LinearResponse(LinearResponseBaseClass):
 
         # Property gradients and responses for all nuclei
         prop_grads = [self.get_property_gradient_4comp(h1_int[I]) for I in range(natm)]
-        #responses  = [solve(E2_mat, prop_grads[I]) for I in range(natm)]
+        responses  = [solve(E2_mat, prop_grads[I]) for I in range(natm)]
 
-        responses = [
-            np.linalg.pinv(E2_mat, rcond=1e-10) @ prop_grads[I]
-            for I in range(natm)
-        ]
+        # responses = [
+        #     np.linalg.pinv(E2_mat, rcond=1e-10) @ prop_grads[I]
+        #     for I in range(natm)
+        # ]
 
 
 

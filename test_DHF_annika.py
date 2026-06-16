@@ -529,8 +529,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         #C_U,
         h_core,
         g_eri,
-        "fuccsd",
-        {"n_layers":0, "is_spin_conserving" : False},
+        "fUCCSD",
+        {"n_layers":1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
@@ -548,30 +548,30 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     #print(WF.rdm1)
 
-    E_tester = get_electronic_energy_generalized(
-                h_mo,
-                g_mo,
-                WF.num_spin_orbs_NES,
-                WF.num_inactive_spin_orbs,
-                WF.num_active_spin_orbs,
-                WF.rdm1,
-                WF.rdm2,
-            )
+    # E_tester = get_electronic_energy_generalized(
+    #             h_mo,
+    #             g_mo,
+    #             WF.num_spin_orbs_NES,
+    #             WF.num_inactive_spin_orbs,
+    #             WF.num_active_spin_orbs,
+    #             WF.rdm1,
+    #             WF.rdm2,
+    #         )
     
-    print(E_tester)
+    # print(E_tester)
     #print(_visscher_ssss_correction(mf,mf.make_rdm1()))
     #print(E_tester + _visscher_ssss_correction(mf,mf.make_rdm1()))
 
 
-    E2 = generalized_expectation_value_energy(
-                WF.ci_coeffs,
-                # [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
-                [H],
-                WF.ci_coeffs,
-                WF.ci_info,
-            )
+    # E2 = generalized_expectation_value_energy(
+    #             WF.ci_coeffs,
+    #             # [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
+    #             [H],
+    #             WF.ci_coeffs,
+    #             WF.ci_info,
+    #         )
 
-    print(E2)
+    # print(E2)
 
 
 
@@ -620,61 +620,61 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     #WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
 
-    #WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True,tol = 1e-10, maxiter = 1000)
+    WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True,tol = 1e-8, maxiter = 1000)
 
     #kappas = np.concatenate([WF.kappa_real, WF.kappa_real_ep, WF.kappa_imag, WF.kappa_imag_ep])
 
-    gradient_test = get_orbital_gradient_generalized_real_imag(
-                WF.h_mo,
-                WF.g_mo,
-                WF.kappa_spin_idx,
-                WF.num_spin_orbs_NES,
-                WF.num_inactive_spin_orbs,
-                WF.num_active_spin_orbs,
-                WF.rdm1,
-                WF.rdm2,
-            )
+    # gradient_test = get_orbital_gradient_generalized_real_imag(
+    #             WF.h_mo,
+    #             WF.g_mo,
+    #             WF.kappa_spin_idx,
+    #             WF.num_spin_orbs_NES,
+    #             WF.num_inactive_spin_orbs,
+    #             WF.num_active_spin_orbs,
+    #             WF.rdm1,
+    #             WF.rdm2,
+    #         )
     #print(np.round(gradient_test,5))
 
-    gradient_test_ep = get_orbital_gradient_generalized_real_imag(
-            WF.h_mo,
-            WF.g_mo,
-            WF.kappa_spin_idx_ep,
-            WF.num_spin_orbs_NES,
-            WF.num_inactive_spin_orbs,
-            WF.num_active_spin_orbs,
-            WF.rdm1,
-            WF.rdm2,
-        )
+    # gradient_test_ep = get_orbital_gradient_generalized_real_imag(
+    #         WF.h_mo,
+    #         WF.g_mo,
+    #         WF.kappa_spin_idx_ep,
+    #         WF.num_spin_orbs_NES,
+    #         WF.num_inactive_spin_orbs,
+    #         WF.num_active_spin_orbs,
+    #         WF.rdm1,
+    #         WF.rdm2,
+    #     )
     #print(np.round(gradient_test_ep,5))
 
 
-    gradient_test_ep = get_orbital_gradient_generalized_real_imag(
-        WF.h_mo,
-        WF.g_mo,
-        WF.kappa_no_activeactive_spin_idx_resp,
-        WF.num_spin_orbs_NES,
-        WF.num_inactive_spin_orbs,
-        WF.num_active_spin_orbs,
-        WF.rdm1,
-        WF.rdm2,
-    )
+    # gradient_test_ep = get_orbital_gradient_generalized_real_imag(
+    #     WF.h_mo,
+    #     WF.g_mo,
+    #     WF.kappa_no_activeactive_spin_idx_resp,
+    #     WF.num_spin_orbs_NES,
+    #     WF.num_inactive_spin_orbs,
+    #     WF.num_active_spin_orbs,
+    #     WF.rdm1,
+    #     WF.rdm2,
+    # )
     #print(np.round(gradient_test_ep,5))
 
-    hess = get_orbital_response_hessian_block(
-        WF.h_mo,
-        WF.g_mo,
-        WF.kappa_no_activeactive_spin_idx_dagger,
-        WF.kappa_no_activeactive_spin_idx,
-        WF.num_spin_orbs_NES, 
-        WF.num_inactive_spin_orbs,
-        WF.num_active_spin_orbs,
-        WF.rdm1,
-        WF.rdm2,
-        )
+    # hess = get_orbital_response_hessian_block(
+    #     WF.h_mo,
+    #     WF.g_mo,
+    #     WF.kappa_no_activeactive_spin_idx_dagger,
+    #     WF.kappa_no_activeactive_spin_idx,
+    #     WF.num_spin_orbs_NES, 
+    #     WF.num_inactive_spin_orbs,
+    #     WF.num_active_spin_orbs,
+    #     WF.rdm1,
+    #     WF.rdm2,
+    #     )
     
-    print(f"Hermiticity check of the Hessian: max|E2 - E2†| = "
-            f"{np.max(np.abs(hess - hess.conj().T)):.2e}")  
+    # print(f"Hermiticity check of the Hessian: max|E2 - E2†| = "
+    #         f"{np.max(np.abs(hess - hess.conj().T)):.2e}")  
 
     # E_tester_post = get_electronic_energy_generalized(
     #             WF.h_mo[size:,size:],
@@ -689,10 +689,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # print(E_tester_post)
 
     LR = generalized_naive_DHF.LinearResponse(WF, excitations="S")
-    #LR.calc_excitation_energies()
-    #print("Excitation energies:", LR.excitation_energies)
+
+    LR.calc_excitation_energies()
+    print("Excitation energies:", LR.excitation_energies)
     #print(np.round(LR.get_transition_dipole(dip_int).real,5))
     #print(LR.get_oscillator_strengths(dip_int))
+
     SSCC = LR.get_SSCC_4comp_iso(h1, h2)
     for I in range(SSCC.shape[0]):
         for J in range(I+1, SSCC.shape[1]):
@@ -712,7 +714,7 @@ def H2():
     #basis = dyall_v2z
     #basis = "sto-3g"
     #basis = "sto-6g"
-    active_space = ((1, 1),2)
+    active_space = ((1, 1), 4)
     #active_space = (2, 4)
     charge = 0
     spin = 0
@@ -757,7 +759,7 @@ def HF():
     #basis = "631-g"
     basis = "sto-3g"
     #active_space = ((1, 1), 4)
-    active_space = ((2, 2), 4)
+    active_space = ((1, 1), 4)
     #active_space = (2, 4)
     charge = 0
     spin = 0
@@ -801,7 +803,7 @@ def HBr():
         Br  0.0  0.0  1.41443 """
     #basis = "dyall-v2z"
     basis = "sto-3g"
-    active_space = ((2,2), 4)
+    active_space = ((1,1), 4)
     charge = 0
     spin = 0
     NR(
@@ -810,11 +812,11 @@ def HBr():
 
 def HCl():
     geometry = """H  0.0   0.0  0.0;
-                  Cl  0.0  0.0  1.41443 """
+                  Cl  0.0  0.0  1.41443 """  # 1.41443
     #basis = "dyall-v2z"
     basis = "sto-3g"
     #active_space = ((2,2), 6)
-    active_space = ((2,2), 4)
+    active_space = ((2,2), 6)
     charge = 0
     spin = 0
     NR(
@@ -823,4 +825,4 @@ def HCl():
     
 ###RUN SCRIPT###
 
-HF()
+H2()
