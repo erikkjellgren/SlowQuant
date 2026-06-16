@@ -28,6 +28,7 @@ from slowquant.unitary_coupled_cluster.util import (
     iterate_t5,
     iterate_t6,
 )
+from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
 
 
 class LinearResponseBaseClass:
@@ -63,6 +64,7 @@ class LinearResponseBaseClass:
         if "s" in excitations:
             for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
                 self.G_ops.append(G1(i, a))
+                print(a, i)
         if "d" in excitations:
             for a, i, b, j in iterate_t2(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
                 self.G_ops.append(G2(i, j, a, b))
@@ -172,7 +174,19 @@ class LinearResponseBaseClass:
         sorting = np.argsort(eigval)
         self.excitation_energies = np.real(eigval[sorting][size:])
         self.response_vectors = np.real(eigvec[:, sorting][:, size:])
+        print(self.response_vectors)
         self.normed_response_vectors = np.zeros_like(self.response_vectors)
+        
+
+        #Dont know what i am doing here....
+        # for i in range(len(self.response_vectors)):
+        #     for p in range()
+        #     val = expectation_value(
+        #         self.response_vectors[i],
+        #         [],
+        #         self.response_vectors[i],
+        #         *self.index_info
+        #         )
         
         self.num_q = self.q_ops_finite
         self.num_G = size - self.num_q

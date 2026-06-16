@@ -62,7 +62,7 @@ def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, 
 
 
     # print(WF.ci_coeffs)
-    ULR = unaive.LinearResponseUPS(WF, excitations="SD")
+    ULR = unaive.LinearResponseUPS(WF, excitations="S")
     ULR.calc_excitation_energies()
     print(f'excitation energies: {ULR.excitation_energies}')
         
@@ -122,6 +122,17 @@ def h2():
 
     get_unrestricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
 
+def h2_minus():
+    geometry = """H  0.0   0.0  0.0;
+        H  0.0  0.0  0.74;"""
+    basis = '6-31g'
+    active_space = ((2,1), 4)
+    charge = -1
+    spin=1
+
+    get_unrestricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
+
+
 def lih():
     geometry = """ Li 0.0 0.0 0.0;
         H 0.0 0.0 1.5957;"""#1.5949
@@ -147,7 +158,7 @@ def h3():
                   H  1.000000   0.000000       0.000000;
                   H  0.500000   0.8660254038   0.000000"""
     # basis = "cc-pvdz"
-    basis = "sto-3g"
+    basis = "6-31g"
     #basis = "sto-3g"
     active_space = ((2, 1), 3)
     #active_space = (2, 4)
@@ -174,5 +185,6 @@ def beH():
 # NO_radical()
 # h2_ion()
 # lih()
-h3()
+# h3()
 # beH()
+h2_minus()

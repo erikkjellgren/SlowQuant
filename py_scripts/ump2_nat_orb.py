@@ -1,10 +1,13 @@
 import numpy as np
-import pyscf
-from pyscf import scf, mcscf, fci
-from pyscf.data import nist
 import sys
+import pyscf
+from pyscf import mp, scf, mp, tools
+from pyscf.mp import ump2
+# from pyscf.mp import ump2
+import scipy
 import slowquant.SlowQuant as sq
 from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
+
 
 # Read geometry file
 def my_read_xyz_file(inp):
@@ -52,56 +55,72 @@ def my_read_xyz_file(inp):
     
     return input, geometry
 
-def get_wf_optimized_unrestricted(geometry, basis, active_space, unit='bohr', charge=0, spin=0):
-    """
-    Optimize unrestricted wavefunction for HFC's with pp-utUPS
-    """
+
+
+def get_ump2_nat_orb(geometry, basis, active_space, unit='bohr', charge=0, spin=0):
+
     print(f"geometry: {geometry}, basis: {basis}, active space:, {active_space}, charge: {charge}, spin (2s+1): {spin+1}")
-    #PySCF UHF
+
     mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
     mol.build()
     mf = scf.UHF(mol)
     mf.kernel()
+    mo = mf.mo_coeff
+    pt = mp.UMP2(mf)
+    ump2_E, t2 = pt.kernel(mf.mo_energy, mf.mo_coeff)
+    rdm1 = pt.make_rdm1()
 
-    mc = mcscf.UCASCI(mf, active_space[1], active_space[0])
-    # mc = mcscf.UCASSCF(mf, active_space[1], active_space[0])
-    res = mc.kernel(mf.mo_coeff)
+    # print(rdm1.shape)
+    occ_a, no_a = scipy.linalg.eigh(rdm1[0])
+    occ_b, no_b = scipy.linalg.eigh(rdm1[1])
 
-    h_core = mol.intor("int1e_kin") + mol.intor("int1e_nuc")
-    g_eri = mol.intor("int2e")
+    print("mos and nos should be of size nao x nao and they are")
+    print(f"no.shape alpha", no_a.shape)
+    print(f"no.shape beta", no_b.shape)
+    print("mo.shape alpha", )
+    print(mo.shape)
+    print("mol.nao")
+    print(mol.nao)
+
+    # print("trace of rdm1, sum of occupation numbers, and number of electrons")
+    # print(f"numpy.trace(rdm1_alpha)", np.trace(rdm1[0]))
+    # print(f"numpy.trace(rdm1_beta", np.trace(rdm1[0]))
+    # print(f"numpy.sum(occ_a)", np.sum(occ_a))
+    # print(f"numpy.sum(occ_a)", np.sum(occ_b))
+    # print("mol.nelectron")
+    # print(mol.nelectron)
+
+    # # eigenvalues are sorted in ascending order so reorder
+    # print("BEFORE REORDER")
+    # print("occ alpha")
+    # print(occ_a)
+    # print("occ beta")
+    # print(occ_b)
+
+
+    # occ_a = occ_a[::-1]
+    # no_a = no_a[:, ::-1]
+    # occ_b = occ_b[::-1]
+    # no_b = no_b[:, ::-1]
+    # print("AFTER REORDER")
+    # print("occ alpha")
+    # print(occ_a)
+    # print("occ beta")
+    # print(occ_b)
+
+
+    # mp = pyscf.mp.ump2.UMP2(mf, frozen=None, mo_coeff=mf.mo_coeff, mo_occ=mf.mo_occ)
+    # # mf = mp.ump2.UMP2(mol)
+    # # mf.kernel()
+    # print("only pyscf functions")
+    # print(pyscf.mp.ump2.get_nmo(mp))
+    # # print(na_orb)
+    # print(pyscf.mp.ump2.get_nocc(mp))
+    # mc = mcscf.UCASCI(mf, active_space[1], active_space[0])
+    # res = mc.kernel(mf.mo_coeff)
     
-    #Slowquant
-    WF = UnrestrictedWaveFunctionUPS(
-        mol.nelectron,
-        active_space,
-        mf.mo_coeff,
-        h_core,
-        g_eri,
-        "utups",
-        {"n_layers":2},
-        include_active_kappa=True,
-    )
-    
-    WF.run_wf_optimization_1step("bfgs", orbital_optimization=True, tol=1e-6, maxiter=5000)
-    # WF.run_wf_optimization_1step("slsqp", True)
-    print("Electronic energy")
-    print(WF.energy_elec_RDM)
-
-    print("thetas")
-    print(WF.thetas)
-    print("alpha mo_coeff")
-    print(WF.c_a_mo)
-    print("beta mo_coeff")
-    print(WF.c_b_mo)
-    print("# active orbs")
-    print(WF.num_active_orbs)
-    print("# inactive orbs")
-    print(WF.num_inactive_orbs)
-    print("one-electron alpha rdm")
-    print(WF.rdm1aa)
-    print("one-electron beta rdm")
-    print(WF.rdm1bb)
-
+    # h_core = mol.intor("int1e_kin") + mol.intor("int1e_nuc")
+    # g_eri = mol.intor("int2e")
 
 
 def molecule():
@@ -112,6 +131,6 @@ def molecule():
     charge = info[0][2]
     active_space = info[0][3]
 
-    get_wf_optimized_unrestricted(geometry=geometry, basis=basis, spin=spin, charge=charge, active_space=active_space, unit="angstrom")
+    get_ump2_nat_orb(geometry=geometry, basis=basis, spin=spin, charge=charge, active_space=active_space, unit="angstrom")
 
 molecule()
