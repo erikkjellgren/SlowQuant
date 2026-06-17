@@ -58,13 +58,9 @@ def fuccsd_test(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=
 
     np.random.seed(42)
     nye_vinkler_real = np.random.uniform(-0.05, 0.05, len(WF.thetas)).tolist()
-    # De imaginære vinkler skal bare være en liste med 10 nuller
     nye_vinkler_imag = [0.0] * len(WF.thetas)
-
-    # Fodr SlowQuant med begge lister
     WF.set_thetas(nye_vinkler_real, nye_vinkler_imag)
 
-    print("KONTROL - Nye reelle vinkler i WF:", WF.thetas_real)
     WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
     E_uccsd=WF._energy_elec
     # WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
@@ -116,19 +112,15 @@ def gtups_test(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=1
         mol,
         "gtups",
         False, #Do x2c
-        {"n_layers": 10, "is_spin_conserving" : False},
+        {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
     np.random.seed(42)
     nye_vinkler_real = np.random.uniform(-0.05, 0.05, len(WF.thetas)).tolist()
-    # De imaginære vinkler skal bare være en liste med 10 nuller
     nye_vinkler_imag = [0.0] * len(WF.thetas)
-
-    # Fodr SlowQuant med begge lister
     WF.set_thetas(nye_vinkler_real, nye_vinkler_imag)
 
-    print("KONTROL - Nye reelle vinkler i WF:", WF.thetas_real)
     WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
     # WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
 

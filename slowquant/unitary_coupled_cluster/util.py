@@ -770,7 +770,7 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
                 elif do_gtups:
-                    # First single
+                    # First single alpha alpha
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((2 * p, 2 * p + 2))
                     print(2 * p, 2 * p + 2)
@@ -778,6 +778,7 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
 
+                    # First single beta beta
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((2 * p + 1, 2 * p + 3))
                     print(2 * p + 1, 2 * p + 3)
@@ -785,6 +786,20 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
 
+                    # First single alpha beta cross added AE
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p, 2 * p + 3))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p + 1 , 2 * p + 2))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+
+                    
 
                 # Double
                 self.excitation_operator_type.append("double")
@@ -814,7 +829,7 @@ class UpsStructure:
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
-
+            
 
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((2 * p + 1, 2 * p + 3))
@@ -822,6 +837,20 @@ class UpsStructure:
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
+
+                    # First single alpha beta cross added AE
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p, 2 * p + 3))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p + 1 , 2 * p + 2))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+
             for p in range(1, num_active_orbs - 1, 2):  # second column of brick-wall
                 # QNP does not have this single
                 if do_tups:
@@ -843,6 +872,21 @@ class UpsStructure:
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((2 * p + 1, 2 * p + 3))
                     print(2 * p + 1, 2 * p + 3)
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+
+
+
+                    # First single alpha beta cross added AE
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p, 2 * p + 3))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p + 1 , 2 * p + 2))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
@@ -874,6 +918,19 @@ class UpsStructure:
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((2 * p + 1, 2 * p + 3))
                     print(2 * p + 1, 2 * p + 3)
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+
+                    # First single alpha beta cross added AE
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p, 2 * p + 3))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p + 1 , 2 * p + 2))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
