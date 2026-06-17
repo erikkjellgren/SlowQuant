@@ -727,26 +727,32 @@ class UpsStructure:
         num_active_orbs=num_active_spin_orbs//2
         print(num_active_orbs)
         # Options
-        valid_options = ("n_layers", "do_qnp", "skip_last_singles", "do_tups", "do_gtups", "do_gqnp", "is_spin_conserving")
+        valid_options = ("n_layers", "do_qnp", "skip_last_singles", "do_gtups", "do_tups", "do_gqnp", "is_spin_conserving")
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(f"Got unknown option for tUPS, {option}. Valid options are: {valid_options}")
         if "n_layers" not in ansatz_options.keys():
             raise ValueError("tUPS require the option 'n_layers'")
         n_layers = ansatz_options["n_layers"]
-        do_tups = False
-        do_qnp = False
-        # do_gtups = False
         if "do_tups" in ansatz_options.keys():
             do_tups = ansatz_options["do_tups"]
-        if "do_qnp" in ansatz_options.keys():
-            do_qnp = ansatz_options["do_qnp"]
+        else:
+            do_tups = False
         if "do_gtups" in ansatz_options.keys():
             do_gtups = ansatz_options["do_gtups"]
-
-        if sum((do_tups, do_qnp, do_gtups)) == 0:
+        else:
+            do_gtups = False
+        if "do_qnp" in ansatz_options.keys():
+            do_qnp = ansatz_options["do_qnp"]
+        else:
+            do_qnp = False
+        if "do_gqnp" in ansatz_options.keys():
+            do_gqnp = ansatz_options["do_gqnp"]
+        else:
+            do_gqnp = False
+        if sum((do_tups, do_qnp, do_gtups, do_gqnp)) == 0:
             raise ValueError("No tiled ansatz specified.")
-        elif sum((do_tups, do_qnp)) > 1:
+        elif sum((do_tups, do_qnp, do_gtups, do_gqnp)) > 1:
             raise ValueError("More than one tiled ansatz specfied.")
         if "skip_last_singles" in ansatz_options.keys():
             skip_last_singles = ansatz_options["skip_last_singles"]
@@ -754,7 +760,7 @@ class UpsStructure:
             skip_last_singles = False
         # Layer loop
         for n in range(n_layers):
-            for p in range(0, num_active_orbs -1,2):  # first column of brick-wall -1,2) AE
+            for p in range(0, num_active_orbs - 1, 2):  # first column of brick-wall
                 # QNP does not have this single
                 if do_tups:
                     # First single
@@ -763,14 +769,23 @@ class UpsStructure:
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
-                elif do_gtups: 
+                elif do_gtups:
                     # First single
                     self.excitation_operator_type.append("single")
-                    self.excitation_indices.append((p, p + 1))
-                    print(p, p+2)
+                    self.excitation_indices.append((2 * p, 2 * p + 2))
+                    print(2 * p, 2 * p + 2)
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
+
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p + 1, 2 * p + 3))
+                    print(2 * p + 1, 2 * p + 3)
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+
+
                 # Double
                 self.excitation_operator_type.append("double")
                 self.excitation_indices.append((2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3))
@@ -778,6 +793,7 @@ class UpsStructure:
                 self.grad_param_R[f"p{self.n_params:09d}"] = 2
                 self.param_names.append(f"p{self.n_params:09d}")
                 self.n_params += 1
+
                 # Second single
                 if n + 1 == n_layers and skip_last_singles and num_active_orbs == 2:
                     # Special case for two orbital.
@@ -790,6 +806,22 @@ class UpsStructure:
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
+                elif do_gtups or do_gqnp:
+                    # First single
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p, 2 * p + 2))
+                    print(2 * p, 2 * p + 2)
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+
+
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p + 1, 2 * p + 3))
+                    print(2 * p + 1, 2 * p + 3)
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
             for p in range(1, num_active_orbs - 1, 2):  # second column of brick-wall
                 # QNP does not have this single
                 if do_tups:
@@ -799,9 +831,25 @@ class UpsStructure:
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
+                elif do_gtups:
+                    # First single
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p, 2 * p + 2))
+                    print(2 * p, 2 * p + 2)
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p + 1, 2 * p + 3))
+                    print(2 * p + 1, 2 * p + 3)
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
                 # Double
                 self.excitation_operator_type.append("double")
                 self.excitation_indices.append((2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3))
+                print(2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3)
                 self.grad_param_R[f"p{self.n_params:09d}"] = 2
                 self.param_names.append(f"p{self.n_params:09d}")
                 self.n_params += 1
@@ -812,6 +860,21 @@ class UpsStructure:
                     self.excitation_operator_type.append("sa_single")
                     self.excitation_indices.append((p, p + 1))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+                elif do_gtups or do_gqnp:
+                    # First single
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p, 2 * p + 2))
+                    print(2 * p, 2 * p + 2)
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p + 1, 2 * p + 3))
+                    print(2 * p + 1, 2 * p + 3)
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
 
@@ -955,7 +1018,7 @@ class UpsStructure:
                 for a, i in iterate_t1(occ_spin_idx, unocc_spin_idx, is_spin_conserving=is_spin_conserving):
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((i, a))
-                    print(i,a)
+                    # print(i,a)
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
@@ -986,7 +1049,7 @@ class UpsStructure:
                 ):
                     self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i, j, a, b))
-                    print((i, j, a, b))
+                    # print((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
