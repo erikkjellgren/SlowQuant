@@ -262,7 +262,7 @@ class WaveFunctionCircuit:
         self._rdm3 = None
         self._rdm4 = None
         self._energy_elec = None
-        self.QI.parameters = parameters
+        self.QI.parameters = parameters.copy()
 
     def change_primitive(self, primitive: BaseSamplerV1 | BaseSamplerV2, verbose: bool = True) -> None:
         """Change the primitive expectation value calculator.

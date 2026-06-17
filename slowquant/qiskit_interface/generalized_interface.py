@@ -128,15 +128,17 @@ class QuantumInterface:
         self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
         self._M_shots = None  # define a separate number of shots for M
 
-    def construct_circuit(self, occ_spin_idx, unocc_spin_idx, num_orbs: int, num_elec: tuple[int, int]) -> None:
+    def construct_circuit(self, occ_spin_idx, unocc_spin_idx, num_spin_orbs: int, num_elec: tuple[int, int]) -> None:
         """Construct qiskit circuit.
 
         Args:
             num_orbs: Number of orbitals in spatial basis.
             num_elec: Number of electrons (alpha, beta).
         """
+        num_orbs = num_spin_orbs // 2
+
         self.num_orbs = num_orbs
-        self.num_spin_orbs = 2 * num_orbs
+        self.num_spin_orbs = num_spin_orbs
         self.num_elec = num_elec
         self.grad_param_R_r: dict[
             str, int
@@ -163,8 +165,10 @@ class QuantumInterface:
             for p in range(0, 2 * num_orbs):
                 if p % 2 == 0:
                     self.state_circuit.x(p)
+        #Relevant ??? Annika
         else:
             self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
+            #self.state_circuit = QuantumCircuit(num_spin_orbs)
         self.num_qubits = self.state_circuit.num_qubits
 
         # Ansatz Circuit
@@ -184,7 +188,7 @@ class QuantumInterface:
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R_r, self.grad_param_R_phi = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+            self.circuit, self.grad_param_R_r, self.grad_param_R_phi = fUCC(occ_spin_idx, unocc_spin_idx, num_orbs, self.num_elec, self.mapper, self.ansatz_options) #AE
         elif self.ansatz == "HF":
             if len(self.ansatz_options) != 0:
                 raise ValueError(f"No options available for HF got {self.ansatz_options}")
@@ -663,6 +667,8 @@ class QuantumInterface:
         else:
             run_parameters = custom_parameters
             save_paulis = False
+        
+        #print(run_parameters) # AWE print
 
         # Check if saving is requested
         if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)) and save_paulis:
