@@ -706,7 +706,7 @@ class UpsStructure:
         self.grad_param_R: dict[str, int] = {}
         self.param_names: list[str] = []
 
-    def create_tiled(self, num_active_orbs: int, ansatz_options: dict[str, Any]) -> None:
+    def create_tiled(self, num_active_spin_orbs: int, ansatz_options: dict[str, Any]) -> None:
         """Create tUPS ansatz.
 
         #. 10.1103/PhysRevResearch.6.023300 (tUPS)
@@ -724,8 +724,10 @@ class UpsStructure:
         Returns:
             tUPS ansatz.
         """
+        num_active_orbs=num_active_spin_orbs//2
+        print(num_active_orbs)
         # Options
-        valid_options = ("n_layers", "do_qnp", "skip_last_singles", "do_tups")
+        valid_options = ("n_layers", "do_qnp", "skip_last_singles", "do_tups", "do_gtups", "do_gqnp", "is_spin_conserving")
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(f"Got unknown option for tUPS, {option}. Valid options are: {valid_options}")
@@ -734,11 +736,15 @@ class UpsStructure:
         n_layers = ansatz_options["n_layers"]
         do_tups = False
         do_qnp = False
+        # do_gtups = False
         if "do_tups" in ansatz_options.keys():
             do_tups = ansatz_options["do_tups"]
         if "do_qnp" in ansatz_options.keys():
             do_qnp = ansatz_options["do_qnp"]
-        if sum((do_tups, do_qnp)) == 0:
+        if "do_gtups" in ansatz_options.keys():
+            do_gtups = ansatz_options["do_gtups"]
+
+        if sum((do_tups, do_qnp, do_gtups)) == 0:
             raise ValueError("No tiled ansatz specified.")
         elif sum((do_tups, do_qnp)) > 1:
             raise ValueError("More than one tiled ansatz specfied.")
@@ -748,7 +754,7 @@ class UpsStructure:
             skip_last_singles = False
         # Layer loop
         for n in range(n_layers):
-            for p in range(0, num_active_orbs - 1, 2):  # first column of brick-wall
+            for p in range(0, num_active_orbs -1,2):  # first column of brick-wall -1,2) AE
                 # QNP does not have this single
                 if do_tups:
                     # First single
@@ -757,9 +763,18 @@ class UpsStructure:
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
+                elif do_gtups: 
+                    # First single
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((p, p + 1))
+                    print(p, p+2)
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
                 # Double
                 self.excitation_operator_type.append("double")
                 self.excitation_indices.append((2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3))
+                print(2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3)
                 self.grad_param_R[f"p{self.n_params:09d}"] = 2
                 self.param_names.append(f"p{self.n_params:09d}")
                 self.n_params += 1
@@ -940,6 +955,7 @@ class UpsStructure:
                 for a, i in iterate_t1(occ_spin_idx, unocc_spin_idx, is_spin_conserving=is_spin_conserving):
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((i, a))
+                    print(i,a)
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
@@ -970,6 +986,7 @@ class UpsStructure:
                 ):
                     self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i, j, a, b))
+                    print((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
