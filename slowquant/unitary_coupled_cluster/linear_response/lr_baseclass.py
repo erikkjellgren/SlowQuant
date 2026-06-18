@@ -4,8 +4,6 @@ import scipy
 from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.operators import (
-    G1,
-    G2,
     G3,
     G4,
     G5,
@@ -20,9 +18,7 @@ from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.util import (
     UccStructure,
     UpsStructure,
-    iterate_t1,
     iterate_t1_sa,
-    iterate_t2,
     iterate_t2_sa,
     iterate_t3,
     iterate_t4,
@@ -38,7 +34,6 @@ class LinearResponseBaseClass:
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
-        do_spin_adapted: bool = True,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
@@ -66,20 +61,12 @@ class LinearResponseBaseClass:
         self.q_ops: list[FermionicOperator] = []
         excitations = excitations.lower()
 
-        if do_spin_adapted:
-            if "s" in excitations:
-                for a, i, _ in iterate_t1_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
-                    self.G_ops.append(G1_sa(i, a))
-            if "d" in excitations:
-                for a, i, b, j, _, op_type in iterate_t2_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
-                    self.G_ops.append(G2_sa(i, j, a, b, op_type))
-        else:
-            if "s" in excitations:
-                for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
-                    self.G_ops.append(G1(i, a))
-            if "d" in excitations:
-                for a, i, b, j in iterate_t2(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
-                    self.G_ops.append(G2(i, j, a, b))
+        if "s" in excitations:
+            for a, i, _ in iterate_t1_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
+                self.G_ops.append(G1_sa(i, a))
+        if "d" in excitations:
+            for a, i, b, j, _, op_type in iterate_t2_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
+                self.G_ops.append(G2_sa(i, j, a, b, op_type))
         if "t" in excitations:
             for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
                 self.G_ops.append(G3(i, j, k, a, b, c))
@@ -99,11 +86,7 @@ class LinearResponseBaseClass:
             ):
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
         for p, q in self.wf.kappa_no_activeactive_idx:
-            if do_spin_adapted or True:
-                self.q_ops.append(G1_sa(p, q))
-            else:
-                self.q_ops.append(G1(2 * p, 2 * q))
-                self.q_ops.append(G1(2 * p + 1, 2 * q + 1))
+            self.q_ops.append(G1_sa(p, q))
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters))
@@ -139,8 +122,8 @@ class LinearResponseBaseClass:
         print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
         if np.abs(np.min(hess_eigval)) < 10**-8:
             print("WARNING: Small eigenvalue in Hessian")
-        # elif np.min(hess_eigval) < 0:
-        #    raise ValueError("Negative eigenvalue in Hessian.")
+        elif np.min(hess_eigval) < 0:
+            raise ValueError("Negative eigenvalue in Hessian.")
 
         S = np.zeros((size * 2, size * 2))
         S[:size, :size] = self.Sigma

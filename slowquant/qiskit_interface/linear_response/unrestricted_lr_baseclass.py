@@ -4,13 +4,15 @@ import numpy as np
 import scipy
 
 from slowquant.qiskit_interface.unrestricted_circuit_wavefunction import UnrestrictedWaveFunctionCircuit
-from slowquant.unitary_coupled_cluster.unrestricted_operators import (
+from slowquant.unitary_coupled_cluster.operators import (
     G3,
     G4,
     G5,
     G6,
     G1_sa,
     G2_sa,
+)
+from slowquant.unitary_coupled_cluster.unrestricted_operators import (
     unrestricted_hamiltonian_0i_0a,
     unrestricted_hamiltonian_1i_1a,
 )
@@ -401,11 +403,8 @@ class quantumLRBaseClass:
 
         return norms
 
-    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_transition_dipole(self) -> np.ndarray:
         """Calculate transition dipole moment.
-
-        Args:
-            dipole_integrals: Dipole integrals (x,y,z) in AO basis.
 
         Returns:
             Transition dipole moments.

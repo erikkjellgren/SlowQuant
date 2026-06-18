@@ -1,5 +1,3 @@
-from collections.abc import Sequence
-
 import numpy as np
 
 from slowquant.molecularintegrals.integralfunctions import (
@@ -62,7 +60,7 @@ class LinearResponseUPS(LinearResponseBaseClass):
                 self.wf.rdm2bbaa,
             )
         # Man behøver ikke regne hele A, men det er bare lige nemt at gøre for qq
-        for i, q in enumerate(self.q_ops):
+        for i in range(len(self.q_ops)):
             if abs(A[i, i]) > 10**-6:  # whatever rimeligt threshold
                 finite_excitations.append(True)
             else:
@@ -529,17 +527,13 @@ class LinearResponseUPS(LinearResponseBaseClass):
         )  # Delta er defineret her fordi den ellers har forkert dimension i unrestricted_lr_baseclass.py
         print("efter", len(self.A))
 
-    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_transition_dipole(self) -> np.ndarray:
         """Calculate transition dipole moment.
-
-        Args:
-            dipole_integrals: Dipole integrals ordered as (x,y,z).
 
         Returns:
             Transition dipole moment.
         """
-        if len(dipole_integrals) != 3:
-            raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
+        dipole_integrals = self.wf.int_gen.electric_dipole
         number_excitations = len(self.excitation_energies)
         mux_aa = one_electron_integral_transform(self.wf.c_a_mo, dipole_integrals[0])
         mux_bb = one_electron_integral_transform(self.wf.c_b_mo, dipole_integrals[0])

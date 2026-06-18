@@ -5,6 +5,7 @@ from functools import partial
 from typing import Any
 
 import numpy as np
+import pyscf
 import scipy
 import scipy.optimize
 
@@ -13,7 +14,9 @@ from slowquant.molecularintegrals.integralfunctions import (
     two_electron_integral_transform,
     two_electron_integral_transform_split,
 )
+from slowquant.SlowQuant import SlowQuant
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
+from slowquant.unitary_coupled_cluster.integral_manager import IntegralManager
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     construct_ups_state,
     expectation_value,
@@ -51,11 +54,9 @@ from slowquant.unitary_coupled_cluster.util import (
 class UnrestrictedWaveFunctionUPS:
     def __init__(
         self,
-        num_elec: int,
         cas: tuple[tuple[int, int], int],
         mo_coeffs: tuple[np.ndarray, np.ndarray],
-        h_ao: np.ndarray,
-        g_ao: np.ndarray,
+        integral_generator: SlowQuant | pyscf.gto.mole.Mole,
         ansatz: str,
         ansatz_options: dict[str, Any] | None = None,
         include_active_kappa: bool = False,
@@ -63,12 +64,10 @@ class UnrestrictedWaveFunctionUPS:
         """Initialize for UPS wave function.
 
         Args:
-            num_elec: Number of electrons.
-            cas: CAS(num_active_elec, num_active_orbs),
-                 orbitals are counted in spatial basis. (det her skal rettes til unrestricted)
+            cas: CAS((num_active_alpha, num_active_beta), num_active_orbs),
+                 orbitals are counted in spatial basis.
             mo_coeffs: Initial orbital coefficients. (der skal være to set, alpha og beta)
-            h_ao: One-electron integrals in AO for Hamiltonian.
-            g_ao: Two-electron integrals in AO.
+            integral_generator: Integral generator object.
             ansatz: Name of ansatz.
             ansatz_options: Ansatz options.
             include_active_kappa: Include active-active orbital rotations.
@@ -81,10 +80,9 @@ class UnrestrictedWaveFunctionUPS:
             raise ValueError(
                 "Number of electrons in the active space must be specified as a tuple of (alpha, beta)."
             )
+        self.int_gen = IntegralManager(integral_generator)
         self._c_a_mo = mo_coeffs[0]
         self._c_b_mo = mo_coeffs[1]
-        self.h_ao = h_ao
-        self.g_ao = g_ao
         self.inactive_spin_idx = []
         self.virtual_spin_idx = []
         self.active_spin_idx = []
@@ -96,18 +94,17 @@ class UnrestrictedWaveFunctionUPS:
         self.active_idx_shifted = []
         self.active_occ_idx_shifted = []
         self.active_unocc_idx_shifted = []
-        self.num_elec = num_elec
-        self.num_elec_alpha = (num_elec - np.sum(cas[0])) // 2 + cas[0][0]
-        self.num_elec_beta = (num_elec - np.sum(cas[0])) // 2 + cas[0][1]
-        self.num_spin_orbs = 2 * len(h_ao)
-        self.num_orbs = len(h_ao)
+        self.num_spin_orbs = 2 * len(self.int_gen.kinetic_energy)
+        self.num_orbs = len(self.int_gen.kinetic_energy)
         self._include_active_kappa = include_active_kappa
         self.num_active_elec_alpha = cas[0][0]
         self.num_active_elec_beta = cas[0][1]
         self.num_active_elec = self.num_active_elec_alpha + self.num_active_elec_beta
         self.num_active_spin_orbs = 2 * cas[1]
-        self.num_inactive_spin_orbs = self.num_elec - self.num_active_elec
-        self.num_virtual_spin_orbs = 2 * len(h_ao) - self.num_inactive_spin_orbs - self.num_active_spin_orbs
+        self.num_inactive_spin_orbs = self.int_gen.num_elec - self.num_active_elec
+        self.num_virtual_spin_orbs = (
+            self.num_spin_orbs - self.num_inactive_spin_orbs - self.num_active_spin_orbs
+        )
         self._rdm1aa = None
         self._rdm1bb = None
         self._rdm2aaaa = None
@@ -120,7 +117,12 @@ class UnrestrictedWaveFunctionUPS:
         self._gbbbb_mo = None
         self._gaabb_mo = None
         self._gbbaa_mo = None
+        self._energy_elec: float | None = None
         self.ansatz_options = ansatz_options
+        self.num_energy_evals = 0
+        # Used when converting to circuit wavefunction.
+        self._include_active_kappa = include_active_kappa
+        # Construct spin orbital spaces and indices
         self.inactive_spin_idx = [x for x in range(self.num_inactive_spin_orbs)]
         self.active_spin_idx = [x + self.num_inactive_spin_orbs for x in range(self.num_active_spin_orbs)]
         self.virtual_spin_idx = [
@@ -270,99 +272,55 @@ class UnrestrictedWaveFunctionUPS:
         print("hf_det", hf_det)
         self.csf_coeffs[self.ci_info.det2idx[hf_det]] = 1
         self.ci_coeffs = np.copy(self.csf_coeffs)
+        # Construct UPS Structure
         self.ups_layout = UpsStructure()
-        if ansatz.lower() == "utups":
-            self.ansatz_options["do_utups"] = True
+        if ansatz.lower() in ("utups", "uqnp"):
+            if ansatz.lower() == "utups":
+                self.ansatz_options["do_utups"] = True
+            elif ansatz.lower() == "uqnp":
+                self.ansatz_options["do_uqnp"] = True
             self.ups_layout.create_tiled(self.num_active_orbs, self.ansatz_options)
-        elif ansatz.lower() == "uqnp":
-            self.ansatz_options["do_uqnp"] = True
-            self.ups_layout.create_tiled(self.num_active_orbs, self.ansatz_options)
-        elif ansatz.lower() == "fuccsd":
+        elif ansatz.lower() in (
+            "fucc",
+            "fuccsd",
+            "ksafupccgsd",
+            "fuccpd",
+            "safuccsd",
+            "fuccsdt",
+            "fuccsdtq",
+            "fuccsdtq5",
+            "fuccsdtq56",
+        ):
+            if ansatz.lower() == "fuccsd":
+                self.ansatz_options["S"] = True
+                self.ansatz_options["D"] = True
+            elif ansatz.lower() == "fuccd":
+                self.ansatz_options["D"] = True
+            elif ansatz.lower() == "fuccsdt":
+                self.ansatz_options["S"] = True
+                self.ansatz_options["D"] = True
+                self.ansatz_options["T"] = True
+            elif ansatz.lower() == "fuccsdtq":
+                self.ansatz_options["S"] = True
+                self.ansatz_options["D"] = True
+                self.ansatz_options["T"] = True
+                self.ansatz_options["Q"] = True
+            elif ansatz.lower() == "fuccsdtq5":
+                self.ansatz_options["S"] = True
+                self.ansatz_options["D"] = True
+                self.ansatz_options["T"] = True
+                self.ansatz_options["Q"] = True
+                self.ansatz_options["5"] = True
+            elif ansatz.lower() == "fuccsdtq56":
+                self.ansatz_options["S"] = True
+                self.ansatz_options["D"] = True
+                self.ansatz_options["T"] = True
+                self.ansatz_options["Q"] = True
+                self.ansatz_options["5"] = True
+                self.ansatz_options["6"] = True
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.ansatz_options["S"] = True
-            self.ansatz_options["D"] = True
-            self.ups_layout.create_fUCC(
-                self.active_occ_idx_shifted,
-                self.active_unocc_idx_shifted,
-                self.active_occ_spin_idx_shifted,
-                self.active_unocc_spin_idx_shifted,
-                self.num_active_orbs,
-                self.ansatz_options,
-            )
-        elif ansatz.lower() == "fuccd":
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            # self.ansatz_options["S"] = True
-            self.ansatz_options["D"] = True
-            self.ups_layout.create_fUCC(
-                self.active_occ_idx_shifted,
-                self.active_unocc_idx_shifted,
-                self.active_occ_spin_idx_shifted,
-                self.active_unocc_spin_idx_shifted,
-                self.num_active_orbs,
-                self.ansatz_options,
-            )  # husk det her har jeg selv sat ind!!!
-        elif ansatz.lower() == "fuccsdt":
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.ansatz_options["S"] = True
-            self.ansatz_options["D"] = True
-            self.ansatz_options["T"] = True
-            self.ups_layout.create_fUCC(
-                self.active_occ_idx_shifted,
-                self.active_unocc_idx_shifted,
-                self.active_occ_spin_idx_shifted,
-                self.active_unocc_spin_idx_shifted,
-                self.num_active_orbs,
-                self.ansatz_options,
-            )
-        elif ansatz.lower() == "fuccsdtq":
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.ansatz_options["S"] = True
-            self.ansatz_options["D"] = True
-            self.ansatz_options["T"] = True
-            self.ansatz_options["Q"] = True
-            self.ups_layout.create_fUCC(
-                self.active_occ_idx_shifted,
-                self.active_unocc_idx_shifted,
-                self.active_occ_spin_idx_shifted,
-                self.active_unocc_spin_idx_shifted,
-                self.num_active_orbs,
-                self.ansatz_options,
-            )
-        elif ansatz.lower() == "fuccsdtq5":
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.ansatz_options["S"] = True
-            self.ansatz_options["D"] = True
-            self.ansatz_options["T"] = True
-            self.ansatz_options["Q"] = True
-            self.ansatz_options["5"] = True
-            self.ups_layout.create_fUCC(
-                self.active_occ_idx_shifted,
-                self.active_unocc_idx_shifted,
-                self.active_occ_spin_idx_shifted,
-                self.active_unocc_spin_idx_shifted,
-                self.num_active_orbs,
-                self.ansatz_options,
-            )
-        elif ansatz.lower() == "fuccsdtq56":
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.ansatz_options["S"] = True
-            self.ansatz_options["D"] = True
-            self.ansatz_options["T"] = True
-            self.ansatz_options["Q"] = True
-            self.ansatz_options["5"] = True
-            self.ansatz_options["6"] = True
             self.ups_layout.create_fUCC(
                 self.active_occ_idx_shifted,
                 self.active_unocc_idx_shifted,
@@ -509,7 +467,7 @@ class UnrestrictedWaveFunctionUPS:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._haa_mo is None:
-            self._haa_mo = one_electron_integral_transform(self.c_a_mo, self.h_ao)
+            self._haa_mo = one_electron_integral_transform(self.c_a_mo, self.int_gen.h_ao)
         return self._haa_mo
 
     @property
@@ -520,7 +478,7 @@ class UnrestrictedWaveFunctionUPS:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._hbb_mo is None:
-            self._hbb_mo = one_electron_integral_transform(self.c_b_mo, self.h_ao)
+            self._hbb_mo = one_electron_integral_transform(self.c_b_mo, self.int_gen.h_ao)
         return self._hbb_mo
 
     @property
@@ -540,7 +498,9 @@ class UnrestrictedWaveFunctionUPS:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._gaaaa_mo is None:
-            self._gaaaa_mo = two_electron_integral_transform(self.c_a_mo, self.g_ao)
+            self._gaaaa_mo = two_electron_integral_transform(
+                self.c_a_mo, self.int_gen.electron_electron_repulsion
+            )
         return self._gaaaa_mo
 
     @property
@@ -551,7 +511,9 @@ class UnrestrictedWaveFunctionUPS:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._gbbbb_mo is None:
-            self._gbbbb_mo = two_electron_integral_transform(self.c_b_mo, self.g_ao)
+            self._gbbbb_mo = two_electron_integral_transform(
+                self.c_b_mo, self.int_gen.electron_electron_repulsion
+            )
         return self._gbbbb_mo
 
     @property
@@ -562,7 +524,9 @@ class UnrestrictedWaveFunctionUPS:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._gaabb_mo is None:
-            self._gaabb_mo = two_electron_integral_transform_split(self.c_a_mo, self.c_b_mo, self.g_ao)
+            self._gaabb_mo = two_electron_integral_transform_split(
+                self.c_a_mo, self.c_b_mo, self.int_gen.electron_electron_repulsion
+            )
         return self._gaabb_mo
 
     @property
@@ -573,7 +537,9 @@ class UnrestrictedWaveFunctionUPS:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._gbbaa_mo is None:
-            self._gbbaa_mo = two_electron_integral_transform_split(self.c_b_mo, self.c_a_mo, self.g_ao)
+            self._gbbaa_mo = two_electron_integral_transform_split(
+                self.c_b_mo, self.c_a_mo, self.int_gen.electron_electron_repulsion
+            )
         return self._gbbaa_mo
 
     @property

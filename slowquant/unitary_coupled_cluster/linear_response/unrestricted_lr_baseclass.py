@@ -1,5 +1,3 @@
-from collections.abc import Sequence
-
 import numpy as np
 import scipy
 import scipy.linalg as la
@@ -87,7 +85,7 @@ class LinearResponseBaseClass:
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
         q_list_a = []
         q_list_b = []
-        for idx, (i, a) in enumerate(self.wf.kappa_no_activeactive_idx):
+        for i, a in self.wf.kappa_no_activeactive_idx:
             op = G1(2 * i, 2 * a)
             q_list_a.append(op)
             op = G1(2 * i + 1, 2 * a + 1)
@@ -242,30 +240,24 @@ class LinearResponseBaseClass:
 
         return norms
 
-    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_transition_dipole(self) -> np.ndarray:
         """Calculate transition dipole moment.
-
-        Args:
-            dipole_integrals: Dipole integrals (x,y,z) in AO basis.
 
         Returns:
             Transition dipole moment.
         """
         raise NotImplementedError
 
-    def get_oscillator_strength(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_oscillator_strength(self) -> np.ndarray:
         r"""Calculate oscillator strength.
 
         .. math::
             f_n = \frac{2}{3}e_n\left|\left<0\left|\hat{\mu}\right|n\right>\right|^2
 
-        Args:
-            dipole_integrals: Dipole integrals (x,y,z) in AO basis.
-
         Returns:
             Oscillator Strength.
         """
-        transition_dipoles = self.get_transition_dipole(dipole_integrals)
+        transition_dipoles = self.get_transition_dipole()
         osc_strs = np.zeros(len(transition_dipoles))
         for idx, (excitation_energy, transition_dipole) in enumerate(
             zip(self.excitation_energies, transition_dipoles)

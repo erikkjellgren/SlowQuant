@@ -19,11 +19,9 @@ def test_ups_oh() -> None:
     mf.kernel()
 
     WF = UnrestrictedWaveFunctionUPS(
-        mol.nelectron,
         ((2, 1), 3),
         mf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         ansatz="fuccsdt",
     )
     WF.run_wf_optimization_1step("SLSQP", True)
@@ -43,11 +41,9 @@ def test_utups_oh_with_oo() -> None:
     mf.kernel()
 
     WF = UnrestrictedWaveFunctionUPS(
-        mol.nelectron,
         ((2, 1), 3),
         mf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         ansatz="utups",
         ansatz_options={"n_layers": 2},
         include_active_kappa=True,
@@ -70,11 +66,9 @@ def test_utups_oh_without_oo() -> None:
     mf.kernel()
 
     WF = UnrestrictedWaveFunctionUPS(
-        mol.nelectron,
         ((2, 1), 3),
         mf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         ansatz="utups",
         ansatz_options={"n_layers": 2},
         include_active_kappa=True,
@@ -97,11 +91,9 @@ def test_hfc_oh() -> None:
     mf.kernel()
 
     WF = UnrestrictedWaveFunctionUPS(
-        mol.nelectron,
         ((2, 1), 3),
         mf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         ansatz="utups",
         ansatz_options={"n_layers": 2},
         include_active_kappa=True,
@@ -115,13 +107,12 @@ def test_hfc_oh() -> None:
         elif atom == "O":
             g_k = -1.89379 * (2 / 5)
         else:
-            print(f"No nuclear g-value is found for atom: {atom}")
+            raise ValueError(f"No nuclear g-value is found for atom: {atom}")
         return g_k
 
     a_iso = []
     spin = 1
     for atom in mol._atom:
-        atom_name = atom[0]
         amp_basis = mol.eval_gto("GTOval_sph", coords=[atom[1]])[0]
         mo_basis_a = amp_basis @ WF.c_a_mo
         mo_basis_b = amp_basis @ WF.c_b_mo

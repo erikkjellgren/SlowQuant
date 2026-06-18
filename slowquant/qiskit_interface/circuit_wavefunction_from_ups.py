@@ -9,7 +9,9 @@ from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from slowquant.qiskit_interface.circuit_wavefunction import WaveFunctionCircuit
 from slowquant.qiskit_interface.interface import QuantumInterface
 from slowquant.qiskit_interface.sa_circuit_wavefunction import WaveFunctionSACircuit
+from slowquant.qiskit_interface.unrestricted_circuit_wavefunction import UnrestrictedWaveFunctionCircuit
 from slowquant.unitary_coupled_cluster.sa_ups_wavefunction import WaveFunctionSAUPS
+from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
 
@@ -25,7 +27,7 @@ def circuit_wavefunction_from_ups(
     do_M_ansatz0: bool = False,
     do_M_ansatz0_plus: bool = False,
     do_postselection: bool = False,
-) -> WaveFunctionCircuit | WaveFunctionSACircuit:
+) -> WaveFunctionCircuit | WaveFunctionSACircuit | UnrestrictedWaveFunctionCircuit:
     """Convert UPS wavefunction to circuit wavefunction.
 
     Args:
@@ -79,5 +81,15 @@ def circuit_wavefunction_from_ups(
         )
         sawf.thetas = ups_wf.thetas
         return sawf
+    elif isinstance(ups_wf, UnrestrictedWaveFunctionUPS):
+        uwf = UnrestrictedWaveFunctionCircuit(
+            ((ups_wf.num_active_elec_alpha, ups_wf.num_active_elec_beta), ups_wf.num_active_orbs),
+            ups_wf.c_mo,
+            ups_wf.int_gen.int_obj,
+            QI,
+            include_active_kappa=ups_wf._include_active_kappa,
+        )
+        uwf.thetas = ups_wf.thetas
+        return uwf
     else:
         raise TypeError(f"Got unknown wavefunction type: {type(ups_wf)}")

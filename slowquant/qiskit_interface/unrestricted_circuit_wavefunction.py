@@ -2,6 +2,7 @@ import time
 from functools import partial
 
 import numpy as np
+import pyscf
 import scipy
 from qiskit import QuantumCircuit
 from qiskit.primitives import (
@@ -18,7 +19,9 @@ from slowquant.molecularintegrals.integralfunctions import (
     two_electron_integral_transform_split,
 )
 from slowquant.qiskit_interface.interface import QuantumInterface
+from slowquant.SlowQuant import SlowQuant
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
+from slowquant.unitary_coupled_cluster.integral_manager import IntegralManager
 from slowquant.unitary_coupled_cluster.operators import a_op
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.unrestricted_density_matrix import (
@@ -33,19 +36,16 @@ from slowquant.unitary_coupled_cluster.unrestricted_operators import (
 class UnrestrictedWaveFunctionCircuit:
     def __init__(
         self,
-        num_elec: int,
         cas: tuple[tuple[int, int], int],
         mo_coeffs: np.ndarray,
-        h_ao: np.ndarray,
-        g_ao: np.ndarray,
+        integral_generator: SlowQuant | pyscf.gto.mole.Mole,
         quantum_interface: QuantumInterface,
         include_active_kappa: bool = False,
     ) -> None:
         """Initialize for UCC wave function.
 
         Args:
-            num_elec: Number of electrons.
-            cas: CAS(num_active_elec, num_active_orbs),
+            cas: CAS((num_active_elec_alpha, num_active_elec_beta), num_active_orbs),
                  orbitals are counted in spatial basis.
             mo_coeffs: Initial orbital coefficients.
             h_ao: One-electron integrals in AO for Hamiltonian.
@@ -63,10 +63,9 @@ class UnrestrictedWaveFunctionCircuit:
             print(
                 "WARNING: A QI with a custom Ansatz was passed. VQE will only work with COBYLA and COBYQA optimizer."
             )
+        self.int_gen = IntegralManager(integral_generator)
         self._c_a_mo = mo_coeffs[0]
         self._c_b_mo = mo_coeffs[1]
-        self.h_ao = h_ao
-        self.g_ao = g_ao
         self.inactive_spin_idx = []
         self.virtual_spin_idx = []
         self.active_spin_idx = []
@@ -78,18 +77,17 @@ class UnrestrictedWaveFunctionCircuit:
         self.active_idx_shifted = []
         self.active_occ_idx_shifted = []
         self.active_unocc_idx_shifted = []
-        self.num_elec = num_elec
-        self.num_elec_alpha = (num_elec - np.sum(cas[0])) // 2 + cas[0][0]
-        self.num_elec_beta = (num_elec - np.sum(cas[0])) // 2 + cas[0][1]
-        self.num_spin_orbs = 2 * len(h_ao)
-        self.num_orbs = len(h_ao)
+        self.num_spin_orbs = 2 * len(self.int_gen.kinetic_energy)
+        self.num_orbs = len(self.int_gen.kinetic_energy)
         self._include_active_kappa = include_active_kappa
         self.num_active_elec_alpha = cas[0][0]
         self.num_active_elec_beta = cas[0][1]
         self.num_active_elec = self.num_active_elec_alpha + self.num_active_elec_beta
         self.num_active_spin_orbs = 2 * cas[1]
-        self.num_inactive_spin_orbs = self.num_elec - self.num_active_elec
-        self.num_virtual_spin_orbs = 2 * len(h_ao) - self.num_inactive_spin_orbs - self.num_active_spin_orbs
+        self.num_inactive_spin_orbs = self.int_gen.num_elec - self.num_active_elec
+        self.num_virtual_spin_orbs = (
+            self.num_spin_orbs - self.num_inactive_spin_orbs - self.num_active_spin_orbs
+        )
         self._rdm1aa = None
         self._rdm1bb = None
         self._rdm2aaaa = None
@@ -354,7 +352,7 @@ class UnrestrictedWaveFunctionCircuit:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._haa_mo is None:
-            self._haa_mo = one_electron_integral_transform(self.c_a_mo, self.h_ao)
+            self._haa_mo = one_electron_integral_transform(self.c_a_mo, self.int_gen.h_ao)
         return self._haa_mo
 
     @property
@@ -365,7 +363,7 @@ class UnrestrictedWaveFunctionCircuit:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._hbb_mo is None:
-            self._hbb_mo = one_electron_integral_transform(self.c_b_mo, self.h_ao)
+            self._hbb_mo = one_electron_integral_transform(self.c_b_mo, self.int_gen.h_ao)
         return self._hbb_mo
 
     @property
@@ -385,7 +383,9 @@ class UnrestrictedWaveFunctionCircuit:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._gaaaa_mo is None:
-            self._gaaaa_mo = two_electron_integral_transform(self.c_a_mo, self.g_ao)
+            self._gaaaa_mo = two_electron_integral_transform(
+                self.c_a_mo, self.int_gen.electron_electron_repulsion
+            )
         return self._gaaaa_mo
 
     @property
@@ -396,7 +396,9 @@ class UnrestrictedWaveFunctionCircuit:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._gbbbb_mo is None:
-            self._gbbbb_mo = two_electron_integral_transform(self.c_b_mo, self.g_ao)
+            self._gbbbb_mo = two_electron_integral_transform(
+                self.c_b_mo, self.int_gen.electron_electron_repulsion
+            )
         return self._gbbbb_mo
 
     @property
@@ -407,7 +409,9 @@ class UnrestrictedWaveFunctionCircuit:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._gaabb_mo is None:
-            self._gaabb_mo = two_electron_integral_transform_split(self.c_a_mo, self.c_b_mo, self.g_ao)
+            self._gaabb_mo = two_electron_integral_transform_split(
+                self.c_a_mo, self.c_b_mo, self.int_gen.electron_electron_repulsion
+            )
         return self._gaabb_mo
 
     @property
@@ -418,7 +422,9 @@ class UnrestrictedWaveFunctionCircuit:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._gbbaa_mo is None:
-            self._gbbaa_mo = two_electron_integral_transform_split(self.c_b_mo, self.c_a_mo, self.g_ao)
+            self._gbbaa_mo = two_electron_integral_transform_split(
+                self.c_b_mo, self.c_a_mo, self.int_gen.electron_electron_repulsion
+            )
         return self._gbbaa_mo
 
     @property
@@ -477,7 +483,12 @@ class UnrestrictedWaveFunctionCircuit:
     def _reconstruct_circuit(self) -> None:
         """Construct circuit again."""
         self.QI.construct_circuit(
-            self.num_active_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta)
+            self.active_occ_idx_shifted,
+            self.active_unocc_idx_shifted,
+            self.active_occ_spin_idx_shifted,
+            self.active_unocc_spin_idx_shifted,
+            self.num_active_orbs,
+            (self.num_active_elec_alpha, self.num_active_elec_beta),
         )
 
     def _calculate_rdm1(self, spin) -> np.ndarray:
