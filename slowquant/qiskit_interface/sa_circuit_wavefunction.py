@@ -72,7 +72,6 @@ class WaveFunctionSACircuit:
         self.active_idx_shifted = []
         self.active_occ_idx_shifted = []
         self.active_unocc_idx_shifted = []
-        self.num_elec = self.int_gen.num_elec
         self.num_spin_orbs = 2 * len(self.int_gen.kinetic_energy)
         self.num_orbs = len(self.int_gen.kinetic_energy)
         self.num_active_elec = cas[0]

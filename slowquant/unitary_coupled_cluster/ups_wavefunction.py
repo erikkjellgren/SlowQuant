@@ -44,6 +44,7 @@ class WaveFunctionUPS:
         ansatz: str,
         ansatz_options: dict[str, Any] | None = None,
         include_active_kappa: bool = False,
+        potfile: str = "",
     ) -> None:
         """Initialize for UPS wave function.
 
@@ -55,13 +56,14 @@ class WaveFunctionUPS:
             ansatz: Name of ansatz.
             ansatz_options: Ansatz options.
             include_active_kappa: Include active-active orbital rotations.
+            potfile: Polarizable embedding potential file.
         """
         if ansatz_options is None:
             ansatz_options = {}
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
         # Init stuff
-        self.int_gen = IntegralManager(integral_generator)
+        self.int_gen = IntegralManager(integral_generator, potfile=potfile)
         self._c_mo = mo_coeffs
         self.inactive_spin_idx = []
         self.virtual_spin_idx = []
@@ -83,6 +85,7 @@ class WaveFunctionUPS:
         self._rdm1 = None
         self._rdm2 = None
         self._h_mo = None
+        self._v_PE_induction_mo = None
         self._g_mo = None
         self._energy_elec: float | None = None
         self.ansatz_options = ansatz_options
@@ -310,6 +313,7 @@ class WaveFunctionUPS:
         self._rdm4 = None
         self._energy_elec = None
         self._thetas = theta_vals.copy()
+        self._v_PE_induction_mo = None
         self.ci_coeffs = construct_ups_state(
             self.csf_coeffs,
             self.ci_info,
@@ -345,7 +349,22 @@ class WaveFunctionUPS:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._h_mo is None:
+            self._v_PE_induction_mo = None
             self._h_mo = one_electron_integral_transform(self.c_mo, self.int_gen.h_ao)
+        if self.int_gen.PE:
+            if self.int_gen.PE.polarizabilities is not None:
+                if self._v_PE_induction_mo is None:
+                    # need to recompute density for induction operator
+                    mo_occ = self.c_mo[:, 0 : self.num_inactive_orbs]
+                    rdm1_ao = 2.0 * mo_occ @ mo_occ.T
+                    mo_cas = self.c_mo[
+                        :, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs
+                    ]
+                    rdm1_ao += mo_cas @ self.rdm1 @ mo_cas.T
+                    v_PE_induction_ao = self.int_gen.v_PE_induction_ao(rdm1_ao)
+                    self.int_gen.PE.v_PE_induction_trace = np.dot(v_PE_induction_ao.ravel(), rdm1_ao.ravel())
+                    self._v_PE_induction_mo = one_electron_integral_transform(self.c_mo, v_PE_induction_ao)
+                return self._h_mo + self._v_PE_induction_mo
         return self._h_mo
 
     @property
@@ -734,6 +753,11 @@ class WaveFunctionUPS:
                 self.ci_coeffs,
                 self.ci_info,
             )
+            if self.int_gen.PE:
+                if self.int_gen.PE.polarizabilities is not None:
+                    self._energy_elec += (
+                        self.int_gen.PE.polarization_energy - self.int_gen.PE.v_PE_induction_trace
+                    )
         return self._energy_elec
 
     def _get_hamiltonian(self, qiskit_form: bool = False) -> FermionicOperator | dict[str, float]:
@@ -1005,6 +1029,9 @@ class WaveFunctionUPS:
                 self.ci_coeffs,
                 self.ci_info,
             )
+        if self.int_gen.PE:
+            if self.int_gen.PE.polarizabilities is not None:
+                E += self.int_gen.PE.polarization_energy - self.int_gen.PE.v_PE_induction_trace
         self._E_opt_old = E
         self._old_opt_parameters = np.copy(parameters)
         self.num_energy_evals += 1  # count one measurement
@@ -1110,6 +1137,10 @@ class WaveFunctionUPS:
         Returns:
             Electronic energies for all shifted thetas.
         """
+        if self.int_gen.PE:
+            # The RotoSolve energy needs the self.int_gen.PE.polarization_energy - self.int_gen.PE.v_PE_induction_trace
+            # contribution, which does not come easily with the current implementation?
+            raise ValueError("RotoSolve is not implemented with PE.")
         # copy of parameters
         thetas_local = np.asarray(parameters)
 
