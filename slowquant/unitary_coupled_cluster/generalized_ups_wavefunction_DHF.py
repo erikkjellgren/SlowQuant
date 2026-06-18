@@ -207,6 +207,9 @@ class GeneralizedWaveFunctionUPS:
         self.kappa_no_activeactive_spin_idx_resp = []
         self.kappa_no_activeactive_spin_idx_dagger_resp = []
 
+        self.kappa_no_activeactive_spin_idx_ep = [] # Positronic
+        self.kappa_no_activeactive_spin_idx_ep_dagger = [] # Positronic
+
         self._kappa_real_redundant = []
         self._kappa_imag_redundant = []
         self.kappa_redundant_spin_idx = []
@@ -280,14 +283,15 @@ class GeneralizedWaveFunctionUPS:
                         self.kappa_no_activeactive_spin_idx_resp.append((P, Q))
                         self.kappa_no_activeactive_spin_idx_dagger_resp.append((Q, P))
 
-                    if P in self.positronic_spin_idx and Q not in self.positronic_spin_idx:
-                        if Q not in self.virtual_spin_idx:
-                            self.kappa_no_activeactive_spin_idx_resp.append((Q, P)) # positronic included, Which one is dagger?
-                            self.kappa_no_activeactive_spin_idx_dagger_resp.append((P, Q))
-
-                    if P not in self.positronic_spin_idx and Q not in self.positronic_spin_idx:
                         self.kappa_no_activeactive_spin_idx.append((P, Q))
                         self.kappa_no_activeactive_spin_idx_dagger.append((Q, P))
+
+                    if P in self.positronic_spin_idx and Q in self.active_spin_idx:
+                        self.kappa_no_activeactive_spin_idx_resp.append((Q, P)) # positronic included, Which one is dagger?
+                        self.kappa_no_activeactive_spin_idx_dagger_resp.append((P, Q))
+
+                        self.kappa_no_activeactive_spin_idx_ep.append((P, Q))
+                        self.kappa_no_activeactive_spin_idx_ep_dagger.append((Q, P))
 
 
                 if P < self.num_spin_orbs_NES and Q >= self.num_spin_orbs_NES and Q not in self.virtual_spin_idx: # Positronic

@@ -688,6 +688,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     
     # print(E_tester_post)
 
+    # print(WF.kappa_no_activeactive_spin_idx_resp)
+
     LR = generalized_naive_DHF.LinearResponse(WF, excitations="S")
 
     LR.calc_excitation_energies()
