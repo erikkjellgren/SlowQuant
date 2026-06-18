@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import os
 import time
 from collections.abc import Sequence
 from functools import partial
 
 import numpy as np
+import pyscf
 import scipy
 import scipy.sparse as ss
 
@@ -13,11 +13,13 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
 )
+from slowquant.SlowQuant import SlowQuant
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
 from slowquant.unitary_coupled_cluster.density_matrix import (
     get_electronic_energy,
     get_orbital_gradient,
 )
+from slowquant.unitary_coupled_cluster.integral_manager import IntegralManager
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     build_operator_matrix,
     construct_ucc_state,
@@ -33,32 +35,27 @@ from slowquant.unitary_coupled_cluster.util import UccStructure
 class WaveFunctionUCC:
     def __init__(
         self,
-        num_elec: int,
         cas: Sequence[int],
         mo_coeffs: np.ndarray,
-        h_ao: np.ndarray,
-        g_ao: np.ndarray,
+        integral_generator: SlowQuant | pyscf.gto.mole.Mole,
         excitations: str,
         include_active_kappa: bool = False,
     ) -> None:
         """Initialize for UCC wave function.
 
         Args:
-            num_elec: Number of electrons.
             cas: CAS(num_active_elec, num_active_orbs),
                  orbitals are counted in spatial basis.
             mo_coeffs: Initial orbital coefficients.
-            h_ao: One-electron integrals in AO for Hamiltonian.
-            g_ao: Two-electron integrals in AO.
+            integral_generator: Integral generator object.
             excitations: Unitary coupled cluster excitation operators.
             include_active_kappa: Include active-active orbital rotations.
         """
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
         # Init stuff
+        self.int_gen = IntegralManager(integral_generator)
         self._c_mo = mo_coeffs
-        self._h_ao = h_ao
-        self._g_ao = g_ao
         self.inactive_spin_idx = []
         self.virtual_spin_idx = []
         self.active_spin_idx = []
@@ -70,11 +67,8 @@ class WaveFunctionUCC:
         self.active_idx_shifted = []
         self.active_occ_idx_shifted = []
         self.active_unocc_idx_shifted = []
-        self.num_elec = num_elec
-        self.num_elec_alpha = num_elec // 2
-        self.num_elec_beta = num_elec // 2
-        self.num_spin_orbs = 2 * len(h_ao)
-        self.num_orbs = len(h_ao)
+        self.num_spin_orbs = 2 * len(self.int_gen.kinetic_energy)
+        self.num_orbs = len(self.int_gen.kinetic_energy)
         self._include_active_kappa = include_active_kappa
         self.num_active_elec = 0
         self.num_active_spin_orbs = 0
@@ -90,6 +84,7 @@ class WaveFunctionUCC:
         # Construct spin orbital spaces and indices
         active_space = []
         orbital_counter = 0
+        num_elec = self.int_gen.num_elec
         for i in range(num_elec - cas[0], num_elec):
             active_space.append(i)
             orbital_counter += 1
@@ -157,10 +152,10 @@ class WaveFunctionUCC:
                 self.active_unocc_idx_shifted.append(active_idx - active_shift)
         # Find non-redundant kappas
         self._kappa = []
-        self.kappa_idx = []
-        self.kappa_no_activeactive_idx = []
-        self.kappa_no_activeactive_idx_dagger = []
-        self.kappa_redundant_idx = []
+        kappa_idx = []
+        kappa_no_activeactive_idx = []
+        kappa_no_activeactive_idx_dagger = []
+        kappa_redundant_idx = []
         self._kappa_old = []
         # kappa can be optimized in spatial basis
         # Loop over all q>p orb combinations and find redundant kappas
@@ -168,32 +163,37 @@ class WaveFunctionUCC:
             for q in range(p + 1, self.num_orbs):
                 # find redundant kappas
                 if p in self.inactive_idx and q in self.inactive_idx:
-                    self.kappa_redundant_idx.append((p, q))
+                    kappa_redundant_idx.append((p, q))
                     continue
                 if p in self.virtual_idx and q in self.virtual_idx:
-                    self.kappa_redundant_idx.append((p, q))
+                    kappa_redundant_idx.append((p, q))
                     continue
                 if not include_active_kappa:
                     if p in self.active_idx and q in self.active_idx:
-                        self.kappa_redundant_idx.append((p, q))
+                        kappa_redundant_idx.append((p, q))
                         continue
                 if not (p in self.active_idx and q in self.active_idx):
-                    self.kappa_no_activeactive_idx.append((p, q))
-                    self.kappa_no_activeactive_idx_dagger.append((q, p))
+                    kappa_no_activeactive_idx.append((p, q))
+                    kappa_no_activeactive_idx_dagger.append((q, p))
                 # the rest is non-redundant
                 self._kappa.append(0.0)
                 self._kappa_old.append(0.0)
-                self.kappa_idx.append((p, q))
+                kappa_idx.append((p, q))
         # HF like orbital rotation indices
-        self.kappa_hf_like_idx = []
+        kappa_hf_like_idx = []
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
                 if p in self.inactive_idx and q in self.virtual_idx:
-                    self.kappa_hf_like_idx.append((p, q))
+                    kappa_hf_like_idx.append((p, q))
                 elif p in self.inactive_idx and q in self.active_unocc_idx:
-                    self.kappa_hf_like_idx.append((p, q))
+                    kappa_hf_like_idx.append((p, q))
                 elif p in self.active_occ_idx and q in self.virtual_idx:
-                    self.kappa_hf_like_idx.append((p, q))
+                    kappa_hf_like_idx.append((p, q))
+        self.kappa_idx = np.array(kappa_idx, dtype=int)
+        self.kappa_no_activeactive_idx = np.array(kappa_no_activeactive_idx, dtype=int)
+        self.kappa_no_activeactive_idx_dagger = np.array(kappa_no_activeactive_idx_dagger, dtype=int)
+        self.kappa_redundant_idx = np.array(kappa_redundant_idx, dtype=int)
+        self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
         # Construct determinant basis
         self.ci_info = get_indexing(
             self.num_inactive_orbs,
@@ -229,29 +229,6 @@ class WaveFunctionUCC:
                 self.active_occ_spin_idx_shifted, self.active_unocc_spin_idx_shifted
             )
         self._thetas = np.zeros(self.ucc_layout.n_params).tolist()
-
-    def save_wavefunction(self, filename: str, force_overwrite: bool = False) -> None:
-        """Save the wave function to a compressed NumPy object.
-
-        Args:
-            filename: Filename of compressed NumPy object without file extension.
-            force_overwrite: Overwrite file if it already exists.
-        """
-        if os.path.exists(f"{filename}.npz") and not force_overwrite:
-            raise ValueError(f"{filename}.npz already exists and force_overwrite is False.")
-        np.savez_compressed(
-            f"{filename}.npz",
-            thetas=self.thetas,
-            c_mo=self.c_mo,
-            h_ao=self._h_ao,
-            g_ao=self._g_ao,
-            excitations=self._excitations,
-            num_elec=self.num_elec,
-            num_active_elec=self.num_active_elec,
-            num_active_orbs=self.num_active_orbs,
-            include_active_kappa=self._include_active_kappa,
-            energy_elec=self.energy_elec,
-        )
 
     @property
     def kappa(self) -> list[float]:
@@ -343,7 +320,9 @@ class WaveFunctionUCC:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._h_mo is None:
-            self._h_mo = one_electron_integral_transform(self.c_mo, self._h_ao)
+            self._h_mo = one_electron_integral_transform(
+                self.c_mo, self.int_gen.kinetic_energy + self.int_gen.nuclear_electron_attraction
+            )
         return self._h_mo
 
     @property
@@ -354,7 +333,7 @@ class WaveFunctionUCC:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._g_mo is None:
-            self._g_mo = two_electron_integral_transform(self.c_mo, self._g_ao)
+            self._g_mo = two_electron_integral_transform(self.c_mo, self.int_gen.electron_electron_repulsion)
         return self._g_mo
 
     @property
@@ -1117,31 +1096,3 @@ class WaveFunctionUCC:
                 theta_params[i] -= step_size
                 gradient[i + num_kappa] = 2 * (E_plus - E) / step_size
         return gradient
-
-
-def load_wavefunction(filename: str) -> WaveFunctionUCC:
-    """Load wave function from a compressed NumPy object.
-
-    Args:
-        filename: Filename of compressed NumPy object without file extension.
-
-    Returns:
-        Wave function object.
-    """
-    dat = np.load(f"{filename}.npz")
-    wf = WaveFunctionUCC(
-        int(dat["num_elec"]),
-        (int(dat["num_active_elec"]), int(dat["num_active_orbs"])),
-        dat["c_mo"],
-        dat["h_ao"],
-        dat["g_ao"],
-        str(dat["excitations"]),
-        bool(dat["include_active_kappa"]),
-    )
-    wf.thetas = dat["thetas"]
-    if abs(wf.energy_elec - float(dat["energy_elec"])) > 10**-6:
-        raise ValueError(
-            f"Calculate energy is different from saved energy: {wf.energy_elec} and {float(dat['energy_elec'])}."
-        )
-    print(f"Electronic energy of loaded wave function is {wf.energy_elec}")
-    return wf

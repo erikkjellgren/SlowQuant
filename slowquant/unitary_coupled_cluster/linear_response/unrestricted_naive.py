@@ -82,8 +82,8 @@ class LinearResponseUPS(LinearResponseBaseClass):
                 finite_excitations.append(True)
             else:
                 finite_excitations.append(False)
-        self.G_ops_finite = sum(bool(x) for x in finite_excitations[len(self.q_ops):])
-        
+        self.G_ops_finite = sum(bool(x) for x in finite_excitations[len(self.q_ops) :])
+
         finite_excitations_idx = np.array(finite_excitations)
         idx_shift = len(self.q_ops)
         # G_shift = int(len(self.G_ops) / 2)
@@ -259,7 +259,7 @@ class LinearResponseUPS(LinearResponseBaseClass):
                     *self.index_info,
                 )
                 # print("val", val)
-                # quit()    
+                # quit()
                 self.A[i, j] = val
                 # make B
                 # <0| qd H qd |0>
@@ -321,7 +321,7 @@ class LinearResponseUPS(LinearResponseBaseClass):
                 self.Sigma[i, j] = val
         # print("A", self.A)
         # print("B", self.B)
-        # print("Sigma", self.Sigma)        
+        # print("Sigma", self.Sigma)
         """
         # End manual version
 
@@ -395,7 +395,7 @@ class LinearResponseUPS(LinearResponseBaseClass):
                         )
                     )
                     self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
-                    
+
         for j, GJ in enumerate(self.G_ops):
             GJH_ket = propagate_state([GJ], H00_ket, *self.index_info)
             GJdH_ket = propagate_state([GJ.dagger], H00_ket, *self.index_info)
@@ -528,6 +528,7 @@ class LinearResponseUPS(LinearResponseBaseClass):
             (len(self.Sigma), len(self.Sigma))
         )  # Delta er defineret her fordi den ellers har forkert dimension i unrestricted_lr_baseclass.py
         print("efter", len(self.A))
+
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
 
@@ -577,7 +578,8 @@ class LinearResponseUPS(LinearResponseBaseClass):
             transfer_op = FermionicOperator({})
             for i, G in enumerate(self.G_ops):
                 transfer_op += (
-                    self.Z_qG_normed[i+shift, state_number] * G.dagger + self.Y_qG_normed[i+shift, state_number] * G
+                    self.Z_qG_normed[i + shift, state_number] * G.dagger
+                    + self.Y_qG_normed[i + shift, state_number] * G
                 )
             q_part_x = 0.0
             q_part_y = 0.0

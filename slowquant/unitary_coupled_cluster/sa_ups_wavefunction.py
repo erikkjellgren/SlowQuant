@@ -6,16 +6,19 @@ from functools import partial
 from typing import Any
 
 import numpy as np
+import pyscf
 import scipy
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
 )
+from slowquant.SlowQuant import SlowQuant
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
 from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient,
 )
+from slowquant.unitary_coupled_cluster.integral_manager import IntegralManager
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     construct_ups_state_SA,
     expectation_value,
@@ -25,38 +28,20 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     propagate_unitary_SA,
 )
 from slowquant.unitary_coupled_cluster.operators import (
-    G1,
-    G2,
     Epq,
-    G1_sa,
-    G2_sa,
     hamiltonian_0i_0a,
     one_elec_op_0i_0a,
 )
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
-from slowquant.unitary_coupled_cluster.util import (
-    UpsStructure,
-    iterate_pair_t2,
-    iterate_pair_t2_generalized,
-    iterate_t1,
-    iterate_t1_generalized,
-    iterate_t1_sa,
-    iterate_t1_sa_generalized,
-    iterate_t2,
-    iterate_t2_generalized,
-    iterate_t2_sa,
-    iterate_t2_sa_generalized,
-)
+from slowquant.unitary_coupled_cluster.util import UpsStructure
 
 
 class WaveFunctionSAUPS:
     def __init__(
         self,
-        num_elec: int,
         cas: Sequence[int],
         mo_coeffs: np.ndarray,
-        h_ao: np.ndarray,
-        g_ao: np.ndarray,
+        integral_generator: SlowQuant | pyscf.gto.mole.Mole,
         states: tuple[list[list[float]], list[list[str]]],
         ansatz: str,
         ansatz_options: dict[str, Any] | None = None,
@@ -65,12 +50,10 @@ class WaveFunctionSAUPS:
         """Initialize for SA-UPS wave function.
 
         Args:
-            num_elec: Number of electrons.
             cas: CAS(num_active_elec, num_active_orbs),
                  orbitals are counted in spatial basis.
             mo_coeffs: Initial orbital coefficients.
-            h_ao: One-electron integrals in AO for Hamiltonian.
-            g_ao: Two-electron integrals in AO.
+            integral_generator: Integral generator object.
             states: States to include in the state-averaged expansion.
                     Tuple of lists containing weights and determinants.
                     Each state in SA can be constructed of several dets.
@@ -83,9 +66,8 @@ class WaveFunctionSAUPS:
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
         # Init stuff
+        self.int_gen = IntegralManager(integral_generator)
         self._c_mo = mo_coeffs
-        self._h_ao = h_ao
-        self._g_ao = g_ao
         self.inactive_spin_idx = []
         self.virtual_spin_idx = []
         self.active_spin_idx = []
@@ -97,11 +79,8 @@ class WaveFunctionSAUPS:
         self.active_idx_shifted = []
         self.active_occ_idx_shifted = []
         self.active_unocc_idx_shifted = []
-        self.num_elec = num_elec
-        self.num_elec_alpha = num_elec // 2
-        self.num_elec_beta = num_elec // 2
-        self.num_spin_orbs = 2 * len(h_ao)
-        self.num_orbs = len(h_ao)
+        self.num_spin_orbs = 2 * len(self.int_gen.kinetic_energy)
+        self.num_orbs = len(self.int_gen.kinetic_energy)
         self.num_active_elec = 0
         self.num_active_spin_orbs = 0
         self.num_inactive_spin_orbs = 0
@@ -114,9 +93,13 @@ class WaveFunctionSAUPS:
         self._state_energies = None
         self.ansatz_options = ansatz_options
         self.num_energy_evals = 0
+        # Used when converting to circuit wavefunction.
+        self._include_active_kappa = include_active_kappa
+        self._states = states
         # Construct spin orbital spaces and indices
         active_space = []
         orbital_counter = 0
+        num_elec = self.int_gen.num_elec
         for i in range(num_elec - cas[0], num_elec):
             active_space.append(i)
             orbital_counter += 1
@@ -184,9 +167,9 @@ class WaveFunctionSAUPS:
                 self.active_unocc_idx_shifted.append(active_idx - active_shift)
         # Find non-redundant kappas
         self._kappa = []
-        self.kappa_idx = []
-        self.kappa_idx_dagger = []
-        self.kappa_redundant_idx = []
+        kappa_idx = []
+        kappa_idx_dagger = []
+        kappa_redundant_idx = []
         self._kappa_old = []
         # kappa can be optimized in spatial basis
         # Loop over all q>p orb combinations and find redundant kappas
@@ -194,30 +177,34 @@ class WaveFunctionSAUPS:
             for q in range(p + 1, self.num_orbs):
                 # find redundant kappas
                 if p in self.inactive_idx and q in self.inactive_idx:
-                    self.kappa_redundant_idx.append((p, q))
+                    kappa_redundant_idx.append((p, q))
                     continue
                 if p in self.virtual_idx and q in self.virtual_idx:
-                    self.kappa_redundant_idx.append((p, q))
+                    kappa_redundant_idx.append((p, q))
                     continue
                 if not include_active_kappa:
                     if p in self.active_idx and q in self.active_idx:
-                        self.kappa_redundant_idx.append((p, q))
+                        kappa_redundant_idx.append((p, q))
                         continue
                 # the rest is non-redundant
                 self._kappa.append(0.0)
                 self._kappa_old.append(0.0)
-                self.kappa_idx.append((p, q))
-                self.kappa_idx_dagger.append((q, p))
+                kappa_idx.append((p, q))
+                kappa_idx_dagger.append((q, p))
         # HF like orbital rotation indices
-        self.kappa_hf_like_idx = []
+        kappa_hf_like_idx = []
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
                 if p in self.inactive_idx and q in self.virtual_idx:
-                    self.kappa_hf_like_idx.append((p, q))
+                    kappa_hf_like_idx.append((p, q))
                 elif p in self.inactive_idx and q in self.active_unocc_idx:
-                    self.kappa_hf_like_idx.append((p, q))
+                    kappa_hf_like_idx.append((p, q))
                 elif p in self.active_occ_idx and q in self.virtual_idx:
-                    self.kappa_hf_like_idx.append((p, q))
+                    kappa_hf_like_idx.append((p, q))
+        self.kappa_idx = np.array(kappa_idx, dtype=int)
+        self.kappa_idx_dagger = np.array(kappa_idx_dagger, dtype=int)
+        self.kappa_redundant_idx = np.array(kappa_redundant_idx, dtype=int)
+        self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
         # Construct determinant basis
         self.ci_info = get_indexing(
             self.num_inactive_orbs,
@@ -256,15 +243,22 @@ class WaveFunctionSAUPS:
                     )
         # Construct UPS Structure
         self.ups_layout = UpsStructure()
-        if ansatz.lower() == "tups":
-            self.ansatz_options["do_tups"] = True
+        if ansatz.lower() in ("tups", "qnp"):
+            if ansatz.lower() == "tups":
+                self.ansatz_options["do_tups"] = True
+            elif ansatz.lower() == "qnp":
+                self.ansatz_options["do_qnp"] = True
             self.ups_layout.create_tiled(self.num_active_orbs, self.ansatz_options)
-        elif ansatz.lower() == "qnp":
-            self.ansatz_options["do_qnp"] = True
-            self.ups_layout.create_tiled(self.num_active_orbs, self.ansatz_options)
-        elif ansatz.lower() == "ksafupccgsd":
-            self.ansatz_options["SAGS"] = True
-            self.ansatz_options["GpD"] = True
+        elif ansatz.lower() in ("fucc", "ksafupccgsd", "safuccsd"):
+            if ansatz.lower() == "ksafupccgsd":
+                self.ansatz_options["SAGS"] = True
+                self.ansatz_options["GpD"] = True
+            elif ansatz.lower() == "safuccsd":
+                self.ansatz_options["SAS"] = True
+                self.ansatz_options["SAD"] = True
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
             self.ups_layout.create_fUCC(
                 self.active_occ_idx_shifted,
                 self.active_unocc_idx_shifted,
@@ -275,14 +269,10 @@ class WaveFunctionSAUPS:
             )
         elif ansatz.lower() == "ksasdsfupccgsd":
             self.ansatz_options["GpD"] = True
-            self.ups_layout.create_SDSfUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        elif ansatz.lower() == "safuccsd":
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.ansatz_options["SAS"] = True
-            self.ansatz_options["SAD"] = True
-            self.ups_layout.create_fUCC(
+            self.ups_layout.create_SDSfUCC(
                 self.active_occ_idx_shifted,
                 self.active_unocc_idx_shifted,
                 self.active_occ_spin_idx_shifted,
@@ -290,14 +280,9 @@ class WaveFunctionSAUPS:
                 self.num_active_orbs,
                 self.ansatz_options,
             )
-        elif ansatz.lower() == "adapt":
-            None
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
-        if self.ups_layout.n_params == 0:
-            self._thetas = []
-        else:
-            self._thetas = np.zeros(self.ups_layout.n_params).tolist()
+        self._thetas = np.zeros(self.ups_layout.n_params).tolist()
 
     @property
     def kappa(self) -> list[float]:
@@ -391,7 +376,7 @@ class WaveFunctionSAUPS:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._h_mo is None:
-            self._h_mo = one_electron_integral_transform(self.c_mo, self._h_ao)
+            self._h_mo = one_electron_integral_transform(self.c_mo, self.int_gen.h_ao)
         return self._h_mo
 
     @property
@@ -402,7 +387,7 @@ class WaveFunctionSAUPS:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._g_mo is None:
-            self._g_mo = two_electron_integral_transform(self.c_mo, self._g_ao)
+            self._g_mo = two_electron_integral_transform(self.c_mo, self.int_gen.electron_electron_repulsion)
         return self._g_mo
 
     @property
@@ -654,7 +639,6 @@ class WaveFunctionSAUPS:
         orbital_optimization: bool = False,
         tol: float = 1e-10,
         maxiter: int = 1000,
-        is_silent: bool = False,
     ) -> None:
         """Run one step optimization of wave function.
 
@@ -663,22 +647,18 @@ class WaveFunctionSAUPS:
             orbital_optimization: Perform orbital optimization.
             tol: Convergence tolerance.
             maxiter: Maximum number of iterations.
-            is_silent: Toggle optimization print.
         """
-        if not is_silent:
-            print("### Parameters information:")
-            if orbital_optimization:
-                print(f"### Number kappa: {len(self.kappa)}")
-            print(f"### Number theta: {self.ups_layout.n_params}")
+        print("### Parameters information:")
+        if orbital_optimization:
+            print(f"### Number kappa: {len(self.kappa)}")
+        print(f"### Number theta: {self.ups_layout.n_params}")
         if optimizer_name.lower() == "rotosolve":
             if orbital_optimization and len(self.kappa) != 0:
                 raise ValueError(
                     "Cannot use RotoSolve together with orbital optimization in the one-step solver."
                 )
-        if not is_silent:
-            print(
-                "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
-            )
+
+        print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #")
         if orbital_optimization:
             if len(self.thetas) > 0:
                 energy = partial(
@@ -726,7 +706,6 @@ class WaveFunctionSAUPS:
             grad=gradient,
             maxiter=maxiter,
             tol=tol,
-            is_silent=is_silent,
             energy_eval_callback=lambda: self.num_energy_evals,
         )
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
@@ -754,151 +733,6 @@ class WaveFunctionSAUPS:
         # Subspace diagonalization
         self._do_state_ci()
         self._sa_energy = res.fun
-
-    def do_adapt(
-        self,
-        operator_pool: list[str],
-        maxiter: int = 1000,
-        grad_threshold: float = 1e-5,
-        orbital_optimization: bool = False,
-    ) -> None:
-        """Do ADAPT optimization.
-
-        The valid operator pool is,
-
-        - S, singles.
-        - D, doubles.
-        - pD, pair doubles.
-        - SAS, spin-adapted singles.
-        - SAD, spin-adapted doubles.
-        - GS, generalized singles.
-        - GD, generalized doubles.
-        - GpD, generalized pair doubles.
-        - SAGS, spin-adapted generalized singles.
-        - SAGD, spin-adapted generalized doubles.
-
-        Args:
-            operator_pool: Which operators to include in the ADAPT.
-            maxiter: Maximum iterations.
-            grad_threshold: Convergence threshold based on gradient.
-            orbital_optimization: Do orbital optimization.
-        """
-        excitation_pool: list[tuple[int, ...]] = []
-        excitation_pool_type = []
-        _operator_pool = [x.lower() for x in operator_pool]
-        valid_operators = ("sags", "sagd", "s", "d", "sas", "sad", "gs", "gd", "gpd", "pd")
-        for operator in _operator_pool:
-            if operator not in valid_operators:
-                raise ValueError(f"Got invalid operator for ADAPT, {operator}")
-        if "s" in _operator_pool:
-            for a, i in iterate_t1(self.active_occ_spin_idx_shifted, self.active_unocc_spin_idx_shifted):
-                excitation_pool.append((i, a))
-                excitation_pool_type.append("single")
-        if "d" in _operator_pool:
-            for a, i, b, j in iterate_t2(
-                self.active_occ_spin_idx_shifted, self.active_unocc_spin_idx_shifted
-            ):
-                excitation_pool.append((i, j, a, b))
-                excitation_pool_type.append("double")
-        if "gs" in _operator_pool:
-            for a, i in iterate_t1_generalized(self.num_active_spin_orbs):
-                excitation_pool.append((i, a))
-                excitation_pool_type.append("single")
-        if "gd" in _operator_pool:
-            for a, i, b, j in iterate_t2_generalized(self.num_active_spin_orbs):
-                excitation_pool.append((i, j, a, b))
-                excitation_pool_type.append("double")
-        if "pd" in _operator_pool:
-            for a, i, b, j in iterate_pair_t2(self.active_occ_idx_shifted, self.active_unocc_idx_shifted):
-                excitation_pool.append((i, j, a, b))
-                excitation_pool_type.append("double")
-        if "gpd" in _operator_pool:
-            for a, i, b, j in iterate_pair_t2_generalized(self.num_active_orbs):
-                excitation_pool.append((i, j, a, b))
-                excitation_pool_type.append("double")
-        if "sas" in _operator_pool:
-            for a, i, _ in iterate_t1_sa(self.active_occ_idx_shifted, self.active_unocc_idx_shifted):
-                excitation_pool.append((i, a))
-                excitation_pool_type.append("sa_single")
-        if "sad" in _operator_pool:
-            for a, i, b, j, _, op_case in iterate_t2_sa(
-                self.active_occ_idx_shifted, self.active_unocc_idx_shifted
-            ):
-                excitation_pool.append((i, j, a, b))
-                excitation_pool_type.append(f"sa_double_{op_case}")
-        if "sags" in _operator_pool:
-            for a, i, _ in iterate_t1_sa_generalized(self.num_active_orbs):
-                excitation_pool.append((i, a))
-                excitation_pool_type.append("sa_single")
-        if "sagd" in _operator_pool:
-            for a, i, b, j, _, op_case in iterate_t2_sa_generalized(self.num_active_orbs):
-                excitation_pool.append((i, j, a, b))
-                excitation_pool_type.append(f"sa_double_{op_case}")
-
-        print(
-            "Iteration # | Iteration time [s] | Electronic energy [Hartree] | max|grad| [Hartree] | Operator"
-        )
-        start = time.time()
-        for iteration in range(maxiter):
-            Hamiltonian = hamiltonian_0i_0a(
-                self.h_mo,
-                self.g_mo,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-            )
-            H_ket = propagate_state_SA(
-                [Hamiltonian],
-                self.ci_coeffs,
-                self.ci_info,
-            )
-            grad = []
-
-            for idx, exc_type in enumerate(excitation_pool_type):
-                if exc_type == "single":
-                    (i, a) = np.array(excitation_pool[idx])
-                    T = G1(i, a, True)
-                elif exc_type == "double":
-                    (i, j, a, b) = np.array(excitation_pool[idx])
-                    T = G2(i, j, a, b, True)
-                elif exc_type in ("sa_single",):
-                    (i, a) = np.array(excitation_pool[idx])
-                    T = G1_sa(i, a, True)
-                elif exc_type in ("sa_double_1",):
-                    (i, j, a, b) = np.array(excitation_pool[idx])
-                    T = G2_sa(i, j, a, b, 1, True)
-                elif exc_type in ("sa_double_2",):
-                    (i, j, a, b) = np.array(excitation_pool[idx])
-                    T = G2_sa(i, j, a, b, 2, True)
-                elif exc_type in ("sa_double_3",):
-                    (i, j, a, b) = np.array(excitation_pool[idx])
-                    T = G2_sa(i, j, a, b, 3, True)
-                elif exc_type in ("sa_double_4",):
-                    (i, j, a, b) = np.array(excitation_pool[idx])
-                    T = G2_sa(i, j, a, b, 4, True)
-                elif exc_type in ("sa_double_5",):
-                    (i, j, a, b) = np.array(excitation_pool[idx])
-                    T = G2_sa(i, j, a, b, 5, True)
-                else:
-                    raise ValueError(f"Got unknown excitation type {exc_type}")
-                gr = expectation_value_SA(self.ci_coeffs, [T], H_ket, self.ci_info, do_folding=False)
-                gr -= expectation_value_SA(H_ket, [T], self.ci_coeffs, self.ci_info, do_folding=False)
-                grad.append(gr)
-            if np.max(np.abs(grad)) < grad_threshold:
-                break
-            max_arg = np.argmax(np.abs(grad))
-            self.ups_layout.excitation_indices.append(excitation_pool[max_arg])
-            self.ups_layout.excitation_operator_type.append(excitation_pool_type[max_arg])
-            self.ups_layout.n_params += 1
-
-            self._thetas.append(0.0)
-            self.run_wf_optimization_1step("bfgs", orbital_optimization=orbital_optimization, is_silent=True)
-            time_str = f"{time.time() - start:7.2f}"
-            e_str = f"{self.sa_energy:3.12f}"
-            grad_str = f"{np.abs(grad[max_arg]):3.12f}"
-            print(
-                f"{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {grad_str.center(19)} | {excitation_pool_type[max_arg]}{tuple([int(x) for x in excitation_pool[max_arg]])}"
-            )
-            start = time.time()
 
     def _do_state_ci(self) -> None:
         r"""Do subspace diagonalisation.
@@ -994,18 +828,16 @@ class WaveFunctionSAUPS:
             transition_property[i] = self._state_ci_coeffs[:, i + 1] @ state_op @ self._state_ci_coeffs[:, 0]
         return transition_property
 
-    def get_oscillator_strenghts(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_oscillator_strenghts(self) -> np.ndarray:
         r"""Get oscillator strengths between ground state and excited states.
 
         .. math::
             f_n = \frac{2}{3}\varepsilon_n\left|\left<0\left|\hat{\boldsymbol{\mu}}\right|n\right>\right|^2
 
-        Args:
-            dipole_integrals: Dipole integrals in AO basis.
-
         Returns:
             Oscillator strengths.
         """
+        dipole_integrals = self.int_gen.electric_dipole
         transition_dipole_x = self.get_transition_property(dipole_integrals[0])
         transition_dipole_y = self.get_transition_property(dipole_integrals[1])
         transition_dipole_z = self.get_transition_property(dipole_integrals[2])

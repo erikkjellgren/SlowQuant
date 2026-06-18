@@ -69,13 +69,34 @@ def apply_operator_serial(
     This part is outside of propagate_state for performance reasons,
     i.e., Numba JIT.
 
+    The algorithm applies an annihilation string to a start determinant to generate a new determinant.
+    This is performed in two step.
 
+    Step 1)
+    First it is checked if the operator will generate the kill-state.
+    This is done by 'bitwise and' with the determinant and annihilation part of the operator,
+    and, 'bitwise and' with the determinant and creation part of the operator.
+    Note here, that the creation indices that also exist in the annihilation part,
+    are assumed to be screened out, this is how number operators are handled.
+
+    Step 2)
+    Second, for all determiant that does not end up in kill-state,
+    loop through the annihilation string,
+    and do a bitflip on the determiant for the given index, and, calculate the phase change.
+    No need to check for kill-state in this step, as that is handled by the first step.
+
+    Note on do_unsafe)
+    For some algorithms it is guaranteed that the application of operators will always
+    keep the new determinants within a pre-defined space (in det2idx and idx2det).
+    For these algorithms it is a sign of bug if a keyerror when calling det2idx is found.
+    These algorithms thus does also not need to check for the exsistence of the new determinant in det2idx.
+    For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
 
     Args:
         state: Original state.
         a_string: Creation and annihilation operator indices.
         create_screen: Creation operator indices without indices in anni_idx.
-        anni_idxs: Indices for annihilation operators.
+        anni_idx: Indices for annihilation operators.
         num_active_orbs: Number of active spatial orbitals.
         parity_check: Array used to check the parity when an operator is applied.
         idx2det: Maps index to determinant.
@@ -108,12 +129,6 @@ def apply_operator_serial(
             det = det ^ (1 << (num_spin_orbs_m1 - orb_idx))
             phase_changes += bitcount(det & parity_check[orb_idx])
         if do_unsafe:
-            # For some algorithms it is guaranteed that the application of operators will always
-            # keep the new determinants within a pre-defined space (in det2idx and idx2det).
-            # For these algorithms it is a sign of bug if a keyerror when calling det2idx is found.
-            # These algorithms thus does also not need to check for the exsistence of the new determinant
-            # in det2idx.
-            # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
             if det not in det2idx:
                 continue
         sign = 1.0 - 2.0 * (phase_changes & 1)
@@ -140,10 +155,34 @@ def apply_operator_threaded(
     This part is outside of propagate_state for performance reasons,
     i.e., Numba JIT.
 
+    The algorithm removes an annihilation string to a target determinant to generate a new determinant.
+    This is performed in two step.
+
+    Step 1)
+    First it is checked if the operator will generate the kill-state.
+    This is done by 'bitwise and' with the determinant and annihilation part of the operator,
+    and, 'bitwise and' with the determinant and creation part of the operator.
+    Note here, that the annihilation indices that also exist in the creation part,
+    are assumed to be screened out, this is how number operators are handled.
+
+    Step 2)
+    Second, for all determiant that does not end up in kill-state,
+    loop through the annihilation string,
+    and do a bitflip on the determiant for the given index, and, calculate the phase change.
+    No need to check for kill-state in this step, as that is handled by the first step.
+
+    Note on do_unsafe)
+    For some algorithms it is guaranteed that the application of operators will always
+    keep the new determinants within a pre-defined space (in det2idx and idx2det).
+    For these algorithms it is a sign of bug if a keyerror when calling det2idx is found.
+    These algorithms thus does also not need to check for the exsistence of the new determinant in det2idx.
+    For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
+
     Args:
         state: Original state.
-        anni_idxs: Indicies for annihilation operators.
-        create_idxs: Indicies for creation operators.
+        a_string: Creation and annihilation operator indices.
+        create_idx: Creation operator indices.
+        anni_screen: Annihilation operator indices without indices in create_idx.
         num_active_orbs: Number of active spatial orbitals.
         parity_check: Array used to check the parity when an operator is applied.
         idx2det: Maps index to determinant.
@@ -159,9 +198,6 @@ def apply_operator_threaded(
     create_mask = 0
     for orb_idx in create_idx:
         create_mask |= 1 << (num_spin_orbs_m1 - orb_idx)
-    # Uses anni_screen instead of anni_idx, because anni_screen
-    # has no overlap in indices with create_idx.
-    # This is how number operators are handled.
     anni_mask = 0
     for orb_idx in anni_screen:
         anni_mask |= 1 << (num_spin_orbs_m1 - orb_idx)
@@ -176,12 +212,6 @@ def apply_operator_threaded(
             det = det ^ (1 << (num_spin_orbs_m1 - orb_idx))
             phase_changes += bitcount(det & parity_check[orb_idx])
         if do_unsafe:
-            # For some algorithms it is guaranteed that the application of operators will always
-            # keep the new determinants within a pre-defined space (in det2idx and idx2det).
-            # For these algorithms it is a sign of bug if a keyerror when calling det2idx is found.
-            # These algorithms thus does also not need to check for the exsistence of the new determinant
-            # in det2idx.
-            # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
             if det not in det2idx:
                 continue
         sign = 1.0 - 2.0 * (phase_changes & 1)
@@ -207,10 +237,13 @@ def add_operator_matrix(
     This part is outside of propagate_state for performance reasons,
     i.e., Numba JIT.
 
+    See 'apply_operator_serial' for algorithmic description.
+
     Args:
         op_mat: Matrix representation of operator.
-        anni_idxs: Indicies for annihilation operators.
-        create_idxs: Indicies for creation operators.
+        a_string: Creation and annihilation operator indices.
+        create_screen: Creation operator indices without indices in anni_idx.
+        anni_idx: Indices for annihilation operators.
         num_active_orbs: Number of active spatial orbitals.
         parity_check: Array used to check the parity when an operator is applied.
         idx2det: Maps index to determinant.
@@ -239,12 +272,6 @@ def add_operator_matrix(
             det = det ^ (1 << (num_spin_orbs_m1 - orb_idx))
             phase_changes += bitcount(det & parity_check[orb_idx])
         if do_unsafe:
-            # For some algorithms it is guaranteed that the application of operators will always
-            # keep the new determinants within a pre-defined space (in det2idx and idx2det).
-            # For these algorithms it is a sign of bug if a keyerror when calling det2idx is found.
-            # These algorithms thus does also not need to check for the exsistence of the new determinant
-            # in det2idx.
-            # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
             if det not in det2idx:
                 continue
         sign = 1.0 - 2.0 * (phase_changes & 1)
@@ -271,10 +298,13 @@ def apply_operator_SA_serial(
     This part is outside of propagate_state for performance reasons,
     i.e., Numba JIT.
 
+    See 'apply_operator_serial' for algorithmic description.
+
     Args:
         state: Original state.
-        anni_idxs: Indicies for annihilation operators.
-        create_idxs: Indicies for creation operators.
+        a_string: Creation and annihilation operator indices.
+        create_screen: Creation operator indices without indices in anni_idx.
+        anni_idx: Indices for annihilation operators.
         num_active_orbs: Number of active spatial orbitals.
         parity_check: Array used to check the parity when an operator is applied.
         idx2det: Maps index to determinant.
@@ -311,12 +341,6 @@ def apply_operator_SA_serial(
             det = det ^ (1 << (num_spin_orbs_m1 - orb_idx))
             phase_changes += bitcount(det & parity_check[orb_idx])
         if do_unsafe:
-            # For some algorithms it is guaranteed that the application of operators will always
-            # keep the new determinants within a pre-defined space (in det2idx and idx2det).
-            # For these algorithms it is a sign of bug if a keyerror when calling det2idx is found.
-            # These algorithms thus does also not need to check for the exsistence of the new determinant
-            # in det2idx.
-            # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
             if det not in det2idx:
                 continue
         sign = 1.0 - 2.0 * (phase_changes & 1)
@@ -343,10 +367,13 @@ def apply_operator_SA_threaded(
     This part is outside of propagate_state for performance reasons,
     i.e., Numba JIT.
 
+    See 'apply_operator_threaded' for algorithmic description.
+
     Args:
         state: Original state.
-        anni_idxs: Indicies for annihilation operators.
-        create_idxs: Indicies for creation operators.
+        a_string: Creation and annihilation operator indices.
+        create_idx: Creation operator indices.
+        anni_screen: Annihilation operator indices without indices in create_idx.
         num_active_orbs: Number of active spatial orbitals.
         parity_check: Array used to check the parity when an operator is applied.
         idx2det: Maps index to determinant.
@@ -362,9 +389,6 @@ def apply_operator_SA_threaded(
     create_mask = 0
     for orb_idx in create_idx:
         create_mask |= 1 << (num_spin_orbs_m1 - orb_idx)
-    # Uses anni_screen instead of anni_idx, because anni_screen
-    # has no overlap in indices with create_idx.
-    # This is how number operators are handled.
     anni_mask = 0
     for orb_idx in anni_screen:
         anni_mask |= 1 << (num_spin_orbs_m1 - orb_idx)
@@ -379,12 +403,6 @@ def apply_operator_SA_threaded(
             det = det ^ (1 << (num_spin_orbs_m1 - orb_idx))
             phase_changes += bitcount(det & parity_check[orb_idx])
         if do_unsafe:
-            # For some algorithms it is guaranteed that the application of operators will always
-            # keep the new determinants within a pre-defined space (in det2idx and idx2det).
-            # For these algorithms it is a sign of bug if a keyerror when calling det2idx is found.
-            # These algorithms thus does also not need to check for the exsistence of the new determinant
-            # in det2idx.
-            # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
             if det not in det2idx:
                 continue
         sign = 1.0 - 2.0 * (phase_changes & 1)
@@ -1022,7 +1040,7 @@ def construct_ups_state(
                     do_folding=False,
                 )
             )
-        elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
+        elif exc_type in ("single", "double", "sa_double_1"):
             # Create T matrix
             if exc_type == "single":
                 (i, a) = np.array(exc_indices) + 2 * offset
@@ -1030,18 +1048,6 @@ def construct_ups_state(
             elif exc_type == "double":
                 (i, j, a, b) = np.array(exc_indices) + 2 * offset
                 T = G2(i, j, a, b, True)
-            elif exc_type == "triple":
-                (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
-                T = G3(i, j, k, a, b, c, True)
-            elif exc_type == "quadruple":
-                (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
-                T = G4(i, j, k, l, a, b, c, d, True)
-            elif exc_type == "quintuple":
-                (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + 2 * offset
-                T = G5(i, j, k, l, m, a, b, c, d, e, True)
-            elif exc_type == "sextuple":
-                (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + 2 * offset
-                T = G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
             elif exc_type == "sa_double_1":
                 (i, j, a, b) = np.array(exc_indices) + offset
                 T = G2_sa(i, j, a, b, 1, True)
@@ -1474,7 +1480,7 @@ def construct_ups_state_SA(
                     do_folding=False,
                 )
             )
-        elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
+        elif exc_type in ("single", "double", "sa_double_1"):
             # Create T matrix
             if exc_type == "single":
                 (i, a) = np.array(exc_indices) + 2 * offset
@@ -1482,18 +1488,6 @@ def construct_ups_state_SA(
             elif exc_type == "double":
                 (i, j, a, b) = np.array(exc_indices) + 2 * offset
                 T = G2(i, j, a, b, True)
-            elif exc_type == "triple":
-                (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
-                T = G3(i, j, k, a, b, c, True)
-            elif exc_type == "quadruple":
-                (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
-                T = G4(i, j, k, l, a, b, c, d, True)
-            elif exc_type == "quintuple":
-                (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + 2 * offset
-                T = G5(i, j, k, l, m, a, b, c, d, e, True)
-            elif exc_type == "sextuple":
-                (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + 2 * offset
-                T = G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
             elif exc_type == "sa_double_1":
                 (i, j, a, b) = np.array(exc_indices) + offset
                 T = G2_sa(i, j, a, b, 1, True)
@@ -1916,7 +1910,7 @@ def propagate_unitary(
                 do_folding=False,
             )
         )
-    elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
+    elif exc_type in ("single", "double", "sa_double_1"):
         # Create T matrix
         if exc_type == "single":
             (i, a) = np.array(exc_indices) + 2 * offset
@@ -1924,18 +1918,6 @@ def propagate_unitary(
         elif exc_type == "double":
             (i, j, a, b) = np.array(exc_indices) + 2 * offset
             T = G2(i, j, a, b, True)
-        elif exc_type == "triple":
-            (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
-            T = G3(i, j, k, a, b, c, True)
-        elif exc_type == "quadruple":
-            (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
-            T = G4(i, j, k, l, a, b, c, d, True)
-        elif exc_type == "quintuple":
-            (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + 2 * offset
-            T = G5(i, j, k, l, m, a, b, c, d, e, True)
-        elif exc_type == "sextuple":
-            (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + 2 * offset
-            T = G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
         elif exc_type == "sa_double_1":
             (i, j, a, b) = np.array(exc_indices) + offset
             T = G2_sa(i, j, a, b, 1, True)
@@ -2361,7 +2343,7 @@ def propagate_unitary_SA(
                 do_folding=False,
             )
         )
-    elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
+    elif exc_type in ("single", "double", "sa_double_1"):
         # Create T matrix
         if exc_type == "single":
             (i, a) = np.array(exc_indices) + 2 * offset
@@ -2369,18 +2351,6 @@ def propagate_unitary_SA(
         elif exc_type == "double":
             (i, j, a, b) = np.array(exc_indices) + 2 * offset
             T = G2(i, j, a, b, True)
-        elif exc_type == "triple":
-            (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
-            T = G3(i, j, k, a, b, c, True)
-        elif exc_type == "quadruple":
-            (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
-            T = G4(i, j, k, l, a, b, c, d, True)
-        elif exc_type == "quintuple":
-            (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + 2 * offset
-            T = G5(i, j, k, l, m, a, b, c, d, e, True)
-        elif exc_type == "sextuple":
-            (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + 2 * offset
-            T = G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
         elif exc_type == "sa_double_1":
             (i, j, a, b) = np.array(exc_indices) + offset
             T = G2_sa(i, j, a, b, 1, True)
@@ -2789,10 +2759,6 @@ def get_grad_action(
     elif exc_type in (
         "single",
         "double",
-        "triple",
-        "quadruple",
-        "quintuple",
-        "sextuple",
         "sa_double_1",
         "sa_double_2",
         "sa_double_3",
@@ -2806,18 +2772,6 @@ def get_grad_action(
         elif exc_type == "double":
             (i, j, a, b) = np.array(exc_indices) + 2 * offset
             T = G2(i, j, a, b, True)
-        elif exc_type == "triple":
-            (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
-            T = G3(i, j, k, a, b, c, True)
-        elif exc_type == "quadruple":
-            (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
-            T = G4(i, j, k, l, a, b, c, d, True)
-        elif exc_type == "quintuple":
-            (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + 2 * offset
-            T = G5(i, j, k, l, m, a, b, c, d, e, True)
-        elif exc_type == "sextuple":
-            (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + 2 * offset
-            T = G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
         elif exc_type == "sa_double_1":
             (i, j, a, b) = np.array(exc_indices) + offset
             T = G2_sa(i, j, a, b, 1, True)
@@ -2900,10 +2854,6 @@ def get_grad_action_SA(
     elif exc_type in (
         "single",
         "double",
-        "triple",
-        "quadruple",
-        "quintuple",
-        "sextuple",
         "sa_double_1",
         "sa_double_2",
         "sa_double_3",
@@ -2917,18 +2867,6 @@ def get_grad_action_SA(
         elif exc_type == "double":
             (i, j, a, b) = np.array(exc_indices) + 2 * offset
             T = G2(i, j, a, b, True)
-        elif exc_type == "triple":
-            (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
-            T = G3(i, j, k, a, b, c, True)
-        elif exc_type == "quadruple":
-            (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
-            T = G4(i, j, k, l, a, b, c, d, True)
-        elif exc_type == "quintuple":
-            (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + 2 * offset
-            T = G5(i, j, k, l, m, a, b, c, d, e, True)
-        elif exc_type == "sextuple":
-            (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + 2 * offset
-            T = G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
         elif exc_type == "sa_double_1":
             (i, j, a, b) = np.array(exc_indices) + offset
             T = G2_sa(i, j, a, b, 1, True)

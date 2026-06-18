@@ -1,8 +1,6 @@
 from collections.abc import Generator, Sequence
 from typing import Any
 
-import numpy as np
-
 
 def iterate_t1_sa(
     active_occ_idx: Sequence[int],
@@ -89,9 +87,9 @@ def iterate_t2_sa_generalized(
         Spin-adapted T2 operator iteration.
     """
     for i in range(num_orbs):
-        for j in range(num_orbs):
+        for j in range(i, num_orbs):
             for a in range(max(i, j) + 1, num_orbs):
-                for b in range(max(i, j) + 1, num_orbs):
+                for b in range(a, num_orbs):
                     fac = 1.0
                     if a == b:
                         fac *= 2.0
@@ -222,9 +220,9 @@ def iterate_t2_generalized(
         T2 operator iteration.
     """
     for i in range(num_spin_orbs):
-        for j in range(num_spin_orbs):
+        for j in range(i, num_spin_orbs):
             for a in range(max(i, j) + 1, num_spin_orbs):
-                for b in range(max(i, j) + 1, num_spin_orbs):
+                for b in range(a, num_spin_orbs):
                     num_alpha = 0
                     num_beta = 0
                     if a % 2 == 0:
@@ -829,8 +827,11 @@ class UpsStructure:
             * GpD [bool]: Add generalized pair double excitations.
 
         Args:
-            num_orbs: Number of active spatial orbitals.
-            num_elec: Number of active electrons.
+            occ_idx: Strongly occupied spatial orbital indices.
+            unocc_idx: Weakly occupied spatial orbital indices.
+            occ_spin_idx: Stongly occupied spin orbital indices.
+            unocc_spin_idx: Weakly occupied spin orbital indices.
+            num_orbs: Number of spatial orbitals.
             ansatz_options: Ansatz options.
 
         Returns:
@@ -872,44 +873,31 @@ class UpsStructure:
         do_6 = False
         do_SAD = False
         if "S" in ansatz_options.keys():
-            if ansatz_options["S"]:
-                do_S = True
+            do_S = ansatz_options["S"]
         if "GS" in ansatz_options.keys():
-            if ansatz_options["GS"]:
-                do_GS = True
+            do_GS = ansatz_options["GS"]
         if "SAS" in ansatz_options.keys():
-            if ansatz_options["SAS"]:
-                do_SAS = True
+            do_SAS = ansatz_options["SAS"]
         if "SAGS" in ansatz_options.keys():
-            if ansatz_options["SAGS"]:
-                do_SAGS = True
+            do_SAGS = ansatz_options["SAGS"]
         if "D" in ansatz_options.keys():
-            if ansatz_options["D"]:
-                do_D = True
+            do_D = ansatz_options["D"]
         if "GD" in ansatz_options.keys():
-            if ansatz_options["GD"]:
-                do_GD = True
+            do_GD = ansatz_options["GD"]
         if "pD" in ansatz_options.keys():
-            if ansatz_options["pD"]:
-                do_pD = True
+            do_pD = ansatz_options["pD"]
         if "GpD" in ansatz_options.keys():
-            if ansatz_options["GpD"]:
-                do_GpD = True
+            do_GpD = ansatz_options["GpD"]
         if "T" in ansatz_options.keys():
-            if ansatz_options["T"]:
-                do_T = True
+            do_T = ansatz_options["T"]
         if "Q" in ansatz_options.keys():
-            if ansatz_options["Q"]:
-                do_Q = True
+            do_Q = ansatz_options["Q"]
         if "5" in ansatz_options.keys():
-            if ansatz_options["5"]:
-                do_5 = True
+            do_5 = ansatz_options["5"]
         if "6" in ansatz_options.keys():
-            if ansatz_options["6"]:
-                do_6 = True
+            do_6 = ansatz_options["6"]
         if "SAD" in ansatz_options.keys():
-            if ansatz_options["SAD"]:
-                do_SAD = True
+            do_SAD = ansatz_options["SAD"]
         if True not in (
             do_S,
             do_SAS,
@@ -937,7 +925,7 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_GS:
-                for a, i in iterate_t1_generalized(2 * num_orbs):
+                for a, i in iterate_t1_generalized(num_orbs):
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((i, a))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
@@ -979,7 +967,7 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_GpD:
-                for a, i, b, j in iterate_pair_t2_generalized(2 * num_orbs):
+                for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
                     self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
@@ -1020,7 +1008,15 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
 
-    def create_SDSfUCC(self, num_orbs: int, num_elec: int, ansatz_options: dict[str, Any]) -> None:
+    def create_SDSfUCC(
+        self,
+        occ_idx: list[int],
+        unocc_idx: list[int],
+        occ_spin_idx: list[int],
+        unocc_spin_idx: list[int],
+        num_orbs: int,
+        ansatz_options: dict[str, Any],
+    ) -> None:
         r"""Create SDS ordered factorized UCC.
 
         The operator ordering of this implementation is,
@@ -1040,8 +1036,11 @@ class UpsStructure:
             * GpD [bool]: Add generalized pair double excitations.
 
         Args:
-            num_orbs: Number of active spatial orbitals.
-            num_elec: Number of active electrons.
+            occ_idx: Strongly occupied spatial orbital indices.
+            unocc_idx: Weakly occupied spatial orbital indices.
+            occ_spin_idx: Stongly occupied spin orbital indices.
+            unocc_spin_idx: Weakly occupied spin orbital indices.
+            num_orbs: Number of spatial orbitals.
             ansatz_options: Ansatz options.
 
         Returns:
@@ -1060,32 +1059,19 @@ class UpsStructure:
         do_pD = False
         do_GpD = False
         if "D" in ansatz_options.keys():
-            if ansatz_options["D"]:
-                do_D = True
+            do_D = ansatz_options["D"]
         if "pD" in ansatz_options.keys():
-            if ansatz_options["pD"]:
-                do_pD = True
+            do_pD = ansatz_options["pD"]
         if "GpD" in ansatz_options.keys():
-            if ansatz_options["GpD"]:
-                do_GpD = True
+            do_GpD = ansatz_options["GpD"]
         if True not in (do_D, do_pD, do_GpD):
             raise ValueError("SDSfUCC requires some excitations got none.")
         n_layers = ansatz_options["n_layers"]
-        num_spin_orbs = 2 * num_orbs
-        occ = []
-        unocc = []
-        idx = 0
-        for _ in range(np.sum(num_elec)):
-            occ.append(idx)
-            idx += 1
-        for _ in range(num_spin_orbs - np.sum(num_elec)):
-            unocc.append(idx)
-            idx += 1
         # Layer loop
         for _ in range(n_layers):
             # Kind of D excitation determines indices for complete SDS block
             if do_D:
-                for a, i, b, j in iterate_t2(occ, unocc):
+                for a, i, b, j in iterate_t2(occ_spin_idx, unocc_spin_idx):
                     if i % 2 == a % 2:
                         self.excitation_indices.append((i, a))
                     else:
@@ -1108,8 +1094,8 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_pD:
-                for a, i, b, j in iterate_pair_t2(occ, unocc):
-                    self.excitation_operator_type.append("sa_single")
+                for a, i, b, j in iterate_pair_t2(occ_idx, unocc_idx):
+                    self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i // 2, a // 2))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")

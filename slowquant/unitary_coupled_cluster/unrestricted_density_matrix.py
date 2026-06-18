@@ -941,7 +941,7 @@ def get_orbital_response_metric_sigma_unrestricted(
                 sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] += RDM1xx(
                     m, p, num_inactive_orbs, num_active_orbs, rdm1bb
                 )
-            
+
     return sigma
 
 
@@ -1310,4 +1310,4 @@ def get_orbital_response_hessian_block_unrestricted(
                             ] * RDM2xxyy(
                                 p, q, r, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
                             )
-    return A1e + (1/2 *A2e)
+    return A1e + (1 / 2 * A2e)

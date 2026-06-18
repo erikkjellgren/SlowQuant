@@ -1,32 +1,24 @@
 import pyscf
 from pyscf import mcscf, scf
-import numpy as np
 
 from slowquant.unitary_coupled_cluster.linear_response import unrestricted_naive as unaive
 from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 
 
-def test_H2_STO3g_unrestricted():
+def test_H2_STO3g_unrestricted() -> None:
+    """Test unrestricted linear response full-space."""
     mol = pyscf.M(atom="H 0 0 0; H 0.0  0.0  0.74", basis="sto-3g", unit="angstrom", spin=0)
     mol.build()
     mf = scf.UHF(mol)
     mf.kernel()
 
-    active_space = ((1, 1), 2)
-
-    mc = mcscf.UCASCI(mf, active_space[1], active_space[0])
-    res = mc.kernel(mf.mo_coeff)
-
-    h_core = mol.intor("int1e_kin") + mol.intor("int1e_nuc")
-    g_eri = mol.intor("int2e")
-
     # SlowQuant
     WF = UnrestrictedWaveFunctionUPS(
         mol.nelectron,
-        active_space,
+        ((1, 1), 2),
         mf.mo_coeff,
-        h_core,
-        g_eri,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
         "fuccsd",
         {"n_layers": 1},
         include_active_kappa=True,
@@ -47,6 +39,7 @@ def test_H2_STO3g_unrestricted():
     assert abs(ULR.excitation_energies[0] - 0.60651048) < thresh
     assert abs(ULR.excitation_energies[1] - 0.9689314) < thresh
     assert abs(ULR.excitation_energies[2] - 1.62042651) < thresh
+
 
 def test_H2_631g_unrestricted():
     mol = pyscf.M(atom="H 0 0 0; H 0.0  0.0  0.74", basis="6-31g", unit="angstrom", spin=0)
@@ -98,8 +91,11 @@ def test_H2_631g_unrestricted():
     assert abs(ULR.excitation_energies[9] - 1.88481546) < thresh
     assert abs(ULR.excitation_energies[10] - 2.58127848) < thresh
 
+
 def test_H4_sto3g_unrestricted():
-    mol = pyscf.M(atom="H 0 0 0; H 0.0  0.0  0.74; H 0 1.11 0.74; H 0 1.11 0", basis="sto-3g", unit="angstrom", spin=0)
+    mol = pyscf.M(
+        atom="H 0 0 0; H 0.0  0.0  0.74; H 0 1.11 0.74; H 0 1.11 0", basis="sto-3g", unit="angstrom", spin=0
+    )
     mol.build()
     mf = scf.UHF(mol)
     mf.kernel()
@@ -149,7 +145,9 @@ def test_H4_sto3g_unrestricted():
 
 
 def test_H4_631g_unrestricted():
-    mol = pyscf.M(atom="H 0 0 0; H 0.0  0.0  0.74; H 0 1.11 0.74; H 0 1.11 0", basis="6-31g", unit="angstrom", spin=0)
+    mol = pyscf.M(
+        atom="H 0 0 0; H 0.0  0.0  0.74; H 0 1.11 0.74; H 0 1.11 0", basis="6-31g", unit="angstrom", spin=0
+    )
     mol.build()
     mf = scf.UHF(mol)
     mf.kernel()
@@ -196,7 +194,6 @@ def test_H4_631g_unrestricted():
     assert abs(ULR.excitation_energies[7] - 0.571007818) < thresh
     assert abs(ULR.excitation_energies[8] - 0.573561423) < thresh
     assert abs(ULR.excitation_energies[9] - 0.664073629) < thresh
-
 
 
 # test_H2_STO3g_unrestricted()

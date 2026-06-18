@@ -689,6 +689,7 @@ def one_elec_op_0i_0a(
             one_elec_op += intsbb_mo[p, q] * a_op(p, "beta", True) * a_op(q, "beta", False)
     return one_elec_op
 
+
 def one_elec_op_0i_0a_HFC(
     intsaa_mo: np.ndarray, intsbb_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int
 ) -> FermionicOperator:
@@ -724,6 +725,7 @@ def one_elec_op_0i_0a_HFC(
     #     one_elec_op += intsaa_mo[p, p] * a_op(p, "alpha", True) * a_op(p, "alpha", False)
     #     one_elec_op -= intsbb_mo[p, p] * a_op(p, "beta", True) * a_op(p, "beta", False)
     return one_elec_op
+
 
 def unrestricted_one_elec_op_1i_1a(
     intsaa_mo: np.ndarray,

@@ -2,8 +2,8 @@ from collections.abc import Sequence
 
 import numpy as np
 import scipy
-
 import scipy.linalg as la
+
 from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.operators import (
@@ -28,7 +28,6 @@ from slowquant.unitary_coupled_cluster.util import (
     iterate_t5,
     iterate_t6,
 )
-from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
 
 
 class LinearResponseBaseClass:
@@ -93,7 +92,7 @@ class LinearResponseBaseClass:
             q_list_a.append(op)
             op = G1(2 * i + 1, 2 * a + 1)
             q_list_b.append(op)
-        self.q_ops = q_list_a + q_list_b # Ordering of q_ops, so it matches the RDM calculated qq-block
+        self.q_ops = q_list_a + q_list_b  # Ordering of q_ops, so it matches the RDM calculated qq-block
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters))
@@ -125,7 +124,7 @@ class LinearResponseBaseClass:
     def calc_excitation_energies(self) -> None:
         """Calculate excitation energies."""
         size = len(self.A)
-        
+
         E2 = np.zeros((size * 2, size * 2))
         E2[:size, :size] = self.A
         E2[:size, size:] = self.B
@@ -150,7 +149,7 @@ class LinearResponseBaseClass:
         print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}")
 
         self.hessian = E2
-        print("removed", ((len(self.q_ops)+ len(self.G_ops))*2) - len(self.hessian) )
+        print("removed", ((len(self.q_ops) + len(self.G_ops)) * 2) - len(self.hessian))
         self.metric = S
         eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)
 
@@ -176,9 +175,8 @@ class LinearResponseBaseClass:
         self.response_vectors = np.real(eigvec[:, sorting][:, size:])
         print(self.response_vectors)
         self.normed_response_vectors = np.zeros_like(self.response_vectors)
-        
 
-        #Dont know what i am doing here....
+        # Dont know what i am doing here....
         # for i in range(len(self.response_vectors)):
         #     for p in range()
         #     val = expectation_value(
@@ -187,7 +185,7 @@ class LinearResponseBaseClass:
         #         self.response_vectors[i],
         #         *self.index_info
         #         )
-        
+
         self.num_q = self.q_ops_finite
         self.num_G = size - self.num_q
         self.num_qG = size
@@ -204,7 +202,7 @@ class LinearResponseBaseClass:
         # self.Y_G_normed = np.zeros_like(self.Y_G)
         self.Z_qG_normed = np.zeros_like(self.Z_qG)
         self.Y_qG_normed = np.zeros_like(self.Y_qG)
-        
+
         norms = self.get_excited_state_norm()
         for state_number, norm in enumerate(norms):
             if norm < 10**-10:
@@ -311,8 +309,8 @@ class LinearResponseBaseClass:
 
 def solve_lr_drop_sigma_null(H, sigma, cut=1e-10):
     # Hermitize (important for numerical stability)
-    Hh = 0.5*(H + H.conj().T)
-    Sh = 0.5*(sigma + sigma.conj().T)
+    Hh = 0.5 * (H + H.conj().T)
+    Sh = 0.5 * (sigma + sigma.conj().T)
     # 1) eigen-decompose metric
     s, U = la.eigh(Sh)
     # 2) keep only non-null directions

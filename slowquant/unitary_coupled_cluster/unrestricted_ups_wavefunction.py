@@ -53,7 +53,7 @@ class UnrestrictedWaveFunctionUPS:
         self,
         num_elec: int,
         cas: tuple[tuple[int, int], int],
-        mo_coeffs: np.ndarray,  # tuple[np.ndarray, np.ndarray] ?,
+        mo_coeffs: tuple[np.ndarray, np.ndarray],
         h_ao: np.ndarray,
         g_ao: np.ndarray,
         ansatz: str,
@@ -259,12 +259,12 @@ class UnrestrictedWaveFunctionUPS:
                 hf_string += "1"
             else:
                 hf_string += "0"
-        print("hf_string:",hf_string)
+        print("hf_string:", hf_string)
         if ansatz.lower() == "utups":
             # perfect pairing of the reference determinant
-            hf1 = hf_string[:int(len(hf_string)/2)]
-            hf2 = hf_string[int(len(hf_string)/2):]
-            hf_string = "".join(hf1[i:i+2] + hf2[i:i+2] for i in range(0, len(hf1), 2))
+            hf1 = hf_string[: int(len(hf_string) / 2)]
+            hf2 = hf_string[int(len(hf_string) / 2) :]
+            hf_string = "".join(hf1[i : i + 2] + hf2[i : i + 2] for i in range(0, len(hf1), 2))
             print("hf_string", hf_string)
         hf_det = int(hf_string, 2)
         print("hf_det", hf_det)
@@ -304,7 +304,7 @@ class UnrestrictedWaveFunctionUPS:
                 self.active_unocc_spin_idx_shifted,
                 self.num_active_orbs,
                 self.ansatz_options,
-            )# husk det her har jeg selv sat ind!!!
+            )  # husk det her har jeg selv sat ind!!!
         elif ansatz.lower() == "fuccsdt":
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
@@ -914,7 +914,7 @@ class UnrestrictedWaveFunctionUPS:
                 parameters = self.kappa_a + self.kappa_b
         else:
             parameters = self.thetas
-        
+
         optimizer = Optimizers(
             energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol, is_silent=is_silent
         )
