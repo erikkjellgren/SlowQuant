@@ -295,9 +295,3 @@ def test_naivelr_H3_STO3g():
     assert abs(LR.excitation_energies[17] -  1.3784135) < 10**-4
 
 
-
-test_naivelr_H2_631g()
-test_naivelr_H2_STO3g()
-test_naivelr_H4_STO3g()
-test_naivelr_H4_STO3g_full()
-test_naivelr_H3_STO3g()

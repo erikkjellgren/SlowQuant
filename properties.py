@@ -26,9 +26,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
     mol.build()
 
-    mf = scf.GHF(mol).sfx2c1e() #spinfree
+    # mf = scf.GHF(mol).sfx2c1e() #spinfree
     # mf = scf.GHF(mol).x2c1e()
-    # mf = scf.GHF(mol).x2c()
+    mf = scf.GHF(mol).x2c()
     # mf = scf.GHF(mol)
 
 
@@ -64,7 +64,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
 
 
-    dip_ao = build_x2c_pc_operator(mf, mol, "int1e_r", 'int1e_sprsp', c, x2c=True, picture_change=False, spin_free=True)
+    dip_ao = build_x2c_pc_operator(mf, mol, "int1e_r", 'int1e_sprsp', c, x2c=True, picture_change=True, spin_free=False)
 
 
     # "Calculate Excitation energies"
@@ -110,7 +110,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     charges = mol.atom_charges()
 
     for A in range(mol.natm):
-        int_pc = build_x2c_pc_operator_efg(mf, mol, A, c, x2c=True, picture_change=False, spin_free=True)  # (3, 3, 2*nao_c, 2*nao_c)
+        int_pc = build_x2c_pc_operator_efg(mf, mol, A, c, x2c=True, picture_change=True, spin_free=False)  # (3, 3, 2*nao_c, 2*nao_c)
 
         efg_elec = np.zeros((3, 3)) #create the EFG matrix
         for alpha in range(3):
