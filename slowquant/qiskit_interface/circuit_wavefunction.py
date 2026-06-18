@@ -5,7 +5,7 @@ from functools import partial
 import numpy as np
 import pyscf
 import scipy
-from qiskit import QuantumCircuit
+from qiskit.circuit import QuantumCircuit
 from qiskit.primitives import (
     BaseEstimatorV1,
     BaseEstimatorV2,
@@ -39,7 +39,7 @@ class WaveFunctionCircuit:
         quantum_interface: QuantumInterface,
         include_active_kappa: bool = False,
     ) -> None:
-        """Initialize for UCC wave function.
+        """Initialize circuit based UPS wave function.
 
         Args:
             cas: CAS(num_active_elec, num_active_orbs),
@@ -65,6 +65,9 @@ class WaveFunctionCircuit:
         self.active_spin_idx_shifted = []
         self.active_occ_spin_idx_shifted = []
         self.active_unocc_spin_idx_shifted = []
+        self.active_idx_shifted = []
+        self.active_occ_idx_shifted = []
+        self.active_unocc_idx_shifted = []
         self.num_spin_orbs = 2 * len(self.int_gen.kinetic_energy)
         self.num_orbs = len(self.int_gen.kinetic_energy)
         self.num_active_elec = cas[0]
@@ -105,14 +108,6 @@ class WaveFunctionCircuit:
             else:
                 self.virtual_spin_idx.append(i)
                 self.num_virtual_spin_orbs += 1
-        if len(self.active_spin_idx) != 0:
-            active_shift = np.min(self.active_spin_idx)
-            for active_idx in self.active_spin_idx:
-                self.active_spin_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_occ_spin_idx:
-                self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_unocc_spin_idx:
-                self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
         self.num_active_orbs = self.num_active_spin_orbs // 2
         self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
@@ -137,6 +132,23 @@ class WaveFunctionCircuit:
         for idx in self.active_unocc_spin_idx:
             if idx // 2 not in self.active_unocc_idx:
                 self.active_unocc_idx.append(idx // 2)
+        # Make shifted indices
+        if len(self.active_spin_idx) != 0:
+            active_shift = np.min(self.active_spin_idx)
+            for active_idx in self.active_spin_idx:
+                self.active_spin_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_occ_spin_idx:
+                self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_unocc_spin_idx:
+                self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
+        if len(self.active_idx) != 0:
+            active_shift = np.min(self.active_idx)
+            for active_idx in self.active_idx:
+                self.active_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_occ_idx:
+                self.active_occ_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_unocc_idx:
+                self.active_unocc_idx_shifted.append(active_idx - active_shift)
         # Find non-redundant kappas
         self._kappa = []
         kappa_idx = []
@@ -181,7 +193,12 @@ class WaveFunctionCircuit:
         # Setup Qiskit stuff
         self.QI = quantum_interface
         self.QI.construct_circuit(
-            self.num_active_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta)
+            self.active_occ_idx_shifted,
+            self.active_unocc_idx_shifted,
+            self.active_occ_spin_idx_shifted,
+            self.active_unocc_spin_idx_shifted,
+            self.num_active_orbs,
+            (self.num_active_elec_alpha, self.num_active_elec_beta),
         )
 
     @property
@@ -312,7 +329,12 @@ class WaveFunctionCircuit:
     def _reconstruct_circuit(self) -> None:
         """Construct circuit again."""
         self.QI.construct_circuit(
-            self.num_active_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta)
+            self.active_occ_idx_shifted,
+            self.active_unocc_idx_shifted,
+            self.active_occ_spin_idx_shifted,
+            self.active_unocc_spin_idx_shifted,
+            self.num_active_orbs,
+            (self.num_active_elec_alpha, self.num_active_elec_beta),
         )
 
     @property
@@ -821,6 +843,7 @@ class WaveFunctionCircuit:
         tol: float = 1e-10,
         maxiter: int = 1000,
         is_silent_subiterations: bool = False,
+        print_std: bool = False,
     ) -> None:
         """Run two step optimization of wave function.
 
@@ -830,6 +853,7 @@ class WaveFunctionCircuit:
             tol: Convergence tolerance.
             maxiter: Maximum number of iterations.
             is_silent_subiterations: Silence subiterations.
+            print_std: Print standard deviation of the electronic Hamiltonian during optimization.
         """
         if isinstance(self.QI.ansatz, QuantumCircuit) and optimizer_name.lower() not in ("cobyla", "cobyqa"):
             raise ValueError("Custom Ansatz in QI only works with COBYLA and COBYQA as optimizer.")
@@ -846,9 +870,11 @@ class WaveFunctionCircuit:
             # Do ansatz optimization
             if not is_silent_subiterations:
                 print("--------Ansatz optimization")
-                print(
-                    "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
-                )
+                subheader = "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+                if print_std:
+                    subheader += " | Std(H)"
+                print(subheader)
+
             energy_theta = partial(
                 self._calc_energy_optimization,
                 theta_optimization=True,
@@ -867,6 +893,19 @@ class WaveFunctionCircuit:
                 tol=tol,
                 is_silent=is_silent_subiterations,
                 energy_eval_callback=lambda: self.num_energy_evals,
+                std_callback=(
+                    (
+                        lambda: self.QI.quantum_variance(
+                            hamiltonian_0i_0a(
+                                self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
+                            ).get_folded_operator(
+                                self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+                            )
+                        )
+                    )
+                    if print_std
+                    else None
+                ),
             )
             res = optimizer.minimize(
                 self.thetas,
@@ -877,7 +916,11 @@ class WaveFunctionCircuit:
             if orbital_optimization and len(self.kappa) != 0:
                 if not is_silent_subiterations:
                     print("--------Orbital optimization")
-                    print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+                    subheader = "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+                    if print_std:
+                        subheader += " | Std(H)"
+                    print(subheader)
+
                 energy_oo = partial(
                     self._calc_energy_optimization,
                     theta_optimization=False,
@@ -897,6 +940,19 @@ class WaveFunctionCircuit:
                     tol=tol,
                     is_silent=is_silent_subiterations,
                     energy_eval_callback=lambda: self.num_energy_evals,
+                    std_callback=(
+                        (
+                            lambda: self.QI.quantum_variance(
+                                hamiltonian_0i_0a(
+                                    self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
+                                ).get_folded_operator(
+                                    self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+                                )
+                            )
+                        )
+                        if print_std
+                        else None
+                    ),
                 )
                 res = optimizer.minimize([0.0] * len(self.kappa_idx))
                 for i in range(len(self.kappa)):
@@ -928,6 +984,7 @@ class WaveFunctionCircuit:
         orbital_optimization: bool = False,
         tol: float = 1e-10,
         maxiter: int = 1000,
+        print_std: bool = False,
     ) -> None:
         """Run one step optimization of wave function.
 
@@ -936,6 +993,7 @@ class WaveFunctionCircuit:
             orbital_optimization: Perform orbital optimization.
             tol: Convergence tolerance.
             maxiter: Maximum number of iterations.
+            print_std: Print standard deviation in sub-iteration headers.
         """
         if isinstance(self.QI.ansatz, QuantumCircuit) and optimizer_name.lower() not in ("cobyla", "cobyqa"):
             raise ValueError("Custom Ansatz in QI only works with COBYLA and COBYQA as optimizer.")
@@ -949,7 +1007,12 @@ class WaveFunctionCircuit:
                     "Cannot use RotoSolve together with orbital optimization in the one-step solver."
                 )
 
-        print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #")
+        header = (
+            "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+        )
+        if print_std:
+            header += " | Std(H)"
+        print(header)
         if orbital_optimization:
             if len(self.thetas) > 0:
                 energy = partial(
@@ -998,6 +1061,19 @@ class WaveFunctionCircuit:
             maxiter=maxiter,
             tol=tol,
             energy_eval_callback=lambda: self.num_energy_evals,
+            std_callback=(
+                (
+                    lambda: self.QI.quantum_variance(
+                        hamiltonian_0i_0a(
+                            self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
+                        ).get_folded_operator(
+                            self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+                        )
+                    )
+                )
+                if print_std
+                else None
+            ),
         )
         res = optimizer.minimize(
             parameters, extra_options={"R": self.QI.grad_param_R, "param_names": self.QI.param_names}
@@ -1078,7 +1154,7 @@ class WaveFunctionCircuit:
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             for i in range(len(parameters[num_kappa:])):
                 R = self.QI.grad_param_R[self.QI.param_names[i]]
-                e_vals_grad = _get_energy_evals_for_grad(H, self.QI, parameters, i, R)
+                e_vals_grad = _get_energy_evals_for_grad(H, self.QI, parameters[num_kappa:], i, R)
                 grad = 0.0
                 for j, mu in enumerate(list(range(1, 2 * R + 1))):
                     x_mu = (2 * mu - 1) / (2 * R) * np.pi
