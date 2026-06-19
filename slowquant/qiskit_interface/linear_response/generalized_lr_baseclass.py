@@ -3,7 +3,11 @@ from collections.abc import Sequence
 import numpy as np
 import scipy
 
-from slowquant.qiskit_interface.circuit_wavefunction import WaveFunctionCircuit
+from slowquant.qiskit_interface.generalized_circuit_wavefunction import GeneralizedWaveFunctionCircuit
+from slowquant.unitary_coupled_cluster.generalized_operators import (
+    generalized_hamiltonian_0i_0a,
+    generalized_hamiltonian_1i_1a,
+)
 from slowquant.unitary_coupled_cluster.operators import (
     G1, #AE
     G2, #AE
@@ -13,8 +17,7 @@ from slowquant.unitary_coupled_cluster.operators import (
     G6,
     G1_sa,
     G2_sa,
-    hamiltonian_0i_0a,
-    hamiltonian_1i_1a,
+
 )
 from slowquant.unitary_coupled_cluster.util import (
     iterate_t1_sa,
@@ -31,7 +34,7 @@ from slowquant.unitary_coupled_cluster.util import (
 class quantumLRBaseClass:
     def __init__(
         self,
-        wf: WaveFunctionCircuit,
+        wf: GeneralizedWaveFunctionCircuit,
         excitations: str,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
@@ -42,8 +45,8 @@ class quantumLRBaseClass:
         """
         self.wf = wf
         # Create operators
-        self.H_0i_0a = hamiltonian_0i_0a(wf.h_mo, wf.g_mo, wf.num_inactive_spin_orbs, wf.num_active_spin_orbs)
-        self.H_1i_1a = hamiltonian_1i_1a(
+        self.H_0i_0a = generalized_hamiltonian_0i_0a(wf.h_mo, wf.g_mo, wf.num_inactive_spin_orbs, wf.num_active_spin_orbs)
+        self.H_1i_1a = generalized_hamiltonian_1i_1a(
             wf.h_mo, wf.g_mo, wf.num_inactive_spin_orbs, wf.num_active_spin_orbs, wf.num_virtual_spin_orbs
         )
 

@@ -7,7 +7,7 @@ from slowquant.qiskit_interface.generalized_circuit_wavefunction import Generali
 from qiskit_aer.primitives import Sampler
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from slowquant.qiskit_interface.generalized_interface import QuantumInterface
-import slowquant.qiskit_interface.linear_response.naive as q_naive
+import slowquant.qiskit_interface.linear_response.generalized_naive as q_generalized_naive
 
 
 
@@ -83,14 +83,85 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03599
     )
     # qWF.thetas = WF.thetas
     qWF.set_thetas(WF.thetas_real, WF.thetas_imag)
-    # thetas_complex = np.array(WF.thetas)
-    # qWF.set_thetas(thetas_complex.real.tolist(), thetas_complex.imag.tolist())
-    # print(WF.QI)        # does it have a QI?
-    # print(WF.circuit)   # does it have a circuit?
-    # print(WF.thetas)    # confirm 18 thetas
-    # print(len(WF.thetas))
+    qLR = q_generalized_naive.quantumLR(qWF, "SD")
 
-    qLR = q_naive.quantumLR(qWF, "SD")
+    qLR.run(do_rdm=True)
+    excitation_energies = qLR.get_excitation_energies()
+
+    print(excitation_energies)
+
+
+    # LR = generalized_naive.LinearResponse(WF, excitations="sd")
+    # LR.calc_excitation_energies()
+    # print(LR.excitation_energies)
+
+
+
+
+def noisy(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03599967994):
+    """.........."""
+    print("active space:", {active_space})
+    # PySCF
+    # mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin, nucmod=1)
+    mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
+    mol.build()
+
+    mf = scf.GHF(mol)
+
+    mf.conv_tol_grad = 1e-10 #gradient tolerance form PYSCF
+
+    mf.max_cycle = 50000
+
+    mf.kernel()
+    coeff=np.array(mf.mo_coeff, dtype=complex)
+
+    e_nuc=mf.energy_nuc()
+    print(e_nuc)
+
+    WF =GeneralizedWaveFunctionUPS(
+        # mol.nelectron,
+        active_space,
+        coeff,
+        mol,
+        "fUCCSD",
+        False, #Do x2c
+        {"n_layers": 1, "is_spin_conserving" : False},
+        include_active_kappa=True,
+    )
+    # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
+
+
+    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
+    # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
+
+    print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
+
+
+
+    "Non-relativistic integrals"
+    h_1e = mol.intor("int1e_kin")  
+    h_nuc=mol.intor("int1e_nuc")
+    h_core=mol.intor("int1e_kin")+mol.intor("int1e_nuc")
+    g_eri = mol.intor("int2e")
+
+    #Mapper
+    mapper = JordanWignerMapper()
+    #Sampler
+    # primitive = Sampler(run_options={"shots": 0})
+    primitive = Sampler()
+    QI = QuantumInterface(primitive, "fUCCSD", mapper, ansatz_options=({"n_layers": 1, "is_spin_conserving" : False}), shots=50000, do_M_ansatz0=True)
+    qWF = GeneralizedWaveFunctionCircuit(
+        mol.nelectron,
+        active_space,
+        WF.c_mo,
+        h_core,
+        g_eri,
+        QI,
+        include_active_kappa=True,
+    )
+    # qWF.thetas = WF.thetas
+    qWF.set_thetas(WF.thetas_real, WF.thetas_imag)
+    qLR = q_generalized_naive.quantumLR(qWF, "SD")
 
     qLR.run(do_rdm=True)
     excitation_energies = qLR.get_excitation_energies()
@@ -101,6 +172,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03599
     LR = generalized_naive.LinearResponse(WF, excitations="sd")
     LR.calc_excitation_energies()
     print(LR.excitation_energies)
+
 
 
 
@@ -130,9 +202,9 @@ def h2():
     # active_space = (2, 4)
     charge = 0
     spin = 0
-    NR(
+    noisy(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
 
-# h2()
-h3()
+h2()
+# h3()

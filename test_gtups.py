@@ -49,7 +49,7 @@ def fuccsd_test(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=
         active_space,
         coeff,
         mol,
-        "fuccsd",
+        "fuccs",
         False, #Do x2c
         {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
@@ -179,6 +179,6 @@ def h3():
 
 
 
-h3()
-# h2()
+# h3()
+h2()
 
