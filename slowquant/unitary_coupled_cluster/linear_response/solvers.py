@@ -88,8 +88,8 @@ class Davidson:
 
             if self._iteration > 1 and 2*self._trial.shape[1] + 2*trial.shape[1] > max_reduced_space:
                 if not is_silent:
-                    print(f"Davidson iter {self._iteration+1:4d}: subspace dimension {self._trial.shape[1]+trial.shape[1]} exceeds max_red_space {max_reduced_space}, restarting with current Ritz vectors")
-                self._reset_reduced_space(X, right_transform)  # type: ignore
+                    print(f"Davidson iter {self._iteration:4d}: subspace dimension {self._trial.shape[1]+trial.shape[1]} exceeds {max_reduced_space = }, restarting with current Ritz vectors")
+                self._reset_reduced_space(X, right_transform)  # type: ignore[possible-unbound-variable]
             else:
                 right_transformed_vectors = right_transform(trial)
                 self._add_iteration_data(trial, right_transformed_vectors)
