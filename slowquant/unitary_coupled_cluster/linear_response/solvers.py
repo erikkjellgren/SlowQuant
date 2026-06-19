@@ -122,14 +122,14 @@ class Davidson:
         print()
         print("Davidson solver for eigenvalue problems (J. Comput. Phys. 17, 87-94 (1975))")
 
-    def _print_iteration_info(self, res_norms_plus: np.ndarray, omega: np.ndarray, tolerance: float) -> None:
+    def _print_iteration_info(self, res_norms: np.ndarray, omega: np.ndarray, tolerance: float) -> None:
         """Print iteration information including the maximum residual norm."""
         roots = "  ".join(
             f"{f'{o:<.4e}' + '*' if r <= tolerance
                else f'{o:<.4e}' + ' '}"
-               for o, r in zip(omega, res_norms_plus)
+               for o, r in zip(omega, res_norms)
             )
-        print(f" {self._iteration:^9} | {time.time() - self._start:^8.2f} | {max(res_norms_plus):^18.4e} | {2*self._trial.shape[1]:^13} | {roots}")
+        print(f" {self._iteration:^9} | {time.time() - self._start:^8.2f} | {max(res_norms):^18.4e} | {2*self._trial.shape[1]:^13} | {roots}")
         self._start = time.time()
 
     @staticmethod
@@ -476,10 +476,7 @@ class PairedDavidson(Davidson):
         R_plus, R_minus = R
         plus_norms = np.linalg.norm(R_plus, axis=0)
         minus_norms = np.linalg.norm(R_minus, axis=0)
-        if max(plus_norms) > max(minus_norms):
-            res_norms = plus_norms
-        else:
-            res_norms = minus_norms
+        res_norms = np.array([max(p, m) for p, m in zip(plus_norms, minus_norms)])
         converged = all(res_norms <= tolerance) and len(res_norms) == n_roots
         return converged, res_norms
 
