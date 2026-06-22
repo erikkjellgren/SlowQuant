@@ -267,7 +267,7 @@ class TDADavidson(Davidson):
             bV = self._trial.conj().T @ property_gradient
             # TODO: Complex numbers currently don't work with FermionicOperator:
             bV = np.real(bV)
-            x = scipy.linalg.solve(E - frequency * S, bV).reshape(-1, n_roots)
+            u = scipy.linalg.solve(E - frequency * S, bV).reshape(-1, n_roots)
             omega = np.array([frequency])
         else:
             # Solve the generalized eigenvalue problem E v = omega S v
@@ -284,16 +284,16 @@ class TDADavidson(Davidson):
 
             # Extract the lowest n_roots eigenvalues and corresponding eigenvectors
             omega = np.real(eigval[:n_roots])
-            x = eigvec[:, :n_roots]
+            u = eigvec[:, :n_roots]
 
         # Compute Ritz vectors (X) and residuals (R)
         norm = np.sqrt(np.abs(np.diag(
-            x.T @ S @ x
+            u.T @ S @ u
         )))
         norm[np.isclose(norm, 0)] = 1
-        X = self._trial @ x / norm
+        X = self._trial @ u / norm
 
-        R = self._sigma @ x - self._tau @ x * omega
+        R = self._sigma @ u - self._tau @ u * omega
         if frequency is not None and property_gradient is not None:
             R -= property_gradient
 
@@ -428,7 +428,7 @@ class PairedDavidson(Davidson):
             ))
             # TODO: Complex numbers currently don't work with FermionicOperator:
             bV = np.real(bV)
-            x = scipy.linalg.solve(E - frequency * S, bV).reshape(-1, n_roots)
+            u = scipy.linalg.solve(E - frequency * S, bV).reshape(-1, n_roots)
             omega = np.array([frequency])
         else:
             # Solve the generalized eigenvalue problem E v = omega S v
@@ -445,21 +445,21 @@ class PairedDavidson(Davidson):
 
             # Extract the lowest n_roots eigenvalues and corresponding eigenvectors
             omega = np.real(eigval[:n_roots])
-            x = eigvec[:, :n_roots]
+            u = eigvec[:, :n_roots]
 
         # Compute Ritz vectors (X) and residuals (R)
-        x_plus, x_minus = _split_vector(x)
+        u_plus, u_minus = _split_vector(u)
         if frequency is None or property_gradient is None:
             norm = np.sqrt(np.abs(np.diag(
-                x_minus.T @ S_minus @ x_plus + x_plus.T @ S_minus.T @ x_minus
+                u_minus.T @ S_minus @ u_plus + u_plus.T @ S_minus.T @ u_minus
             )))
             norm[np.isclose(norm, 0)] = 1
-            x_plus /= norm
-            x_minus /= norm
-        X = np.vstack((trial_plus @ x_plus + trial_minus @ x_minus, (trial_plus @ x_plus - trial_minus @ x_minus).conj()))
+            u_plus /= norm
+            u_minus /= norm
+        X = np.vstack((trial_plus @ u_plus + trial_minus @ u_minus, (trial_plus @ u_plus - trial_minus @ u_minus).conj()))
 
-        R_plus = self._sigma_plus @ x_plus - self._tau_plus @ x_minus * omega
-        R_minus = self._sigma_minus @ x_minus - self._tau_minus @ x_plus * omega
+        R_plus = self._sigma_plus @ u_plus - self._tau_plus @ u_minus * omega
+        R_minus = self._sigma_minus @ u_minus - self._tau_minus @ u_plus * omega
         if frequency is not None and property_gradient is not None:
             V = np.vstack((property_gradient, -property_gradient.conj()))
             omega = np.diag(X.T @ V)
