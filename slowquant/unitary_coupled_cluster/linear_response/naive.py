@@ -676,7 +676,7 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.num_active_orbs,
                 self.wf.rdm1,
             )
-        H00_ket = propagate_state([self.H_0i_0a], self.wf.ci_coeffs, *self.index_info)
+        F00_ket = propagate_state([F_0i_0a], self.wf.ci_coeffs, *self.index_info)
         for i, GI in enumerate(self.G_ops):
             GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
             GId_ket = propagate_state([GI.dagger], self.wf.ci_coeffs, *self.index_info)
@@ -690,7 +690,7 @@ class LinearResponse(LinearResponseBaseClass):
             prec_A[i + num_q] -= expectation_value(
                 GI_ket,
                 [GI],
-                H00_ket,
+                F00_ket,
                 *self.index_info,
             )
             prec_A[i + num_q] += expectation_value(
@@ -702,7 +702,7 @@ class LinearResponse(LinearResponseBaseClass):
             prec_A[i + num_q] -= expectation_value(
                 GId_ket,
                 [GI.dagger],
-                H00_ket,
+                F00_ket,
                 *self.index_info,
             )
             # Exact G diagonal
