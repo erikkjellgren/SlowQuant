@@ -18,73 +18,47 @@ from slowquant.unitary_coupled_cluster.generalized_operators import generalized_
 from slowquant.unitary_coupled_cluster.operators import a_op_spin
 from slowquant.molecularintegrals.integralfunctions import generalized_one_electron_transform
 
-def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
+def test_efg_dipmom_PC_HF():
     """.........."""
-    print("active space:", {active_space})
-    # PySCF
-    mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin, nucmod=1)
-    # mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
-    mol.build()
+    from pyscf.gto.basis import load
+    import pyscf.gto as gto
+    mol = gto.M(
+                atom = """H  0.0  0.0  0.91680 ;
+                  F  0.000000   0.000000       0.000000""",
+                basis = {'H': gto.uncontract(load('../x2c-SVPall.nw', 'H')),
+                'F': gto.uncontract(load('../x2c-SVPall.nw', 'F'))},
+                charge = 0,
+                spin = 0,
+    )
 
-    # mf = scf.GHF(mol).sfx2c1e() #spinfree
-    # mf = scf.GHF(mol).x2c1e()
+
+    c=137.036
     mf = scf.GHF(mol).x2c()
-    # mf = scf.GHF(mol)
-
 
     mf.conv_tol_grad = 1e-10 #gradient tolerance form PYSCF
 
     mf.max_cycle = 50000
-    # int = mol.intor("int1e_r")
-    # print(int.shape)
-
-    # mf.scf()
     mf.kernel()
-    print("PySCF SCF energy:", mf.e_tot)
-    print("PySCF electronic:", mf.e_tot - mf.energy_nuc())
     coeff=np.array(mf.mo_coeff, dtype=complex)
-    # print(np.round(np.array(mf.mo_coeff),3))
-
-    e_nuc=mf.energy_nuc()
-    print(e_nuc)
-
+    
     WF =GeneralizedWaveFunctionUPS(
-        # mol.nelectron,
-        active_space,
+        ((1,1), 2),
         coeff,
-        #C_u,
         mol,
         "fUCCSD",
         True, #Do x2c
         {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
+
     WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
-
-    print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
-
 
     dip_ao = build_x2c_pc_operator(mf, mol, "int1e_r", 'int1e_sprsp', c, x2c=True, picture_change=True, spin_free=False)
 
-
-    # "Calculate Excitation energies"
-    # LR = generalized_naive.LinearResponse(WF, excitations="sd")
-    # LR.calc_excitation_energies()
-    # print(LR.excitation_energies)
-
-    # print(dip_ao.shape)
-    # # "Calculate polarizability"
-    # prop_grad = LR.get_property_gradient(dip_ao) #Computes property gradient V
-    # response = solve(LR.hessian, prop_grad) # solve (E-h_bar omega S)X=V (the solution/responsevector) with omega =0 response = solve(LR.hessian- omega LR.metric, prop_grad) for non-static?
-    # alpha = np.einsum('ix,ix->x', prop_grad.conj(), response)
-
-
-    # print(f'Polarizabilities:\n \t xx: {alpha[0]:.4f} \t yy: {alpha[1]:.4f} \t zz: {alpha[2]:.4f}')
-
     "Calculate dipole moments"
-    mux = generalized_one_electron_transform(WF.c_mo, dip_ao[0], x2c=True) #false for spinfree PC...
-    muy = generalized_one_electron_transform(WF.c_mo, dip_ao[1], x2c=True) #false for spinfree...
-    muz = generalized_one_electron_transform(WF.c_mo, dip_ao[2], x2c=True) #false for spinfree...
+    mux = generalized_one_electron_transform(WF.c_mo, dip_ao[0], x2c=True) 
+    muy = generalized_one_electron_transform(WF.c_mo, dip_ao[1], x2c=True)
+    muz = generalized_one_electron_transform(WF.c_mo, dip_ao[2], x2c=True)
     mu_op_x = generalized_one_elec_op_0i_0a(mux, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
     mu_op_y = generalized_one_elec_op_0i_0a(muy, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
     mu_op_z = generalized_one_elec_op_0i_0a(muz, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
@@ -93,15 +67,13 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     dip_z=generalized_expectation_value(WF.ci_coeffs, [mu_op_z], WF.ci_coeffs, WF.ci_info)
 
 
-    print(f'Electric Dipolemoments:\n \t xx: {dip_x:.4f} \t yy: {dip_y:.4f} \t zz: {dip_z:.4f}')
-
-
     charges = mol.atom_charges()
     coords = mol.atom_coords()
     nuclear_dipole = np.einsum('i,ij->j', charges, coords)
 
+    print(-dip_z+nuclear_dipole[2])
 
-    print(f'Total Dipolemoments:\n \t xx: {-dip_x+nuclear_dipole[0]:.4f} \t yy: {-dip_y+nuclear_dipole[1]:.4f} \t zz: {-dip_z+nuclear_dipole[2]:.4f}')
+    assert abs(-dip_z+nuclear_dipole[2] - (0.8380+0.0000*1j)) < 10**-4
 
 
 
@@ -152,19 +124,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         print(f"  Symmetric: {np.allclose(efg_total, efg_total.T)}")
 
 
+    assert abs(efg_total[2,2]-3.1157) < 10**-4
 
 "Calculate Properties"
 def block_diagonal_matrix(mat):
     return scipy.linalg.block_diag(mat, mat)
 
-
-# def _sigma_dot(prp4: np.ndarray) -> np.ndarray:
-#     "Mapping the 4 Pauli coefficients to correct positions of the spin-orbital block matrix"
-#     w, x, y, z = prp4
-#     return np.block([
-#         [w + z,        x - 1j * y],
-#         [x + 1j * y,   w - z     ]
-#     ])
 
 
 def _sigma_dot2(prp4: np.ndarray) -> np.ndarray:
@@ -208,7 +173,7 @@ def build_x2c_pc_operator(mf, mol, int_LL, int_SS, c, x2c=True, picture_change=T
             return r_so
 
 
-def build_x2c_pc_operator_efg(mf, mol, atom_idx, c, x2c=False, picture_change=False, spin_free=False):
+def build_x2c_pc_operator_efg(mf, mol, atom_idx, c, x2c=True, picture_change=True, spin_free=False):
     with mol.with_rinv_origin(mol.atom_coord(atom_idx)):
         nao_c = mol.nao
         if x2c==False:
@@ -277,59 +242,42 @@ def build_x2c_pc_operator_efg(mf, mol, atom_idx, c, x2c=False, picture_change=Fa
 
         return ao_efg
 
-from pyscf.gto.basis import load
-import pyscf.gto as gto
-def HCl():
-    geometry = """H  0.0   0.0  1.27455;
-        Cl  0.0  0.0  0.0 """
-    # basis = {'H':'sto-3g','Cl': 'x2c-SVPall.nw'}
-    basis = {'H': gto.uncontract(load('x2c-SVPall.nw', 'H')),
-                'Cl': gto.uncontract(load('x2c-SVPall.nw', 'Cl'))}
-    # active_space = ((2,2), 6) #spin orbitaler or spinor basis
-    active_space = ((1,1), 2) #spin orbitaler or spinor basis
-    # active_space = (2, 4)
-    charge = 0
-    spin = 0
-    NR(
-        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
-    )
-    
-def HF():
-    geometry = """F  0.0   0.0  0.0;
-        H  0.0  0.0  0.91680 """
-    # basis = 'sto-3g'
-    # basis = {'H':'sto-3g','Cl': 'x2c-SVPall.nw'}
-    basis = {'H': gto.uncontract(load('x2c-SVPall.nw', 'H')),
-                'F': gto.uncontract(load('x2c-SVPall.nw', 'F'))}
-    active_space = ((1,1), 2) #spin orbitaler or spinor basis
-    # active_space = ((2,2), 6) #spin orbitaler or spinor basis
-    # active_space = (2, 4)
-    charge = 0
-    spin = 0
-    NR(
-        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+
+
+def test_polarizability_H2():
+    """Test polarizability for H2."""
+    mol = gto.M(
+                atom = """H  0.0   0.0  0.0;
+        H  0.0  0.0  0.74""",
+                basis = "631-g",
+                charge = 0,
+                spin = 0,
     )
 
+    mf = scf.GHF(mol)
+    mf.kernel()
+    coeff=np.array(mf.mo_coeff, dtype=complex)
 
-def h2():
-    geometry = """H  0.0   0.0  0.0;
-        H  0.0  0.0  0.74"""
-    basis = "sto-3g"
-    active_space = ((1, 1), 4) #spin orbitaler or spinor basis
-    # active_space = (2, 4)
-    charge = 0
-    spin = 0
+    WF =GeneralizedWaveFunctionUPS(
+            ((1, 1), 4),
+            coeff,
+            mol,
+            "fUCCSD",
+            False, #Do x2c
+            {"n_layers": 1, "is_spin_conserving" : False},
+            include_active_kappa=True,
+        )
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
 
-    # restricted(
-    #     geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
-    # )
-    NR(
-        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
-    )
-    # unrestricted(
-    #     geometry=geometry, basis=basis, active_space=active_space_u, charge=charge, spin=spin, unit="angstrom"
-    # )
+    LR = generalized_naive.LinearResponse(WF, excitations="sd")
+    LR.calc_excitation_energies()
+    print(LR.excitation_energies)
 
-# h2()
-# HCl()
-HF()
+    # "Calculate polarizability"
+    prop_grad = LR.get_property_gradient( mol.intor_symmetric("int1e_r")) 
+    response = solve(LR.hessian, prop_grad) 
+    alpha = np.einsum('ix,ix->x', prop_grad.conj(), response)
+
+    assert abs(alpha[2] - (5.8506+0.0000*1j)) < 10**-4
+
+

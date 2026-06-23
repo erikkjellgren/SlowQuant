@@ -227,6 +227,7 @@ class GeneralizedWaveFunctionUPS:
                 hf_string += "1"
             else:
                 hf_string += "0"
+
         hf_det = int(hf_string, 2)
         self.csf_coeffs[self.ci_info.det2idx[hf_det]] = 1
         self.ci_coeffs = np.copy(self.csf_coeffs)
@@ -239,7 +240,10 @@ class GeneralizedWaveFunctionUPS:
         #       F.x. not the p^dagger p single excitation.
         #       These should be there? (At some point)
         #
-        if ansatz.lower() == "fuccsd":
+        if ansatz.lower() == "gtups":
+            self.ansatz_options["do_gtups"] = True
+            self.ups_layout.create_tiled(self.num_active_spin_orbs, self.ansatz_options)
+        elif ansatz.lower() == "fuccsd":
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
