@@ -360,19 +360,16 @@ class PairedDavidson(Davidson):
         trial_plus = trial[:trial.shape[0] // 2, :]
         trial_minus = trial[trial.shape[0] // 2:, :]
 
-        Q, R = np.linalg.qr(trial_plus)
-        # remove near-zero columns (if any)
-        diagR = np.abs(np.diag(R))
-        keep_plus = diagR > 1e-12
+        Qp, Rp = np.linalg.qr(trial_plus)
+        Qm, Rm = np.linalg.qr(trial_minus)
 
-        Q, R = np.linalg.qr(trial_minus)
         # remove near-zero columns (if any)
-        diagR = np.abs(np.diag(R))
-        keep_minus = diagR > 1e-12
-
+        keep_plus = np.abs(np.diag(Rp)) > 1e-12
+        keep_minus = np.abs(np.diag(Rm)) > 1e-12
         keep = keep_plus & keep_minus
-        new_trial_plus = Q[:, keep]
-        new_trial_minus = Q[:, keep]
+
+        new_trial_plus = Qp[:, keep]
+        new_trial_minus = Qm[:, keep]
 
         new_trial_plus /= np.linalg.norm(new_trial_plus, axis=0)
         new_trial_minus /= np.linalg.norm(new_trial_minus, axis=0)
