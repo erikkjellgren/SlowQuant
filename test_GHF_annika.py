@@ -248,8 +248,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         #mol.nelectron,
         active_space,
         c,
-        #h_core,
-        #g_eri,
+        # h_core,
+        # g_eri,
         mol,
         "fuccsd",
         {"n_layers": 1, "is_spin_conserving" : False},
@@ -390,8 +390,14 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
                             print("imaginary part")
                             print(WF.kappa_spin_idx[i-len(WF.kappa_spin_idx)],WF.kappa_spin_idx[j-len(WF.kappa_spin_idx)])'''
 
+    np.random.seed(20)
 
-    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
+    arr1 = np.random.uniform(-0.05, 0.05, len(WF.thetas_real)).tolist()
+    arr2 = np.zeros_like(WF.thetas_imag)
+
+    WF.set_thetas(arr1, arr2)
+
+    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
     #WF.do_adapt(["S","D"])
 
     #print(WF.ups_layout.excitation_indices)
@@ -453,9 +459,38 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print(exp_value_gradient_nonsplit)'''
 
 
+    WF2 = GeneralizedWaveFunctionUPS(
+        mol.nelectron,
+        active_space,
+        WF.c_mo,
+        h_core,
+        g_eri,
+        #mol,
+        "fuccsd",
+        {"n_layers": 1, "is_spin_conserving" : False},
+        include_active_kappa=True,
+    )
+
+    WF2.set_thetas(WF.thetas_real,WF.thetas_imag)
+
     LR = generalized_naive.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
-    print(LR.excitation_energies)
+    print(np.array2string(LR.excitation_energies, precision=4, suppress_small=True))
+
+    # LR = generalized_naive.LinearResponse(WF2, excitations="SD")
+    # LR.calc_excitation_energies()
+    # print(np.array2string(LR.excitation_energies, precision=4, suppress_small=True))
+
+    # LR = generalized_naive.LinearResponse(WF, excitations="SD")
+    # LR.calc_excitation_energies()
+    # print(np.array2string(LR.excitation_energies, precision=4, suppress_small=True))
+
+    # LR = generalized_naive.LinearResponse(WF2, excitations="SD")
+    # LR.calc_excitation_energies()
+    # print(np.array2string(LR.excitation_energies, precision=4, suppress_small=True))
+
+
+    #print(LR.excitation_energies)
     #print(np.round(LR.get_transition_dipole(dip_int).real,5))
     #print(LR.get_oscillator_strengths(dip_int))
 
@@ -490,7 +525,7 @@ def h3():
     #basis = "cc-pvdz"
     basis = "631-g"
     #basis = "sto-6g"
-    #basis = ""
+    #basis = "sto-3g"
     active_space = ((2, 1), 6)
     #active_space = (2, 4)
     charge = 0

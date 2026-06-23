@@ -5,7 +5,6 @@ from scipy.stats import unitary_group
 from pyscf.lib import chkfile
 from scipy.linalg import expm
 import basis_set_exchange as bse
-from zora_build_new import read_zora_so
 import struct
 
 
@@ -217,145 +216,57 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     mf.conv_tol_grad = 1e-10   # Optional: gradient convergence
     mf.max_cycle = 1000
 
-    
-    T = mol.intor("int1e_kin")
-    T_2c = np.kron(np.eye(2), T)
-
-    V = mol.intor("int1e_nuc")
-    V_2c = np.kron(np.eye(2), V)
-
-    px = -1j * mol.intor('int1e_ipovlp', comp=3)[0]
-    py = -1j * mol.intor('int1e_ipovlp', comp=3)[1]
-    pz = -1j * mol.intor('int1e_ipovlp', comp=3)[2]
-
-    PxVPx = px.conj().T @ V @ px
-    PyVPy = py.conj().T @ V @ py
-    PzVPz = pz.conj().T @ V @ pz
-
-    PxVPy = px.conj().T @ V @ py
-    PxVPz = px.conj().T @ V @ pz
-
-    PyVPx = py.conj().T @ V @ px
-    PyVPz = py.conj().T @ V @ pz
-
-    PzVPx = pz.conj().T @ V @ px
-    PzVPy = pz.conj().T @ V @ py
-
-    c = lib.param.LIGHT_SPEED
-
-    sigma_x = np.array([[0, 1],
-                    [1, 0]], dtype=complex)
-
-    sigma_y = np.array([[0, -1j],
-                    [1j,  0]], dtype=complex)
-
-    sigma_z = np.array([[1,  0],
-                    [0, -1]], dtype=complex)
-    
-    scalar = PxVPx + PyVPy + PzVPz
-
-    scalar_2c = np.kron(np.eye(2), scalar)
-
-    Wx = PyVPz - PzVPy
-    Wy = PzVPx - PxVPz
-    Wz = PxVPy - PyVPx
-
-    soc_2c = (np.kron(sigma_x, 1j * Wx) + np.kron(sigma_y, 1j * Wy) + np.kron(sigma_z, 1j * Wz))
 
 
-    W_0 = 0.25*(1/c**2)*(scalar_2c+soc_2c) # Remember to put back the soc_2c!!
-
-    #W = np.linalg.inv(np.linalg.inv(W_0) - np.linalg.inv(T_2c))
- 
-    #hcore = T_2c + W + V_2c
-
-    #print(mol.nao)
-
-
-
-
-    # ZORA SOC Hamiltonian:
-
-    # h_core_pyscf_1dim = mol.intor('int1e_kin') + mol.intor('int1e_nuc')
-
-    # h_core_pyscf = np.kron(np.eye(2), h_core_pyscf_1dim)
-
-    #H_zora= read_zora_so("Cl_so.zora_so")
-
-    #h_core_tot = (h_core_pyscf + H_zora)
-
-    #mf.get_hcore = lambda *args: h_core_tot
-
-
+    # Building the magnetic field Hamiltonian: 
     nao = mol.nao
+    Bz = 1e-2
 
-    # Magnetic field Hamiltonian: 
-    # ── Gauge origin at coordinate origin (matches DIRAC default) ─────────────────
-    #mol.set_common_origin([0.0, 0.0, 0.0])
+    mol.set_common_origin((0.0, 0.0, 0.0))
 
-    # ── Angular momentum integrals ────────────────────────────────────────────────
-    # int1e_cg_irxp returns <mu|i*(r-Rg)×p|nu> as REAL numbers
-    # Shape (3, nao, nao): [0]=x, [1]=y, [2]=z component
-    # The stored value IS the matrix element of i*(r×p)
-    # Angular momentum L = r×p = -i * (i*(r×p)), so L_matrix = -1j * intor
-    irxp = mol.intor('int1e_cg_irxp')   # (3, nao, nao), real
+    irxp = mol.intor('int1e_cg_irxp')
+    Lz_ao = -1j * irxp[2]
 
-    # z-component of L in AO basis (complex, antisymmetric Hermitian)
-    # L_z = (r×p)_z,  the PySCF integral gives i*Lz as real -> Lz = irxp[2] / i = -1j*irxp[2]
-    # BUT: DIRAC defines the orbital Zeeman as H = -0.5*B*(Lz) where Lz = (r×p)_z
-    # PySCF int1e_cg_irxp[2] = <mu|i*Lz|nu> stored real
-    # So the matrix element of Lz is: <mu|Lz|nu> = -1j * irxp[2]
-
-    Lz_ao = -1j * irxp[2]               # (nao, nao), purely imaginary antisymmetric -> Hermitian
-
-    # ── Expand to GHF spinor basis (2*nao, 2*nao) ────────────────────────────────
-    # Orbital Zeeman only (no spin Zeeman) -- matches DIRAC ZAVECTOR (orbital part)
-    # Both spin blocks identical, no off-diagonal spin coupling
-    Lz_spinor = np.zeros((2*nao, 2*nao), dtype=complex)
+    Lz_spinor = np.zeros((2 * nao, 2 * nao), dtype=complex)
     Lz_spinor[:nao, :nao] = Lz_ao
     Lz_spinor[nao:, nao:] = Lz_ao
 
-    # ── Diamagnetic term: (Bz^2/8)*(x^2 + y^2) ───────────────────────────────────
-    Bz = 1e-3
-    rr  = mol.intor('int1e_rr').reshape(3, 3, nao, nao)
-    H_dia_ao = (Bz**2 / 8.0) * (rr[0,0] + rr[1,1])   # real, symmetric
-    H_dia = np.zeros((2*nao, 2*nao), dtype=complex)
-    H_dia[:nao, :nao] = H_dia_ao
-    H_dia[nao:, nao:] = H_dia_ao
+    rr = mol.intor('int1e_rr').reshape(3, 3, nao, nao)
+    dia_ao = (Bz**2 / 8.0) * (rr[0, 0] + rr[1, 1])
 
-    # ── Full Hamiltonian ──────────────────────────────────────────────────────────
-    # H = H0 + (-0.5*Bz)*Lz + (Bz^2/8)*(x^2+y^2)
-    # The -0.5 matches DIRAC's COMFACTOR = -Bz/2 = -0.0005
-    hcore0 = mf.get_hcore()                             # real (2*nao, 2*nao)
-    hcoreB = hcore0.astype(complex)
-    hcoreB += -0.5 * Bz * Lz_spinor                     # orbital Zeeman
-    hcoreB += H_dia                                     # diamagnetic
+    H_dia = np.zeros((2 * nao, 2 * nao), dtype=complex)
+    H_dia[:nao, :nao] = dia_ao
+    H_dia[nao:, nao:] = dia_ao
 
+    Sz = np.zeros((2 * nao, 2 * nao), dtype=complex)
+    Sz[:nao, :nao] = 0.5 * np.eye(nao)
+    Sz[nao:, nao:] = -0.5 * np.eye(nao)
+
+    hcoreB = mf.get_hcore().astype(complex)
+    hcoreB += -0.5 * Bz * Lz_spinor
+    hcoreB += H_dia
+    g_e = 2.00231930436256 # Electronic g-factor
+    hcoreB += 0.5 * g_e * Bz * Sz
+
+
+    # Modyfing the Hcore
     mf.get_hcore = lambda *args: hcoreB
 
 
-
+    # Runnign PySCF
     mf.kernel()
 
-    
 
- 
-
-
-
+    # MO coefficients:
     c_MO=np.array(mf.mo_coeff,dtype=complex)
 
-    h_core = mol.intor("int1e_kin") + mol.intor("int1e_nuc")
-    h_1e = mol.intor("int1e_kin")
-    h_nuc = mol.intor("int1e_nuc")
+
+    # Integrals
     g_eri = mol.intor("int2e")
     dip_int = mol.intor("int1e_r")
-    #mc = mcscf.CASCI(mf, active_space[1], active_space[0])
 
-    # mc = mcscf.UCASCI(mf, active_space[1], active_space[0])
-    # # Slowquant
 
-     # small random anti-Hermitian
+    # small random anti-Hermitian
     eps = 0.2  # controls "step size"
     X_anti = np.random.randn(c_MO.shape[0],c_MO.shape[0]) + 1j*np.random.randn(c_MO.shape[0],c_MO.shape[0])
     A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian
@@ -364,8 +275,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     c_u = c_MO @ U_step
 
-    print("MAX in C_MO directly from pyscf", np.max(c_MO.imag))
-    #print(mf.mo_coeff)
+    print("MAX imag component in C_MO directly from pyscf", np.max(c_MO.imag))
 
 
 
@@ -374,54 +284,15 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         active_space,
         #c_u,
         c_MO,
-        #h_core,
-        #h_core_pyscf,
-        #h_core_tot,
         hcoreB,
         g_eri,
         "fuccsd",
-        {"n_layers": 0, "is_spin_conserving" : False},
+        "False",
+        {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
-
-    print("GHF", mf.energy_elec()[0])
-    #print(mf.energy_nuc())
-    #print(mf.energy_elec()[0]+0.715104390540)
-
-
-    #H = generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo, WF.num_spin_orbs)
-
-    #threshold = 1e-15
-
-    #mask1 = (np.abs(c.real - WF._c_mo.real) <= threshold) & (np.abs(c.imag - WF._c_mo.imag) <= threshold)
-
-    #mask2 = (np.abs(c.real - WF.c_mo.real) <= threshold) & (np.abs(c.imag - WF.c_mo.imag) <= threshold)
-
-    #print(mask1, "\n\n")
-    #print(mask2, "\n\n")
-
-    #test_energy = generalized_expectation_value_energy(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
-
-    #mask1 = (np.abs(c.real - WF._c_mo.real) <= threshold) & (np.abs(c.imag - WF._c_mo.imag) <= threshold)
-
-    #mask2 = (np.abs(c.real - WF.c_mo.real) <= threshold) & (np.abs(c.imag - WF.c_mo.imag) <= threshold)
-
-    #print(mask1, "\n\n")
-    #print(mask2, "\n\n")
-
-    #print(test_energy)
-
-    '''E_tester = get_electronic_energy_generalized(
-                WF.h_mo,
-                WF.g_mo,
-                WF.num_inactive_spin_orbs,
-                WF.num_active_spin_orbs,
-                WF.rdm1,
-                WF.rdm2,
-            )
-    
-    print(E_tester)'''
+    print("PySCF electronic energy", mf.energy_elec()[0])
 
 
     print("Nr. of kappas:", len(WF.kappa_spin_idx))
@@ -430,172 +301,17 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Nr. of active spin orbitals:", WF.num_active_spin_orbs)
     print("Nr. of virtual spin orbitals:", WF.num_virtual_spin_orbs)
 
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-8, maxiter = 10000)
 
-    #print("Nr. of occ active spind idx shifted orbitals:", WF.active_occ_spin_idx_shifted)
-    #print("Nr. of unocc active spind idx shifted orbitals:", WF.active_unocc_spin_idx_shifted)
-
-
-    #mask1 = (np.abs(c.real - WF._c_mo.real) <= threshold) & (np.abs(c.imag - WF._c_mo.imag) <= threshold)
-
-    #mask2 = (np.abs(c.real - WF.c_mo.real) <= threshold) & (np.abs(c.imag - WF.c_mo.imag) <= threshold)
-
-    #print(mask1, "\n\n")
-    #print(mask2, "\n\n")
-
-    #print("pyscf", c, "\n\n")
-
-    #print("wf variable", WF._c_mo, "\n\n")
-
-    #print("wf function", WF.c_mo, "\n\n")
-
-
-    '''H=generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo, WF.num_spin_orbs)
-    H2=generalized_hamiltonian_0i_0a(WF.h_mo, WF.g_mo, WF.num_inactive_spin_orbs, WF.num_active_spin_orbs)
-    H3=generalized_hamiltonian_1i_1a(WF.h_mo, WF.g_mo, WF.num_inactive_spin_orbs, WF.num_active_spin_orbs, WF.num_virtual_spin_orbs)
-
-    test_energy=expectation_value(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
-    test_energy2=expectation_value(WF.ci_coeffs, [H2], WF.ci_coeffs, WF.ci_info)
-    test_energy3=expectation_value(WF.ci_coeffs, [H3], WF.ci_coeffs, WF.ci_info)
-
-    print(test_energy)
-    print(test_energy2)
-    print(test_energy3)'''
-
-    #print("integrals before:\n", WF.h_mo)
-
-    '''my_gradient_before = get_orbital_gradient_generalized_real_imag(WF.h_mo,
-        WF.g_mo,
-        WF.kappa_spin_idx,
-        WF.num_inactive_spin_orbs, 
-        WF.num_active_spin_orbs,
-        WF.rdm1,
-        WF.rdm2)
-
-    print(f"my gradient_before:\n\n",np.round(my_gradient_before,10))'''
-
-    '''finite_diff = get_gradient_finite_diff(WF.ci_coeffs,WF.ci_info,WF._h_ao,WF._g_ao,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,
-                                           WF.kappa_spin_idx, WF.kappa_real,WF.kappa_imag,WF._c_mo)
-
-    print(f"Finite difference gradient, delta 1e-2, centered:\n\n", finite_diff)'''
-
-    #my_gradient_before = np.array(my_gradient_before)
-    #print("my_gradient_before:",np.linalg.norm(my_gradient_before, ord=2))
-
-
-    '''total_gradient_before = get_orbital_gradient_expvalue_real_imag(
-        WF.ci_coeffs,
-        WF.ci_info,
-        WF.h_mo,
-        WF.g_mo,
-        WF.num_spin_orbs,
-        WF.kappa_spin_idx)
-            
-    print(f'total gradient_before:\n\n',np.round(total_gradient_before,10))'''
-
-    #print(WF.kappa_spin_idx)
-
-    '''mask = np.isclose(my_gradient_before, total_gradient_before, atol=1e-10)
-    k_array = np.array(WF.kappa_spin_idx)
-
-    print(k_array[~mask[:len(WF.kappa_spin_idx)]])
-    Wrong_gradient_elements = my_gradient_before[~mask]
-    Wrong_gradient_elements_exp = total_gradient_before[~mask]
-    print(Wrong_gradient_elements[:int(len(Wrong_gradient_elements)/2)])
-    print(Wrong_gradient_elements_exp[:int(len(Wrong_gradient_elements)/2)])
-    print(k_array[~mask[len(WF.kappa_spin_idx):]])
-    print(Wrong_gradient_elements[int(len(Wrong_gradient_elements)/2):])
-    print(Wrong_gradient_elements_exp[int(len(Wrong_gradient_elements)/2):])'''
-
-    '''for i in range(len(my_gradient_before)):
-        for j in range(len(my_gradient_before)):
-            if i != j:
-                if np.abs([i]) > 1e-10 and np.abs(my_gradient_before[j]) > 1e-10:
-                    if i < len(WF.kappa_spin_idx) and j < len(WF.kappa_spin_idx):
-                        if np.abs(my_gradient_before[i]-my_gradient_before[j]) < 1e-10:
-                            print("real part")
-                            print(WF.kappa_spin_idx[i],WF.kappa_spin_idx[j])
-                            print(my_gradient_before[i],my_gradient_before[j])
-                    elif i > len(WF.kappa_spin_idx) and j > len(WF.kappa_spin_idx):
-                        if np.abs(my_gradient_before[i]-my_gradient_before[j]) < 1e-10:
-                            print("imaginary part")
-                            print(WF.kappa_spin_idx[i-len(WF.kappa_spin_idx)],WF.kappa_spin_idx[j-len(WF.kappa_spin_idx)])'''
-
-
-    #WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
-    
-    #print("MAX in C_MO after optimization", np.max(WF.c_mo.imag))
-    
-    #WF.do_adapt(["S","D"])
-
-    #print(WF.ups_layout.excitation_indices)
-    #print(WF.c_mo)
-
-    #print("efter optimering")
-
-    #print(WF.thetas)
-
-
-
-    ''' my_gradient_after = get_orbital_gradient_generalized_real_imag(WF.h_mo,
-        WF.g_mo,
-        WF.kappa_spin_idx,
-        WF.num_inactive_spin_orbs, 
-        WF.num_active_spin_orbs,
-        WF.rdm1,
-        WF.rdm2)
-
-    print(f"my gradient_after:\n\n",np.round(my_gradient_after,10))'''
-
-
-    '''finite_diff_2 = get_gradient_finite_diff(WF.ci_coeffs,WF.ci_info,WF._h_ao,WF._g_ao,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,
-                                           WF.kappa_spin_idx, WF.kappa_real,WF.kappa_imag,WF._c_mo)
-
-    print(f"Finite difference gradient, delta 1e-2, centered:\n\n", finite_diff_2)'''
-
-    #print("integrals after:\n", WF.h_mo)
-
-
-    #my_gradient_after = np.array(my_gradient_after)
-    #print("Gradient norm after:",np.linalg.norm(my_gradient_after, ord=2))
-
-
-    '''total_gradient_after = get_orbital_gradient_expvalue_real_imag(
-        WF.ci_coeffs,
-        WF.ci_info,
-        WF.h_mo,
-        WF.g_mo,
-        WF.num_spin_orbs,
-        WF.kappa_spin_idx)
-            
-    print(f'total gradient_after:\n\n',np.round(total_gradient_after,10))'''
-
-
-    '''WF.do_adapt(
-        operator_pool = ["s","g"],
-        orbital_optimization = True,
-    )'''
-
-
-    '''exp_value_gradient_nonsplit = get_nonsplit_gradient_expvalue(
-            WF.ci_coeffs,
-            WF.ci_info,
-            WF.h_mo,
-            WF.g_mo,
-            WF.num_spin_orbs,
-            WF.kappa_spin_idx,
-        )
-    
-    print(exp_value_gradient_nonsplit)'''
-
-
-    LR = generalized_naive.LinearResponse(WF, excitations="S")
+    LR = generalized_naive.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     print("Excitation energies")
-    print(np.round(LR.excitation_energies,6))
-    print("Transition dipole moments")
-    print(np.round(LR.get_transition_dipole(dip_int).real,6))
-    print("Oscillator strengths")
-    print(np.round(LR.get_oscillator_strengths(dip_int),6))
+    print(np.array2string(LR.excitation_energies, precision=5, suppress_small=True))
+    # There is an error in Transition dipole moments!
+    #print("Transition dipole moments")
+    #print(np.round(LR.get_transition_dipole(dip_int).real,4))
+    #print("Oscillator strengths")
+    #print(np.round(LR.get_oscillator_strengths(dip_int),4))
 
 
 
@@ -693,7 +409,7 @@ def h2o():
     basis = "sto-3g"
     #basis = "sto-6g"
     #active_space = ((5, 5), 14)
-    active_space = ((3,3),8)
+    active_space = ((1,1),2)
     charge = 0
     spin = 0
 
@@ -731,7 +447,7 @@ def HCl():
     #basis = "dyall-v2z"
     #basis = "cc-pvdz"
     basis = "sto-3g"
-    active_space = ((9,9), 20)
+    active_space = ((3,3), 8)
     charge = 0
     spin = 0
     #print("Restricted HBr")
@@ -775,7 +491,7 @@ def BeH():
 
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-h2()
+HCl()
 
 
 # h2o()

@@ -6,7 +6,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform, generalized_one_electron_transform,
 )
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
-    get_orbital_gradient_response, get_orbital_gradient_response_real_imag,
+    get_orbital_gradient_response, get_orbital_gradient_response_real_imag, get_orbital_gradient_generalized_real_imag,
     get_orbital_response_hessian_block,
     get_orbital_response_metric_sigma,
     get_orbital_response_property_gradient_annika, get_orbital_response_property_gradient_real_imag, 
@@ -111,6 +111,17 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.rdm1,
                 self.wf.rdm2,
             )
+            # print(np.array2string(grad, precision=8, suppress_small=True))
+            # grad2 = get_orbital_gradient_generalized_real_imag(  #tjek om det er den rigtige, og om der er fejl.
+            #     self.wf.h_mo,
+            #     self.wf.g_mo,
+            #     self.wf.kappa_no_activeactive_spin_idx,
+            #     self.wf.num_inactive_spin_orbs,
+            #     self.wf.num_active_spin_orbs,
+            #     self.wf.rdm1,
+            #     self.wf.rdm2,
+            # )
+            # print(np.array2string(grad2, precision=8, suppress_small=True))
             print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**3:
                 raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))

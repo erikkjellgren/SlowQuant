@@ -212,7 +212,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         active_space,
         WF.c_mo,
         mol,
-        "fUCCSD",
+        "fUCCD",
         ansatz_options = {"n_layers": 1, "is_spin_conserving" : spin_cons},
         include_active_kappa=True,
     )
@@ -221,7 +221,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         active_space,
         WF.c_mo,
         mol,
-        "fUCCSD",
+        "fUCCD",
         ansatz_options = {"n_layers": 1, "is_spin_conserving" : spin_cons},
         include_active_kappa=act_k,
     )
@@ -239,7 +239,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     QI = QuantumInterface(
         Sampler(run_options={"shots": None}),
-        "fUCCSD", # Ansatz
+        "fUCCD", # Ansatz
         mapper,
         ansatz_options = {"n_layers": 1, "is_spin_conserving" : spin_cons},
         ISA=False, # default is false
@@ -306,8 +306,8 @@ def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
     #basis = "cc-pvdz"
-    basis = "631-g"
-    #basis = "sto-3g"
+    #basis = "631-g"
+    basis = "sto-3g"
     #basis = "sto-6g"
     active_space = ((1, 1), 4)
     #active_space = (2, 4)
