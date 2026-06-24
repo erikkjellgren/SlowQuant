@@ -425,7 +425,10 @@ class PairedDavidson(Davidson):
             ))
             # TODO: Complex numbers currently don't work with FermionicOperator:
             bV = np.real(bV)
-            u = scipy.linalg.solve(E - frequency * S, bV).reshape(-1, n_roots)
+            if np.isclose(frequency, 0):
+                u = scipy.linalg.lstsq(E - frequency * S, bV, cond=None)[0].reshape(-1, n_roots)
+            else:
+                u = scipy.linalg.solve(E - frequency * S, bV).reshape(-1, n_roots)
             omega = np.array([frequency])
         else:
             # Solve the generalized eigenvalue problem E v = omega S v
