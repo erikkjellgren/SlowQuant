@@ -652,7 +652,8 @@ class LinearResponse(LinearResponseBaseClass):
             transfer_op = FermionicOperator({})
             for i, G in enumerate(self.G_ops):
                 transfer_op += (
-                    self.Z_G_normed[i+shift, state_number] * G.dagger + self.Y_G_normed[i, state_number] * G
+                    # self.Z_G_normed[i+shift, state_number] * G.dagger + self.Y_G_normed[i, state_number] * G
+                    self.Z_qG_normed[i+shift, state_number] * G.dagger + self.Y_qG_normed[i, state_number] * G #AE
                 ) #AE added + shift
             q_part_x = 0.0
             q_part_y = 0.0

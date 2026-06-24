@@ -494,6 +494,8 @@ def G1_sa(i: int, a: int, return_anti_hermitian: bool = False) -> FermionicOpera
     Returns:
         Singlet one-electron spin-adapted excitation operator.
     """
+
+    
     op = 2 ** (-1 / 2) * Epq(a, i)
     if return_anti_hermitian:
         op -= op.dagger
