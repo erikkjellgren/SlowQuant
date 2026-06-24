@@ -231,13 +231,22 @@ class quantumLR(quantumLRBaseClass):
         for j, GJ in enumerate(self.G_ops):
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
-                self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = (
+                self.A[i + idx_shift, j + idx_shift] =  (
                     self.wf.QI.quantum_expectation_value_complex(
                         double_commutator(
                             GI.dagger, self.H_0i_0a, GJ, do_symmetrized=True
                         ).get_folded_operator(*self.orbs)
                     )
                 )
+
+                self.A[j + idx_shift, i + idx_shift] = (
+                    self.wf.QI.quantum_expectation_value_complex(
+                        double_commutator(
+                            GI.dagger, self.H_0i_0a, GJ, do_symmetrized=True
+                        ).get_folded_operator(*self.orbs)
+                    )
+                ).conj()
+
                 # Make B
                 self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = (
                     self.wf.QI.quantum_expectation_value_complex(
@@ -245,13 +254,22 @@ class quantumLR(quantumLRBaseClass):
                     )
                 )
                 # Make Sigma
-                self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = (
+                self.Sigma[i + idx_shift, j + idx_shift] =  (
                     self.wf.QI.quantum_expectation_value_complex(
                         commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)
                     )
                 )
+                self.Sigma[j + idx_shift, i + idx_shift] = (
+                    self.wf.QI.quantum_expectation_value_complex(
+                        commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)
+                    )
+                ).conj()
 
-                "Screening af A - Pernille"
+            print(self.A)
+            print(self.B)
+            print(self.Sigma)
+
+            "Screening af A - Pernille"
         self.A = self.A[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape(
                     (np.sum(finite_excitations_idx), np.sum(finite_excitations_idx))
                 )
@@ -357,21 +375,34 @@ class quantumLR(quantumLRBaseClass):
         for j, GJ in enumerate(self.G_ops):
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
-                A[i + idx_shift][j + idx_shift] = A[j + idx_shift][i + idx_shift] = self.wf.QI.op_to_qbit(
+                A[i + idx_shift][j + idx_shift] =  self.wf.QI.op_to_qbit(
                     double_commutator(GI.dagger, self.H_1i_1a, GJ, do_symmetrized=True).get_folded_operator(
                         *self.orbs
                     )
                 ).paulis.to_labels()
+
+                A[j + idx_shift][i + idx_shift] = self.wf.QI.op_to_qbit(
+                    double_commutator(GI.dagger, self.H_1i_1a, GJ, do_symmetrized=True).get_folded_operator(
+                        *self.orbs
+                    ).conj()
+                ).paulis.to_labels()
+
                 # Make B
                 B[i + idx_shift][j + idx_shift] = B[j + idx_shift][i + idx_shift] = self.wf.QI.op_to_qbit(
                     double_commutator(GI.dagger, self.H_1i_1a, GJ.dagger).get_folded_operator(*self.orbs)
                 ).paulis.to_labels()
+                
                 # Make Sigma
-                Sigma[i + idx_shift][j + idx_shift] = Sigma[j + idx_shift][i + idx_shift] = (
+                Sigma[i + idx_shift][j + idx_shift] = (
                     self.wf.QI.op_to_qbit(
                         commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)
                     ).paulis.to_labels()
                 )
+                Sigma[j + idx_shift][i + idx_shift] = (
+                    self.wf.QI.op_to_qbit(
+                        commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)
+                    ).paulis.to_labels()
+                ).conj()
 
         if cliques:
             for i in range(self.num_params):
@@ -513,7 +544,7 @@ class quantumLR(quantumLRBaseClass):
         for j, GJ in enumerate(self.G_ops):
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
-                A[i + idx_shift, j + idx_shift] = A[j + idx_shift, i + idx_shift] = np.sqrt(
+                A[i + idx_shift, j + idx_shift] = np.sqrt(
                     self.wf.QI.quantum_variance(
                         double_commutator(
                             GI.dagger, self.H_0i_0a, GJ, do_symmetrized=True
@@ -521,6 +552,15 @@ class quantumLR(quantumLRBaseClass):
                         no_coeffs=no_coeffs,
                     )
                 )
+
+                A[j + idx_shift, i + idx_shift] = np.sqrt(
+                    self.wf.QI.quantum_variance(
+                        double_commutator(
+                            GI.dagger, self.H_0i_0a, GJ, do_symmetrized=True
+                        ).get_folded_operator(*self.orbs),
+                        no_coeffs=no_coeffs,
+                    )
+                ).conj()
                 # Make B
                 B[i + idx_shift, j + idx_shift] = B[j + idx_shift, i + idx_shift] = np.sqrt(
                     self.wf.QI.quantum_variance(
@@ -534,6 +574,11 @@ class quantumLR(quantumLRBaseClass):
                         commutator(GI.dagger, GJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
                     )
                 )
+                Sigma[j + idx_shift, i + idx_shift] = np.sqrt(
+                    self.wf.QI.quantum_variance(
+                        commutator(GI.dagger, GJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )).conj()
+                
 
         if no_coeffs:
             cv = False

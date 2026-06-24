@@ -46,23 +46,24 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03599
 
     print("c_mo is real?", np.allclose(WF.c_mo.imag, 0))
 
-
-    np.random.seed(42)
-    nye_vinkler_real = np.random.uniform(-0.05, 0.05, len(WF.thetas)).tolist()
-    nye_vinkler_imag = [0.0] * len(WF.thetas)
-    WF.set_thetas(nye_vinkler_real, nye_vinkler_imag)
-
-
-    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
-    # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
-
-    # print(WF.thetas)
-    #IKKE SIKKER PÅ DET HER kappa ..
     
-    # kappa=(np.array(WF.kappa_real) + 1.0j * np.array(WF.kappa_imag)).tolist()
-    # print(kappa) kappa skal vidst være 0 her, fordi det er det skridt vi tager for at opdatere vores
-    #mo koefficienter, og her skulle de gerne være opdateret. Og de bliver initieret til 0 også. 
-    # print("E_opt:", WF._energy_elec)
+    # np.random.seed(42)
+    # nye_vinkler_real = np.random.uniform(-0.05, 0.05, len(WF.thetas)).tolist()
+    # nye_vinkler_imag = [0.0] * len(WF.thetas)
+    # WF.set_thetas(nye_vinkler_real, nye_vinkler_imag)
+
+    ny_theta_real = np.random.uniform(-0.05, 0.05, len(WF.thetas))
+    print(ny_theta_real)
+    ny_theta_imag = np.random.uniform(-0.05,0.05,len(WF.thetas)) 
+    # ny_theta_imag = [0.0] * len(WF.thetas)
+    print(ny_theta_imag)
+    WF.set_thetas(ny_theta_real, ny_theta_imag)
+    print(WF.thetas)
+
+
+    # WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
+
     print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
 
     LR = generalized_naive.LinearResponse(WF, excitations="sd")
@@ -71,7 +72,6 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03599
     # LR.get_transition_dipole(mol.intor("int1e_r"))
     # print(LR.get_oscillator_strengths(mol.intor("int1e_r")))
     # print(LR.get_oscillator_strength(mol.intor("int1e_r")))
-    print(LR.get_formatted_oscillator_strength)
 
 
     "Non-relativistic integrals"
@@ -113,10 +113,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03599
     # qLR.get_formatted_oscillator_strength()
 
 
-    ##OBS!!!!: Den første jeg regner giver nogle inf værdier, men den næste bliver god nok + MAAAANGE  vcxwarnings...
     ##OBS tjek oscillator stryker
-    #OBS virker circuit kun for full space!!!
-    ##OBS!!! har prøvet at lave samme screening, men den ene får flere warnings end den anden..
     #OBS har ændret alt til complex expectation value i Naive
 
 
@@ -155,10 +152,17 @@ def noisy(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03
     # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
 
 
-    np.random.seed(42)
-    nye_vinkler_real = np.random.uniform(-0.05, 0.05, len(WF.thetas)).tolist()
-    nye_vinkler_imag = [0.0] * len(WF.thetas)
-    WF.set_thetas(nye_vinkler_real, nye_vinkler_imag)
+    # np.random.seed(42)
+    # nye_vinkler_real = np.random.uniform(-0.05, 0.05, len(WF.thetas)).tolist()
+    # nye_vinkler_imag = [0.0] * len(WF.thetas)
+    # WF.set_thetas(nye_vinkler_real, nye_vinkler_imag)
+
+    ny_theta_real = np.random.random(-0.05, 0.05, len(WF.thetas))
+    print(ny_theta_real)
+    ny_theta_imag = np.random.random(len(WF.thetas)) 
+    print(ny_theta_imag)
+    WF.set_thetas(ny_theta_real, ny_theta_imag)
+    print(WF.thetas)
 
     WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
     # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
@@ -229,7 +233,7 @@ def h3():
 def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
-    basis = "631-g"
+    basis = "STO-3g"
     active_space = ((1, 1), 4) #spin orbitaler or spinor basis
     # active_space = (2, 4)
     charge = 0
@@ -271,5 +275,5 @@ def h7():
     )
 
 # h7()
-# h2()
-h3()
+h2()
+# h3()
