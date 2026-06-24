@@ -48,11 +48,11 @@ from slowquant.unitary_coupled_cluster.util import (
 class GeneralizedWaveFunctionUPS:
     def __init__(
         self,
-        # num_elec: int,
+        #num_elec: int,
         cas: tuple[tuple[int, int], int],
         mo_coeffs: np.ndarray,
-        #h_ao: np.ndarray,
-        #g_ao: np.ndarray,
+        # h_ao: np.ndarray,
+        # g_ao: np.ndarray,
         integral_generator: SlowQuant | pyscf.gto.mole.Mole,
         ansatz: str,
         do_x2c: bool = False,
@@ -456,6 +456,8 @@ class GeneralizedWaveFunctionUPS:
 
 
             self._h_mo = generalized_one_electron_transform(self.c_mo, self.int_gen.h_ao, x2c=self.int_gen.x2c) #AE self._h_ao
+            #self._h_mo = DHF_one_electron_transform(self.c_mo, self._h_ao)
+            #self._h_mo = generalized_one_electron_transform(self.c_mo, self._h_ao)
         return self._h_mo
 
     @property
@@ -467,6 +469,7 @@ class GeneralizedWaveFunctionUPS:
         """
         if self._g_mo is None:
             self._g_mo = generalized_two_electron_transform(self.c_mo,  self.int_gen.electron_electron_repulsion) #AE self._g_ao
+            #self._g_mo = generalized_two_electron_transform(self.c_mo,  self._g_ao) #AE self._g_ao
         return self._g_mo
 
     @property
