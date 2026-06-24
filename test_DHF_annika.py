@@ -17,6 +17,8 @@ warnings.filterwarnings('ignore', category=UserWarning, module='pyscf')
 from pyscf.prop.ssc.dhf import SSC
 from pyscf.prop.ssc.dhf import sa01sa01_integral
 
+from pyscf.scf import dhf
+
 
 
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
@@ -437,6 +439,61 @@ def make_h1_ao(mol):
     return h1
 
 
+
+def make_h2_ao_shielding(mol):
+    """
+    Diamagnetic property Hessian integrals for all atom pairs.
+
+    Returns h2 of shape (natm, natm, 3, 3, n4c, n4c), complex
+    h2[I, J, alpha, beta, :, :] is the (alpha,beta) component of Z_I Z_J
+    Note: h2[I,J] == h2[J,I] (symmetric in atom indices)
+    """
+    n2c = mol.nao_2c()
+    n4c = n2c * 2
+    natm = mol.natm
+
+    h2 = np.zeros((natm, natm, 3, 3, n4c, n4c), dtype=np.complex128)
+
+    for I in range(natm):
+        for J in range(I, natm):
+            orig1 = mol.atom_coord(I)
+            orig2 = mol.atom_coord(J)
+            a01a01 = sa01sa01_integral(mol, orig1, orig2)  # (3, 3, n2c, n2c)
+
+            block = np.zeros((3, 3, n4c, n4c), dtype=np.complex128)
+            block[:, :, n2c:, :n2c] =  0.5 * a01a01
+            block[:, :, :n2c, n2c:] =  0.5 * a01a01.conj().transpose(0, 1, 3, 2)
+
+            h2[I, J] = block
+            h2[J, I] = block  # symmetric
+
+    return h2  # (natm, natm, 3, 3, n4c, n4c)
+
+
+n4c = dm0.shape[0]
+    n2c = n4c // 2
+    msc_dia = []
+    for n, atm_id in enumerate(shielding_nuc):
+        mol.set_rinv_origin(mol.atom_coord(atm_id))
+        if mb.upper() == 'RMB':
+            if gauge_orig is None:
+                t11 = mol.intor('int1e_giao_sa10sa01_spinor', 9)
+                t11 += mol.intor('int1e_spgsa01_spinor', 9)
+            else:
+                t11 = mol.intor('int1e_cg_sa10sa01_spinor', 9)
+        elif gauge_orig is None:
+            t11 = mol.intor('int1e_spgsa01_spinor', 9)
+        else:
+            t11 = numpy.zeros(9)
+        h11 = numpy.zeros((9, n4c, n4c), complex)
+        for i in range(9):
+            h11[i,n2c:,:n2c] = t11[i] * .5
+            h11[i,:n2c,n2c:] = t11[i].conj().T * .5
+
+
+
+
+
 def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     """.........."""
     print("active space:", {active_space})
@@ -449,23 +506,27 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #uhf = scf.UHF(mol)
     #uhf.kernel()
 
+    #mf_n = dhf.DHF(mol)        # bypass scf.DHF factory — always gives DHF, never RDHF
+    #mf = scf.newton(mf_n)
 
+    #print(type(mf))   # should be _SecondOrderDHF
 
     mf = scf.DHF(mol)
-    mf.conv_tol = 1e-10        # Energy convergence (Hartree)
-    mf.conv_tol_grad = 1e-10   # Optional: gradient convergence
+
+
+    mf.conv_tol = 1e-8        # Energy convergence (Hartree)
+    mf.conv_tol_grad = 1e-8   # Optional: gradient convergence
     mf.max_cycle = 500
-    #mf.with_ssss
+    # mf.with_ssss
 
 
-    #DIRAC_dict = read_dirac_file("OPERATORS.h5")
+    '''#DIRAC_dict = read_dirac_file("OPERATORS.h5")
 
     #hcore_dirac = build_hcore_from_dirac(DIRAC_dict)
 
     #mf.get_hcore = lambda *args: hcore_dirac
 
-    #mf.get_init_guess = lambda *args: initial_guess_from_hcore(hcore_dirac, mol.nelectron)
-
+    #mf.get_init_guess = lambda *args: initial_guess_from_hcore(hcore_dirac, mol.nelectron)'''
 
     mf.kernel()
 
@@ -473,16 +534,14 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     sscobj = SSC(mf)
     sscobj.cphf = True
     sscobj.conv_tol = 1e-9
-    sscobj.mb = "RKB"
+    sscobj.mb = "RMB"
     sscobj.verbose = 5
     sscobj.with_fcsd = True
     jj = sscobj.kernel()
 
 
-
     # print("PySCF e11 (raw, before Hz conversion):", jj)
     # print("PySCF Tr(e11)/3:", np.trace(jj[0])/3)
-
 
 
     # Getting integrals for response:
@@ -497,8 +556,6 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
 
-
-
     C_MO=np.array(mf.mo_coeff,dtype=complex)
 
     c = lib.param.LIGHT_SPEED
@@ -509,7 +566,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     #dip_int = mol.intor("int1e_r")
 
-    size = int(C_MO.shape[1]/2)
+    size = C_MO.shape[0] // 2
 
 
     # small random anti-Hermitian
@@ -525,14 +582,23 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF = GeneralizedWaveFunctionUPS(
         mol.nelectron,
         active_space,
-        C_MO,
-        #C_U,
+        #C_MO,
+        C_U,
         h_core,
         g_eri,
         "fUCCSD",
         {"n_layers":1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
+
+    np.random.seed(20)
+
+    if len(WF.thetas) > 0:
+        real = np.random.uniform(-0.05,0.05,len(WF.thetas_real))
+        imag = np.zeros_like(WF.thetas_imag)
+        #imag = np.random.uniform(-0.05,0.05,len(WF.thetas_real))
+
+        WF.set_thetas(real, imag)
 
 
     print("DHF", mf.energy_elec()[0])
@@ -543,7 +609,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     H = DHF_hamiltonian_full_space(h_mo[size:,size:], g_mo[size:,size:,size:,size:], WF.num_spin_orbs_NES)
 
-    #H = generalized_hamiltonian_full_space(h_mo, g_mo, WF.num_spin_orbs)
+    '''#H = generalized_hamiltonian_full_space(h_mo, g_mo, WF.num_spin_orbs)
 
 
     #print(WF.rdm1)
@@ -571,8 +637,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #             WF.ci_info,
     #         )
 
-    # print(E2)
-
+    # print(E2)'''
 
 
     print("Nr. of kappas:", len(WF.kappa_spin_idx))
@@ -589,7 +654,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Positronic spin orbitals idx:", WF.positronic_spin_idx)
     print("Active occupied:",WF.active_occ_spin_idx)
     print("Active unoccupied:",WF.active_unocc_spin_idx)
-    # print("noactive_active", WF.kappa_no_activeactive_spin_idx)
+
+    '''# print("noactive_active", WF.kappa_no_activeactive_spin_idx)
     # print("noactive_active resp", WF.kappa_no_activeactive_spin_idx_resp)
     # print("Kappas ep:", WF.kappa_spin_idx_ep)
     # print("Kappas ee:", WF.kappa_spin_idx)
@@ -615,14 +681,15 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #                     RDM2(p,q,r,s,WF.num_spin_orbs_NES, WF.num_inactive_spin_orbs, WF.num_active_spin_orbs, WF.rdm1, WF.rdm2) 
     #                   + RDM2(r,q,p,s,WF.num_spin_orbs_NES, WF.num_inactive_spin_orbs, WF.num_active_spin_orbs, WF.rdm1, WF.rdm2)
     #                 ))
-    # print("err", err)
-
+    # print("err", err)'''
 
     #WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
 
-    WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True,tol = 1e-8, maxiter = 1000)
+    WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-8, maxiter = 1000)
 
-    #kappas = np.concatenate([WF.kappa_real, WF.kappa_real_ep, WF.kappa_imag, WF.kappa_imag_ep])
+    print(WF._calc_gradient_optimization_DHF(WF.thetas_real + WF.thetas_imag, theta_optimization=True, kappa_ee_optimization=False,kappa_ep_optimization=False))
+
+    '''#kappas = np.concatenate([WF.kappa_real, WF.kappa_real_ep, WF.kappa_imag, WF.kappa_imag_ep])
 
     # gradient_test = get_orbital_gradient_generalized_real_imag(
     #             WF.h_mo,
@@ -688,9 +755,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     
     # print(E_tester_post)
 
-    # print(WF.kappa_no_activeactive_spin_idx_resp)
+    # print(WF.kappa_no_activeactive_spin_idx_resp)'''
 
-    LR = generalized_naive_DHF.LinearResponse(WF, excitations="S")
+    LR = generalized_naive_DHF.LinearResponse(WF, excitations="SD")
 
     LR.calc_excitation_energies()
     print("Excitation energies:", LR.excitation_energies)
@@ -805,7 +872,7 @@ def HBr():
         Br  0.0  0.0  1.41443 """
     #basis = "dyall-v2z"
     basis = "sto-3g"
-    active_space = ((1,1), 4)
+    active_space = ((2,2), 6)
     charge = 0
     spin = 0
     NR(
@@ -818,7 +885,7 @@ def HCl():
     #basis = "dyall-v2z"
     basis = "sto-3g"
     #active_space = ((2,2), 6)
-    active_space = ((2,2), 6)
+    active_space = ((1,1), 4)
     charge = 0
     spin = 0
     NR(

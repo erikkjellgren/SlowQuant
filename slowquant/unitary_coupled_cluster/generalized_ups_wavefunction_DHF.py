@@ -1135,7 +1135,7 @@ class GeneralizedWaveFunctionUPS:
                     self._kappa_real_old[i] = 0.0
                     self._kappa_imag_old[i] = 0.0
 
-                """
+                
                 # Positronic
                 if not is_silent_subiterations:
                     print("--------Orbital optimization e-p")
@@ -1155,7 +1155,7 @@ class GeneralizedWaveFunctionUPS:
                     kappa_ee_optimization=False,
                 )
 
-                angle_bound = np.pi / 2
+                angle_bound = np.pi / 100
                 bounds_ep = [(-angle_bound, angle_bound) for _ in range(2 * len(self.kappa_spin_idx_ep))]
 
                 optimizer = Optimizers(
@@ -1181,7 +1181,8 @@ class GeneralizedWaveFunctionUPS:
                     self._kappa_real_ep[i] = 0.0
                     self._kappa_imag_ep[i] = 0.0
                     self._kappa_real_old_ep[i] = 0.0
-                    self._kappa_imag_old_ep[i] = 0.0"""
+                    self._kappa_imag_old_ep[i] = 0.0
+            
             else:
                 # If there is no orbital optimization, then the algorithm is already converged.
                 e_new = res.fun
@@ -1639,6 +1640,7 @@ class GeneralizedWaveFunctionUPS:
                 list(self.ups_layout.grad_param_R.values())
             )  # Count energy measurements for all gradients
             #print(np.max(np.abs(gradient)))
+            #print(gradient)
         return gradient
 
     def _calc_energy_optimization(
