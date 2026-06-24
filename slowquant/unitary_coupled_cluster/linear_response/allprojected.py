@@ -12,6 +12,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_hessian_diagonal,
     get_orbital_metric_diagonal,
     get_orbital_gradient_response_right_transformed,
+    orbital_rotation_hamiltonian_commutator,
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
@@ -323,18 +324,30 @@ class LinearResponse(LinearResponseBaseClass):
 
                 # (A+B)_qG @ b_G
                 # (A-B)_qG @ b_G
-                for i, qi in enumerate(self.q_ops):
+                for i, kappa in enumerate(self.wf.kappa_no_activeactive_idx):
+                    qH_commutator = orbital_rotation_hamiltonian_commutator(
+                        self.wf.h_mo,
+                        self.wf.g_mo,
+                        kappa,
+                    )
+                    Hq = - hamiltonian_0i_0a(
+                        qH_commutator[0],
+                        qH_commutator[1],
+                        self.wf.num_inactive_orbs,
+                        self.wf.num_active_orbs,
+                    )
+                    Hq_ket = propagate_state([Hq], self.wf.ci_coeffs, *self.index_info)
                     # <0| Gsd H qi |0>
                     sigma_plus[i, root] += expectation_value(
                         Gsp_ket,
-                        [commutator(self.H_1i_1a, qi)],
-                        self.wf.ci_coeffs,
+                        [],
+                        Hq_ket,
                         *self.index_info,
                     )
                     sigma_minus[i, root] += expectation_value(
                         Gsm_ket,
-                        [commutator(self.H_1i_1a, qi)],
-                        self.wf.ci_coeffs,
+                        [],
+                        Hq_ket,
                         *self.index_info,
                     )
 

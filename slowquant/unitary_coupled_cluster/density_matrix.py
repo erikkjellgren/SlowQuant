@@ -738,3 +738,36 @@ def get_orbital_metric_diagonal(
         diagonal[idx1] -= RDM1(q, q, num_inactive_orbs, num_active_orbs, rdm1)
     diagonal *= 0.5
     return diagonal
+
+def orbital_rotation_hamiltonian_commutator(
+    h_int: np.ndarray,
+    g_int: np.ndarray,
+    kappa_idx: tuple[int, int],
+) -> tuple[np.ndarray, np.ndarray]:
+    r"""Calculate the orbital rotation Hamiltonian commutator.
+
+    .. math::
+        \left[\hat{\kappa}_{tu},\hat{H}\right]
+
+    Args:
+        h_int: One-electron integrals in MO in Hamiltonian.
+        g_int: Two-electron integrals in MO in Hamiltonian.
+        kappa_idx: Orbital parameter indices in spatial basis.
+
+    Returns:
+        Commutator of orbital rotation and Hamiltonian.
+    """
+    num_orbs = h_int.shape[0]
+    kappa_factor = 1 / np.sqrt(2)
+    u, t = kappa_idx
+    comm1e = np.zeros_like(h_int)
+    comm2e = np.zeros_like(g_int)
+
+    for p in range(num_orbs):
+        comm1e[t, p] += kappa_factor * h_int[u, p]
+        comm1e[p, u] -= kappa_factor * h_int[p, t]
+        for q in range(num_orbs):
+            for r in range(num_orbs):
+                comm2e[t, p, q, r] += 2 * kappa_factor * g_int[u, p, q, r]
+                comm2e[p, u, q, r] -= 2 * kappa_factor * g_int[p, t, q, r]
+    return comm1e, comm2e
