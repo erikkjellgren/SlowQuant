@@ -564,6 +564,8 @@ class LinearResponse(LinearResponseBaseClass):
         E2[size:, :size] = self.B.conjugate() #AE added conjugtate 
         E2[size:, size:] = self.A.conjugate() #AE added conjugtate 
 
+        print('Klassisk A', self.A)
+
         print(f"Hermiticity check of the Hessian: max|E2 - E2†| = "
             f"{np.max(np.abs(E2 - E2.conj().T)):.2e}")  
 

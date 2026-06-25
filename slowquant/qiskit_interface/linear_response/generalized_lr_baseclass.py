@@ -344,8 +344,6 @@ class quantumLRBaseClass:
         print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.metric)))}")
 
         
-
-
         # Solve eigenvalue equation
         eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)
         sorting = np.argsort(eigval)
@@ -391,11 +389,11 @@ class quantumLRBaseClass:
             # )
 
             # Pernille 
-            self._Z_qG_normed[:, state_number] = self._Z_qG[:, state_number] * (1 / norm) ** 0.5 * np.sign(norm.real)
-            self._Y_qG_normed[:, state_number] = self._Y_qG[:, state_number] * (1 / norm) ** 0.5 * np.sign(norm.real)
+            self._Z_qG_normed[:, state_number] = self._Z_qG[:, state_number] * (1 / norm) ** 0.5 #AE skal rettes??
+            self._Y_qG_normed[:, state_number] = self._Y_qG[:, state_number] * (1 / norm) ** 0.5 #AE skal rettes??
             
             self.normed_excitation_vectors[:, state_number] = (
-                self.excitation_vectors[:, state_number] * (1 / abs(norm)) ** 0.5 * np.sign(norm.real)
+                self.excitation_vectors[:, state_number] * (1 / norm) ** 0.5 #AE skal rettes??
             )
 
     def _get_excited_state_norm(self) -> np.ndarray:

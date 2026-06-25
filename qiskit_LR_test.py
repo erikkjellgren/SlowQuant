@@ -95,8 +95,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03599
         include_active_kappa=True,
     )
     # qWF.thetas = WF.thetas
-    qWF.set_thetas(WF.thetas_real, WF.thetas_imag)
-    qLR = q_generalized_naive.quantumLR(qWF, "SD")
+    qWF.set_thetas_initial(WF.thetas_real, WF.thetas_imag)
+    qLR = q_generalized_naive.quantumLR(qWF, "sd")
 
     qLR.run(do_rdm=True)
 
@@ -233,7 +233,7 @@ def h3():
 def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
-    basis = "STO-3g"
+    basis = "631-g"
     active_space = ((1, 1), 4) #spin orbitaler or spinor basis
     # active_space = (2, 4)
     charge = 0
