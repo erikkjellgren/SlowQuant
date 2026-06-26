@@ -54,15 +54,15 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03599
 
     ny_theta_real = np.random.uniform(-0.05, 0.05, len(WF.thetas))
     print(ny_theta_real)
-    ny_theta_imag = np.random.uniform(-0.05,0.05,len(WF.thetas)) 
-    # ny_theta_imag = [0.0] * len(WF.thetas)
+    # ny_theta_imag = np.random.uniform(-0.05,0.05,len(WF.thetas)) 
+    ny_theta_imag = [0.0] * len(WF.thetas)
     print(ny_theta_imag)
     WF.set_thetas(ny_theta_real, ny_theta_imag)
     print(WF.thetas)
 
 
-    # WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
-    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
+    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
+    # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
 
     print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
 
@@ -159,14 +159,14 @@ def noisy(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03
 
     ny_theta_real = np.random.uniform(-0.05, 0.05, len(WF.thetas))
     print(ny_theta_real)
-    ny_theta_imag = np.random.uniform(-0.05,0.05,len(WF.thetas)) 
-    # ny_theta_imag = [0.0] * len(WF.thetas)
+    # ny_theta_imag = np.random.uniform(-0.05,0.05,len(WF.thetas)) 
+    ny_theta_imag = [0.0] * len(WF.thetas)
     print(ny_theta_imag)
     WF.set_thetas(ny_theta_real, ny_theta_imag)
     print('Theats noisy',WF.thetas)
 
-    # WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
-    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
+    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
+    # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
 
     print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
     LR = generalized_naive.LinearResponse(WF, excitations="sd")
@@ -231,9 +231,9 @@ def h3():
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
-    noisy(
-        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
-    )
+    # noisy(
+    #     geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    # )
 
 
 def h2():
@@ -284,4 +284,4 @@ def h7():
 
 # h7()
 # h2()
-# h3()
+h3()

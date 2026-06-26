@@ -564,7 +564,6 @@ class LinearResponse(LinearResponseBaseClass):
         E2[size:, :size] = self.B.conjugate() #AE added conjugtate 
         E2[size:, size:] = self.A.conjugate() #AE added conjugtate 
 
-        print('Klassisk A', self.A)
 
         print(f"Hermiticity check of the Hessian: max|E2 - E2†| = "
             f"{np.max(np.abs(E2 - E2.conj().T)):.2e}")  
@@ -666,7 +665,7 @@ class LinearResponse(LinearResponseBaseClass):
             for i, G in enumerate(self.G_ops):
                 transfer_op += (
                     # self.Z_G_normed[i+shift, state_number] * G.dagger + self.Y_G_normed[i, state_number] * G
-                    self.Z_qG_normed[i+shift, state_number] * G.dagger + self.Y_qG_normed[i, state_number] * G #AE
+                    self.Z_qG_normed[i+shift, state_number] * G.dagger + self.Y_qG_normed[i+shift, state_number] * G #AE
                 ) #AE added + shift
             q_part_x = 0.0
             q_part_y = 0.0
@@ -751,14 +750,14 @@ class LinearResponse(LinearResponseBaseClass):
             transition_dipoles[state_number, 2] = q_part_z + transition_dipole_z
         return transition_dipoles
     
-    def get_oscillator_strengths(self, dipole_integrals):
-        # Check if the excitation energies have been calculated:
-        if not hasattr(self, "excitation_energies"):
-            self.excitation_energies = self.calc_excitation_energies()
-        # Calculate the transition dipole moments:
-        tdm = self.get_transition_dipole(dipole_integrals)
-        # Oscillator strengths:
-        return np.round((2/3*np.multiply(self.excitation_energies,(np.square(tdm[:,0])+np.square(tdm[:,1])+np.square(tdm[:,2])))).real,8)
+    # def get_oscillator_strengths(self, dipole_integrals):
+    #     # Check if the excitation energies have been calculated:
+    #     if not hasattr(self, "excitation_energies"):
+    #         self.excitation_energies = self.calc_excitation_energies()
+    #     # Calculate the transition dipole moments:
+    #     tdm = self.get_transition_dipole(dipole_integrals)
+    #     # Oscillator strengths:
+    #     return np.round((2/3*np.multiply(self.excitation_energies,(np.square(tdm[:,0])+np.square(tdm[:,1])+np.square(tdm[:,2])))).real,8)
 
 
     # def get_property_gradient(self, property_integrals: np.ndarray) -> np.ndarray:
