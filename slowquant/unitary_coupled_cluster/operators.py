@@ -734,3 +734,66 @@ def one_elec_op_1i_1a(
             if abs(ints_mo[p, q]) > 10**-14:
                 one_elec_op += ints_mo[p, q] * Epq(p, q)
     return one_elec_op
+
+
+def spin_number_op(num_spin_orb: int) -> FermionicOperator:
+    """Generates the number operator in spin basis.
+
+    Args:
+        num_spin_orb (int): The number of spin orbitals.
+
+    Returns:
+        FermionicOperator: The number operator.
+    """
+    spin_number_op = FermionicOperator({})
+
+    for i in range(num_spin_orb):
+        spin_number_op += a_op_spin(i, True) * a_op_spin(i, False)
+
+    return spin_number_op
+
+
+def S2_op(num_spatial_orb: int, num_spin_orb: int) -> FermionicOperator:
+    """Spin squared operator.
+
+    Args:
+        num_spatial_orb (int): Number of spatial orbitals.
+        num_spin_orb (int): Number of spin orbitals.
+
+    Returns:
+        FermionicOperator: The spin squared operator.
+    """
+    s2 = FermionicOperator({})
+
+    s2 += 3 / 4 * spin_number_op(num_spin_orb)
+
+    t1 = FermionicOperator({})
+    t2 = FermionicOperator({})
+
+    for p in range(num_spatial_orb):
+        for q in range(num_spatial_orb):
+            t11 = (
+                a_op(p, "alpha", True)
+                * a_op(q, "beta", True)
+                * a_op(p, "beta", False)
+                * a_op(q, "alpha", False)
+            )
+            t12 = (
+                a_op(p, "beta", True)
+                * a_op(q, "alpha", True)
+                * a_op(p, "alpha", False)
+                * a_op(q, "beta", False)
+            )
+            t1 += t11 + t12
+
+            n1 = a_op(p, "alpha", True) * a_op(p, "alpha", False) - a_op(p, "beta", True) * a_op(
+                p, "beta", False
+            )
+            n2 = a_op(q, "alpha", True) * a_op(q, "alpha", False) - a_op(q, "beta", True) * a_op(
+                q, "beta", False
+            )
+            t2 += n1 * n2
+
+    s2 -= 1 / 2 * t1
+    s2 += 1 / 4 * t2
+    return s2
