@@ -1,4 +1,16 @@
 import numpy as np
+
+# Compatibility patch for old code expecting np.complex
+if not hasattr(np, "complex"):
+    np.complex = complex
+
+if not hasattr(np, "float"):
+    np.float = float
+
+if not hasattr(np, "int"):
+    np.int = int
+
+
 import pyscf
 from pyscf import mcscf, scf, gto, x2c, lib
 from scipy.stats import unitary_group
@@ -16,6 +28,7 @@ warnings.filterwarnings('ignore', category=UserWarning, module='pyscf')
 
 from pyscf.prop.ssc.dhf import SSC
 from pyscf.prop.ssc.dhf import sa01sa01_integral
+from pyscf.prop.nmr import dhf as nmr_dhf
 
 from pyscf.scf import dhf
 
@@ -38,6 +51,8 @@ from slowquant.unitary_coupled_cluster.fermionic_operator import (
 )
 
 from slowquant.molecularintegrals.integralfunctions import DHF_one_electron_transform, DHF_two_electron_transform
+
+c = lib.param.LIGHT_SPEED
 
 def unpack_triangular_old(vec):
     """
@@ -243,7 +258,6 @@ def make_h1_ao_old(mol):
 
     return h1  # (natm, 3, n4c, n4c)
 
-
 def make_h1_ao_other(mol):
     """
     Construct relativistic SSC operator:
@@ -312,7 +326,6 @@ def make_h1_ao_other(mol):
 
     return h1
 
-
 def make_h1_ao_other_old(mol):
     """
     Construct relativistic SSC perturbation operator h1 in AO basis.
@@ -348,7 +361,6 @@ def make_h1_ao_other_old(mol):
             # Other blocks remain zero
 
     return h1
-
 
 def make_h1_ao_diff_int(mol):
     """
@@ -428,7 +440,7 @@ def make_h1_ao(mol):
         # (nabla-rinv cross sigma | sigma dot p)
         # = (sigma x r_M/r_M^3 | sigma dot p)  [RKB included via sp]
         # shape: (3, n2c, n2c)
-        a01 = mol.intor('int1e_sa01sp_spinor', comp=3)  *.5#*(0.25/c**2)  
+        a01 = mol.intor('int1e_sa01sp_spinor', comp=3)  *.5 #*(0.25/c**2)  
 
         for a in range(3):
                 # h1[I, a, :n2c, n2c:] = spin_factor*a01[a]      # LS block
@@ -438,9 +450,7 @@ def make_h1_ao(mol):
 
     return h1
 
-
-
-def make_h2_ao_shielding(mol):
+def make_h2_ao_shield(mol):
     """
     Diamagnetic property Hessian integrals for all atom pairs.
 
@@ -452,44 +462,248 @@ def make_h2_ao_shielding(mol):
     n4c = n2c * 2
     natm = mol.natm
 
-    h2 = np.zeros((natm, natm, 3, 3, n4c, n4c), dtype=np.complex128)
+
+    dia = np.zeros((natm, 3, 3, n4c, n4c), dtype=np.complex128)
 
     for I in range(natm):
-        for J in range(I, natm):
-            orig1 = mol.atom_coord(I)
-            orig2 = mol.atom_coord(J)
-            a01a01 = sa01sa01_integral(mol, orig1, orig2)  # (3, 3, n2c, n2c)
+        mol.set_rinv_origin(mol.atom_coord(I))
 
-            block = np.zeros((3, 3, n4c, n4c), dtype=np.complex128)
-            block[:, :, n2c:, :n2c] =  0.5 * a01a01
-            block[:, :, :n2c, n2c:] =  0.5 * a01a01.conj().transpose(0, 1, 3, 2)
+        #gauge_orig = None
 
-            h2[I, J] = block
-            h2[J, I] = block  # symmetric
+        gauge_orig = mol.set_common_orig([0,0,0])
 
-    return h2  # (natm, natm, 3, 3, n4c, n4c)
-
-
-n4c = dm0.shape[0]
-    n2c = n4c // 2
-    msc_dia = []
-    for n, atm_id in enumerate(shielding_nuc):
-        mol.set_rinv_origin(mol.atom_coord(atm_id))
-        if mb.upper() == 'RMB':
-            if gauge_orig is None:
-                t11 = mol.intor('int1e_giao_sa10sa01_spinor', 9)
-                t11 += mol.intor('int1e_spgsa01_spinor', 9)
+        test = True
+        
+        if test:
+            if gauge_orig is None: #This is running and matches pyscf
+                t11 = mol.intor('int1e_giao_sa10sa01_spinor', 9).reshape(3,3,n2c,n2c)
+                t11 += mol.intor('int1e_spgsa01_spinor', 9).reshape(3,3,n2c,n2c)
             else:
-                t11 = mol.intor('int1e_cg_sa10sa01_spinor', 9)
-        elif gauge_orig is None:
-            t11 = mol.intor('int1e_spgsa01_spinor', 9)
+                t11 = mol.intor('int1e_cg_sa10sa01_spinor', 9).reshape(3,3,n2c,n2c)
         else:
-            t11 = numpy.zeros(9)
-        h11 = numpy.zeros((9, n4c, n4c), complex)
-        for i in range(9):
-            h11[i,n2c:,:n2c] = t11[i] * .5
-            h11[i,:n2c,n2c:] = t11[i].conj().T * .5
+            t11 = mol.intor('int1e_spgsa01_spinor', 9)
 
+        for x in range(3):
+            for y in range(3):
+                dia[I,x,y,n2c:,:n2c] = t11[x,y] * .5
+                dia[I,x,y,:n2c,n2c:] = t11[x,y].conj().T * .5
+
+    return dia  # (natm, 3, 3, n4c, n4c)
+
+
+def make_h1_ao_shield(mol):
+    n2c = mol.nao_2c()
+    n4c = n2c * 2
+    natm = mol.natm
+
+    h01 = np.zeros((natm, 3, n4c, n4c), dtype=complex)
+
+    for I in range(natm):
+        mol.set_rinv_origin(mol.atom_coord(I))
+        t01 = mol.intor('int1e_sa01sp_spinor', 3)  #TRUE
+
+
+        #t01 = mol.intor('int1e_giao_sa10sa01_spinor', 3)
+        #t01 = mol.intor('int1e_spgsa01_spinor', 3)
+
+        for m in range(3):
+            h01[I, m, :n2c, n2c:] = 0.5 * t01[m]
+            h01[I, m, n2c:, :n2c] = 0.5 * t01[m].conj().T
+
+    return h01
+
+
+def make_h_B_ao(mol):
+    n2c = mol.nao_2c()
+    n4c = 2 * n2c
+    natm = mol.natm
+
+    hB = np.zeros((natm, 3, n4c, n4c), dtype=complex)
+
+    for I in range(natm):
+        coord = mol.atom_coord(I)
+        mol.set_common_orig([0,0,0])
+
+        
+        t1 = mol.intor('int1e_cg_sa10sp_spinor', 3)
+        #v1 = mol.intor('int1e_cg_sa10nucsp_spinor', 3)
+
+
+        #t1 = mol.intor('int1e_giao_sa10sp_spinor', 3)  #TRUE
+
+
+        #t1 = mol.intor('int1e_giao_sa10sa01_spinor', 3)
+        #t1 = mol.intor('int1e_spgsa01_spinor', 3)
+
+
+        
+
+        for b in range(3):
+            hB[I, b, :n2c, n2c:] =  0.5 * t1[b]
+            hB[I, b, n2c:, :n2c] =  0.5 * t1[b].conj().T
+
+            # hB[I, b, :n2c, n2c:] =  -t1[b]
+            # hB[I, b, n2c:, :n2c] =  -t1[b].conj().T
+
+            # hB[I, b, :n2c, n2c:] =  - 0.5 * t1[b]
+            # hB[I, b, n2c:, :n2c] =  - 0.5 * t1[b].conj().T
+
+            # t1cc = t1[b] + t1[b].conj().T
+            # hB[I,b,:n2c,n2c:] += t1cc * .5
+            # hB[I,b,n2c:,:n2c] += t1cc * .5
+            # hB[I,b,n2c:,n2c:] +=-t1cc * .5 + (v1[b]+v1[b].conj().T) * (.25/c**2)
+
+    return hB
+
+def make_h_B_2e_ao(mol):
+    n2c = mol.nao_2c()
+    c1 = 0.5 / c
+
+    mol.set_common_origin([0, 0, 0])
+
+    # Perturbed 2e integrals, shape (3, n2c, n2c, n2c, n2c)
+    g_ssss = mol.intor('int2e_cg_sa10sp1spsp2_spinor', 3) * c1**4
+    g_lsss = mol.intor('int2e_cg_sa10sp1_spinor', 3)      * c1**2
+
+    return g_ssss, g_lsss  # return AO integrals
+
+
+# Old functions:
+
+def make_h1_ao_shield_recent(mol):
+    n2c = mol.nao_2c()
+    n4c = n2c * 2
+    natm = mol.natm
+
+    h01 = np.zeros((natm, 3, n4c, n4c), dtype=complex)
+
+    for I in range(natm):
+        mol.set_rinv_origin(mol.atom_coord(I))
+
+        # int1e_spgsa01_spinor = (g sigma.p | nabla-rinv x sigma)
+        # shape (9,) = (3,3): first index = B-field, second = nuclear
+        # this IS the gauge-invariant version of int1e_sa01sp_spinor
+        t01_giao = mol.intor('int1e_spgsa01_spinor', 9).reshape(3, 3, n2c, n2c)
+
+        for m in range(3):
+            h01[I, m, :n2c, n2c:] = 0.5 * t01_giao[m, m]
+            h01[I, m, n2c:, :n2c] = 0.5 * t01_giao[m, m].conj().T
+
+    return h01
+
+def make_h1_ao_shield_tester(mol):
+    n2c = mol.nao_2c()
+    n4c = n2c * 2
+    natm = mol.natm
+
+    h01 = np.zeros((natm, 3, n4c, n4c), dtype=complex)
+
+    for I in range(natm):
+        mol.set_rinv_origin(mol.atom_coord(I))
+
+        t11  = mol.intor('int1e_giao_sa10sa01_spinor', 9).reshape(3, 3, n2c, n2c)
+        t11 += mol.intor('int1e_spgsa01_spinor', 9).reshape(3, 3, n2c, n2c)
+        # sum over B-field index to get gauge invariant nuclear operator
+        for m in range(3):
+            mat = t11[:, m].sum(axis=0)  # sum over B-field index
+            h01[I, m, :n2c, n2c:] = 0.5 * mat
+            h01[I, m, n2c:, :n2c] = 0.5 * mat.conj().T
+
+    return h01
+
+def make_h1_ao_shield_trial(mol):
+    n2c = mol.nao_2c()
+    n4c = n2c * 2
+    natm = mol.natm
+
+    h01 = np.zeros((natm, 3, n4c, n4c), dtype=complex)
+
+    for I in range(natm):
+        mol.set_rinv_origin(mol.atom_coord(I))
+
+        # Mirrors make_h2_ao_shield exactly:
+        # main: int1e_giao_sa10sa01 but we only need sa01 side -> int1e_sa01sp
+        # correction: int1e_spgsa01 -> diagonal [m,m]
+        t01      = mol.intor('int1e_sa01sp_spinor', 3)                               # (3, n2c, n2c)
+        t01_corr = mol.intor('int1e_spgsa01_spinor', 9).reshape(3, 3, n2c, n2c)      # (3, 3, n2c, n2c)
+
+        for m in range(3):
+            mat = t01[m] + t01_corr[m, m]
+            h01[I, m, n2c:, :n2c] = 0.5 * mat            # SL block, same as make_h2_ao_shield
+            h01[I, m, :n2c, n2c:] = 0.5 * mat.conj().T   # LS block
+
+    return h01
+
+def make_h1_ao_shield_corr(mol):
+    n2c = mol.nao_2c()
+    n4c = n2c * 2
+    natm = mol.natm
+
+    h01 = np.zeros((natm, 3, n4c, n4c), dtype=complex)
+
+    for I in range(natm):
+        mol.set_rinv_origin(mol.atom_coord(I))
+
+        t01      = mol.intor('int1e_sa01sp_spinor', 3)      # (3, n2c, n2c)
+        t01_giao = mol.intor('int1e_spgsa01_spinor', 9).reshape(3, 3, n2c, n2c)  # GIAO correction
+
+        for m in range(3):
+            # main term + GIAO correction summed over B-field directions
+            mat = t01[m] + t01_giao[m, m]
+            h01[I, m, :n2c, n2c:] = 0.5 * mat
+            h01[I, m, n2c:, :n2c] = 0.5 * mat.conj().T
+
+    return h01
+
+def make_h_B_ao_corr(mol):
+    n2c = mol.nao_2c()
+    n4c = 2 * n2c
+
+    hB = np.zeros((3, n4c, n4c), dtype=complex)
+
+    t1      = mol.intor('int1e_giao_sa10sp_spinor', 3)           # (3, n2c, n2c)
+    t1_corr = mol.intor('int1e_spgsp_spinor', 9).reshape(3, 3, n2c, n2c)  # (3, 3, n2c, n2c)
+
+    for b in range(3):
+        mat = t1[b] + t1_corr[b, b]   # diagonal only, same as t01_giao[m,m]
+        hB[b, :n2c, n2c:] = 0.5 * mat
+        hB[b, n2c:, :n2c] = 0.5 * mat.conj().T
+
+    return hB
+
+def make_h_B_ao_corr_orig(mol):
+    n2c = mol.nao_2c()
+    n4c = 2 * n2c
+
+    natm = mol.natm
+
+    hB = np.zeros((natm, 3, n4c, n4c), dtype=complex)
+
+    for I in range(natm):
+        mol.set_rinv_origin(mol.atom_coord(I))
+        t1      = mol.intor('int1e_giao_sa10sp_spinor', 3)                          # (3, n2c, n2c)
+        t1_corr = mol.intor('int1e_spgsp_spinor', 9).reshape(3, 3, n2c, n2c)        # (3,3,n2c,n2c) -> diagonal
+        
+        for b in range(3):
+            mat = t1[b] + t1_corr[b, b]
+            hB[I, b, :n2c, n2c:] = -0.5*mat
+            hB[I, b, n2c:, :n2c] = -0.5*mat.conj().T
+
+    return hB
+
+def make_h_B_ao_old(mol):
+    n2c = mol.nao_2c()
+    n4c = 2 * n2c
+
+    hB = np.zeros((3, n4c, n4c), dtype=complex)
+
+    t1 = mol.intor('int1e_giao_sa10sp_spinor', 3)
+
+    for b in range(3):
+        hB[b, :n2c, n2c:] = -t1[b]
+        hB[b, n2c:, :n2c] = -t1[b].conj().T
+
+    return hB
 
 
 
@@ -540,6 +754,17 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     jj = sscobj.kernel()
 
 
+    nmr = nmr_dhf.NMR(mf)
+    nmr.cphf = True
+    nmr.mb = 'RKB'      # or 'RKB'
+    nmr.gauge_orig = [0,0,0]  # GIAO
+
+    shielding = nmr.kernel()
+
+    sigma_iso = np.trace(shielding, axis1=1, axis2=2) / 3
+    print(sigma_iso)
+
+
     # print("PySCF e11 (raw, before Hz conversion):", jj)
     # print("PySCF Tr(e11)/3:", np.trace(jj[0])/3)
 
@@ -582,12 +807,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF = GeneralizedWaveFunctionUPS(
         mol.nelectron,
         active_space,
-        #C_MO,
-        C_U,
+        C_MO,
+        #C_U,
         h_core,
         g_eri,
         "fUCCSD",
-        {"n_layers":1, "is_spin_conserving" : False},
+        {"n_layers":0, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
@@ -685,9 +910,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     #WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
 
-    WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-8, maxiter = 1000)
+    #WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-8, maxiter = 1000)
 
-    print(WF._calc_gradient_optimization_DHF(WF.thetas_real + WF.thetas_imag, theta_optimization=True, kappa_ee_optimization=False,kappa_ep_optimization=False))
+    #print(WF._calc_gradient_optimization_DHF(WF.thetas_real + WF.thetas_imag, theta_optimization=True, kappa_ee_optimization=False,kappa_ep_optimization=False))
 
     '''#kappas = np.concatenate([WF.kappa_real, WF.kappa_real_ep, WF.kappa_imag, WF.kappa_imag_ep])
 
@@ -757,12 +982,23 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # print(WF.kappa_no_activeactive_spin_idx_resp)'''
 
-    LR = generalized_naive_DHF.LinearResponse(WF, excitations="SD")
+    LR = generalized_naive_DHF.LinearResponse(WF, excitations="S")
 
     LR.calc_excitation_energies()
     print("Excitation energies:", LR.excitation_energies)
     #print(np.round(LR.get_transition_dipole(dip_int).real,5))
     #print(LR.get_oscillator_strengths(dip_int))
+
+    h1_shield = make_h1_ao_shield(mol)
+    h2_shield = make_h2_ao_shield(mol)
+    hb_shield = make_h_B_ao(mol)
+    g_ssss, g_lsss = make_h_B_2e_ao(mol)
+
+    shieldings = LR.get_shieldings_4comp_iso(h1_shield, h2_shield, hb_shield, g_ssss, g_lsss)
+
+    print("Shieldings:")
+    print(shieldings)
+
 
     SSCC = LR.get_SSCC_4comp_iso(h1, h2)
     for I in range(SSCC.shape[0]):
@@ -783,7 +1019,7 @@ def H2():
     #basis = dyall_v2z
     #basis = "sto-3g"
     #basis = "sto-6g"
-    active_space = ((1, 1), 4)
+    active_space = ((1, 1), 2)
     #active_space = (2, 4)
     charge = 0
     spin = 0
@@ -828,7 +1064,7 @@ def HF():
     #basis = "631-g"
     basis = "sto-3g"
     #active_space = ((1, 1), 4)
-    active_space = ((1, 1), 4)
+    active_space = ((1, 1), 2)
     #active_space = (2, 4)
     charge = 0
     spin = 0
@@ -885,7 +1121,7 @@ def HCl():
     #basis = "dyall-v2z"
     basis = "sto-3g"
     #active_space = ((2,2), 6)
-    active_space = ((1,1), 4)
+    active_space = ((1,1), 2)
     charge = 0
     spin = 0
     NR(
@@ -894,4 +1130,4 @@ def HCl():
     
 ###RUN SCRIPT###
 
-H2()
+HF()

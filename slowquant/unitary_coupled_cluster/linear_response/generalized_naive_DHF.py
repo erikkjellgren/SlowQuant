@@ -1668,3 +1668,210 @@ class LinearResponse(LinearResponseBaseClass):
 
 
         return ktensor  # reduced K (Hz), (natm, natm)
+    
+
+
+    
+    def get_shieldings_4comp_iso(self, h1: np.ndarray, h2: np.ndarray, hb: np.ndarray,g_ssss: np.ndarray, g_lsss: np.ndarray) -> np.ndarray:
+        # Hessian and metric:
+        # size = len(self.A)
+
+        # E2 = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
+        # E2[:size, :size] = self.A
+        # E2[:size, size:] = self.B
+        # E2[size:, :size] = self.B.conjugate() #AE added conjugtate 
+        # E2[size:, size:] = self.A.conjugate() #AE added conjugtate 
+
+        # S = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
+        # S[:size, :size] = self.Sigma
+        # S[:size, size:] = self.Delta
+        # S[size:, :size] = -self.Delta.conjugate()
+        # S[size:, size:] = -self.Sigma.conjugate()
+
+        natm = h1.shape[0]
+
+        num_parameters = len(self.G_ops) + len(self.q_ops_resp)
+        A_mat     = np.zeros((num_parameters, num_parameters), dtype=complex)
+        B_mat     = np.zeros((num_parameters, num_parameters), dtype=complex)
+
+        if len(self.q_ops_resp) != 0:
+            A_mat[:len(self.wf.kappa_no_activeactive_spin_idx_ep), :len(self.wf.kappa_no_activeactive_spin_idx_ep)] = get_orbital_response_hessian_block(
+                self.wf.h_mo, self.wf.g_mo,
+                #self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
+                #self.wf.kappa_no_activeactive_spin_idx_resp,
+                self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+                self.wf.kappa_no_activeactive_spin_idx_ep,
+                self.wf.num_spin_orbs_NES,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.rdm1, self.wf.rdm2,
+            )
+            A_mat[: len(self.wf.kappa_no_activeactive_spin_idx_ep), len(self.wf.kappa_no_activeactive_spin_idx_ep) : len(self.q_ops_resp)] = get_orbital_response_hessian_block(
+                self.wf.h_mo, self.wf.g_mo,
+                self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+                self.wf.kappa_no_activeactive_spin_idx,
+                self.wf.num_spin_orbs_NES,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.rdm1, self.wf.rdm2,
+            )
+            A_mat[len(self.wf.kappa_no_activeactive_spin_idx_ep) : len(self.q_ops_resp), : len(self.wf.kappa_no_activeactive_spin_idx_ep)] = get_orbital_response_hessian_block(
+                self.wf.h_mo, self.wf.g_mo,
+                self.wf.kappa_no_activeactive_spin_idx_dagger,
+                self.wf.kappa_no_activeactive_spin_idx_ep,
+                self.wf.num_spin_orbs_NES,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.rdm1, self.wf.rdm2,
+            )
+            A_mat[len(self.wf.kappa_no_activeactive_spin_idx_ep) : len(self.q_ops_resp), len(self.wf.kappa_no_activeactive_spin_idx_ep) : len(self.q_ops_resp)] = get_orbital_response_hessian_block(
+                self.wf.h_mo, self.wf.g_mo,
+                self.wf.kappa_no_activeactive_spin_idx_dagger,
+                self.wf.kappa_no_activeactive_spin_idx,
+                self.wf.num_spin_orbs_NES,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.rdm1, self.wf.rdm2,
+            )
+
+            B_mat[: len(self.q_ops_resp), : len(self.q_ops_resp)] = get_orbital_response_hessian_block(
+                self.wf.h_mo, self.wf.g_mo,
+                self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
+                self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
+                self.wf.num_spin_orbs_NES,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.rdm1, self.wf.rdm2,
+            )
+        
+
+        size = len(A_mat)
+        E2_mat = np.zeros((size * 2, size * 2), dtype=complex)
+        E2_mat[:size, :size] = A_mat
+        E2_mat[:size, size:] = B_mat
+        E2_mat[size:, :size] = B_mat.conjugate()
+        E2_mat[size:, size:] = A_mat.conjugate()
+
+        '''# Transform perturbed 2e integrals to MO basis
+        # g_ssss shape: (3, n2c, n2c, n2c, n2c) — need to embed in n4c first
+        n4c = self.wf.c_mo.shape[0]
+        n2c = n4c // 2
+
+        # Embed in full 4c space and transform
+        h_2e_correction = np.zeros((3, size_mo, size_mo), dtype=complex)
+
+        for b in range(3):
+            # Coulomb - exchange for each b direction
+            # Contract over rs with RDM1: eff_pq = sum_rs (pq|rs) D_rs - (ps|rq) D_rs
+            
+            # Build effective AO matrix
+            eff_ssss = np.zeros((n2c, n2c), dtype=complex)
+            eff_lsss = np.zeros((n2c, n2c), dtype=complex)
+
+            for i in range(size_mo):
+                for j in range(size_mo):
+                    rdm1_ij = RDM1(
+                        i, j,
+                        self.wf.num_spin_orbs_NES,
+                        self.wf.num_inactive_spin_orbs,
+                        self.wf.num_active_spin_orbs,
+                        self.wf.rdm1,
+                    )
+                    # Coulomb: sum_rs g[b,p,q,r,s] * D[r,s]
+                    eff_ssss += rdm1_ij * np.einsum(
+                        'pqrs,r,s->pq',
+                        g_ssss[b],
+                        self.wf.c_mo[n2c:, i],
+                        self.wf.c_mo[n2c:, j].conj()
+                    )
+                    eff_lsss += rdm1_ij * np.einsum(
+                        'pqrs,r,s->pq',
+                        g_lsss[b],
+                        self.wf.c_mo[n2c:, i],
+                        self.wf.c_mo[n2c:, j].conj()
+                    )
+
+            # Embed in full 4c AO matrix
+            eff_ao = np.zeros((n4c, n4c), dtype=complex)
+            eff_ao[n2c:, n2c:] = eff_ssss  # SS block
+            eff_ao[:n2c, :n2c] = eff_lsss  # LL block
+
+            # Transform to MO basis
+            h_2e_correction[b] = DHF_one_electron_transform(self.wf.c_mo, eff_ao)'''
+
+
+
+        # Paramagnetic:
+        # Property gradients: shape (num_parameters, 3)
+        prop_grads_h1 = [self.get_property_gradient_4comp(h1[I]) for I in range(natm)]
+        prop_grads_B  = [self.get_property_gradient_4comp(hb[I]) for I in range(natm)]
+        #prop_grads_B  = self.get_property_gradient_4comp_no_ep(hb)
+
+        response_B = [
+            np.linalg.pinv(E2_mat, rcond=1e-10) @ prop_grads_B[I]
+            for I in range(natm)
+        ]
+
+        msc_para = np.zeros((natm, 3, 3))
+
+        for I in range(natm):
+            for alpha in range(3):
+                for beta in range(3):
+                    msc_para[I, alpha, beta] = np.einsum(
+                        'i,i->',
+                        -prop_grads_h1[I][:, alpha].conj(),
+                        response_B[I][:, beta]
+                    ).real
+
+
+        # Diamagnetic:
+        size_mo = (
+            self.wf.num_spin_orbs_NES
+            + self.wf.num_inactive_spin_orbs
+            + self.wf.num_active_spin_orbs
+            + self.wf.num_virtual_spin_orbs
+        )
+
+        mo2 = np.zeros((natm, 3, 3, size_mo, size_mo), dtype=complex)
+
+        for I in range(natm):
+            for a in range(3):
+                for b in range(3):
+                    mo2[I, a, b] = DHF_one_electron_transform(
+                        self.wf.c_mo,
+                        h2[I, a, b]
+                    )
+
+        msc_dia = np.zeros((natm, 3, 3))
+
+        for I in range(natm):
+            for a in range(3):
+                for b in range(3):
+                    for i in range(size_mo):
+                        for j in range(size_mo):
+                            rdm1_ij = RDM1(
+                                i, j,
+                                self.wf.num_spin_orbs_NES,
+                                self.wf.num_inactive_spin_orbs,
+                                self.wf.num_active_spin_orbs,
+                                self.wf.rdm1,
+                            )
+                            msc_dia[I, a, b] += (mo2[I, a, b, i, j] * rdm1_ij).real
+
+        # Units, returning and printing:
+        unit_ppm = nist.ALPHA**2 * 1e6
+
+        msc_para *= unit_ppm
+        msc_dia *= unit_ppm
+
+        sigma_total = msc_para #+ msc_dia
+
+        print("para")
+        print(msc_para)
+        print("dia")
+        print(msc_dia)
+
+        return np.trace(sigma_total, axis1=1, axis2=2) / 3
+    
+
+
