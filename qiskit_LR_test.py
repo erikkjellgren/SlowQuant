@@ -220,7 +220,7 @@ def h3():
     geometry = """H  0.000000   0.000000       0.000000;
                   H  1.000000   0.000000       0.000000;
                   H  0.500000   0.8660254038   0.000000"""
-    basis = "631-++g"
+    basis = "631-g"
     # basis = "STO-3G"
     # basis = "6-311-g**"
     active_space = ((2, 1), 6)
@@ -231,9 +231,9 @@ def h3():
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
-    # noisy(
-    #     geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
-    # )
+    noisy(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
 
 
 def h2():
