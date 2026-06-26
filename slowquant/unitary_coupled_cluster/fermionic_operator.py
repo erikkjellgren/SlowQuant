@@ -470,6 +470,100 @@ class FermionicOperator:
                 operators[new_key] = fac * self.operators[op_key]
         return FermionicOperator(operators)
 
+    def get_folded_operator(
+        self, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int
+    ) -> FermionicOperator:
+        r"""Get folded operator.
+
+        Operator is split into spaces
+
+        .. math::
+            \hat{O} = \hat{O}_I\otimes \hat{O}_A\otimes \hat{O}_V
+
+        giving the expectation values as
+
+        .. math::
+            \left<0\left(\boldsymbol{\theta}\right)\left|\hat{O}\right|0\left(\boldsymbol{\theta}\right)\right>
+            = \left<I\left|\hat{O}_{I}\right|I\right>\otimes \left<A\left(\boldsymbol{\theta}\right)\left|\hat{O}_{A}\right|A\left(\boldsymbol{\theta}\right)\right>
+                \otimes\left<V\left|\hat{O}_{V}\right|V\right>
+
+        where the inactive and virtual parts follow simple annihilation operator arguments, leaving just the active part.
+
+        Warning, multiplication of folded operators, might give wrong operators.
+        (I have not quite figured out a good programming structure that will not allow multiplication after folding)
+
+        Note, that the indices of the folded operator is remapped, such that idx=0 is the first index in the active space.
+
+        Args:
+            num_inactive_orbs: Number of spatial inactive orbitals.
+            num_active_orbs: Number of spatial active orbitals.
+            num_virtual_orbs: Number of spatial virtual orbitals.
+
+        Returns:
+           Folded fermionic operator.
+        """
+        operators: dict[tuple[tuple[int, bool], ...], float | complex] = {}
+        inactive_idx = []
+        active_idx = []
+        virtual_idx = []
+        # Get indices of spaces
+        for i in range(2 * num_inactive_orbs + 2 * num_active_orbs + 2 * num_virtual_orbs):
+            if i < 2 * num_inactive_orbs:
+                inactive_idx.append(i)
+            elif i < 2 * num_inactive_orbs + 2 * num_active_orbs:
+                active_idx.append(i)
+            else:
+                virtual_idx.append(i)
+
+        # Loop over string of annihilation operators
+        for op_key in self.operators.keys():
+            virtual = []
+            virtual_dagger = []
+            inactive = []
+            inactive_dagger = []
+            active = []
+            active_dagger = []
+            fac = 1
+            # Loop over individual annihilation operator and sort into spaces
+            for anni in op_key:
+                if anni[1]:
+                    if anni[0] in inactive_idx:
+                        inactive_dagger.append(anni[0])
+                    elif anni[0] in active_idx:
+                        active_dagger.append((anni[0] - 2 * num_inactive_orbs, anni[1]))
+                    elif anni[0] in virtual_idx:
+                        virtual_dagger.append(anni[0])
+                elif anni[0] in inactive_idx:
+                    inactive.append(anni[0])
+                elif anni[0] in active_idx:
+                    active.append((anni[0] - 2 * num_inactive_orbs, anni[1]))
+                elif anni[0] in virtual_idx:
+                    virtual.append(anni[0])
+            # Any virtual indices will make the operator evaluate to zero.
+            if len(virtual) != 0 or len(virtual_dagger) != 0:
+                continue
+            active_op = active_dagger + active  # list
+            bra_side = inactive_dagger
+            ket_side = inactive
+            # The inactive bra and ket side must end up giving identical state vectors.
+            if bra_side != ket_side:
+                continue
+            if len(inactive_dagger) % 2 == 1 and len(active_dagger) % 2 == 1:
+                fac *= -1
+            # Calculate sign coming from flipping the order of the ket side.
+            # It has to be "flipped" to match the order on the bra side.
+            ket_flip_fac = 1
+            for i in range(1, len(ket_side) + 1):
+                if i % 2 == 0:
+                    ket_flip_fac *= -1
+            fac *= ket_flip_fac
+            new_key = tuple(active_op)
+            if new_key in operators.keys():
+                operators[new_key] += fac * self.operators[op_key]
+            else:
+                operators[new_key] = fac * self.operators[op_key]
+        return FermionicOperator(operators)
+        
     def get_info(self) -> tuple[list[list[int]], list[list[int]], list[float | complex]]:
         """Return operator excitation in ordered strings with coefficient."""
         operator = self.operators_readable
@@ -486,3 +580,5 @@ class FermionicOperator:
             creation.append(c)
             annihilation.append(a)
         return annihilation, creation, coefficients
+
+

@@ -564,6 +564,8 @@ class LinearResponse(LinearResponseBaseClass):
         E2[size:, :size] = self.B.conjugate() #AE added conjugtate 
         E2[size:, size:] = self.A.conjugate() #AE added conjugtate 
 
+        print('Klassisk A', self.A)
+
         print(f"Hermiticity check of the Hessian: max|E2 - E2†| = "
             f"{np.max(np.abs(E2 - E2.conj().T)):.2e}")  
 
@@ -663,7 +665,8 @@ class LinearResponse(LinearResponseBaseClass):
             transfer_op = FermionicOperator({})
             for i, G in enumerate(self.G_ops):
                 transfer_op += (
-                    self.Z_G_normed[i+shift, state_number] * G.dagger + self.Y_G_normed[i, state_number] * G
+                    # self.Z_G_normed[i+shift, state_number] * G.dagger + self.Y_G_normed[i, state_number] * G
+                    self.Z_qG_normed[i+shift, state_number] * G.dagger + self.Y_qG_normed[i, state_number] * G #AE
                 ) #AE added + shift
             q_part_x = 0.0
             q_part_y = 0.0

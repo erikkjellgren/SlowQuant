@@ -7,6 +7,7 @@ from slowquant.qiskit_interface.generalized_circuit_wavefunction import Generali
 from slowquant.unitary_coupled_cluster.generalized_operators import (
     generalized_hamiltonian_0i_0a,
     generalized_hamiltonian_1i_1a,
+    generalized_hamiltonian_full_space
 )
 from slowquant.unitary_coupled_cluster.operators import (
     G1, #AE
@@ -53,6 +54,11 @@ class quantumLRBaseClass:
         self.G_ops = []
         self.q_ops = []
         excitations = excitations.lower()
+        self.operator_labels_q = [] #AE
+        self.operator_labels_G = [] #AE
+        self.G_ops_finite: int = 0 #PERNILLE
+        self.q_ops_finite: int = 0 #PERNILLE
+
 
         if "s" in excitations:
             for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx, is_spin_conserving=False): #AE -SA +SO
@@ -80,18 +86,18 @@ class quantumLRBaseClass:
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
         # q
         for p, q in wf.kappa_no_activeactive_spin_idx: #AE
-            self.q_ops.append(G1_sa(p, q))
+            self.q_ops.append(G1(p, q))
 
         num_parameters = len(self.q_ops) + len(self.G_ops)
         self.num_params = num_parameters
         self.num_q = len(self.q_ops)
         self.num_G = len(self.G_ops)
-        self.A = np.zeros((num_parameters, num_parameters))
-        self.B = np.zeros((num_parameters, num_parameters))
-        self.Sigma = np.zeros((num_parameters, num_parameters))
-        self.Delta = np.zeros((num_parameters, num_parameters))
+        self.A = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
+        self.B = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
+        self.Sigma = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
+        self.Delta = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
 
-        self.orbs = [self.wf.num_inactive_spin_orbs, self.wf.num_active_spin_orbs, self.wf.num_virtual_spin_orbs] #AE
+        self.orbs = [self.wf.num_inactive_spin_orbs//2, self.wf.num_active_spin_orbs//2, self.wf.num_virtual_spin_orbs//2] #AE ændret..
 
     def get_operator_info(self) -> None:
         """Information about operators."""
@@ -315,17 +321,17 @@ class quantumLRBaseClass:
         """Solve LR eigenvalue problem."""
         # Build Hessian and Metric
         size = len(self.A)
-        self.Delta = np.zeros_like(self.Sigma)
-        self.hessian = np.zeros((size * 2, size * 2))
+        self.Delta = np.zeros_like(self.Sigma, dtype=complex)
+        self.hessian = np.zeros((size * 2, size * 2), dtype=complex)
         self.hessian[:size, :size] = self.A
         self.hessian[:size, size:] = self.B
-        self.hessian[size:, :size] = self.B
-        self.hessian[size:, size:] = self.A
-        self.metric = np.zeros((size * 2, size * 2))
+        self.hessian[size:, :size] = self.B.conjugate()
+        self.hessian[size:, size:] = self.A.conjugate()
+        self.metric = np.zeros((size * 2, size * 2), dtype=complex)
         self.metric[:size, :size] = self.Sigma
         self.metric[:size, size:] = self.Delta
-        self.metric[size:, :size] = -self.Delta
-        self.metric[size:, size:] = -self.Sigma
+        self.metric[size:, :size] = -self.Delta.conjugate()
+        self.metric[size:, size:] = -self.Sigma.conjugate()
 
         # Check eigenvalues of Hessian/Metric
         (
@@ -337,37 +343,57 @@ class quantumLRBaseClass:
             print("WARNING: Negative eigenvalue in Hessian.")
         print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.metric)))}")
 
+        
         # Solve eigenvalue equation
         eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)
         sorting = np.argsort(eigval)
         self.excitation_energies = np.real(eigval[sorting][size:])
-        self.excitation_vectors = np.real(eigvec[:, sorting][:, size:])
+        self.excitation_vectors = (eigvec[:, sorting][:, size:]) #AE fjernet np.real
+
+        #pernille
+        self.num_q = self.q_ops_finite
+        self.num_qG = size
 
         return self.excitation_energies
 
     def get_normed_excitation_vectors(self) -> None:
         """Get normed excitation vectors via excited state norm."""
-        self.normed_excitation_vectors = np.zeros_like(self.excitation_vectors)
-        self._Z_q = self.excitation_vectors[: self.num_q, :]
-        self._Z_G = self.excitation_vectors[self.num_q : self.num_q + self.num_G, :]
-        self._Y_q = self.excitation_vectors[self.num_q + self.num_G : 2 * self.num_q + self.num_G]
-        self._Y_G = self.excitation_vectors[2 * self.num_q + self.num_G :]
-        self._Z_q_normed = np.zeros_like(self._Z_q)
-        self._Z_G_normed = np.zeros_like(self._Z_G)
-        self._Y_q_normed = np.zeros_like(self._Y_q)
-        self._Y_G_normed = np.zeros_like(self._Y_G)
+        self.normed_excitation_vectors = np.zeros_like(self.excitation_vectors, dtype=complex)
+
+        # Pernille block-remap til qG struktur
+        self._Z_qG = self.excitation_vectors[: self.num_qG, :]
+        self._Y_qG = self.excitation_vectors[self.num_qG :, :]
+        self._Z_qG_normed = np.zeros_like(self._Z_qG, dtype=complex)
+        self._Y_qG_normed = np.zeros_like(self._Y_qG, dtype=complex)
+
+        # self._Z_q = self.excitation_vectors[: self.num_q, :]
+        # self._Z_G = self.excitation_vectors[self.num_q : self.num_q + self.num_G, :]
+        # self._Y_q = self.excitation_vectors[self.num_q + self.num_G : 2 * self.num_q + self.num_G]
+        # self._Y_G = self.excitation_vectors[2 * self.num_q + self.num_G :]
+        # self._Z_q_normed = np.zeros_like(self._Z_q, dtype=complex)
+        # self._Z_G_normed = np.zeros_like(self._Z_G, dtype=complex)
+        # self._Y_q_normed = np.zeros_like(self._Y_q, dtype=complex)
+        # self._Y_G_normed = np.zeros_like(self._Y_G, dtype=complex)
 
         norms = self._get_excited_state_norm()
         for state_number, norm in enumerate(norms):
             if norm < 10**-10:
                 print(f"WARNING: State number {state_number} could not be normalized. Norm of {norm}.")
                 continue
-            self._Z_q_normed[:, state_number] = self._Z_q[:, state_number] * (1 / norm) ** 0.5
-            self._Z_G_normed[:, state_number] = self._Z_G[:, state_number] * (1 / norm) ** 0.5
-            self._Y_q_normed[:, state_number] = self._Y_q[:, state_number] * (1 / norm) ** 0.5
-            self._Y_G_normed[:, state_number] = self._Y_G[:, state_number] * (1 / norm) ** 0.5
+            # self._Z_q_normed[:, state_number] = self._Z_q[:, state_number] * (1 / norm) ** 0.5
+            # self._Z_G_normed[:, state_number] = self._Z_G[:, state_number] * (1 / norm) ** 0.5
+            # self._Y_q_normed[:, state_number] = self._Y_q[:, state_number] * (1 / norm) ** 0.5
+            # self._Y_G_normed[:, state_number] = self._Y_G[:, state_number] * (1 / norm) ** 0.5
+            # self.normed_excitation_vectors[:, state_number] = (
+            #     self.excitation_vectors[:, state_number] * (1 / norm) ** 0.5
+            # )
+
+            # Pernille 
+            self._Z_qG_normed[:, state_number] = self._Z_qG[:, state_number] * (1 / norm) ** 0.5 #AE skal rettes??
+            self._Y_qG_normed[:, state_number] = self._Y_qG[:, state_number] * (1 / norm) ** 0.5 #AE skal rettes??
+            
             self.normed_excitation_vectors[:, state_number] = (
-                self.excitation_vectors[:, state_number] * (1 / norm) ** 0.5
+                self.excitation_vectors[:, state_number] * (1 / norm) ** 0.5 #AE skal rettes??
             )
 
     def _get_excited_state_norm(self) -> np.ndarray:
@@ -376,18 +402,24 @@ class quantumLRBaseClass:
         Returns:
             Norm of excited states.
         """
-        norms = np.zeros(len(self._Z_G[0]))
-        for state_number in range(len(self._Z_G[0])):
-            # Get Z_q Z_G Y_q and Y_G matrices
-            ZZq = np.outer(self._Z_q[:, state_number], self._Z_q[:, state_number].transpose())
-            YYq = np.outer(self._Y_q[:, state_number], self._Y_q[:, state_number].transpose())
-            ZZG = np.outer(self._Z_G[:, state_number], self._Z_G[:, state_number].transpose())
-            YYG = np.outer(self._Y_G[:, state_number], self._Y_G[:, state_number].transpose())
+        # norms = np.zeros(len(self._Z_G[0]), dtype=complex) #Pernille
+        norms = np.zeros(len(self.excitation_vectors[0]), dtype=complex)
+        # for state_number in range(len(self._Z_G[0])): #Pernille
+        for state_number in range(len(self.excitation_vectors[0])):
+            # Pernille 
+            ZZqG = np.outer(self._Z_qG[:, state_number], self._Z_qG[:, state_number].conj().transpose())
+            YYqG = np.outer(self._Y_qG[:, state_number], self._Y_qG[:, state_number].conj().transpose())
+            norms[state_number] = np.sum(self.metric[: self.num_qG, : self.num_qG] * (ZZqG - YYqG))
+            # # Get Z_q Z_G Y_q and Y_G matrices
+            # ZZq = np.outer(self._Z_q[:, state_number], self._Z_q[:, state_number].transpose())
+            # YYq = np.outer(self._Y_q[:, state_number], self._Y_q[:, state_number].transpose())
+            # ZZG = np.outer(self._Z_G[:, state_number], self._Z_G[:, state_number].transpose())
+            # YYG = np.outer(self._Y_G[:, state_number], self._Y_G[:, state_number].transpose())
 
-            norms[state_number] = np.sum(self.metric[: self.num_q, : self.num_q] * (ZZq - YYq)) + np.sum(
-                self.metric[self.num_q : self.num_q + self.num_G, self.num_q : self.num_q + self.num_G]
-                * (ZZG - YYG)
-            )
+            # norms[state_number] = np.sum(self.metric[: self.num_q, : self.num_q] * (ZZq - YYq)) + np.sum(
+            #     self.metric[self.num_q : self.num_q + self.num_G, self.num_q : self.num_q + self.num_G]
+            #     * (ZZG - YYG)
+            # )
 
         return norms
 
