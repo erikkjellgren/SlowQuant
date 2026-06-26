@@ -658,7 +658,7 @@ class quantumLR(quantumLRBaseClass):
                 transfer_op += (
                     # self._Z_G_normed[i, state_number] * G.dagger + self._Y_G_normed[i, state_number] * G #Pernille
                     # self._Z_qG_normed[i, state_number] * G.dagger + self._Y_qG_normed[i, state_number] * G
-                    self._Z_qG_normed[i+shift, state_number] * G.dagger + self._Y_qG_normed[i, state_number] * G #AE SHIFT MANGLER
+                    self._Z_qG_normed[i+shift, state_number] * G.dagger + self._Y_qG_normed[i+shift, state_number] * G #AE SHIFT MANGLER
 
 
                 )
