@@ -982,7 +982,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # print(WF.kappa_no_activeactive_spin_idx_resp)'''
 
-    LR = generalized_naive_DHF.LinearResponse(WF, excitations="S")
+    LR = generalized_naive_DHF.LinearResponse(WF, excitations="SD")
 
     LR.calc_excitation_energies()
     print("Excitation energies:", LR.excitation_energies)
@@ -1013,7 +1013,7 @@ def H2():
                             H   1.1785   -0.5748    1.0355
                             """  #0.74
     #basis = "cc-pvdz"
-    basis = "631-g**"
+    basis = "631-g"
     dyall_v2z = bse.get_basis('dyall-v2z', elements=['H'], fmt='nwchem')
     # with open('dyall2zp_H.nwchem', 'w') as f:
     #     f.write(dyall_v2z)
@@ -1021,7 +1021,7 @@ def H2():
     #basis = dyall_v2z
     #basis = "sto-3g"
     #basis = "sto-6g"
-    active_space = ((1, 1), 2)
+    active_space = ((1, 1), 4)
     #active_space = (2, 4)
     charge = 0
     spin = 0
@@ -1152,4 +1152,4 @@ def HCl():
     
 ###RUN SCRIPT###
 
-LiH()
+H2()

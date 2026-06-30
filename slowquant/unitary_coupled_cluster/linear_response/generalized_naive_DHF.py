@@ -964,17 +964,31 @@ class LinearResponse(LinearResponseBaseClass):
                     val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
                     V[idx + idx_shift_q, :] += mo[:, p, q] * val
 
-        # Determine hermiticity per component to set correct sign of lower block
-        lower_V = np.zeros_like(V)
-        for i in range(num_mo):
-            if np.allclose(mo[i], mo[i].conj().T, atol=1e-10):
-                # Hermitian operator: lower block is -V*
-                lower_V[:, i] = -V[:, i].conj()
-            else:
-                # Anti-Hermitian operator: lower block is +V*
-                lower_V[:, i] = V[:, i].conj()
+        # # Determine hermiticity per component to set correct sign of lower block
+        # lower_V = np.zeros_like(V)
+        # for i in range(num_mo):
+        #     if np.allclose(mo[i], mo[i].conj().T, atol=1e-10):
+        #         # Hermitian operator: lower block is -V*
+        #         lower_V[:, i] = -V[:, i].conj()
+        #     else:
+        #         # Anti-Hermitian operator: lower block is +V*
+        #         lower_V[:, i] = V[:, i].conj()
 
-        return np.vstack((V, lower_V)).reshape(-1, *in_shape)
+        # return np.vstack((V, lower_V)).reshape(-1, *in_shape)
+
+        full_mask = np.concatenate([
+                    self.finite_excitations_idx,
+                    self.finite_excitations_idx,
+                ])
+        for i in range(num_mo):
+            if np.allclose(mo, mo.conj().transpose(0, -1, -2)):
+                V_stacked= np.vstack((V, -1 * V.conj())).reshape(-1, *in_shape)
+                V_stacked = V_stacked[full_mask, :]
+                return V_stacked
+        else: 
+            V_stacked =  np.vstack((V, V.conj())).reshape(-1, *in_shape)
+            V_stacked=V_stacked[full_mask, :]
+            return V_stacked
 
 
     def get_SSCC_4comp_old(self, h1_int, h2_int: np.ndarray) -> np.ndarray:
