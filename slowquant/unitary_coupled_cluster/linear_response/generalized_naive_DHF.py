@@ -2,6 +2,7 @@ from collections.abc import Sequence
 
 import numpy as np
 from scipy.linalg import solve
+import scipy.linalg as la
 from pyscf.data import nist
 
 from slowquant.molecularintegrals.integralfunctions import (
@@ -950,13 +951,13 @@ class LinearResponse(LinearResponseBaseClass):
         for idx, G in enumerate(self.G_ops):
             G_ket = generalized_propagate_state([G], self.wf.ci_coeffs, *self.index_info)
             Gd_ket = generalized_propagate_state([G.dagger], self.wf.ci_coeffs, *self.index_info)
-            for i in range(self.wf.num_inactive_spin_orbs):
+            for i in range(self.wf.num_spin_orbs_NES, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs):
                 E_ket = generalized_propagate_state([a_op_spin(i,True), a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
                 val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
                 val -= generalized_expectation_value(E_ket, [], G_ket, *self.index_info)
                 V[idx + idx_shift_q, :] += mo[:, i, i] * val
-            for p in range(self.wf.num_inactive_spin_orbs, self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
-                for q in range(self.wf.num_inactive_spin_orbs, self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
+            for p in range(self.wf.num_spin_orbs_NES+self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES +self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
+                for q in range(self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
                     E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(q,False)], self.wf.ci_coeffs, *self.index_info)
                     Ed_ket = generalized_propagate_state([a_op_spin(q,True)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
                     val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
@@ -1238,7 +1239,7 @@ class LinearResponse(LinearResponseBaseClass):
             S[size:, :size] = -self.Delta.conjugate()
             S[size:, size:] = -self.Sigma.conjugate()
 
-            import scipy.linalg as la
+            
             def solve_lr_drop_sigma_null(H, sigma, cut=1e-10):
                 # Hermitize (important for numerical stability)
                 Hh = 0.5*(H + H.conj().T)
@@ -1253,7 +1254,7 @@ class LinearResponse(LinearResponseBaseClass):
                 Sk = Uk.conj().T @ Sh @ Uk
                 return Hk, Sk
 
-            E2_red, S_red = solve_lr_drop_sigma_null(E2,S)
+            #E2_red, S_red = solve_lr_drop_sigma_null(E2,S)
 
             # # Hermitize (important for numerical stability)
             # Hh = 0.5*(H + H.conj().T)
@@ -1583,7 +1584,7 @@ class LinearResponse(LinearResponseBaseClass):
             ktensor = np.zeros((natm, natm))
 
             for k, (I, J) in enumerate(nuc_pair):
-                ktensor[I, J] = ktensor[J, I] = au2Hz * nuc_mag ** 2 * np.trace(ssc_para[I, J] + ssc_dia[I, J]).real / 3
+                ktensor[I, J] = ktensor[J, I] = au2Hz * nuc_mag ** 2 * np.trace(ssc_para[I, J] + ssc_dia[I, J]).real / 3 
 
                 print("Diamagnetic contribution:")
                 print(np.round(ssc_dia[I,J].real, 10))
@@ -1674,25 +1675,22 @@ class LinearResponse(LinearResponseBaseClass):
     
     def get_shieldings_4comp_iso(self, h1: np.ndarray, h2: np.ndarray, hb: np.ndarray,g_ssss: np.ndarray, g_lsss: np.ndarray) -> np.ndarray:
         # Hessian and metric:
-        # size = len(self.A)
-
-        # E2 = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
-        # E2[:size, :size] = self.A
-        # E2[:size, size:] = self.B
-        # E2[size:, :size] = self.B.conjugate() #AE added conjugtate 
-        # E2[size:, size:] = self.A.conjugate() #AE added conjugtate 
-
-        # S = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
-        # S[:size, :size] = self.Sigma
-        # S[:size, size:] = self.Delta
-        # S[size:, :size] = -self.Delta.conjugate()
-        # S[size:, size:] = -self.Sigma.conjugate()
-
         natm = h1.shape[0]
 
+        size = len(self.A)
+
+        E2 = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
+        E2[:size, :size] = self.A
+        E2[:size, size:] = self.B
+        E2[size:, :size] = self.B.conjugate() #AE added conjugtate 
+        E2[size:, size:] = self.A.conjugate() #AE added conjugtate 
+
+        
         num_parameters = len(self.G_ops) + len(self.q_ops_resp)
         A_mat     = np.zeros((num_parameters, num_parameters), dtype=complex)
         B_mat     = np.zeros((num_parameters, num_parameters), dtype=complex)
+        Sigma_mat = np.zeros((num_parameters, num_parameters), dtype=complex)
+        Delta_mat = np.zeros((num_parameters, num_parameters), dtype=complex)
 
         if len(self.q_ops_resp) != 0:
             A_mat[:len(self.wf.kappa_no_activeactive_spin_idx_ep), :len(self.wf.kappa_no_activeactive_spin_idx_ep)] = get_orbital_response_hessian_block(
@@ -1743,6 +1741,14 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.num_active_spin_orbs,
                 self.wf.rdm1, self.wf.rdm2,
             )
+
+            Sigma_mat[: len(self.q_ops_resp), : len(self.q_ops_resp)] = get_orbital_response_metric_sigma(
+                self.wf.kappa_no_activeactive_spin_idx_resp,
+                self.wf.num_spin_orbs_NES, 
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.rdm1,
+            )
         
 
         size = len(A_mat)
@@ -1751,6 +1757,13 @@ class LinearResponse(LinearResponseBaseClass):
         E2_mat[:size, size:] = B_mat
         E2_mat[size:, :size] = B_mat.conjugate()
         E2_mat[size:, size:] = A_mat.conjugate()
+
+
+        S_mat = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
+        S_mat[:size, :size] = Sigma_mat
+        S_mat[:size, size:] = Delta_mat
+        S_mat[size:, :size] = -Delta_mat.conjugate()
+        S_mat[size:, size:] = -Sigma_mat.conjugate()
 
         '''# Transform perturbed 2e integrals to MO basis
         # g_ssss shape: (3, n2c, n2c, n2c, n2c) — need to embed in n4c first
@@ -1800,17 +1813,116 @@ class LinearResponse(LinearResponseBaseClass):
             h_2e_correction[b] = DHF_one_electron_transform(self.wf.c_mo, eff_ao)'''
 
 
-
         # Paramagnetic:
         # Property gradients: shape (num_parameters, 3)
-        prop_grads_h1 = [self.get_property_gradient_4comp(h1[I]) for I in range(natm)]
-        prop_grads_B  = [self.get_property_gradient_4comp(hb[I]) for I in range(natm)]
-        #prop_grads_B  = self.get_property_gradient_4comp_no_ep(hb)
+        prop_grads_h1 = [self.get_property_gradient_4comp_no_ep(h1[I]) for I in range(natm)]
+        prop_grads_B  = [self.get_property_gradient_4comp_no_ep(hb[I]) for I in range(natm)]
 
-        response_B = [
-            np.linalg.pinv(E2_mat, rcond=1e-10) @ prop_grads_B[I]
-            for I in range(natm)
-        ]
+        # prop_grads_h1 = [self.get_property_gradient_4comp(h1[I]) for I in range(natm)]
+        # prop_grads_B  = [self.get_property_gradient_4comp(hb[I]) for I in range(natm)]
+
+        # response_B = [
+        #     np.linalg.pinv(E2_mat, rcond=1e-10) @ prop_grads_B[I]
+        #     for I in range(natm)
+        # ]
+
+
+
+        def solve_lr_drop_sigma_null(H, sigma, prop_grads1=None, prop_grads2=None, cut=1e-10):
+            """
+            H: Hessian
+            sigma: metric / overlap-like matrix
+            prop_grads: optional list or array of RHS vectors (or dict of them)
+
+            Returns:
+                w, v, s, keep, (and projected prop_grads if given)
+            """
+
+            # 1) Hermitize
+            Hh = 0.5 * (H + H.conj().T)
+            Sh = 0.5 * (sigma + sigma.conj().T)
+
+            # 2) eigen-decompose metric
+            s, U = la.eigh(Sh)
+
+            # 3) select non-null subspace
+            keep = np.abs(s) > cut * np.max(np.abs(s))
+            Uk = U[:, keep]
+
+            # 4) project operators
+            Hk = Uk.conj().T @ Hh @ Uk
+            Sk = Uk.conj().T @ Sh @ Uk
+
+            # 5) project property gradients (THIS WAS MISSING)
+            prop_grads_k1 = None
+            if prop_grads1 is not None:
+
+                # case 1: single vector
+                if isinstance(prop_grads1, np.ndarray) and prop_grads1.ndim == 1:
+                    prop_grads_k1 = Uk.conj().T @ prop_grads1
+
+                # case 2: list of vectors
+                elif isinstance(prop_grads1, (list, tuple)):
+                    prop_grads_k1 = [Uk.conj().T @ g for g in prop_grads1]
+
+                # case 3: stacked array (n_props, n_dim)
+                elif isinstance(prop_grads1, np.ndarray) and prop_grads1.ndim == 2:
+                    prop_grads_k1 = np.array([Uk.conj().T @ g for g in prop_grads1])
+
+                else:
+                    raise ValueError("Unsupported prop_grads format")
+                
+            # 5) project property gradients (THIS WAS MISSING)
+            prop_grads_k2 = None
+            if prop_grads2 is not None:
+
+                # case 1: single vector
+                if isinstance(prop_grads2, np.ndarray) and prop_grads2.ndim == 1:
+                    prop_grads_k2 = Uk.conj().T @ prop_grads2
+
+                # case 2: list of vectors
+                elif isinstance(prop_grads2, (list, tuple)):
+                    prop_grads_k2 = [Uk.conj().T @ g for g in prop_grads2]
+
+                # case 3: stacked array (n_props, n_dim)
+                elif isinstance(prop_grads2, np.ndarray) and prop_grads2.ndim == 2:
+                    prop_grads_k2 = np.array([Uk.conj().T @ g for g in prop_grads2])
+
+                else:
+                    raise ValueError("Unsupported prop_grads format")
+
+            # 6) solve reduced generalized eigenproblem
+            w, y = la.eig(Hk, Sk)
+
+            # 7) backtransform eigenvectors
+            v = Uk @ y
+
+            return Hk, Sk, prop_grads_k1, prop_grads_k2
+
+
+        #E2_mat_trans, S_mat_trans, prop_grads_h1_trans, prop_grads_B_trans = solve_lr_drop_sigma_null(E2_mat,S_mat,prop_grads_h1,prop_grads_B)
+
+
+        
+        '''# print(E2)
+        (
+            hess_eigval,
+            _,
+        ) = np.linalg.eig(E2_mat_trans)
+        print(f"Smallest absolute value of Hessian eigenvalues: {np.min(np.abs(hess_eigval))}")
+        if np.abs(np.min(hess_eigval)) < 10**-3:
+            print("WARNING: Small eigenvalue in Hessian")
+        for i in hess_eigval:
+            if np.abs(i) < 1e-3:
+                print("Small eigenvalue in Hessian:",i)
+            #raise ValueError("Negative eigenvalue in Hessian.")
+        
+        # print(S)
+        print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(S_mat_trans)))}")'''
+
+
+
+        response_B  = [solve(E2, prop_grads_B[I]) for I in range(natm)]
 
         msc_para = np.zeros((natm, 3, 3))
 
@@ -1864,7 +1976,7 @@ class LinearResponse(LinearResponseBaseClass):
         msc_para *= unit_ppm
         msc_dia *= unit_ppm
 
-        sigma_total = msc_para #+ msc_dia
+        sigma_total = msc_para + msc_dia
 
         print("para")
         print(msc_para)

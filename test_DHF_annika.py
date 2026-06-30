@@ -522,7 +522,7 @@ def make_h_B_ao(mol):
 
     for I in range(natm):
         coord = mol.atom_coord(I)
-        mol.set_common_orig([0,0,0])
+        mol.set_common_orig(coord)
 
         
         t1 = mol.intor('int1e_cg_sa10sp_spinor', 3)
@@ -536,11 +536,9 @@ def make_h_B_ao(mol):
         #t1 = mol.intor('int1e_spgsa01_spinor', 3)
 
 
-        
-
         for b in range(3):
-            hB[I, b, :n2c, n2c:] =  0.5 * t1[b]
-            hB[I, b, n2c:, :n2c] =  0.5 * t1[b].conj().T
+            hB[I, b, :n2c, n2c:] =   0.5*t1[b]
+            hB[I, b, n2c:, :n2c] =   0.5*t1[b].conj().T
 
             # hB[I, b, :n2c, n2c:] =  -t1[b]
             # hB[I, b, n2c:, :n2c] =  -t1[b].conj().T
@@ -756,7 +754,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     nmr = nmr_dhf.NMR(mf)
     nmr.cphf = True
-    nmr.mb = 'RKB'      # or 'RKB'
+    nmr.mb = 'RMB'      # or 'RKB'
     nmr.gauge_orig = [0,0,0]  # GIAO
 
     shielding = nmr.kernel()
@@ -812,7 +810,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         h_core,
         g_eri,
         "fUCCSD",
-        {"n_layers":0, "is_spin_conserving" : False},
+        {"n_layers":1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
@@ -820,8 +818,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     if len(WF.thetas) > 0:
         real = np.random.uniform(-0.05,0.05,len(WF.thetas_real))
-        imag = np.zeros_like(WF.thetas_imag)
-        #imag = np.random.uniform(-0.05,0.05,len(WF.thetas_real))
+        #imag = np.zeros_like(WF.thetas_imag)
+        imag = np.random.uniform(-0.05,0.05,len(WF.thetas_real))
 
         WF.set_thetas(real, imag)
 
@@ -910,7 +908,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     #WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
 
-    #WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-8, maxiter = 1000)
+    
+
+    WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-8, maxiter = 1000)
 
     #print(WF._calc_gradient_optimization_DHF(WF.thetas_real + WF.thetas_imag, theta_optimization=True, kappa_ee_optimization=False,kappa_ep_optimization=False))
 
@@ -989,15 +989,15 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #print(np.round(LR.get_transition_dipole(dip_int).real,5))
     #print(LR.get_oscillator_strengths(dip_int))
 
-    h1_shield = make_h1_ao_shield(mol)
-    h2_shield = make_h2_ao_shield(mol)
-    hb_shield = make_h_B_ao(mol)
-    g_ssss, g_lsss = make_h_B_2e_ao(mol)
 
-    shieldings = LR.get_shieldings_4comp_iso(h1_shield, h2_shield, hb_shield, g_ssss, g_lsss)
+    # h1_shield = make_h1_ao_shield(mol)
+    # h2_shield = make_h2_ao_shield(mol)
+    # hb_shield = make_h_B_ao(mol)
+    # g_ssss, g_lsss = make_h_B_2e_ao(mol)
 
-    print("Shieldings:")
-    print(shieldings)
+    # shieldings = LR.get_shieldings_4comp_iso(h1_shield, h2_shield, hb_shield, g_ssss, g_lsss)
+    # print("Shieldings:")
+    # print(shieldings)
 
 
     SSCC = LR.get_SSCC_4comp_iso(h1, h2)
@@ -1008,10 +1008,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
 def H2():
-    geometry = """H  0.0   0.0  0.0;
-                  H  0.0  0.0  0.74"""
+    geometry = geometry = """
+                            H   1.0215   -0.0252    0.5645
+                            H   1.1785   -0.5748    1.0355
+                            """  #0.74
     #basis = "cc-pvdz"
-    basis = "631-g"
+    basis = "631-g**"
     dyall_v2z = bse.get_basis('dyall-v2z', elements=['H'], fmt='nwchem')
     # with open('dyall2zp_H.nwchem', 'w') as f:
     #     f.write(dyall_v2z)
@@ -1023,6 +1025,26 @@ def H2():
     #active_space = (2, 4)
     charge = 0
     spin = 0
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+
+def O2():
+    geometry = """O  0.0   0.0  0.0;
+                  O  0.0  0.0  1.00"""
+    #basis = "cc-pvdz"
+    #basis = "631-g"
+    dyall_v2z = bse.get_basis('dyall-v2z', elements=['H'], fmt='nwchem')
+    # with open('dyall2zp_H.nwchem', 'w') as f:
+    #     f.write(dyall_v2z)
+    #     f.close()
+    #basis = dyall_v2z
+    basis = "sto-3g"
+    #basis = "sto-6g"
+    active_space = ((1, 1), 2)
+    #active_space = (2, 4)
+    charge = 0
+    spin = 2
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
@@ -1049,8 +1071,8 @@ def LiH():
     #basis = "cc-pvdz"
     #basis = "631-g"
     basis = "sto-3g"
-    active_space = ((2, 2), 8)
-    #active_space = (2, 4)
+    #active_space = ((2, 2), 4)
+    active_space = ((1,1), 4)
     charge = 0
     spin = 0
     NR(
@@ -1063,8 +1085,8 @@ def HF():
     #basis = "cc-pvdz"
     #basis = "631-g"
     basis = "sto-3g"
-    #active_space = ((1, 1), 4)
-    active_space = ((1, 1), 2)
+    active_space = ((1, 1), 4)
+    #active_space = ((5, 5), 10)
     #active_space = (2, 4)
     charge = 0
     spin = 0
@@ -1130,4 +1152,4 @@ def HCl():
     
 ###RUN SCRIPT###
 
-HF()
+LiH()
