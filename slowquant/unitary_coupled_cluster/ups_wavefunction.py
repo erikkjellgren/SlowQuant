@@ -22,6 +22,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.integral_manager import IntegralManager
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
+    build_operator_matrix,
     construct_ups_state,
     expectation_value,
     get_grad_action,
@@ -262,7 +263,9 @@ class WaveFunctionUPS:
                 self.num_active_orbs,
                 self.ansatz_options,
             )
-        else:
+        elif ansatz.lower() == "none":
+            print("UPS wave function with no Ansatz was chosen.")
+        else: 
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
 
@@ -748,12 +751,20 @@ class WaveFunctionUPS:
         if qiskit_form:
             return H.get_qiskit_form(self.num_active_orbs)
         return H
+    
+    def _get_hamiltonian_matrix(self) -> np.ndarray:
+        """Return Hamitlonian matrix.
+        
+        Returns:
+            Hamiltonian matrix
+        """
+        return build_operator_matrix(self._get_hamiltonian(), self.ci_info)
 
     def run_wf_optimization_2step(
         self,
         optimizer_name: str,
         orbital_optimization: bool = False,
-        tol: float = 1e-10,
+        tol: float = 1e-6,
         maxiter: int = 1000,
         is_silent_subiterations: bool = False,
     ) -> None:
@@ -803,7 +814,7 @@ class WaveFunctionUPS:
             )
             self._old_opt_parameters = np.zeros_like(self.thetas) + 10**20
             self._E_opt_old = 0.0
-            if optimizer_name.lower() == "rotosolve":
+            if optimizer_name.lower() in ("rotosolve", "rotosolve_grad"):
                 res = optimizer.minimize(
                     self.thetas,
                     extra_options={
@@ -874,7 +885,7 @@ class WaveFunctionUPS:
         self,
         optimizer_name: str,
         orbital_optimization: bool = False,
-        tol: float = 1e-10,
+        tol: float = 1e-6,
         maxiter: int = 1000,
     ) -> None:
         """Run one step optimization of wave function.
@@ -889,7 +900,7 @@ class WaveFunctionUPS:
         if orbital_optimization:
             print(f"### Number kappa: {len(self.kappa)}")
         print(f"### Number theta: {self.ups_layout.n_params}")
-        if optimizer_name.lower() == "rotosolve":
+        if optimizer_name.lower() in ("rotosolve", "rotosolve_grad"):
             if orbital_optimization and len(self.kappa) != 0:
                 raise ValueError(
                     "Cannot use RotoSolve together with orbital optimization in the one-step solver."
@@ -947,7 +958,7 @@ class WaveFunctionUPS:
         )
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
-        if optimizer_name.lower() == "rotosolve":
+        if optimizer_name.lower() in ("rotosolve", "rotosolve_grad"):
             res = optimizer.minimize(
                 parameters,
                 extra_options={
