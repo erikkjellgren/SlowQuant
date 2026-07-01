@@ -601,7 +601,7 @@ def get_orbital_gradient_response_right_transformed(
     """
     inv_sqrt_2 = 1 / np.sqrt(2)
     gradient = np.zeros(len(q_idx))
-    for idx, (t, u) in enumerate(q_idx):
+    for idx, (u, t) in enumerate(q_idx):
         # 1e contribution
         for p in range(num_inactive_orbs + num_active_orbs):
             gradient[idx] += h_int[u, p] * RDM1(t, p, num_inactive_orbs, num_active_orbs, rdm1)

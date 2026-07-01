@@ -165,7 +165,7 @@ def test_lih_naive():
         "optical rotation",
         {"max_iterations": 50, "tolerance": 1e-8},
     )
-    pol = - 1j * lr[0].T @ lr[1]
+    pol = - lr[0].T @ lr[1]
     print(pol)
     solutions = np.array([
         [0, 0, 0],
@@ -322,7 +322,7 @@ def test_lih_projected():
         "optical rotation",
         {"max_iterations": 50, "tolerance": 1e-8},
     )
-    pol = - 1j * lr[0].T @ lr[1]
+    pol = - lr[0].T @ lr[1]
     solutions = np.array([
         [0, 0, 0],
         [0, 0, -2.53196759e+00+0j],
@@ -478,7 +478,7 @@ def test_lih_allprojected():
         "optical rotation",
         {"max_iterations": 50, "tolerance": 1e-8},
     )
-    pol = - 1j * lr[0].T @ lr[1]
+    pol = - lr[0].T @ lr[1]
     solutions = np.array([
         [0, 0, 0],
         [0, 0, -2.56644246e+00+0j],

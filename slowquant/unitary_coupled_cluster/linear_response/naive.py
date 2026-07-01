@@ -335,7 +335,7 @@ class LinearResponse(LinearResponseBaseClass):
                 sigma_minus[:num_q, root] += get_orbital_gradient_response_right_transformed(
                     h_minus,
                     g_minus,
-                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.kappa_no_activeactive_idx_dagger,
                     self.wf.num_inactive_orbs,
                     self.wf.num_active_orbs,
                     self.wf.rdm1,
@@ -762,21 +762,22 @@ class LinearResponse(LinearResponseBaseClass):
             self.wf.num_active_orbs,
         )
         op_ket = propagate_state([op], self.wf.ci_coeffs, *self.index_info)
+        opd_ket = propagate_state([op.dagger], self.wf.ci_coeffs, *self.index_info)
         for i, GI in enumerate(self.G_ops):
             GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
             GId_ket = propagate_state([GI.dagger], self.wf.ci_coeffs, *self.index_info)
-            # <0| op Gs |0>
+            # <0| Gs op |0>
             gradient[num_q + i] += expectation_value(
-                op_ket,
-                [],
-                GI_ket,
-                *self.index_info,
-            )
-            # - <0| Gs op |0>
-            gradient[num_q + i] -= expectation_value(
                 GId_ket,
                 [],
                 op_ket,
+                *self.index_info,
+            )
+            # - <0| op Gs |0>
+            gradient[num_q + i] -= expectation_value(
+                opd_ket,
+                [],
+                GI_ket,
                 *self.index_info,
             )
         return gradient.reshape(-1, 1)
