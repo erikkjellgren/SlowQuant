@@ -448,15 +448,25 @@ def get_orbital_response_property_gradient(
     prop_grad = 0
     for i, (m, n) in enumerate(kappa_idx):
         for p in range(num_inactive_orbs + num_active_orbs):
-            prop_grad += (
-                (response_vectors[i + number_excitations, state_number] - response_vectors[i, state_number])
+            prop_grad -= (
+                response_vectors[i, state_number]
                 * x_mo[n, p]
-                * RDM1(m, p, num_inactive_orbs, num_active_orbs, rdm1)
+                * RDM1(p, m, num_inactive_orbs, num_active_orbs, rdm1)
             )
             prop_grad += (
-                (response_vectors[i, state_number] - response_vectors[i + number_excitations, state_number])
-                * x_mo[m, p]
+                response_vectors[i, state_number]
+                * x_mo[p, m]
                 * RDM1(n, p, num_inactive_orbs, num_active_orbs, rdm1)
+            )
+            prop_grad -= (
+                response_vectors[i + number_excitations, state_number]
+                * x_mo[m, p]
+                * RDM1(p, n, num_inactive_orbs, num_active_orbs, rdm1)
+            )
+            prop_grad += (
+                response_vectors[i + number_excitations, state_number]
+                * x_mo[p, n]
+                * RDM1(m, p, num_inactive_orbs, num_active_orbs, rdm1)
             )
     return 2 ** (-1 / 2) * prop_grad
 
