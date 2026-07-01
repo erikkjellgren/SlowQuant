@@ -71,15 +71,7 @@ class Davidson:
         if not is_silent:
             print(f" Iteration | Time [s] | Max. residual norm | Subspace size | Roots ...")
 
-        if property_gradient is not None and frequency is not None:
-            start_guess = np.vstack((
-                property_gradient / diag.reshape(-1, 1),
-                - property_gradient.conj() / diag.reshape(-1, 1)
-            ))
-        else:
-            start_guess = np.zeros((dim, n_roots), dtype=np.float64)
-            start_guess[np.argsort(diag)[:n_roots], np.arange(n_roots)] = 1.0
-            start_guess = np.vstack((start_guess, start_guess))
+        start_guess = self._prepare_start_guess(frequency, property_gradient, diag, n_roots)
         trial = self._orthonormalize(start_guess)
         if _start_guess is not None:
             trial = _start_guess
@@ -129,8 +121,17 @@ class Davidson:
                else f'{o:<.4e}' + ' '}"
                for o, r in zip(omega, res_norms)
             )
-        print(f" {self._iteration:^9} | {time.time() - self._start:^8.2f} | {max(res_norms):^18.4e} | {2*self._trial.shape[1]:^13} | {roots}")
+        print(f" {self._iteration:^9} | {time.time() - self._start:^8.2f} | {max(res_norms):^18.4e} | {self.subspace_size:^13} | {roots}")
         self._start = time.time()
+
+    @property
+    @abstractmethod
+    def subspace_size(self) -> int:
+        """Return the current size of the subspace."""
+
+    @abstractmethod
+    def _prepare_start_guess(self, frequency: float | None, property_gradient: np.ndarray | None, diag: np.ndarray, n_roots: int) -> np.ndarray:
+        """Prepare the starting guess for the trial vectors."""
 
     @staticmethod
     def _remove_converged(trial: np.ndarray, res_norms: np.ndarray, tol: float) -> np.ndarray:
@@ -233,6 +234,21 @@ class TDADavidson(Davidson):
         """Print the citation for the Davidson method."""
         super()._print_citation()
 
+    @property
+    def subspace_size(self) -> int:
+        """Return the current size of the subspace."""
+        return self._trial.shape[1]
+
+    def _prepare_start_guess(self, frequency: float | None, property_gradient: np.ndarray | None, diag: np.ndarray, n_roots: int) -> np.ndarray:
+        """Prepare the starting guess for the trial vectors."""
+        dim = diag.shape[-1]
+        if property_gradient is not None and frequency is not None:
+            start_guess = property_gradient / diag.reshape(-1, 1)
+        else:
+            start_guess = np.zeros((dim, n_roots), dtype=np.float64)
+            start_guess[np.argsort(diag)[:n_roots], np.arange(n_roots)] = 1.0
+        return start_guess
+
     @staticmethod
     def _orthonormalize(trial: np.ndarray) -> np.ndarray:
         """Orthogonalize columns of trial using QR and return Q with collapsed tiny columns removed."""
@@ -287,11 +303,13 @@ class TDADavidson(Davidson):
             u = eigvec[:, :n_roots]
 
         # Compute Ritz vectors (X) and residuals (R)
-        norm = np.sqrt(np.abs(np.diag(
-            u.T @ S @ u
-        )))
-        norm[np.isclose(norm, 0)] = 1
-        X = self._trial @ u / norm
+        if frequency is None or property_gradient is None:
+            norm = np.sqrt(np.abs(np.diag(
+                u.T @ S @ u
+            )))
+            norm[np.isclose(norm, 0)] = 1
+            u /= norm
+        X = self._trial @ u
 
         R = self._sigma @ u - self._tau @ u * omega
         if frequency is not None and property_gradient is not None:
@@ -314,12 +332,10 @@ class TDADavidson(Davidson):
         _R, *_ = R
         o = omega if frequency is None else np.array([frequency])
 
-        contribution = diagonal_A.reshape(-1, 1) - diagonal_Sigma.reshape(-1, 1) @ o.reshape(1, -1)
-        denominator = - np.ones_like(_R)
+        denominator = diagonal_A.reshape(-1, 1) - diagonal_Sigma.reshape(-1, 1) @ o.reshape(1, -1)
         # Check if any of the contributions are close to zero to avoid division by zero, if so skip the division for that contribution
-        contribution[np.isclose(contribution, 0)] = 1
-        denominator /= contribution
-        new_trial = denominator * _R
+        denominator[np.isclose(denominator, 0)] = 1
+        new_trial = - _R / denominator
         return new_trial
 
     def _reset_reduced_space(self, trial: np.ndarray, right_transform: Callable[[np.ndarray], Any]) -> None:
@@ -353,6 +369,25 @@ class PairedDavidson(Davidson):
         """Print the citation for the Davidson method."""
         super()._print_citation()
         print("Davidson solver for paired eigenvalue problems (J. Chem. Phys. 118, 522-536 (2003))")
+
+    @property
+    def subspace_size(self) -> int:
+        """Return the current size of the subspace."""
+        return 2 * self._trial.shape[1]
+
+    def _prepare_start_guess(self, frequency: float | None, property_gradient: np.ndarray | None, diag: np.ndarray, n_roots: int) -> np.ndarray:
+        """Prepare the starting guess for the trial vectors."""
+        dim = diag.shape[-1]
+        if property_gradient is not None and frequency is not None:
+            start_guess = np.vstack((
+                property_gradient / diag.reshape(-1, 1),
+                - property_gradient.conj() / diag.reshape(-1, 1)
+            ))
+        else:
+            start_guess = np.zeros((dim, n_roots), dtype=np.float64)
+            start_guess[np.argsort(diag)[:n_roots], np.arange(n_roots)] = 1.0
+            start_guess = np.vstack((start_guess, start_guess))
+        return start_guess
 
     @staticmethod
     def _orthonormalize(trial: np.ndarray) -> np.ndarray:
