@@ -753,47 +753,73 @@ def spin_number_op(num_spin_orb: int) -> FermionicOperator:
     return spin_number_op
 
 
-def S2_op(num_spatial_orb: int, num_spin_orb: int) -> FermionicOperator:
-    """Spin squared operator.
+def S_plus(num_inactive: int, num_active: int, minus: bool = False) -> FermionicOperator:
+    """Spin raising and spin lowering. Acts only on active orbitals.
 
     Args:
-        num_spatial_orb (int): Number of spatial orbitals.
-        num_spin_orb (int): Number of spin orbitals.
+        num_inactive (int): Number of inactive spatial orbitals.
+        num_active (int): Number of active spatial orbitals.
+        minus (bool, optional): If True will switch to spin lowering operator. Defaults to False.
 
     Returns:
-        FermionicOperator: The spin squared operator.
+        FermionicOperator: The Spin lowering or raising operator specified.
+    """
+    if minus:
+        # Lowering operator
+        spin1 = "beta"
+        spin2 = "alpha"
+    else:
+        # Raising operator
+        spin1 = "alpha"
+        spin2 = "beta"
+
+    S_op = FermionicOperator({})
+
+    # Over  active orbitals.
+    for i in range(num_inactive, num_inactive + num_active):
+        S_op += a_op(i, spin1, True) * a_op(i, spin2, False)
+
+    return S_op
+
+
+def S_z(num_inactive: int, num_active: int) -> FermionicOperator:
+    """S_z operator on active orbitals.
+
+    Args:
+        num_inactive (int): Number of inactive spatial orbitals.
+        num_active (int): Number of active spatial orbitals.
+
+    Returns:
+        FermionicOperator: Resulting S_z operator.
+    """
+    op = FermionicOperator({})
+
+    # Over  active orbitals.
+    for i in range(num_inactive, num_inactive + num_active):
+        op += a_op(i, "alpha", True) * a_op(i, "alpha", False) - a_op(i, "beta", True) * a_op(
+            i, "beta", False
+        )
+
+    S_z_op = 0.5 * op
+    return S_z_op
+
+
+def S2_op(num_inactive: int, num_active: int) -> FermionicOperator:
+    """S^2 operator applied to active orbitals.
+
+    Args:
+        num_inactive (int): Number of inactive spatial orbitals.
+        num_active (int): Number of active spatial orbitals.
+
+    Returns:
+        FermionicOperator: S^2 operator.
     """
     s2 = FermionicOperator({})
 
-    s2 += 3 / 4 * spin_number_op(num_spin_orb)
+    s2 = (
+        S_plus(num_inactive, num_active, False) * S_plus(num_inactive, num_active, True)
+        + S_z(num_inactive, num_active) * S_z(num_inactive, num_active)
+        - S_z(num_inactive, num_active)
+    )
 
-    t1 = FermionicOperator({})
-    t2 = FermionicOperator({})
-
-    for p in range(num_spatial_orb):
-        for q in range(num_spatial_orb):
-            t11 = (
-                a_op(p, "alpha", True)
-                * a_op(q, "beta", True)
-                * a_op(p, "beta", False)
-                * a_op(q, "alpha", False)
-            )
-            t12 = (
-                a_op(p, "beta", True)
-                * a_op(q, "alpha", True)
-                * a_op(p, "alpha", False)
-                * a_op(q, "beta", False)
-            )
-            t1 += t11 + t12
-
-            n1 = a_op(p, "alpha", True) * a_op(p, "alpha", False) - a_op(p, "beta", True) * a_op(
-                p, "beta", False
-            )
-            n2 = a_op(q, "alpha", True) * a_op(q, "alpha", False) - a_op(q, "beta", True) * a_op(
-                q, "beta", False
-            )
-            t2 += n1 * n2
-
-    s2 -= 1 / 2 * t1
-    s2 += 1 / 4 * t2
     return s2
