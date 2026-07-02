@@ -34,7 +34,7 @@ from slowquant.unitary_coupled_cluster.generalized_operators import (
     generalized_one_elec_op_0i_0a, a_op_spin
 )
 
-from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space
+from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, DHF_hamiltonian_full_space
 
 class LinearResponse(LinearResponseBaseClass):
  import numpy as np
@@ -58,7 +58,11 @@ class LinearResponse(LinearResponseBaseClass):
         print("qs", len(self.q_ops))
         
         
-        H = generalized_hamiltonian_full_space(self.wf.h_mo, self.wf.g_mo, self.wf.num_spin_orbs)
+        #H = generalized_hamiltonian_full_space(self.wf.h_mo, self.wf.g_mo, self.wf.num_spin_orbs)
+
+        NES = self.wf.num_spin_orbs_NES 
+
+        H = DHF_hamiltonian_full_space(self.wf.h_mo[NES:,NES:], self.wf.g_mo[NES:,NES:,NES:,NES:], self.wf.num_spin_orbs_NES)
 
         
         """
@@ -956,7 +960,7 @@ class LinearResponse(LinearResponseBaseClass):
                 val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
                 val -= generalized_expectation_value(E_ket, [], G_ket, *self.index_info)
                 V[idx + idx_shift_q, :] += mo[:, i, i] * val
-            for p in range(self.wf.num_spin_orbs_NES+self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES +self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
+            for p in range(self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
                 for q in range(self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
                     E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(q,False)], self.wf.ci_coeffs, *self.index_info)
                     Ed_ket = generalized_propagate_state([a_op_spin(q,True)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
@@ -964,31 +968,33 @@ class LinearResponse(LinearResponseBaseClass):
                     val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
                     V[idx + idx_shift_q, :] += mo[:, p, q] * val
 
-        # # Determine hermiticity per component to set correct sign of lower block
-        # lower_V = np.zeros_like(V)
-        # for i in range(num_mo):
-        #     if np.allclose(mo[i], mo[i].conj().T, atol=1e-10):
-        #         # Hermitian operator: lower block is -V*
-        #         lower_V[:, i] = -V[:, i].conj()
-        #     else:
-        #         # Anti-Hermitian operator: lower block is +V*
-        #         lower_V[:, i] = V[:, i].conj()
-
-        # return np.vstack((V, lower_V)).reshape(-1, *in_shape)
-
-        full_mask = np.concatenate([
-                    self.finite_excitations_idx,
-                    self.finite_excitations_idx,
-                ])
+        # Determine hermiticity per component to set correct sign of lower block
+        lower_V = np.zeros_like(V)
         for i in range(num_mo):
-            if np.allclose(mo, mo.conj().transpose(0, -1, -2)):
-                V_stacked= np.vstack((V, -1 * V.conj())).reshape(-1, *in_shape)
-                V_stacked = V_stacked[full_mask, :]
-                return V_stacked
-        else: 
-            V_stacked =  np.vstack((V, V.conj())).reshape(-1, *in_shape)
-            V_stacked=V_stacked[full_mask, :]
-            return V_stacked
+            if np.allclose(mo[i], mo[i].conj().T, atol=1e-10):
+                # Hermitian operator: lower block is -V*
+                lower_V[:, i] = -V[:, i].conj()
+            else:
+                # Anti-Hermitian operator: lower block is +V*
+                lower_V[:, i] = V[:, i].conj()
+
+        return np.vstack((V, lower_V)).reshape(-1, *in_shape)
+    
+        # Annas screening using A based on pernilles screening:
+
+        # full_mask = np.concatenate([
+        #             self.finite_excitations_idx,
+        #             self.finite_excitations_idx,
+        #         ])
+        # for i in range(num_mo):
+        #     if np.allclose(mo, mo.conj().transpose(0, -1, -2)):
+        #         V_stacked= np.vstack((V, -1 * V.conj())).reshape(-1, *in_shape)
+        #         V_stacked = V_stacked[full_mask, :]
+        #         return V_stacked
+        # else: 
+        #     V_stacked =  np.vstack((V, V.conj())).reshape(-1, *in_shape)
+        #     V_stacked=V_stacked[full_mask, :]
+        #     return V_stacked
 
 
     def get_SSCC_4comp_old(self, h1_int, h2_int: np.ndarray) -> np.ndarray:

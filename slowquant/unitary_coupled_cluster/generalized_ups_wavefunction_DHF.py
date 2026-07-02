@@ -1136,52 +1136,52 @@ class GeneralizedWaveFunctionUPS:
                     self._kappa_imag_old[i] = 0.0
 
                 
-                # Positronic
-                if not is_silent_subiterations:
-                    print("--------Orbital optimization e-p")
-                    print(
-                        "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
-                    )
-                energy_ep = partial(
-                    self._calc_energy_optimization_DHF,
-                    theta_optimization=False,
-                    kappa_ep_optimization=True,
-                    kappa_ee_optimization=False,
-                )
-                gradient_ep = partial(
-                    self._calc_gradient_optimization_DHF,
-                    theta_optimization=False,
-                    kappa_ep_optimization=True,
-                    kappa_ee_optimization=False,
-                )
+                # # Positronic
+                # if not is_silent_subiterations:
+                #     print("--------Orbital optimization e-p")
+                #     print(
+                #         "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+                #     )
+                # energy_ep = partial(
+                #     self._calc_energy_optimization_DHF,
+                #     theta_optimization=False,
+                #     kappa_ep_optimization=True,
+                #     kappa_ee_optimization=False,
+                # )
+                # gradient_ep = partial(
+                #     self._calc_gradient_optimization_DHF,
+                #     theta_optimization=False,
+                #     kappa_ep_optimization=True,
+                #     kappa_ee_optimization=False,
+                # )
 
-                angle_bound = np.pi / 100
-                bounds_ep = [(-angle_bound, angle_bound) for _ in range(2 * len(self.kappa_spin_idx_ep))]
+                # angle_bound = np.pi / 100
+                # bounds_ep = [(-angle_bound, angle_bound) for _ in range(2 * len(self.kappa_spin_idx_ep))]
 
-                optimizer = Optimizers(
-                    energy_ep,
-                    #"SLSQP",
-                    optimizer_name,
-                    grad=gradient_ep,
-                    maxiter=maxiter,
-                    tol=tol,
-                    is_silent=is_silent_subiterations,
-                    energy_eval_callback=lambda: self.num_energy_evals,
-                    maxls = 10,
-                    maxcor = 10,
-                    bounds=bounds_ep,
-                    gtol = 1e-6,
-                )
+                # optimizer = Optimizers(
+                #     energy_ep,
+                #     #"SLSQP",
+                #     optimizer_name,
+                #     grad=gradient_ep,
+                #     maxiter=maxiter,
+                #     tol=tol,
+                #     is_silent=is_silent_subiterations,
+                #     energy_eval_callback=lambda: self.num_energy_evals,
+                #     maxls = 10,
+                #     maxcor = 10,
+                #     bounds=bounds_ep,
+                #     gtol = 1e-6,
+                # )
 
-                self._old_opt_parameters = np.zeros(2 * len(self.kappa_spin_idx_ep), dtype=np.float64) + 10**20
-                self._E_opt_old = 0.0
-                parameters = np.zeros(2 * len(self.kappa_real_ep), dtype=float).tolist()
-                res = optimizer.minimize(parameters)
-                for i in range(len(self.kappa_real_ep)):
-                    self._kappa_real_ep[i] = 0.0
-                    self._kappa_imag_ep[i] = 0.0
-                    self._kappa_real_old_ep[i] = 0.0
-                    self._kappa_imag_old_ep[i] = 0.0
+                # self._old_opt_parameters = np.zeros(2 * len(self.kappa_spin_idx_ep), dtype=np.float64) + 10**20
+                # self._E_opt_old = 0.0
+                # parameters = np.zeros(2 * len(self.kappa_real_ep), dtype=float).tolist()
+                # res = optimizer.minimize(parameters)
+                # for i in range(len(self.kappa_real_ep)):
+                #     self._kappa_real_ep[i] = 0.0
+                #     self._kappa_imag_ep[i] = 0.0
+                #     self._kappa_real_old_ep[i] = 0.0
+                #     self._kappa_imag_old_ep[i] = 0.0
             
             else:
                 # If there is no orbital optimization, then the algorithm is already converged.

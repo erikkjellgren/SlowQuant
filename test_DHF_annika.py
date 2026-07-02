@@ -1021,7 +1021,7 @@ def H2():
     #basis = dyall_v2z
     #basis = "sto-3g"
     #basis = "sto-6g"
-    active_space = ((1, 1), 4)
+    active_space = ((1, 1), 8)
     #active_space = (2, 4)
     charge = 0
     spin = 0
