@@ -736,23 +736,6 @@ def one_elec_op_1i_1a(
     return one_elec_op
 
 
-def spin_number_op(num_spin_orb: int) -> FermionicOperator:
-    """Generates the number operator in spin basis.
-
-    Args:
-        num_spin_orb (int): The number of spin orbitals.
-
-    Returns:
-        FermionicOperator: The number operator.
-    """
-    spin_number_op = FermionicOperator({})
-
-    for i in range(num_spin_orb):
-        spin_number_op += a_op_spin(i, True) * a_op_spin(i, False)
-
-    return spin_number_op
-
-
 def S_plus(num_inactive: int, num_active: int, minus: bool = False) -> FermionicOperator:
     """Spin raising and spin lowering. Acts only on active orbitals.
 
@@ -776,7 +759,7 @@ def S_plus(num_inactive: int, num_active: int, minus: bool = False) -> Fermionic
     S_op = FermionicOperator({})
 
     # Over  active orbitals.
-    for i in range(num_inactive, num_inactive + num_active):
+    for i in range(0, num_inactive + num_active):
         S_op += a_op(i, spin1, True) * a_op(i, spin2, False)
 
     return S_op
@@ -795,7 +778,7 @@ def S_z(num_inactive: int, num_active: int) -> FermionicOperator:
     op = FermionicOperator({})
 
     # Over  active orbitals.
-    for i in range(num_inactive, num_inactive + num_active):
+    for i in range(0, num_inactive + num_active):
         op += a_op(i, "alpha", True) * a_op(i, "alpha", False) - a_op(i, "beta", True) * a_op(
             i, "beta", False
         )
@@ -814,12 +797,8 @@ def S2_op(num_inactive: int, num_active: int) -> FermionicOperator:
     Returns:
         FermionicOperator: S^2 operator.
     """
-    s2 = FermionicOperator({})
+    Sp = S_plus(num_inactive, num_active, minus=False)
+    Sm = S_plus(num_inactive, num_active, minus=True)
+    Sz = S_z(num_inactive, num_active)
 
-    s2 = (
-        S_plus(num_inactive, num_active, False) * S_plus(num_inactive, num_active, True)
-        + S_z(num_inactive, num_active) * S_z(num_inactive, num_active)
-        - S_z(num_inactive, num_active)
-    )
-
-    return s2
+    return Sp * Sm + Sz * Sz - Sz
