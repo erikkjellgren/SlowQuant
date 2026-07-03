@@ -36,7 +36,7 @@ def test_lih_naive():
     WF.run_wf_optimization_1step("L-BFGS-B", True)
 
     # naive
-    LR = naive.LinearResponse(WF, excitations="SDTQ")
+    LR = naive.LinearResponse(WF, excitations="SDTQ", case=2)
     LR._construct_hessian_metric_blocks()
 
     A = LR.A
@@ -91,7 +91,7 @@ def test_lih_projected():
     WF.run_wf_optimization_1step("L-BFGS-B", True)
 
     # naive
-    LR = projected.LinearResponse(WF, excitations="SDTQ")
+    LR = projected.LinearResponse(WF, excitations="SDTQ", case=2)
     LR._construct_hessian_metric_blocks()
 
     A = LR.A
@@ -146,7 +146,7 @@ def test_lih_allprojected():
     WF.run_wf_optimization_1step("L-BFGS-B", True)
 
     # naive
-    LR = allprojected.LinearResponse(WF, excitations="SDTQ")
+    LR = allprojected.LinearResponse(WF, excitations="SDTQ", case=2)
     LR._construct_hessian_metric_blocks()
 
     A = LR.A

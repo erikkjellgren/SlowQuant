@@ -34,14 +34,16 @@ class LinearResponse(LinearResponseBaseClass):
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
+        case: int = 1,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
+            case: Case identifier. 1: exp(Q)exp(R), 2: exp(Q+R). Default is 1.
         """
-        super().__init__(wave_function, excitations)
+        super().__init__(wave_function, excitations, case)
 
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
@@ -137,9 +139,9 @@ class LinearResponse(LinearResponseBaseClass):
                 self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = val
                 # Make B
                 # - 1/2<0| Gd [qd, H] |0> = - 1/2<0| Gd qd H |0>, commutator implementation is faster.
+                fac = 0.5 if self.case == 2 else 1
                 val = (
-                    -1
-                    / 2
+                    - fac
                     * expectation_value(
                         G_ket,
                         [],
@@ -329,14 +331,15 @@ class LinearResponse(LinearResponseBaseClass):
                         tH00m_ket,
                         *self.index_info,
                     )
+                    fac = 0.5 if self.case == 2 else 1
                     # 0.5 h <0| GId [qsd, H] |0>
-                    sigma_plus[num_q + i, root] -= 0.5 * expectation_value(
+                    sigma_plus[num_q + i, root] -= fac * expectation_value(
                         GI_ket,
                         [],
                         tH00up_ket,
                         *self.index_info,
                     )
-                    sigma_minus[num_q + i, root] += 0.5 * expectation_value(
+                    sigma_minus[num_q + i, root] += fac * expectation_value(
                         GI_ket,
                         [],
                         tH00um_ket,
@@ -383,13 +386,14 @@ class LinearResponse(LinearResponseBaseClass):
                         *self.index_info,
                     )
                     # - 0.5 <0| Gsd [qid, H] |0>
-                    sigma_plus[i, root] -= 0.5 * expectation_value(
+                    fac = 0.5 if self.case == 2 else 1
+                    sigma_plus[i, root] -= fac * expectation_value(
                         Gsp_ket,
                         [],
                         qdH_ket,
                         *self.index_info,
                     ).conjugate()
-                    sigma_minus[i, root] += 0.5 * expectation_value(
+                    sigma_minus[i, root] += fac * expectation_value(
                         Gsm_ket,
                         [],
                         qdH_ket,

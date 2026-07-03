@@ -35,14 +35,17 @@ class LinearResponseBaseClass:
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
+        case: int = 1,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
+            case: Case identifier. 1: exp(Q)exp(R), 2: exp(Q+R). Default is 1.
         """
         self.wf = wave_function
+        self.case = case
         if isinstance(self.wf, WaveFunctionUCC):
             self.index_info = (
                 self.wf.ci_info,

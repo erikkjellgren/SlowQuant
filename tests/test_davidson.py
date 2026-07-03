@@ -124,7 +124,7 @@ def test_lih_naive():
     threshold = 10 ** (-5)
 
     # naive
-    LR = naive.LinearResponse(WF, excitations="SD")
+    LR = naive.LinearResponse(WF, excitations="SD", case=2)
     LR.calc_excitation_energies(3, {"max_iteration": 50, "tolerance": 1e-8, "max_reduced_space": 1_000})
 
     solutions = np.array(
@@ -196,7 +196,7 @@ def test_lih_projected_explicit():
     threshold = 10 ** (-5)
 
     # naive
-    LR = projected.LinearResponse(WF, excitations="SD")
+    LR = projected.LinearResponse(WF, excitations="SD", case=2)
     LR._construct_hessian_metric_blocks()
 
     A = LR.A
@@ -281,7 +281,7 @@ def test_lih_projected():
     threshold = 10 ** (-5)
 
     # naive
-    LR = projected.LinearResponse(WF, excitations="SD")
+    LR = projected.LinearResponse(WF, excitations="SD", case=2)
     LR.calc_excitation_energies(3, {"max_iteration": 50, "tolerance": 1e-8, "max_reduced_space": 1_000})
 
     solutions = np.array(
@@ -352,7 +352,7 @@ def test_lih_allprojected_explicit():
     threshold = 10 ** (-5)
 
     # naive
-    LR = allprojected.LinearResponse(WF, excitations="SD")
+    LR = allprojected.LinearResponse(WF, excitations="SD", case=2)
     LR._construct_hessian_metric_blocks()
 
     A = LR.A
@@ -437,7 +437,7 @@ def test_lih_allprojected():
     threshold = 10 ** (-5)
 
     # naive
-    LR = allprojected.LinearResponse(WF, excitations="SD")
+    LR = allprojected.LinearResponse(WF, excitations="SD", case=2)
     LR.calc_excitation_energies(3, {"max_iteration": 50, "tolerance": 1e-8, "max_reduced_space": 1_000})
 
     solutions = np.array(

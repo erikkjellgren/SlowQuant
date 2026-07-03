@@ -34,14 +34,16 @@ class LinearResponse(LinearResponseBaseClass):
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
+        case: int = 1,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
+            case: Case identifier. 1: exp(Q)exp(R), 2: exp(Q+R). Default is 1.
         """
-        super().__init__(wave_function, excitations)
+        super().__init__(wave_function, excitations, case)
 
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
@@ -135,7 +137,7 @@ class LinearResponse(LinearResponseBaseClass):
                 # <0| [GId, H, qJ] |0>
                 val = expectation_value(
                     self.wf.ci_coeffs,
-                    [double_commutator(GI.dagger, self.H_1i_1a, qJ, do_symmetrized=True)],
+                    [double_commutator(GI.dagger, self.H_1i_1a, qJ, do_symmetrized=self.case==2)],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
@@ -144,7 +146,7 @@ class LinearResponse(LinearResponseBaseClass):
                 # <0| [GId, H, qJd] |0>
                 val = expectation_value(
                     self.wf.ci_coeffs,
-                    [double_commutator(GI.dagger, self.H_1i_1a, qJ.dagger, do_symmetrized=True)],
+                    [double_commutator(GI.dagger, self.H_1i_1a, qJ.dagger, do_symmetrized=self.case==2)],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
@@ -390,32 +392,33 @@ class LinearResponse(LinearResponseBaseClass):
                         GId_ket,
                         *self.index_info,
                     )
-                    # 0.5 <0| H [qs, Gid] |0>
-                    sigma_plus[num_q + i, root] += 0.5 * expectation_value(
-                        self.wf.ci_coeffs,
-                        [double_commutator(self.H_1i_1a, qs_plus, GI.dagger)],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    sigma_minus[num_q + i, root] += 0.5 * expectation_value(
-                        self.wf.ci_coeffs,
-                        [double_commutator(self.H_1i_1a, qs_minus, GI.dagger)],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    # 0.5 h <0| [Gd, qsd] H |0>
-                    sigma_plus[num_q + i, root] -= 0.5 * expectation_value(
-                        self.wf.ci_coeffs,
-                        [double_commutator(self.H_1i_1a, GI.dagger, qsd_plus)],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    sigma_minus[num_q + i, root] += 0.5 * expectation_value(
-                        self.wf.ci_coeffs,
-                        [double_commutator(self.H_1i_1a, GI.dagger, qsd_minus)],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
+                    if self.case == 2:
+                        # 0.5 <0| H [qs, Gid] |0>
+                        sigma_plus[num_q + i, root] += 0.5 * expectation_value(
+                            self.wf.ci_coeffs,
+                            [double_commutator(self.H_1i_1a, qs_plus, GI.dagger)],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                        sigma_minus[num_q + i, root] += 0.5 * expectation_value(
+                            self.wf.ci_coeffs,
+                            [double_commutator(self.H_1i_1a, qs_minus, GI.dagger)],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                        # 0.5 h <0| [Gd, qsd] H |0>
+                        sigma_plus[num_q + i, root] -= 0.5 * expectation_value(
+                            self.wf.ci_coeffs,
+                            [double_commutator(self.H_1i_1a, GI.dagger, qsd_plus)],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                        sigma_minus[num_q + i, root] += 0.5 * expectation_value(
+                            self.wf.ci_coeffs,
+                            [double_commutator(self.H_1i_1a, GI.dagger, qsd_minus)],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
 
                     # <0| GId tH00m |0>
                     sigma_minus[num_q + i, root] += expectation_value(
@@ -467,84 +470,86 @@ class LinearResponse(LinearResponseBaseClass):
                     )
                     qdH_ket = propagate_state([qdH], self.wf.ci_coeffs, *self.index_info)
                     Hq_ket = propagate_state([qdH.dagger], self.wf.ci_coeffs, *self.index_info)
+                    fac = 0.5 if self.case == 2 else 1
                     # 0.5 <0| qid H Gs |0>
-                    sigma_plus[i, root] += 0.5 * expectation_value(
+                    sigma_plus[i, root] += fac * expectation_value(
                         Hq_ket,
                         [],
                         Gsp_ket,
                         *self.index_info,
                     )
-                    sigma_minus[i, root] += 0.5 * expectation_value(
+                    sigma_minus[i, root] += fac * expectation_value(
                         Hq_ket,
                         [],
                         Gsm_ket,
                         *self.index_info,
                     )
                     # 0.5 h <0| qid H Gsd |0>
-                    sigma_plus[i, root] += 0.5 * expectation_value(
+                    sigma_plus[i, root] += fac * expectation_value(
                         Hq_ket,
                         [],
                         Gsdp_ket,
                         *self.index_info,
                     )
-                    sigma_minus[i, root] -= 0.5 * expectation_value(
+                    sigma_minus[i, root] -= fac * expectation_value(
                         Hq_ket,
                         [],
                         Gsdm_ket,
                         *self.index_info,
                     )
                     # - 0.5 <0| Gs qid H |0>
-                    sigma_plus[i, root] -= 0.5 * expectation_value(
+                    sigma_plus[i, root] -= fac * expectation_value(
                         Gsdp_ket,
                         [],
                         qdH_ket,
                         *self.index_info,
                     )
-                    sigma_minus[i, root] -= 0.5 * expectation_value(
+                    sigma_minus[i, root] -= fac * expectation_value(
                         Gsdm_ket,
                         [],
                         qdH_ket,
                         *self.index_info,
                     )
                     # - 0.5 h <0| Gsd qid H |0>
-                    sigma_plus[i, root] -= 0.5 * expectation_value(
+                    sigma_plus[i, root] -= fac * expectation_value(
                         Gsp_ket,
                         [],
                         qdH_ket,
                         *self.index_info,
                     )
-                    sigma_minus[i, root] += 0.5 * expectation_value(
+                    sigma_minus[i, root] += fac * expectation_value(
                         Gsm_ket,
                         [],
                         qdH_ket,
                         *self.index_info,
                     )
-                    # 0.5 <0 | qid [H, Gs] |0>
-                    sigma_plus[i, root] += 0.5 * expectation_value(
-                        self.wf.ci_coeffs,
-                        [commutator(qi.dagger, HGsp)],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    sigma_minus[i, root] += 0.5 * expectation_value(
-                        self.wf.ci_coeffs,
-                        [commutator(qi.dagger, HGsm)],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    # 0.5 h <0| qid [H, Gsd] |0>
-                    sigma_plus[i, root] += 0.5 * expectation_value(
-                        self.wf.ci_coeffs,
-                        [commutator(qi.dagger, HGsdp)],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    sigma_minus[i, root] -= 0.5 * expectation_value(
-                        self.wf.ci_coeffs,
-                        [commutator(qi.dagger, HGsdm)],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
+                    if self.case == 2:
+                        # 0.5 <0 | qid [H, Gs] |0>
+                        sigma_plus[i, root] += 0.5 * expectation_value(
+                            self.wf.ci_coeffs,
+                            [commutator(qi.dagger, HGsp)],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                        sigma_minus[i, root] += 0.5 * expectation_value(
+                            self.wf.ci_coeffs,
+                            [commutator(qi.dagger, HGsm)],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                        # 0.5 h <0| qid [H, Gsd] |0>
+                        sigma_plus[i, root] += 0.5 * expectation_value(
+                            self.wf.ci_coeffs,
+                            [commutator(qi.dagger, HGsdp)],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                        sigma_minus[i, root] -= 0.5 * expectation_value(
+                            self.wf.ci_coeffs,
+                            [commutator(qi.dagger, HGsdm)],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
 
         for root in range(n_roots):
             Gsp = FermionicOperator({})
