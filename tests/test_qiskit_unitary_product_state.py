@@ -547,3 +547,42 @@ def test_convert_saups_to_circuit() -> None:
     primitive = Sampler(run_options={"shots": None})
     qWF = circuit_wavefunction_from_ups(WF, primitive, mapper)
     assert abs(WF.sa_energy - qWF.sa_energy) < 10**-9
+
+
+def test_pp_ups_to_circuit() -> None:
+    """Test pp in ups and circuit and its translation from ups to circuit."""
+    # Define molecule: H2O
+    atom = """O   0.0  0.0           0.1035174918;
+        H   0.0  0.7955612117 -0.4640237459;
+        H   0.0 -0.7955612117 -0.4640237459;"""
+    basis = "sto-3g"
+
+    # HF
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        atom,
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set(basis)
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+
+    mo_coeff = SQobj.hartree_fock.mo_coeff
+    integral_generator = SQobj
+
+    WF = WaveFunctionUPS(
+        (6, 5),  # active space
+        mo_coeff,
+        integral_generator,
+        "tUPS",  # our circuit Ansatz
+        ansatz_options={"n_layers": 1, "do_pp": True, "skip_last_singles": True},  # we use 1 layer
+        include_active_kappa=True,
+    )
+
+    WF.run_wf_optimization_1step("bfgs", orbital_optimization=True)
+
+    assert abs(WF.energy_elec + 83.98433373390003) < 10**-10
+
+    qWF = circuit_wavefunction_from_ups(WF, Sampler(), JordanWignerMapper(), shots=None)
+
+    assert abs(qWF.energy_elec + 83.9843337275081) < 10**-10
