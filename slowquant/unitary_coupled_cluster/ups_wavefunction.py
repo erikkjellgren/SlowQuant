@@ -31,7 +31,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     propagate_unitary,
     propagate_unitary_SA,
 )
-from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
+from slowquant.unitary_coupled_cluster.operators import Epq, S2_op, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UpsStructure
 
@@ -265,7 +265,7 @@ class WaveFunctionUPS:
             )
         elif ansatz.lower() == "none":
             print("UPS wave function with no Ansatz was chosen.")
-        else: 
+        else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
 
@@ -751,14 +751,14 @@ class WaveFunctionUPS:
         if qiskit_form:
             return H.get_qiskit_form(self.num_active_orbs)
         return H
-    
+
     def _get_hamiltonian_matrix(self) -> np.ndarray:
         """Return Hamitlonian matrix.
-        
+
         Returns:
             Hamiltonian matrix
         """
-        return build_operator_matrix(self._get_hamiltonian(), self.ci_info)
+        return build_operator_matrix(FermionicOperator(self._get_hamiltonian()), self.ci_info)  # type: ignore
 
     def run_wf_optimization_2step(
         self,
@@ -1156,3 +1156,13 @@ class WaveFunctionUPS:
         self.num_energy_evals += len(energies)
 
         return energies
+
+    def get_total_spin(self) -> float:
+        """Calculates the spin of the current state using the spin squared operator.
+
+        Returns:
+            float: The expectation value of the spin squared operator.
+        """
+        S2 = S2_op(self.num_inactive_orbs, self.num_active_orbs)
+
+        return expectation_value(self.ci_coeffs, [S2], self.ci_coeffs, self.ci_info)
