@@ -511,19 +511,19 @@ class LinearResponse(LinearResponseBaseClass):
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
         )
-        op_ket = propagate_state([op], self.wf.ci_coeffs, *self.index_info)
+        opd_ket = propagate_state([op.dagger], self.wf.ci_coeffs, *self.index_info)
         for i, GI in enumerate(self.G_ops):
             GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
             gradient[num_q + i] -= expectation_value(
-                GI_ket,
+                opd_ket,
                 [],
-                op_ket,
+                GI_ket,
                 *self.index_info,
             )
             gradient[num_q + i] += self._G_expect[i] * expectation_value(
-                self.wf.ci_coeffs,
+                opd_ket,
                 [],
-                op_ket,
+                self.wf.ci_coeffs,
                 *self.index_info,
             )
         return - gradient.reshape(-1, 1)

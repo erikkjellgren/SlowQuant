@@ -557,19 +557,19 @@ class LinearResponse(LinearResponseBaseClass):
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
         )
-        op_ket = propagate_state([op], self.wf.ci_coeffs, *self.index_info)
+        opd_ket = propagate_state([op.dagger], self.wf.ci_coeffs, *self.index_info)
         for i, GI in enumerate(self.G_ops):
             GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
             gradient[num_q + i] -= expectation_value(
-                GI_ket,
+                opd_ket,
                 [],
-                op_ket,
+                GI_ket,
                 *self.index_info,
             )
             gradient[num_q + i] += self._G_expect[i] * expectation_value(
-                self.wf.ci_coeffs,
+                opd_ket,
                 [],
-                op_ket,
+                self.wf.ci_coeffs,
                 *self.index_info,
             )
         return - gradient.reshape(-1, 1)
@@ -601,14 +601,20 @@ class LinearResponse(LinearResponseBaseClass):
             self.wf.num_active_orbs,
         )
         mux_ket = propagate_state([mux_op], self.wf.ci_coeffs, *self.index_info)
+        muxd_ket = propagate_state([mux_op.dagger], self.wf.ci_coeffs, *self.index_info)
         muy_ket = propagate_state([muy_op], self.wf.ci_coeffs, *self.index_info)
+        muyd_ket = propagate_state([muy_op.dagger], self.wf.ci_coeffs, *self.index_info)
         muz_ket = propagate_state([muz_op], self.wf.ci_coeffs, *self.index_info)
+        muzd_ket = propagate_state([muz_op.dagger], self.wf.ci_coeffs, *self.index_info)
         # <0| mux |0>
         exp_mux = expectation_value(self.wf.ci_coeffs, [], mux_ket, *self.index_info)
+        exp_muxd = expectation_value(self.wf.ci_coeffs, [], muxd_ket, *self.index_info)
         # <0| muy |0>
         exp_muy = expectation_value(self.wf.ci_coeffs, [], muy_ket, *self.index_info)
+        exp_muyd = expectation_value(self.wf.ci_coeffs, [], muyd_ket, *self.index_info)
         # <0| muz |0>
         exp_muz = expectation_value(self.wf.ci_coeffs, [], muz_ket, *self.index_info)
+        exp_muzd = expectation_value(self.wf.ci_coeffs, [], muzd_ket, *self.index_info)
         transition_dipoles = np.zeros((number_excitations, 3))
         for state_number in range(number_excitations):
             q_part_x = 0.0
@@ -654,23 +660,29 @@ class LinearResponse(LinearResponseBaseClass):
                 exp_G = self._G_expect[i]
                 # <0| Gd mux |0>
                 exp_Gmux = expectation_value(G_ket, [], mux_ket, *self.index_info)
+                # <0| Gd muxd |0>
+                exp_Gmuxd = expectation_value(G_ket, [], muxd_ket, *self.index_info)
                 # <0| Gd muy |0>
                 exp_Gmuy = expectation_value(G_ket, [], muy_ket, *self.index_info)
+                # <0| Gd muyd |0>
+                exp_Gmuyd = expectation_value(G_ket, [], muyd_ket, *self.index_info)
                 # <0| Gd muz |0>
                 exp_Gmuz = expectation_value(G_ket, [], muz_ket, *self.index_info)
+                # <0| Gd muzd |0>
+                exp_Gmuzd = expectation_value(G_ket, [], muzd_ket, *self.index_info)
 
                 g_part_x += self.Z_G_normed[i, state_number] * exp_G * exp_mux
                 g_part_x -= self.Z_G_normed[i, state_number] * exp_Gmux
                 g_part_x -= self.Y_G_normed[i, state_number] * exp_G * exp_mux
-                g_part_x += self.Y_G_normed[i, state_number] * exp_Gmux
+                g_part_x += self.Y_G_normed[i, state_number] * exp_Gmuxd
                 g_part_y += self.Z_G_normed[i, state_number] * exp_G * exp_muy
                 g_part_y -= self.Z_G_normed[i, state_number] * exp_Gmuy
                 g_part_y -= self.Y_G_normed[i, state_number] * exp_G * exp_muy
-                g_part_y += self.Y_G_normed[i, state_number] * exp_Gmuy
+                g_part_y += self.Y_G_normed[i, state_number] * exp_Gmuyd
                 g_part_z += self.Z_G_normed[i, state_number] * exp_G * exp_muz
                 g_part_z -= self.Z_G_normed[i, state_number] * exp_Gmuz
                 g_part_z -= self.Y_G_normed[i, state_number] * exp_G * exp_muz
-                g_part_z += self.Y_G_normed[i, state_number] * exp_Gmuz
+                g_part_z += self.Y_G_normed[i, state_number] * exp_Gmuzd
 
             transition_dipoles[state_number, 0] = q_part_x + g_part_x
             transition_dipoles[state_number, 1] = q_part_y + g_part_y
