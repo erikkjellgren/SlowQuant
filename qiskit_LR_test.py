@@ -31,6 +31,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03599
 
     e_nuc=mf.energy_nuc()
     print(e_nuc)
+    
+    "Non-relativistic integrals"
+    h_1e = mol.intor("int1e_kin")  
+    h_nuc=mol.intor("int1e_nuc")
+    h_core=mol.intor("int1e_kin")+mol.intor("int1e_nuc")
+    g_eri = mol.intor("int2e")
 
     WF =GeneralizedWaveFunctionUPS(
         # mol.nelectron,
@@ -76,18 +82,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03599
     # file_out.write(f"E_opt: (+nuc!) {str(WF._energy_elec + e_nuc)}")
 
     LR = generalized_naive.LinearResponse(WF, excitations="sd")
-    LR.calc_excitation_energies()
-    print(LR.excitation_energies)
+    # LR.calc_excitation_energies()
+    # print(LR.excitation_energies)
     # LR.get_transition_dipole(mol.intor("int1e_r"))
-    # print(LR.get_oscillator_strengths(mol.intor("int1e_r")))
     # print(LR.get_oscillator_strength(mol.intor("int1e_r")))
 
 
-    "Non-relativistic integrals"
-    h_1e = mol.intor("int1e_kin")  
-    h_nuc=mol.intor("int1e_nuc")
-    h_core=mol.intor("int1e_kin")+mol.intor("int1e_nuc")
-    g_eri = mol.intor("int2e")
 
     #Mapper
     mapper = JordanWignerMapper()
@@ -111,7 +111,6 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03599
 
     LR.calc_excitation_energies()
     print('Exci. LR ideal', LR.excitation_energies)
-    # print(LR.get_oscillator_strengths(mol.intor("int1e_r")))
     print('Osc. LR ideal',LR.get_oscillator_strength(mol.intor("int1e_r"))) #forskel på denne og strengths??
 
     # file_out.write(f"Exci. LR ideal {str(LR.excitation_energies)}")
@@ -322,6 +321,32 @@ def h7():
     )
 
 
-h2()
+def Cu3():
+    geometry = """Cu 0.000000   0.000000   0.000000;
+                Cu   0.000000   0.000000   2.350000;
+                Cu   0.000000   1.989900   1.250000"""
+    basis = "def2svp"
+    active_space = ((2, 1), 6)
+    charge = 0
+    spin = 1
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+
+
+def N3():
+    geometry = """N
+                  N 1 1.4823
+                  N 1 1.4823 2 49.2 """
+    basis = "6-31g"
+    active_space = ((5,4), 18)
+    charge = 0
+    spin = 1
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+Cu3()
+N3()
+# h2()
 # h7()
 # h2()
