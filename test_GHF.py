@@ -14,7 +14,7 @@ from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.linear_response import generalized_naive, naive
 from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import generalized_expectation_value, generalized_propagate_state
-from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a, generalized_hamiltonian_1i_1a, generalized_one_elec_op_0i_0a
+from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a, generalized_hamiltonian_1i_1a, generalized_one_elec_op_0i_0a, generalized_hamiltonian_2i_2a
 from slowquant.unitary_coupled_cluster.operators import a_op_spin
 from slowquant.molecularintegrals.integralfunctions import generalized_one_electron_transform
 
@@ -223,17 +223,20 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # thetas = np.array([0, 0, 0, 0, -0.11284015184], dtype=float).tolist()
     
      
-    
     'Test of Hamiltonians'
-    # H=generalized_hamiltonian_full_space(h_eri_mo, g_eri_mo, c.shape[0])
-    # H_test=generalized_hamiltonian_0i_0a(h_eri_mo, g_eri_mo,num_inactive_spin_orbs,num_active_spin_orbs)
-    # test=generalized_expectation_value(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
-    # print(test, test+e_nuc)
-    # test2=generalized_expectation_value(WF.ci_coeffs, [H_test], WF.ci_coeffs, WF.ci_info)
-    # print(test2, test2+e_nuc)
-    # H_1iai=generalized_hamiltonian_1i_1a(h_eri_mo, g_eri_mo,num_inactive_spin_orbs,num_active_spin_orbs, num_virtual_spin_orbs)
-    # test3=generalized_expectation_value(WF.ci_coeffs, [H_1iai], WF.ci_coeffs, WF.ci_info)
-    # print(test3, test3+e_nuc)
+    H=generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo, coeff.shape[0])
+    H_test=generalized_hamiltonian_0i_0a(WF.h_mo, WF.g_mo, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs)
+    test=generalized_expectation_value(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
+    print(test, test+e_nuc)
+    test2=generalized_expectation_value(WF.ci_coeffs, [H_test], WF.ci_coeffs, WF.ci_info)
+    print(test2, test2+e_nuc)
+    H_1iai=generalized_hamiltonian_1i_1a(WF.h_mo, WF.g_mo,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs, WF.num_virtual_spin_orbs)
+    test3=generalized_expectation_value(WF.ci_coeffs, [H_1iai], WF.ci_coeffs, WF.ci_info)
+    print(test3, test3+e_nuc)
+    H_2i2a=generalized_hamiltonian_2i_2a(WF.h_mo, WF.g_mo,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs, WF.num_virtual_spin_orbs)
+    test4=generalized_expectation_value(WF.ci_coeffs, [H_2i2a], WF.ci_coeffs, WF.ci_info)
+    print(test4, test4+e_nuc)
+
     
     # # 'Test of gradients'
     # print('Expectation Value',np.round(WF.get_orbital_gradient_generalized_expvalue_real_imag,10))
@@ -530,8 +533,8 @@ def h5():
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
 
-# h3()
-h2()
+h3()
+# h2()
 # h4_rektangle()
 # HI()
 # HBr()

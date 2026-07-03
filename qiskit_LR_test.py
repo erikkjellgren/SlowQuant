@@ -51,20 +51,29 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03599
     # nye_vinkler_real = np.random.uniform(-0.05, 0.05, len(WF.thetas)).tolist()
     # nye_vinkler_imag = [0.0] * len(WF.thetas)
     # WF.set_thetas(nye_vinkler_real, nye_vinkler_imag)
+    # file_out = open("output.txt", "w")
 
     ny_theta_real = np.random.uniform(-0.05, 0.05, len(WF.thetas))
-    print(ny_theta_real)
-    # ny_theta_imag = np.random.uniform(-0.05,0.05,len(WF.thetas)) 
-    ny_theta_imag = [0.0] * len(WF.thetas)
-    print(ny_theta_imag)
+    # print(ny_theta_real)
+    ny_theta_imag = np.random.uniform(-0.05,0.05,len(WF.thetas)) 
+    # ny_theta_imag = [0.0] * len(WF.thetas)
+    # print(ny_theta_imag)
     WF.set_thetas(ny_theta_real, ny_theta_imag)
     print(WF.thetas)
+
+    # file_out.write(str(WF.thetas))
+
+
 
 
     WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
     # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
 
+    # file_out.write(f"Optimized thetas {str(WF.thetas)}")
+
     print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
+
+    # file_out.write(f"E_opt: (+nuc!) {str(WF._energy_elec + e_nuc)}")
 
     LR = generalized_naive.LinearResponse(WF, excitations="sd")
     LR.calc_excitation_energies()
@@ -105,12 +114,20 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03599
     # print(LR.get_oscillator_strengths(mol.intor("int1e_r")))
     print('Osc. LR ideal',LR.get_oscillator_strength(mol.intor("int1e_r"))) #forskel på denne og strengths??
 
+    # file_out.write(f"Exci. LR ideal {str(LR.excitation_energies)}")
+    # file_out.write(f"Osc. LR ideal {str(LR.get_oscillator_strength(mol.intor("int1e_r")))}")
+
     excitation_energies = qLR.get_excitation_energies()
     print('Exci. qLR ideal ',excitation_energies)
     qLR.get_normed_excitation_vectors()
     qLR.get_transition_dipole(mol.intor("int1e_r"))
+    print('TDM',qLR.get_transition_dipole(mol.intor("int1e_r")))
     print('Osc. qLR ideal',qLR.get_oscillator_strength(mol.intor("int1e_r")))
-    # qLR.get_formatted_oscillator_strength()
+    # # qLR.get_formatted_oscillator_strength()
+    # file_out.write(f"Exci. qLR ideal {str(qLR.get_excitation_energies())}")
+    # file_out.write(f"Osc. qLR ideal {str(qLR.get_oscillator_strength(mol.intor("int1e_r")))}")
+    # file_out.close()
+
 
 
     ##OBS tjek oscillator stryker
@@ -135,6 +152,7 @@ def noisy(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03
 
     mf.kernel()
     coeff=np.array(mf.mo_coeff, dtype=complex)
+    
 
     e_nuc=mf.energy_nuc()
     print(e_nuc)
@@ -157,22 +175,34 @@ def noisy(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03
     # nye_vinkler_imag = [0.0] * len(WF.thetas)
     # WF.set_thetas(nye_vinkler_real, nye_vinkler_imag)
 
+    file_out = open("outputnoisy.txt", "w")
+
     ny_theta_real = np.random.uniform(-0.05, 0.05, len(WF.thetas))
-    print(ny_theta_real)
+    # print(ny_theta_real)
     # ny_theta_imag = np.random.uniform(-0.05,0.05,len(WF.thetas)) 
     ny_theta_imag = [0.0] * len(WF.thetas)
-    print(ny_theta_imag)
+    # print(ny_theta_imag)
+
     WF.set_thetas(ny_theta_real, ny_theta_imag)
     print('Theats noisy',WF.thetas)
+    WF.set_thetas(ny_theta_real, ny_theta_imag)
+    print(WF.thetas)
+
+    file_out.write(str(WF.thetas))
 
     WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
     # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
 
     print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
+    print("Optimized MO coefficients", WF.c_mo)
+
+    file_out.write(f"Optimized thetas {str(WF.thetas)}")
+
+    print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
     LR = generalized_naive.LinearResponse(WF, excitations="sd")
     LR.calc_excitation_energies()
     print(LR.excitation_energies)
-    print(LR.get_oscillator_strengths(mol.intor("int1e_r")))
+    print(LR.get_oscillator_strength(mol.intor("int1e_r")))
     # print(LR.get_oscillator_strength(mol.intor("int1e_r"))) #forskel på denne og strengths??
 
 
@@ -207,12 +237,18 @@ def noisy(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03
     print('Exci. LR noisy', LR.excitation_energies)
     # print(LR.get_oscillator_strengths(mol.intor("int1e_r")))
     print('Osc. LR noisy',LR.get_oscillator_strength(mol.intor("int1e_r"))) #forskel på denne og strengths??
+    file_out.write(f"Exci. LR noisy {str(LR.excitation_energies)}")
+    file_out.write(f"Osc. LR noisy {str(LR.get_oscillator_strength(mol.intor("int1e_r")))}")
 
     excitation_energies = qLR.get_excitation_energies()
     print('Exci. qLR noisy ',excitation_energies)
     qLR.get_normed_excitation_vectors()
     qLR.get_transition_dipole(mol.intor("int1e_r"))
     print('Osc. qLR noisy',qLR.get_oscillator_strength(mol.intor("int1e_r")))
+    file_out.write(f"Exci. qLR noisy {str(qLR.get_excitation_energies())}")
+    file_out.write(f"Osc. qLR noisy {str(qLR.get_oscillator_strength(mol.intor("int1e_r")))}")
+    file_out.close()
+
 
 
 
@@ -247,9 +283,9 @@ def h2():
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
-    noisy(
-        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
-    )
+    # noisy(
+    #     geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    # )
 
 def h5():
     geometry = """H   0.000000   0.850651   0.000000;
@@ -257,7 +293,7 @@ def h5():
                   H   0.500000  -0.688191   0.000000;
                   H  -0.500000  -0.688191   0.000000;
                   H  -0.809017   0.262866   0.000000"""
-    basis = "STO-3g"
+    basis = "631-g"
     active_space = ((3, 2), 10)
     charge = 0
     spin = 1
@@ -275,13 +311,17 @@ def h7():
               H  -1.123354  -0.256429   0.000000;
               H  -0.899454   0.718499   0.000000"""
     basis = "6-311g**"
-    active_space = ((3, 2), 10)
+    active_space = ((4, 3), 14)
     charge = 0
     spin = 1
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
+    noisy(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
 
+
+h2()
 # h7()
 # h2()
-h3()
