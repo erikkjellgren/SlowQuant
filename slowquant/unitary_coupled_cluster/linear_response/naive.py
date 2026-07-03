@@ -780,7 +780,7 @@ class LinearResponse(LinearResponseBaseClass):
                 GI_ket,
                 *self.index_info,
             )
-        return gradient.reshape(-1, 1)
+        return - gradient.reshape(-1, 1)
 
     def get_transition_dipole(self, dipole_integrals: tuple[np.ndarray, np.ndarray, np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
