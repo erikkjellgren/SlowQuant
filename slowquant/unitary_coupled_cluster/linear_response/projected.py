@@ -608,13 +608,10 @@ class LinearResponse(LinearResponseBaseClass):
         muzd_ket = propagate_state([muz_op.dagger], self.wf.ci_coeffs, *self.index_info)
         # <0| mux |0>
         exp_mux = expectation_value(self.wf.ci_coeffs, [], mux_ket, *self.index_info)
-        exp_muxd = expectation_value(self.wf.ci_coeffs, [], muxd_ket, *self.index_info)
         # <0| muy |0>
         exp_muy = expectation_value(self.wf.ci_coeffs, [], muy_ket, *self.index_info)
-        exp_muyd = expectation_value(self.wf.ci_coeffs, [], muyd_ket, *self.index_info)
         # <0| muz |0>
         exp_muz = expectation_value(self.wf.ci_coeffs, [], muz_ket, *self.index_info)
-        exp_muzd = expectation_value(self.wf.ci_coeffs, [], muzd_ket, *self.index_info)
         transition_dipoles = np.zeros((number_excitations, 3))
         for state_number in range(number_excitations):
             q_part_x = 0.0
