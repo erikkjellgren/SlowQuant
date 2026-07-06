@@ -558,6 +558,12 @@ class LinearResponse(LinearResponseBaseClass):
             self.wf.num_active_orbs,
         )
         opd_ket = propagate_state([op.dagger], self.wf.ci_coeffs, *self.index_info)
+        op_exp = expectation_value(
+            opd_ket,
+            [],
+            self.wf.ci_coeffs,
+            *self.index_info,
+        )
         for i, GI in enumerate(self.G_ops):
             GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
             gradient[num_q + i] -= expectation_value(
@@ -566,12 +572,7 @@ class LinearResponse(LinearResponseBaseClass):
                 GI_ket,
                 *self.index_info,
             )
-            gradient[num_q + i] += self._G_expect[i] * expectation_value(
-                opd_ket,
-                [],
-                self.wf.ci_coeffs,
-                *self.index_info,
-            )
+            gradient[num_q + i] += self._G_expect[i] * op_exp
         return - gradient.reshape(-1, 1)
 
     def get_transition_dipole(self, dipole_integrals: tuple[np.ndarray, np.ndarray, np.ndarray]) -> np.ndarray:
