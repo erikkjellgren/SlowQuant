@@ -160,19 +160,25 @@ def test_lih_naive():
     ])
     assert np.allclose(pol, solutions, atol=threshold)
 
+    temp = LR.normed_response_vectors.T @ lr[1]
+    assert np.allclose(2/3 * LR.excitation_energies * (temp * temp).sum(axis=1), LR.oscillator_strengths, atol=threshold)
+
     lr = LR.linear_response_function(
         1.0,
         "optical rotation",
         {"max_iterations": 50, "tolerance": 1e-8},
     )
     pol = - 1j * lr[0].T @ lr[1]
-    print(pol)
     solutions = np.array([
         [0, 0, 0],
         [0, 0, -2.53196664e+00+0j],
         [0, 2.53196664e+00+0j, 0]
     ])
     assert np.allclose(pol, solutions, atol=threshold)
+
+    temp *= (0.5j * LR.normed_response_vectors.T @ lr[1]).real
+    LR.get_rotational_strength()
+    assert np.allclose(temp.sum(axis=1), LR.rotational_strengths, atol=threshold)
 
 def test_lih_projected_explicit():
     """Test LiH energies for projected q LR methods."""
@@ -317,6 +323,9 @@ def test_lih_projected():
     ])
     assert np.allclose(pol, solutions, atol=threshold)
 
+    temp = LR.normed_response_vectors.T @ lr[1]
+    assert np.allclose(2/3 * LR.excitation_energies * (temp * temp).sum(axis=1), LR.oscillator_strengths, atol=threshold)
+
     lr = LR.linear_response_function(
         1.0,
         "optical rotation",
@@ -329,6 +338,10 @@ def test_lih_projected():
         [0, 2.53196759e+00+0j, 0]
     ])
     assert np.allclose(pol, solutions, atol=threshold)
+
+    temp *= (0.5j * LR.normed_response_vectors.T @ lr[1]).real
+    LR.get_rotational_strength()
+    assert np.allclose(temp.sum(axis=1), LR.rotational_strengths, atol=threshold)
 
 def test_lih_allprojected_explicit():
     """Test LiH energies for projected q LR methods."""
@@ -473,6 +486,9 @@ def test_lih_allprojected():
     ])
     assert np.allclose(pol, solutions, atol=threshold)
 
+    temp = LR.normed_response_vectors.T @ lr[1]
+    assert np.allclose(2/3 * LR.excitation_energies * (temp * temp).sum(axis=1), LR.oscillator_strengths, atol=threshold)
+
     lr = LR.linear_response_function(
         1.0,
         "optical rotation",
@@ -485,3 +501,7 @@ def test_lih_allprojected():
         [0, 2.56644246e+00+0j, 0]
     ])
     assert np.allclose(pol, solutions, atol=threshold)
+
+    temp *= (0.5j * LR.normed_response_vectors.T @ lr[1]).real
+    LR.get_rotational_strength()
+    assert np.allclose(temp.sum(axis=1), LR.rotational_strengths, atol=threshold)
