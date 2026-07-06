@@ -759,7 +759,7 @@ def S_plus(num_inactive: int, num_active: int, minus: bool = False) -> Fermionic
     S_op = FermionicOperator({})
 
     # Over  active orbitals.
-    for i in range(0, num_inactive + num_active):
+    for i in range(num_inactive, num_inactive + num_active):
         S_op += a_op(i, spin1, True) * a_op(i, spin2, False)
 
     return S_op
@@ -778,7 +778,7 @@ def S_z(num_inactive: int, num_active: int) -> FermionicOperator:
     op = FermionicOperator({})
 
     # Over  active orbitals.
-    for i in range(0, num_inactive + num_active):
+    for i in range(num_inactive, num_inactive + num_active):
         op += a_op(i, "alpha", True) * a_op(i, "alpha", False) - a_op(i, "beta", True) * a_op(
             i, "beta", False
         )
