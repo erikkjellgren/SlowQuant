@@ -360,7 +360,11 @@ def test_saups_h3_3states_threaded() -> None:
 
 
 def test_ups_n2_fuccsdtq56() -> None:
-    """Test high exictation order."""
+    """Test high excitation order.
+
+    Test added after bug was discovered that didnt allow for,
+    T, Q, 5, and 6 excitation orders to run.
+    """
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """N 0.0 0.0 0.0; N 0.0 0.0 1.1;""",
