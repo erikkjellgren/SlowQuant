@@ -13,6 +13,7 @@ import slowquant.qiskit_interface.linear_response.generalized_naive as q_general
 
 
 def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03599967994):
+    np.set_printoptions(threshold=np.inf)
     """.........."""
     print("active space:", {active_space})
     # PySCF
@@ -28,6 +29,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03599
 
     mf.kernel()
     coeff=np.array(mf.mo_coeff, dtype=complex)
+    print(coeff, flush=True)
 
     e_nuc=mf.energy_nuc()
     print(e_nuc)
@@ -50,7 +52,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03599
     )
     # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
 
-    print("c_mo is real?", np.allclose(WF.c_mo.imag, 0))
+    # print("c_mo is real?", np.allclose(WF.c_mo.imag, 0))
 
     
     # np.random.seed(42)
@@ -72,12 +74,14 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03599
 
 
 
-    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
     # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
 
     # file_out.write(f"Optimized thetas {str(WF.thetas)}")
 
-    print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
+    print("E_opt: (+nuc!)", WF._energy_elec + e_nuc, flush=True)
+    print('Optimized theta',WF.thetas, flush=True)
+    print('optimized mo coeff', WF.c_mo, flush=True)
 
     # file_out.write(f"E_opt: (+nuc!) {str(WF._energy_elec + e_nuc)}")
 
@@ -323,29 +327,30 @@ def h7():
 
 def Cu3():
     geometry = """Cu 0.000000   0.000000   0.000000;
-                Cu   0.000000   0.000000   2.350000;
-                Cu   0.000000   1.989900   1.250000"""
-    basis = "def2svp"
+                Cu   0.000000   0.000000   2.260000;
+                Cu   0.000000   1.883000   1.250000"""
+    # basis = "def2svp"
+    # basis = 'lanll2dz_ecp.nw'
+    basis = 'lanl2dz'
+    ecp   = 'lanl2dz'
     active_space = ((2, 1), 6)
     charge = 0
     spin = 1
     NR(
-        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
-    )
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom", ecp=ecp)
 
 
 def N3():
-    geometry = """N
-                  N 1 1.4823
-                  N 1 1.4823 2 49.2 """
-    basis = "6-31g"
+    geometry = """N 0.000 0.000 0.000;
+                  N 0.609 1.316 0.000;
+                  N 1.218 0.000 0.000"""
+    basis = "STO-3g"
     active_space = ((5,4), 18)
     charge = 0
     spin = 1
     NR(
-        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
-    )
-Cu3()
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
+# Cu3()
 N3()
 # h2()
 # h7()

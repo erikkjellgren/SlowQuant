@@ -94,7 +94,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # print(WF.c_mo)
 
-    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
 
     # print("E_opt:", WF._energy_elec)
     print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
@@ -532,8 +532,19 @@ def h5():
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
+def O2():
+    geometry = """O    1.20752 0.0 0.0;
+                O  0.0 0.0 0.0"""
+    basis = "631-g"
+    active_space = ((3, 1), 8)
+    charge = 0
+    spin = 2 
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
 
-h3()
+O2() 
+# h3()
 # h2()
 # h4_rektangle()
 # HI()

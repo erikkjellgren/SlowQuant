@@ -54,7 +54,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         coeff,
         #C_u,
         mol,
-        "fUCCSD",
+        "gtups",
         True, #Do x2c
         {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
@@ -186,6 +186,7 @@ def build_x2c_pc_operator(mf, mol, int_LL, int_SS, c, x2c=True, picture_change=T
                     nao = xmol.nao
                     r = xmol.intor_symmetric(int_LL)                          # (3, nao_x, nao_x)
                     c1 = 0.5 / c
+                    print(sprsp.shape)
                     sprsp = xmol.intor_symmetric(int_SS).reshape(3, 4, nao, nao)
                     sprsp_sf = sprsp[:, 3] * (c1**2)
                     return mf.with_x2c.picture_change((r, sprsp_sf)) 
@@ -256,7 +257,7 @@ def build_x2c_pc_operator_efg(mf, mol, atom_idx, c, x2c=False, picture_change=Fa
                         xmol.intor("int1e_ipipsprinvsp")
                         + xmol.intor("int1e_ipipsprinvsp").transpose(0, 2, 1)
                         + 2 * xmol.intor("int1e_ipsprinvspip")).reshape(9, 4, nao_x, nao_x)
-                        
+                    print(efg_ao_ss.shape)
                     f2_SS_spinor = np.array([_sigma_dot2(x) * (0.5/c)**2 for x in efg_ao_ss])
                     ao_efg = mf.with_x2c.picture_change((f2_LL_spinor, f2_SS_spinor))  #det er her den går galt
                     ao_efg = 0.5 * (ao_efg + ao_efg.conj().transpose(0, 2, 1))
