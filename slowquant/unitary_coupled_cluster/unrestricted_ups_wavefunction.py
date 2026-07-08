@@ -96,7 +96,6 @@ class UnrestrictedWaveFunctionUPS:
         self.active_unocc_idx_shifted = []
         self.num_spin_orbs = 2 * len(self.int_gen.kinetic_energy)
         self.num_orbs = len(self.int_gen.kinetic_energy)
-        self._include_active_kappa = include_active_kappa
         self.num_active_elec_alpha = cas[0][0]
         self.num_active_elec_beta = cas[0][1]
         self.num_active_elec = self.num_active_elec_alpha + self.num_active_elec_beta
@@ -219,19 +218,12 @@ class UnrestrictedWaveFunctionUPS:
                         self.kappa_redundant_idx.append((p, q))
                         continue
                 if include_active_kappa:
-                    if p in self.active_occ_idx and q in self.active_occ_idx:
-                        self._kappa_a_redundant.append(0.0)
-                        self._kappa_b_redundant.append(0.0)
-                        self._kappa_a_redundant_old.append(0.0)
-                        self._kappa_b_redundant_old.append(0.0)
-                        self.kappa_redundant_idx.append((p, q))
-                        continue
-                    if p in self.active_unocc_idx and q in self.active_unocc_idx:
-                        self._kappa_a_redundant.append(0.0)
-                        self._kappa_b_redundant.append(0.0)
-                        self._kappa_a_redundant_old.append(0.0)
-                        self._kappa_b_redundant_old.append(0.0)
-                        self.kappa_redundant_idx.append((p, q))
+                    if p in self.active_idx and q in self.active_idx:
+                        self._kappa_a.append(0.0)
+                        self._kappa_b.append(0.0)
+                        self._kappa_a_old.append(0.0)
+                        self._kappa_b_old.append(0.0)
+                        self.kappa_idx.append((p, q))
                         continue
                 if not (p in self.active_idx and q in self.active_idx):
                     self.kappa_no_activeactive_idx.append((p, q))

@@ -196,19 +196,12 @@ class UnrestrictedWaveFunctionCircuit:
                         self.kappa_redundant_idx.append((p, q))
                         continue
                 if include_active_kappa:
-                    if p in self.active_occ_idx and q in self.active_occ_idx:
-                        self._kappa_a_redundant.append(0.0)
-                        self._kappa_b_redundant.append(0.0)
-                        self._kappa_a_redundant_old.append(0.0)
-                        self._kappa_b_redundant_old.append(0.0)
-                        self.kappa_redundant_idx.append((p, q))
-                        continue
-                    if p in self.active_unocc_idx and q in self.active_unocc_idx:
-                        self._kappa_a_redundant.append(0.0)
-                        self._kappa_b_redundant.append(0.0)
-                        self._kappa_a_redundant_old.append(0.0)
-                        self._kappa_b_redundant_old.append(0.0)
-                        self.kappa_redundant_idx.append((p, q))
+                    if p in self.active_idx and q in self.active_idx:
+                        self._kappa_a.append(0.0)
+                        self._kappa_b.append(0.0)
+                        self._kappa_a_old.append(0.0)
+                        self._kappa_b_old.append(0.0)
+                        self.kappa_idx.append((p, q))
                         continue
                 if not (p in self.active_idx and q in self.active_idx):
                     self.kappa_no_activeactive_idx.append((p, q))
