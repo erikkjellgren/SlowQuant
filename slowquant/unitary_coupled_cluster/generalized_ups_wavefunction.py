@@ -191,11 +191,11 @@ class GeneralizedWaveFunctionUPS:
                 if include_active_kappa:
                     if P in self.active_occ_spin_idx and Q in self.active_occ_spin_idx:
                         if P != Q:
-                            self._kappa_real_redundant.append(0.0)
-                            self._kappa_imag_redundant.append(0.0)
-                            self._kappa_real_redundant_old.append(0.0)
-                            self._kappa_imag_redundant_old.append(0.0)
-                            self.kappa_redundant_spin_idx.append((P, Q))
+                            self._kappa_real.append(0.0)
+                            self._kappa_imag.append(0.0)
+                            self._kappa_real_old.append(0.0)
+                            self._kappa_imag_old.append(0.0)
+                            self.kappa_spin_idx.append((P, Q))
                         continue
                 
                 if not (P in self.active_spin_idx and Q in self.active_spin_idx):
@@ -680,16 +680,13 @@ class GeneralizedWaveFunctionUPS:
                             self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
         return self._rdm2
 
-    def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
+    def check_orthonormality(self) -> None:
         r"""Check orthonormality of orbitals.
 
         .. math::
             \boldsymbol{I} = \boldsymbol{C}_\text{MO}\boldsymbol{S}\boldsymbol{C}_\text{MO}^T
-
-        Args:
-            overlap_integral: Overlap integral in AO basis.
         """
-        S_ortho = generalized_one_electron_transform(self.c_mo, overlap_integral)
+        S_ortho = generalized_one_electron_transform(self.c_mo, self.int_gen.overlap)
         one = np.identity(len(S_ortho))
         diff = np.abs(S_ortho - one)
         print("Max ortho-normal diff:", np.max(diff))
@@ -710,7 +707,7 @@ class GeneralizedWaveFunctionUPS:
                         self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs
                     )
                 ],
-                # [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
+                #[generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
             )
