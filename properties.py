@@ -14,7 +14,7 @@ from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.linear_response import generalized_naive, naive
 from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import generalized_expectation_value, generalized_propagate_state
-from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a, generalized_hamiltonian_1i_1a, generalized_one_elec_op_0i_0a
+from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a, generalized_hamiltonian_1i_1a, generalized_one_elec_op_0i_0a, test_generalized_one_elec_op_0i_0a
 from slowquant.unitary_coupled_cluster.operators import a_op_spin
 from slowquant.molecularintegrals.integralfunctions import generalized_one_electron_transform
 
@@ -48,21 +48,34 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     e_nuc=mf.energy_nuc()
     print(e_nuc)
 
+
     WF =GeneralizedWaveFunctionUPS(
         # mol.nelectron,
         active_space,
         coeff,
         #C_u,
         mol,
-        "gtups",
+        "fUCCSD",
         True, #Do x2c
         {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
+
+    # ny_theta_real = np.random.uniform(-0.05, 0.05, len(WF.thetas))
+    # print(ny_theta_real)
+    # ny_theta_imag = np.random.uniform(-0.05,0.05,len(WF.thetas)) 
+    # ny_theta_imag = [0.0] * len(WF.thetas)
+    # print(ny_theta_imag)
+
+    # WF.set_thetas(ny_theta_real, ny_theta_imag)
+
+    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=False, tol=1e-10, maxiter = 2000)
 
     print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
+    # print(np.diag(WF.rdm1))
 
+    # print('Optimized thetas', WF.thetas)
+    # print('Optimized MO coefficients',WF.c_mo)
 
     dip_ao = build_x2c_pc_operator(mf, mol, "int1e_r", 'int1e_sprsp', c, x2c=True, picture_change=True, spin_free=False)
 
@@ -80,6 +93,15 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
     # print(f'Polarizabilities:\n \t xx: {alpha[0]:.4f} \t yy: {alpha[1]:.4f} \t zz: {alpha[2]:.4f}')
+    # E_test = generalized_expectation_value(
+    # WF.ci_coeffs,
+    # [generalized_hamiltonian_full_space],
+    # WF.ci_coeffs,
+    # WF.ci_info,
+    # do_folding=False)
+
+
+    # print(E_test)
 
     "Calculate dipole moments"
     mux = generalized_one_electron_transform(WF.c_mo, dip_ao[0], x2c=True) #false for spinfree PC...
@@ -118,8 +140,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
                 mo = generalized_one_electron_transform(WF.c_mo, int_pc[alpha, beta], x2c=True) #must be false for sf...
                 op = generalized_one_elec_op_0i_0a(mo, WF.num_inactive_spin_orbs, WF.num_active_spin_orbs)
                 efg_elec[alpha, beta] = generalized_expectation_value(
-                    WF.ci_coeffs, [op], WF.ci_coeffs, WF.ci_info
-                )
+                    WF.ci_coeffs, [op], WF.ci_coeffs, WF.ci_info)
 
         # Make traceless
         trace = np.trace(efg_elec) / 3
@@ -150,6 +171,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         print(f"  zz={efg_total[2,2]:.4f}")
         print(f"  Trace: {np.trace(efg_total):.2e}")
         print(f"  Symmetric: {np.allclose(efg_total, efg_total.T)}")
+
 
 
 
@@ -287,8 +309,9 @@ def HCl():
     basis = {'H': gto.uncontract(load('x2c-SVPall.nw', 'H')),
                 'Cl': gto.uncontract(load('x2c-SVPall.nw', 'Cl'))}
     # active_space = ((2,2), 6) #spin orbitaler or spinor basis
-    active_space = ((1,1), 2) #spin orbitaler or spinor basis
+    # active_space = ((1,1), 2) #spin orbitaler or spinor basis
     # active_space = (2, 4)
+    active_space = ((3,3), 8) #spin orbitaler or spinor basis
     charge = 0
     spin = 0
     NR(
@@ -315,8 +338,9 @@ def HF():
 def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
-    basis = "sto-3g"
-    active_space = ((1, 1), 4) #spin orbitaler or spinor basis
+    basis = "631-g"
+    # active_space = ((1, 1), 8) #spin orbitaler or spinor basis
+    active_space = ((1, 1), 2) #spin orbitaler or spinor basis
     # active_space = (2, 4)
     charge = 0
     spin = 0
@@ -332,5 +356,5 @@ def h2():
     # )
 
 # h2()
-# HCl()
-HF()
+HCl()
+# HF()
