@@ -30,7 +30,7 @@ class Optimizers:
         method: str,
         grad: Callable[[list[float]], np.ndarray] | None = None,
         maxiter: int = 1000,
-        tol: float = 10e-8,
+        tol: float = 10e-6,
         is_silent: bool = False,
         energy_eval_callback: Callable[[], int] | None = None,
         std_callback: Callable[[], float] | None = None,
@@ -152,6 +152,28 @@ class Optimizers:
                 )
             else:
                 res = optimizer.minimize(self.fun, x0)
+        elif self.method in ("rotosolve_grad",):
+            if not isinstance(extra_options, dict):
+                raise TypeError("extra_options is not set, but is required for RotoSolve")
+            if "R" not in extra_options:
+                raise ValueError(f"Expected option 'R' in extra_options, got {extra_options.keys()}")
+            if "param_names" not in extra_options:
+                raise ValueError(
+                    f"Expected option 'param_names' in extra_options, got {extra_options.keys()}"
+                )
+            optimizer = RotoSolve(
+                extra_options["R"],
+                extra_options["param_names"],
+                maxiter=self.maxiter,
+                tol=self.tol,
+                callback=print_progress,
+            )
+            if "f_rotosolve_optimized" in extra_options:
+                res = optimizer.minimize(
+                    self.fun, x0, f_rotosolve_optimized=extra_options["f_rotosolve_optimized"], grad=self.grad
+                )
+            else:
+                res = optimizer.minimize(self.fun, x0, grad=self.grad)
 
         else:
             raise ValueError(f"Got an unkonwn optimizer {self.method}")
@@ -198,7 +220,7 @@ class RotoSolve:
         R: dict[str, int],
         param_names: Sequence[str],
         maxiter: int = 1000,
-        tol: float = 1e-8,
+        tol: float = 1e-10,
         callback: Callable[[list[float]], None] | None = None,
     ) -> None:
         """Initialize Rotosolver.
@@ -222,6 +244,7 @@ class RotoSolve:
         f: Callable[[list[float]], float | np.ndarray],
         x0: Sequence[float],
         f_rotosolve_optimized: None | Callable[[list[float], list[float], int], list[float]] = None,
+        grad: Callable[[list[float]], np.ndarray] | None = None,
     ) -> Result:
         """Run minimization.
 
@@ -229,6 +252,7 @@ class RotoSolve:
             f: Function to be minimized, can only take one argument.
             x0: Initial guess of changeable parameters of f.
             f_rotosolve_optimized: Optimized function for Rotosolve.
+            grad: Gradient of f, used for gradient-based convergence criterion.
 
         Returns:
             Minimization results.
@@ -274,13 +298,23 @@ class RotoSolve:
             else:
                 # Single state case
                 f_new = f_tmp
-            if self._callback is not None:
-                self._callback(x)
-            if abs(f_best - f_new) < self.threshold:
+            if grad is None:
+                # energy-based convergence criterion
+                if abs(f_best - f_new) < self.threshold:
+                    f_best = f_new
+                    x_best = x.copy()
+                    success = True  # sucessful optimization
+                    break
+            # gradient-based convergence threshold
+            # get gradients in all parameters
+            # check against infinity norm (= max gradient)
+            elif np.max(np.abs(grad(x))) < self.threshold:
                 f_best = f_new
                 x_best = x.copy()
                 success = True  # sucessful optimization
                 break
+            if self._callback is not None:
+                self._callback(x)
             if (f_new - f_best) > 0.0:
                 fails += 1
             else:

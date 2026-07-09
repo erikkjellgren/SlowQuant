@@ -233,7 +233,7 @@ def test_saups_h3_3states() -> None:
         include_active_kappa=True,
     )
 
-    WF.run_wf_optimization_2step("BFGS", True)
+    WF.run_wf_optimization_2step("BFGS", True, tol=10**-8)
 
     assert abs(WF.excitation_energies[0] - 0.838466) < 10**-6
     assert abs(WF.excitation_energies[1] - 0.838466) < 10**-6
@@ -308,7 +308,7 @@ def test_ups_water_44_threaded() -> None:
         ansatz_options={},
         include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("SLSQP", True, tol=10**-8)
     assert abs(WF.energy_elec - -83.97256228053688) < 10**-8
     nb.set_num_threads(1)
 
@@ -349,7 +349,7 @@ def test_saups_h3_3states_threaded() -> None:
         include_active_kappa=True,
     )
 
-    WF.run_wf_optimization_2step("BFGS", True)
+    WF.run_wf_optimization_2step("BFGS", True, tol=10**-8)
 
     assert abs(WF.excitation_energies[0] - 0.838466) < 10**-6
     assert abs(WF.excitation_energies[1] - 0.838466) < 10**-6
