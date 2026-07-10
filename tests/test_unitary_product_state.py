@@ -357,3 +357,28 @@ def test_saups_h3_3states_threaded() -> None:
     assert abs(osc[0] - 0.7569) < 10**-3
     assert abs(osc[1] - 0.7569) < 10**-3
     nb.set_num_threads(1)
+
+
+def test_ups_n2_fuccsdtq56() -> None:
+    """Test high excitation order.
+
+    Test added after bug was discovered that didnt allow for,
+    T, Q, 5, and 6 excitation orders to run.
+    """
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """N 0.0 0.0 0.0; N 0.0 0.0 1.1;""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("STO-3G")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    WF = WaveFunctionUPS(
+        (6, 6),
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
+        "fUCC",
+        ansatz_options={"S": True, "D": True, "T": True, "Q": True, "5": True, "6": True},
+    )
+    WF.run_wf_optimization_1step("bfgs", False)
+    assert abs(WF.energy_elec - -131.1965135680604533) < 10**-6
