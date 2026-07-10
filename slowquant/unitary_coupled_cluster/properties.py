@@ -233,19 +233,16 @@ class properties():
         property_gradient = []
         response_vector = []
         for i in range(len(atoms)):
-            print("h1ao", len(self.wf.int_gen.spin_dipolar_fermi_contact(atoms[i,:])), self.wf.int_gen.spin_dipolar_fermi_contact(atoms[i,:])[0].shape)
             property_gradient.append(
                 self.LR_triplet.get_property_gradient(
                 self.wf.int_gen.spin_dipolar_fermi_contact(atoms[i,:])
                 ).reshape(-1, 3, 3)
             )
-            print("property gradient", property_gradient[i].shape)
             response_vector.append(
                 scipy.linalg.solve(
                     self.LR_triplet.hessian, 
                     property_gradient[i])
             )
-            print("response vector", response_vector[i].shape)
         
         sdfc = np.zeros_like(dso)
         for k, (i,j) in enumerate(nuc_pair):
