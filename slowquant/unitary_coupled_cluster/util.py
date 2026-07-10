@@ -972,6 +972,8 @@ class UpsStructure:
                     self.excitation_operator_type.append("sextuple")
                     self.excitation_indices.append((i, j, k, l, m, n, a, b, c, d, e, f))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
             if do_SAD:
                 for a, i, b, j, _, op_case in iterate_t2_sa(occ_idx, unocc_idx):
                     self.excitation_operator_type.append(f"sa_double_{op_case}")
