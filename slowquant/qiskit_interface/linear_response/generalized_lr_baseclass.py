@@ -455,7 +455,7 @@ class quantumLRBaseClass:
                 2
                 / 3
                 * excitation_energy
-                * (transition_dipole[0] ** 2 + transition_dipole[1] ** 2 + transition_dipole[2] ** 2)
+                * (abs(transition_dipole[0]) ** 2 + abs(transition_dipole[1]) ** 2 + abs(transition_dipole[2]) ** 2)
             )
         self.oscillator_strengths = osc_strs
         return osc_strs

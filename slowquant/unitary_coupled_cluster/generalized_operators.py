@@ -99,9 +99,13 @@ def generalized_hamiltonian_0i_0a(
     # Inactive two-electron
     for P in range(num_inactive_spin_orbs):
         for Q in range(num_inactive_spin_orbs):
-            if P != Q and abs(g_mo[P, P, Q, Q]) > 10**-14:
+            if abs(g_mo[P, P, Q, Q]) > 10**-14:
                 hamiltonian_operator += (1 / 2 * g_mo[P, P, Q, Q] 
                                          *a_op_spin(P,dagger=True)*a_op_spin(Q,dagger=True)
+                                         *a_op_spin(Q,dagger=False)*a_op_spin(P,dagger=False))
+            if P != Q and abs(g_mo[Q, P, P, Q]) > 10**-14:
+                hamiltonian_operator += (1 / 2 * g_mo[P, Q, Q, P] 
+                                         *a_op_spin(Q,dagger=True)*a_op_spin(P,dagger=True)
                                          *a_op_spin(Q,dagger=False)*a_op_spin(P,dagger=False))
     # Inactive-Active two-electron
     for I in range(num_inactive_spin_orbs):
@@ -187,6 +191,68 @@ def generalized_hamiltonian_1i_1a(
                     if Q < num_inactive_spin_orbs and R < num_inactive_spin_orbs and Q == R:
                         num_act -= 2
                     if num_act > 1:
+                        continue
+                    if abs(g_mo[P, Q, R, S]) > 10**-14:
+                        hamiltonian_operator += 1 / 2 * (g_mo[P, Q, R, S]
+                                         *a_op_spin(P,dagger=True)*a_op_spin(R,dagger=True)
+                                         *a_op_spin(S,dagger=False)*a_op_spin(Q,dagger=False))
+    return hamiltonian_operator
+
+
+
+
+def generalized_hamiltonian_2i_2a(
+    h_mo: np.ndarray,
+    g_mo: np.ndarray,
+    num_inactive_spin_orbs: int,
+    num_active_spin_orbs: int,
+    num_virtual_spin_orbs: int,
+) -> FermionicOperator:
+    """Get Hamiltonian operator that works together with an extra inactive and an extra virtual index.
+
+    Args:
+        h_mo: One-electron Hamiltonian integrals in MO.
+        g_mo: Two-electron Hamiltonian integrals in MO.
+        num_inactive_orbs: Number of inactive orbitals in spin basis.
+        num_active_orbs: Number of active orbitals in spin basis.
+        num_virtual_orbs: Number of virtual orbitals in spin basis.
+
+    Returns:
+        Modified Hamiltonian fermionic operator.
+    """
+    num_spin_orbs = num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs
+    hamiltonian_operator = FermionicOperator({})
+    virtual_start = num_inactive_spin_orbs + num_active_spin_orbs
+    for P in range(num_spin_orbs):
+        for Q in range(num_spin_orbs):
+            if P >= virtual_start and Q >= virtual_start:
+                continue
+            if P < num_inactive_spin_orbs and Q < num_inactive_spin_orbs and P != Q:
+                continue
+            if abs(h_mo[P, Q]) > 10**-14:
+                hamiltonian_operator += h_mo[P, Q] * a_op_spin(P,dagger=True)*a_op_spin(Q,dagger=False)
+    for P in range(num_spin_orbs):
+        for Q in range(num_spin_orbs):
+            for R in range(num_spin_orbs):
+                for S in range(num_spin_orbs):
+                    num_virt, num_act = (0,0)
+                    for item in [P,Q,R,S]:
+                        if item >= virtual_start:
+                            num_virt += 1
+                    if num_virt > 2:
+                        continue
+                    for item in [P,Q,R,S]:
+                        if item < num_inactive_spin_orbs:
+                            num_act += 1
+                    if P < num_inactive_spin_orbs and Q < num_inactive_spin_orbs and P == Q:
+                        num_act -= 2
+                    if R < num_inactive_spin_orbs and S < num_inactive_spin_orbs and R == S:
+                        num_act -= 2
+                    if P < num_inactive_spin_orbs and S < num_inactive_spin_orbs and P == S:
+                        num_act -= 2
+                    if Q < num_inactive_spin_orbs and R < num_inactive_spin_orbs and Q == R:
+                        num_act -= 2
+                    if num_act > 2:
                         continue
                     if abs(g_mo[P, Q, R, S]) > 10**-14:
                         hamiltonian_operator += 1 / 2 * (g_mo[P, Q, R, S]
