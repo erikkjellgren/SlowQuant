@@ -31,6 +31,7 @@ from pyscf.prop.ssc.dhf import sa01sa01_integral
 from pyscf.prop.nmr import dhf as nmr_dhf
 
 from pyscf.scf import dhf
+from pyscf.prop.ssc.rhf import SSC as SSC_rhf
 
 
 
@@ -712,6 +713,23 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # PySCF
     mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin, cart = False)
 
+
+    # rhf = scf.RHF(mol)
+
+
+    # rhf.conv_tol = 1e-8        # Energy convergence (Hartree)
+    # rhf.conv_tol_grad = 1e-8   # Optional: gradient convergence
+    # rhf.max_cycle = 500
+    # rhf.kernel()
+
+    # sscobj_rhf = SSC_rhf(rhf)
+    # sscobj_rhf.cphf = True
+    # sscobj_rhf.conv_tol = 1e-9
+    # sscobj_rhf.verbose = 5
+    # sscobj_rhf.with_fcsd = True
+    # sscobj_rhf.kernel()
+
+
     #mol = build_ukb_mol(mol_init)
 
 
@@ -775,6 +793,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # Diamagnetic: (natm, natm, 3, 3, n4c, n4c)
     h2 = make_h2_ao(mol)
+    #h2 = np.zeros_like(h1)
 
 
 
@@ -793,7 +812,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
     # small random anti-Hermitian
-    eps = 0.0001  # controls "step size"
+    eps = 0.001  # controls "step size"
     X_anti = np.random.randn(C_MO.shape[0],C_MO.shape[0]) + 1j*np.random.randn(C_MO.shape[0],C_MO.shape[0])
     A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian
 
@@ -810,7 +829,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         h_core,
         g_eri,
         "fUCCSD",
-        {"n_layers":1, "is_spin_conserving" : False},
+        {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
@@ -912,7 +931,32 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-8, maxiter = 1000)
 
-    #print(WF._calc_gradient_optimization_DHF(WF.thetas_real + WF.thetas_imag, theta_optimization=True, kappa_ee_optimization=False,kappa_ep_optimization=False))
+    gradient_ee = get_orbital_gradient_generalized_real_imag(
+                WF.h_mo,
+                WF.g_mo,
+                WF.kappa_spin_idx,
+                WF.num_spin_orbs_NES,
+                WF.num_inactive_spin_orbs,
+                WF.num_active_spin_orbs,
+                WF.rdm1,
+                WF.rdm2,
+            )
+
+    gradient_ep = - get_orbital_gradient_generalized_real_imag(
+                WF.h_mo_ep,
+                WF.g_mo_ep,
+                WF.kappa_spin_idx_ep,
+                WF.num_spin_orbs_NES,
+                WF.num_inactive_spin_orbs,
+                WF.num_active_spin_orbs,
+                WF.rdm1,
+                WF.rdm2,
+            )
+    
+    print("max gradient ee", np.max(np.abs(gradient_ee)))
+    print("max gradient ep", np.max(np.abs(gradient_ep)))
+
+    #print(WF._calc_gradient_optimization_DHF(WF.kappa_real + WF.kappa_imag, theta_optimization=False, kappa_ee_optimization=True,kappa_ep_optimization=True))
 
     '''#kappas = np.concatenate([WF.kappa_real, WF.kappa_real_ep, WF.kappa_imag, WF.kappa_imag_ep])
 
@@ -1006,6 +1050,19 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
             print(f"K({mol.atom_symbol(I)}{I} - {mol.atom_symbol(J)}{J}) = {SSCC[I,J]:.5f} Hz")
 
 
+def split_general_contraction(basis_dict):
+    """Convert generally-contracted shells into segmented (nctr=1) shells."""
+    new_basis = {}
+    for elem, shells in basis_dict.items():
+        new_shells = []
+        for shell in shells:
+            l = shell[0]
+            rows = shell[1:]                     # [exp, c1, c2, ..., cN] per primitive
+            ncontr = len(rows[0]) - 1
+            for col in range(ncontr):
+                new_shells.append([l] + [[row[0], row[col+1]] for row in rows])
+        new_basis[elem] = new_shells
+    return new_basis
 
 def H2():
     geometry = geometry = """
@@ -1013,8 +1070,13 @@ def H2():
                             H   1.1785   -0.5748    1.0355
                             """  #0.74
     #basis = "cc-pvdz"
-    basis = "631-g"
-    dyall_v2z = bse.get_basis('dyall-v2z', elements=['H'], fmt='nwchem')
+    #J_631g = bse.get_basis('6-31g-J', elements=['H'], fmt='nwchem')
+    raw = {atom: gto.parse(bse.get_basis('6-31G-J', elements=[Z], fmt='nwchem', header=False))
+       for atom, Z in [('H', 1)]}   # do this per element you use
+    fixed_basis = split_general_contraction(raw)
+    basis = fixed_basis
+    #basis = "631-g"
+    #dyall_v2z = bse.get_basis('dyall-v2z', elements=['H'], fmt='nwchem')
     # with open('dyall2zp_H.nwchem', 'w') as f:
     #     f.write(dyall_v2z)
     #     f.close()
@@ -1041,7 +1103,7 @@ def O2():
     #basis = dyall_v2z
     basis = "sto-3g"
     #basis = "sto-6g"
-    active_space = ((1, 1), 2)
+    active_space = ((2, 2), 6)
     #active_space = (2, 4)
     charge = 0
     spin = 2
@@ -1056,14 +1118,14 @@ def H3():
     #basis = "cc-pvdz"
     basis = "631-g"
     #basis = "sto-3g"
-    #basis = ""
-    active_space = ((2, 1),6)
+    #basis = "def-2-svp"
+    active_space = ((2, 1), 6)
     #active_space = (2, 4)
     charge = 0
     spin = 1
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
-    )
+    )s
 
 def LiH():
     geometry = """H  0.0   0.0  0.0;
@@ -1143,13 +1205,53 @@ def HCl():
     #basis = "dyall-v2z"
     basis = "sto-3g"
     #active_space = ((2,2), 6)
-    active_space = ((1,1), 2)
+    active_space = ((2,2), 6)
     charge = 0
     spin = 0
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
     
+def CuH():
+    geometry = """Cu  0.000000   0.000000   0.000000
+                  H   0.000000   0.000000   1.463 """  
+    #basis = "dyall-v2z"
+    basis = "sto-3g"
+    #active_space = ((2,2), 6)
+    active_space = ((1,1), 4)
+    charge = 0
+    spin = 0
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+
+def AgH():
+    geometry = """Ag  0.000000   0.000000   0.000000
+                  H   0.000000   0.000000   1.622 """  
+    #basis = "dyall-v2z"
+    basis = "sto-3g"
+    #active_space = ((2,2), 6)
+    active_space = ((2,2), 6)
+    charge = 0
+    spin = 0
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+
+def N3():
+    geometry = """N
+                  N 1 1.4823
+                  N 1 1.4823 2 49.2 """  
+    basis = "6-31g"
+    active_space = ((5,4), 18)
+    charge = 0
+    spin = 1
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+
+
+
 ###RUN SCRIPT###
 
-H2()
+CuH()

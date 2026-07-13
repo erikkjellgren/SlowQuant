@@ -905,13 +905,13 @@ class LinearResponse(LinearResponseBaseClass):
         for idx, G in enumerate(self.G_ops):
             G_ket = generalized_propagate_state([G], self.wf.ci_coeffs, *self.index_info)
             Gd_ket = generalized_propagate_state([G.dagger], self.wf.ci_coeffs, *self.index_info)
-            for i in range(self.wf.num_inactive_spin_orbs):
+            for i in range(self.wf.num_spin_orbs_NES, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs):
                 E_ket = generalized_propagate_state([a_op_spin(i,True), a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
                 val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
                 val -= generalized_expectation_value(E_ket, [], G_ket, *self.index_info)
                 V[idx + idx_shift_q, :] += mo[:, i, i] * val
-            for p in range(self.wf.num_inactive_spin_orbs, self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
-                for q in range(self.wf.num_inactive_spin_orbs, self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
+            for p in range(self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
+                for q in range(self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
                     E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(q,False)], self.wf.ci_coeffs, *self.index_info)
                     Ed_ket = generalized_propagate_state([a_op_spin(q,True)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
                     val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
@@ -1333,7 +1333,7 @@ class LinearResponse(LinearResponseBaseClass):
                     self.wf.num_active_spin_orbs,
                     self.wf.rdm1, self.wf.rdm2,
                 )
-                A_mat[: len(self.wf.kappa_no_activeactive_spin_idx_ep), len(self.wf.kappa_no_activeactive_spin_idx_ep) : len(self.q_ops_resp)] = get_orbital_response_hessian_block(
+                A_mat[:len(self.wf.kappa_no_activeactive_spin_idx_ep), len(self.wf.kappa_no_activeactive_spin_idx_ep) : len(self.q_ops_resp)] = get_orbital_response_hessian_block(
                     self.wf.h_mo, self.wf.g_mo,
                     self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
                     self.wf.kappa_no_activeactive_spin_idx,
@@ -1370,9 +1370,10 @@ class LinearResponse(LinearResponseBaseClass):
                     self.wf.num_active_spin_orbs,
                     self.wf.rdm1, self.wf.rdm2,
                 )
-            
 
-            H = generalized_hamiltonian_full_space(self.wf.h_mo, self.wf.g_mo, self.wf.num_spin_orbs)
+            NES = self.wf.num_spin_orbs_NES             
+
+            H = DHF_hamiltonian_full_space(self.wf.h_mo[NES:,NES:], self.wf.g_mo[NES:,NES:,NES:,NES:], self.wf.num_spin_orbs_NES)
 
             idx_shift = len(self.q_ops_resp)
 
@@ -1507,20 +1508,19 @@ class LinearResponse(LinearResponseBaseClass):
 
         # Property gradients and responses for all nuclei
         # prop_grads = [self.get_property_gradient_4comp(h1_int[I]) for I in range(natm)]
-        # responses  = [solve(E2_mat, prop_grads[I]) for I in range(natm)]
-        
-        prop_grads = [self.get_property_gradient_4comp_no_ep(h1_int[I]) for I in range(natm)]
-        # responses  = [solve(E2, prop_grads[I]) for I in range(natm)]
-
         # responses = [
         #     np.linalg.pinv(E2_mat, rcond=1e-10) @ prop_grads[I]
         #     for I in range(natm)
         # ]
-
+        
+        prop_grads = [self.get_property_gradient_4comp_no_ep(h1_int[I]) for I in range(natm)]
         responses = [
             np.linalg.pinv(E2, rcond=1e-10) @ prop_grads[I]
             for I in range(natm)
         ]
+
+        # responses  = [solve(E2, prop_grads[I]) for I in range(natm)]
+        # responses  = [solve(E2_mat, prop_grads[I]) for I in range(natm)]
 
         # prop_grads = [self.get_property_gradient_4comp_no_ep_select(h1_int[I]) for I in range(natm)]
 

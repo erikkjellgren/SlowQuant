@@ -100,7 +100,22 @@ class Optimizers:
         self._start = time.time()
         self._iteration = 0
         print_progress = partial(self._print_progress, fun=self.fun, silent=self.is_silent)
-        if self.method in ("bfgs", "slsqp", "l-bfgs-b"):
+        
+        if self.method in ("trust-constr"):
+            def callback(xk, state=None):
+                return self._print_progress(xk,fun=self.fun,silent=self.is_silent)
+            if self.grad is not None:
+                res = scipy.optimize.minimize(
+                    self.fun,
+                    x0,
+                    jac=self.grad,
+                    method=self.method,
+                    callback=callback,
+                    bounds=self.bounds,
+                    options = {"maxiter": self.maxiter, "disp": True, "gtol":self.gtol, "xtol": 1e-10, "initial_tr_radius": 0.05,
+                               "barrier_tol": 1e-8, "sparse_jacobian": False, "verbose": 2},
+                )
+        elif self.method in ("bfgs", "slsqp", "l-bfgs-b"):
             if self.grad is not None:
                 res = scipy.optimize.minimize(
                     self.fun,
