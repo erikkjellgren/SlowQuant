@@ -32,13 +32,6 @@ from qiskit_nature.second_q.operators import FermionicOp
 from qiskit.quantum_info import SparsePauliOp
 
 
-# Connect to IBM cloud
-service = QiskitRuntimeService(channel="ibm_quantum_platform", token="?", instance="Random stuff") # Alternative backend: "Random stuff-eu"
-# Find least busy backend
-backend = service.least_busy(operational=True, simulator=False)
-
-print("We will use the quantum device: ", backend)
-
 
 def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     """.........."""
@@ -80,35 +73,6 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
 
-    mapper = JordanWignerMapper()
-    sampler = SamplerV2(mode=backend)
-
-    QI = QuantumInterface(
-        sampler,
-        "fUCCSD", # Ansatz
-        mapper,
-        ansatz_options = {"n_layers": 1, "is_spin_conserving" : False},
-        shots = 20000,
-        do_M_ansatz0=True, # default is false
-    )
-
-    qWF = GeneralizedWaveFunctionCircuit(
-        mol.nelectron,
-        active_space,
-        WF.c_mo,
-        h_core,
-        g_eri,
-        QI,
-        include_active_kappa = True,
-    )
-
-    QI.get_info()
-
-    qWF.set_thetas_initial(WF.thetas_real, WF.thetas_imag)
-
-    qWF.energy_elec
-
-
 
 def h3():
     geometry = """H  0.000000   0.000000       0.000000;
@@ -119,6 +83,62 @@ def h3():
     charge = 0
     spin = 1
 
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+
+def h5():
+    geometry = """  H   0.850651   0.000000   0.000000
+                    H   0.262866   0.809017   0.000000
+                    H  -0.688191   0.500000   0.000000
+                    H  -0.688191  -0.500000   0.000000
+                    H   0.262866  -0.809017   0.000000  """
+    basis = "def-2-svp"
+    active_space = ((3, 2), 10)
+    charge = 0
+    spin = 1
+
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+
+def h7():
+    geometry = """  H   1.152382   0.000000   0.000000
+                    H   0.718499   0.900969   0.000000
+                    H  -0.256328   1.123490   0.000000
+                    H  -1.038362   0.500000   0.000000
+                    H  -1.038362  -0.500000   0.000000
+                    H  -0.256328  -1.123490   0.000000
+                    H   0.718499  -0.900969   0.000000  """
+    basis = "def-2-svp"
+    active_space = ((4, 3), 14)
+    charge = 0
+    spin = 1
+
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+
+def N3():
+    geometry = """N
+                  N 1 1.4823
+                  N 1 1.4823 2 49.2 """
+    basis = "6-31g"
+    active_space = ((5,4), 18)
+    charge = 0
+    spin = 1
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+
+def Cu3():
+    geometry = """Cu   0.000000   0.000000   0.000000;
+                  Cu   0.000000   0.000000   2.260000;
+                  Cu   0.000000   1.883000   1.250000"""
+    basis = "def-2-svp"
+    active_space = ((2, 1), 6)
+    charge = 0
+    spin = 1
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )

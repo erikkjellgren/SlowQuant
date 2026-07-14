@@ -23,21 +23,15 @@ from slowquant.unitary_coupled_cluster.fermionic_operator import (
 from slowquant.molecularintegrals.integralfunctions import DHF_one_electron_transform, DHF_two_electron_transform
 
 # qWF imports:
-#from qiskit_aer.primitives import SamplerV2, QiskitRuntimeService
-from qiskit_ibm_runtime import SamplerV2, QiskitRuntimeService
+from qiskit_aer.primitives import Sampler, SamplerV2
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper, InterleavedQubitMapper
 from slowquant.qiskit_interface.generalized_circuit_wavefunction import GeneralizedWaveFunctionCircuit
 from slowquant.qiskit_interface.generalized_interface import QuantumInterface
 from qiskit_nature.second_q.operators import FermionicOp
 from qiskit.quantum_info import SparsePauliOp
+from qiskit_ibm_runtime.fake_provider import FakeTorino
+from qiskit_aer.noise import NoiseModel
 
-
-# Connect to IBM cloud
-service = QiskitRuntimeService(channel="ibm_quantum_platform", token="?", instance="Random stuff") # Alternative backend: "Random stuff-eu"
-# Find least busy backend
-backend = service.least_busy(operational=True, simulator=False)
-
-print("We will use the quantum device: ", backend)
 
 
 def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
@@ -49,7 +43,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     mf = scf.GHF(mol)
     mf.conv_tol = 1e-10        # Energy convergence (Hartree)
-    mf.conv_tol_grad = 1e-10   # Optional: gradient convergence
+    mf.conv_tol_grad = 1e-8   # Optional: gradient convergence
     mf.max_cycle = 1000
 
     mf.kernel()
@@ -59,31 +53,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     h_core = mol.intor("int1e_kin") + mol.intor("int1e_nuc")
     g_eri = mol.intor("int2e")
 
-    WF = GeneralizedWaveFunctionUPS(
-        active_space,
-        c_mo,
-        mol,
-        "fUCCSD",
-        ansatz_options = {"n_layers": 1, "is_spin_conserving" : False},
-        include_active_kappa=True,
-    )
-
-    np.random.seed(42)
-    new_thetas_real = np.random.uniform(-0.05, 0.05, len(WF.thetas_real)).tolist()
-    new_thetas_imag = np.zeros_like(WF.thetas_imag)
-
-    WF.set_thetas(new_thetas_real, new_thetas_imag)
-
-    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol = 1e-10)
-
-    WF.energy_elec
-
-
-
     mapper = JordanWignerMapper()
-    sampler = SamplerV2(mode=backend)
+    backend = FakeTorino()
+    sampler = SamplerV2(options={"backend_options":{"noise_model":NoiseModel.from_backend(backend)}})
+    
 
-    QI = QuantumInterface(
+    QI1 = QuantumInterface(
         sampler,
         "fUCCSD", # Ansatz
         mapper,
@@ -92,21 +67,56 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         do_M_ansatz0=True, # default is false
     )
 
-    qWF = GeneralizedWaveFunctionCircuit(
+    qWF1 = GeneralizedWaveFunctionCircuit(
         mol.nelectron,
         active_space,
-        WF.c_mo,
+        c_mo,
         h_core,
         g_eri,
-        QI,
+        QI1,
         include_active_kappa = True,
     )
 
-    QI.get_info()
+    QI1.get_info()
 
-    qWF.set_thetas_initial(WF.thetas_real, WF.thetas_imag)
+    np.random.seed(42)
+    new_thetas_real = np.random.uniform(-0.05, 0.05, len(qWF1.thetas_real)).tolist()
+    new_thetas_imag = np.zeros_like(qWF1.thetas_imag)
 
-    qWF.energy_elec
+    qWF1.set_thetas_initial(new_thetas_real, new_thetas_imag)
+
+    qWF1.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10)
+
+    qWF1.energy_elec
+
+
+
+    '''QI2 = QuantumInterface(
+        SamplerV2(),
+        "fUCCSD", # Ansatz
+        mapper,
+        ansatz_options = {"n_layers": 1, "is_spin_conserving" : False},
+        shots = 100,
+        do_M_ansatz0=True, # default is false
+    )
+
+    qWF2 = GeneralizedWaveFunctionCircuit(
+        mol.nelectron,
+        active_space,
+        qWF1.c_mo,
+        h_core,
+        g_eri,
+        QI2,
+        include_active_kappa = True,
+    )
+
+    QI2.get_info()
+
+    qWF2.set_thetas(qWF1.thetas_real, qWF2.thetas_imag)
+
+    qWF2.energy_elec()'''
+
+    
 
 
 
@@ -123,4 +133,16 @@ def h3():
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
 
-h3()
+def h2():
+    geometry = """H  0.000000   0.000000       0.000000;
+                  H  0.000000   0.000000       0.740000;"""
+    basis = "sto-3g"
+    active_space = ((1, 1), 4)
+    charge = 0
+    spin = 0
+
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+
+h2()
