@@ -285,8 +285,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("oo-UCCSD Quantum                  :", qWF.energy_elec)
 
     
-    fig = qWF.QI.circuit.draw("mpl")
-    fig.savefig("circuit_GHF.png")
+    #fig = qWF.QI.circuit.draw("mpl")
+    #fig.savefig("circuit_GHF.png")
 
     #print("param_names:", qWF.QI.param_names)
 
