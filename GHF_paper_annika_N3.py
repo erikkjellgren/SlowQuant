@@ -36,40 +36,78 @@ from qiskit.quantum_info import SparsePauliOp
 def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     """.........."""
     print("active space:", {active_space})
+    print("basis", {basis})
+    print("Geometry", {geometry})
+    print("Spin", {spin})
+    print("Charge",{charge})
     # PySCF
     mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
     mol.build()
 
+    # GHF
+    tole = 1e-10
+    tolg = 1e-8
+
+    print("GHF")
+    print("convergence tolerance energy:", tole)
+    print("convergence tolerance energy:", tolg)
+
     mf = scf.GHF(mol)
-    mf.conv_tol = 1e-10        # Energy convergence (Hartree)
-    mf.conv_tol_grad = 1e-10   # Optional: gradient convergence
+    mf.conv_tol = tole        # Energy convergence (Hartree)
+    mf.conv_tol_grad = tolg   # Optional: gradient convergence
     mf.max_cycle = 1000
 
     mf.kernel()
 
     c_mo = np.array(mf.mo_coeff,dtype=complex)
 
-    h_core = mol.intor("int1e_kin") + mol.intor("int1e_nuc")
-    g_eri = mol.intor("int2e")
+    method = "fUCCSD"
+    spin_consv = False
+    active_k = True
+    orb_opt = True
+    optimizer = "l-bfgs-b"
+    rd_seed = 42
+    bounds = [-0.5,0.5]
+    tolerance = 1e-10
+    nl = 1
+
+    print("WF optimization:")
+    print("method:", method)
+    print("Is spin conserving:", spin_consv)
+    print("Include Active kappa:", active_k)
+    print("Orbital optimization:", orb_opt)
+    print("optimizer:",optimizer)
+    print("Random seed:", rd_seed)
+    print("Bounds for initiation of thetas:", bounds)
+    print("COnvergence tolerance:", tolerance)
+    print("Number of layers:", nl)
+
 
     WF = GeneralizedWaveFunctionUPS(
         active_space,
         c_mo,
         mol,
-        "fUCCSD",
-        ansatz_options = {"n_layers": 1, "is_spin_conserving" : False},
-        include_active_kappa=True,
+        method,
+        ansatz_options = {"n_layers": nl, "is_spin_conserving" : spin_consv},
+        include_active_kappa=active_k,
     )
 
-    np.random.seed(42)
-    new_thetas_real = np.random.uniform(-0.05, 0.05, len(WF.thetas_real)).tolist()
+    np.random.seed(rd_seed)
+    new_thetas_real = np.random.uniform(bounds[0], bounds[1], len(WF.thetas_real)).tolist()
     new_thetas_imag = np.zeros_like(WF.thetas_imag)
 
     WF.set_thetas(new_thetas_real, new_thetas_imag)
 
-    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol = 1e-10)
+    WF.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol = tolerance)
 
     WF.energy_elec
+
+    np.savez(
+        "data_N3.npz",
+        c_mo=WF.c_mo,
+        theta_real=WF.thetas_real,
+        theta_imag=WF.thetas_imag
+        )
 
 
 
@@ -143,13 +181,4 @@ def Cu3():
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
 
-h3()
-
-h5()
-
 N3()
-
-h7()
-
-Cu3()
-
