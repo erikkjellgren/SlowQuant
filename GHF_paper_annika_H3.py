@@ -103,7 +103,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF.energy_elec
 
     np.savez(
-        "data_H3.npz",
+        "data_H3_6-31g.npz",
         c_mo=WF.c_mo,
         theta_real=WF.thetas_real,
         theta_imag=WF.thetas_imag
@@ -116,7 +116,7 @@ def h3():
     geometry = """H  0.000000   0.000000       0.000000;
                   H  1.000000   0.000000       0.000000;
                   H  0.500000   0.8660254038   0.000000"""
-    basis = "def-2-svp"
+    basis = "6-31g"
     active_space = ((2, 1), 6)
     charge = 0
     spin = 1

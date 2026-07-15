@@ -5,7 +5,8 @@ from scipy.stats import unitary_group
 from pyscf.lib import chkfile
 from scipy.linalg import expm
 import matplotlib
-
+import basis_set_exchange as bse
+from pyscf.gto import basis as bs
 
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
@@ -41,7 +42,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Spin", {spin})
     print("Charge",{charge})
     # PySCF
-    mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
+    ecp="lanl2dz"
+    mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin, ecp=ecp)
     mol.build()
 
     # GHF
@@ -173,7 +175,7 @@ def Cu3():
     geometry = """Cu   0.000000   0.000000   0.000000;
                   Cu   0.000000   0.000000   2.260000;
                   Cu   0.000000   1.883000   1.250000"""
-    basis = "def-2-svp"
+    basis = "lanl2dz"
     active_space = ((2, 1), 6)
     charge = 0
     spin = 1

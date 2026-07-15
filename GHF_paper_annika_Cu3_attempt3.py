@@ -5,7 +5,8 @@ from scipy.stats import unitary_group
 from pyscf.lib import chkfile
 from scipy.linalg import expm
 import matplotlib
-
+import basis_set_exchange as bse
+from pyscf.gto import basis as bs
 
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
@@ -41,7 +42,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Spin", {spin})
     print("Charge",{charge})
     # PySCF
-    mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
+    ecp="lanl2dz"
+    mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin, ecp=ecp)
     mol.build()
 
     # GHF
@@ -66,7 +68,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     active_k = True
     orb_opt = True
     optimizer = "l-bfgs-b"
-    rd_seed = 42
+    rd_seed = 10
     bounds = [-0.5,0.5]
     tolerance = 1e-10
     nl = 1
@@ -98,12 +100,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     WF.set_thetas(new_thetas_real, new_thetas_imag)
 
-    WF.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter=5000)
+    WF.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter = 5000)
 
     WF.energy_elec
 
     np.savez(
-        "data_H5_6-31g_maxiter5000.npz",
+        "data_Cu3_attempt3.npz",
         c_mo=WF.c_mo,
         theta_real=WF.thetas_real,
         theta_imag=WF.thetas_imag
@@ -131,7 +133,7 @@ def h5():
                     H  -0.688191   0.500000   0.000000
                     H  -0.688191  -0.500000   0.000000
                     H   0.262866  -0.809017   0.000000  """
-    basis = "6-31g"
+    basis = "def-2-svp"
     active_space = ((3, 2), 10)
     charge = 0
     spin = 1
@@ -173,7 +175,7 @@ def Cu3():
     geometry = """Cu   0.000000   0.000000   0.000000;
                   Cu   0.000000   0.000000   2.260000;
                   Cu   0.000000   1.883000   1.250000"""
-    basis = "def-2-svp"
+    basis = "lanl2dz"
     active_space = ((2, 1), 6)
     charge = 0
     spin = 1
@@ -181,4 +183,4 @@ def Cu3():
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
 
-h5()
+Cu3()

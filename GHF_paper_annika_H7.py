@@ -98,12 +98,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     WF.set_thetas(new_thetas_real, new_thetas_imag)
 
-    WF.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol = tolerance)
+    WF.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter = 5000)
 
     WF.energy_elec
 
     np.savez(
-        "data_H7.npz",
+        "data_H7_6-31g_maxiter5000.npz",
         c_mo=WF.c_mo,
         theta_real=WF.thetas_real,
         theta_imag=WF.thetas_imag
@@ -148,7 +148,7 @@ def h7():
                     H  -1.038362  -0.500000   0.000000
                     H  -0.256328  -1.123490   0.000000
                     H   0.718499  -0.900969   0.000000  """
-    basis = "def-2-svp"
+    basis = "6-31g"
     active_space = ((4, 3), 14)
     charge = 0
     spin = 1
