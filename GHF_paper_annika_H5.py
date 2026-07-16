@@ -70,6 +70,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     bounds = [-0.5,0.5]
     tolerance = 1e-10
     nl = 1
+    max_iter = 10000
 
     print("WF optimization:")
     print("Method:", method)
@@ -81,6 +82,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Bounds for initiation of thetas:", bounds)
     print("Convergence tolerance:", tolerance)
     print("Number of layers:", nl)
+    print("Max iterations:", max_iter)
 
 
     WF = GeneralizedWaveFunctionUPS(
@@ -98,7 +100,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     WF.set_thetas(new_thetas_real, new_thetas_imag)
 
-    WF.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter=5000)
+    WF.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter=max_iter)
 
     WF.energy_elec
 

@@ -5,6 +5,8 @@ from scipy.stats import unitary_group
 from pyscf.lib import chkfile
 from scipy.linalg import expm
 import matplotlib
+from pathlib import Path
+import os
 
 
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
@@ -70,6 +72,18 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     bounds = [-0.5,0.5]
     tolerance = 1e-10
     nl = 1
+    max_iter=10000
+
+    directory = os.getcwd() + "/"
+    name = "data_H7_new"
+
+    j = 0
+    while j < 30:
+        if os.path.exists("%s/%s_%s.npz" % (directory,name,j)):
+            k = j
+        j+=1
+
+    data_file = Path("%s/%s_%s.npz" % (directory,name,j))
 
     print("WF optimization:")
     print("Method:", method)
@@ -81,6 +95,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Bounds for initiation of thetas:", bounds)
     print("Convergence tolerance:", tolerance)
     print("Number of layers:", nl)
+    print("Max iterstions:",max_iter)
+    print("Name of data file:",data_file)
 
 
     WF = GeneralizedWaveFunctionUPS(
@@ -98,15 +114,22 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     WF.set_thetas(new_thetas_real, new_thetas_imag)
 
-    WF.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter = 5000)
+    WF.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter = max_iter)
 
-    WF.energy_elec
+    print("Final electronic energy:", WF.energy_elec)
 
     np.savez(
-        "data_H7_6-31g_maxiter5000.npz",
+        "data_H7_new_EXTRA",
         c_mo=WF.c_mo,
-        theta_real=WF.thetas_real,
-        theta_imag=WF.thetas_imag
+        thetas_real=WF.thetas_real,
+        thetas_imag=WF.thetas_imag
+        )
+
+    np.savez(
+        data_file,
+        c_mo=WF.c_mo,
+        thetas_real=WF.thetas_real,
+        thetas_imag=WF.thetas_imag
         )
 
 
