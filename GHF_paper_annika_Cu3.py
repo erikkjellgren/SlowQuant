@@ -116,7 +116,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     WF.set_thetas(new_thetas_real, new_thetas_imag)
 
-    WF.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol = tolerance, max_iter)
+    WF.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter = max_iter)
 
     print("Final electronic energy:", WF.energy_elec)
 
