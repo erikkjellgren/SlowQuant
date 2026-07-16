@@ -117,7 +117,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     qWF.set_thetas_initial(data["theta_real"], data["theta_imag"])
 
-    qWF.energy_elec
+    print("Final energy from hardware calculation:", qWF.energy_elec)
 
 
 

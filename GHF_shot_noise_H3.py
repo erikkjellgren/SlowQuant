@@ -122,7 +122,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     qWF1.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol=tolerance, maxiter = max_iter)
 
-    qWF1.energy_elec
+    qWF1.energy_elec()
 
     np.savez(
         "data_H3_shot_noise.npz",
