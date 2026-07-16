@@ -35,8 +35,8 @@ from qiskit.quantum_info import SparsePauliOp
 
 def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     """.........."""
-    print("active space:", {active_space})
-    print("basis", {basis})
+    print("Active space:", {active_space})
+    print("Basis", {basis})
     print("Geometry", {geometry})
     print("Spin", {spin})
     print("Charge",{charge})
@@ -49,8 +49,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     tolg = 1e-8
 
     print("GHF")
-    print("convergence tolerance energy:", tole)
-    print("convergence tolerance energy:", tolg)
+    print("Convergence tolerance energy:", tole)
+    print("Convergence tolerance energy:", tolg)
 
     mf = scf.GHF(mol)
     mf.conv_tol = tole        # Energy convergence (Hartree)
@@ -72,14 +72,14 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     nl = 1
 
     print("WF optimization:")
-    print("method:", method)
+    print("Method:", method)
     print("Is spin conserving:", spin_consv)
     print("Include Active kappa:", active_k)
     print("Orbital optimization:", orb_opt)
-    print("optimizer:",optimizer)
+    print("Optimizer:",optimizer)
     print("Random seed:", rd_seed)
     print("Bounds for initiation of thetas:", bounds)
-    print("COnvergence tolerance:", tolerance)
+    print("Convergence tolerance:", tolerance)
     print("Number of layers:", nl)
 
 
