@@ -124,6 +124,13 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     qWF1.energy_elec
 
+    np.savez(
+        "data_H3_shot_noise.npz",
+        c_mo=qWF1.c_mo,
+        theta_real=qWF1.thetas_real,
+        theta_imag=qWF1.thetas_imag
+        )
+
     
 
 
