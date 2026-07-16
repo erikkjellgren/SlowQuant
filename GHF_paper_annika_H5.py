@@ -5,6 +5,8 @@ from scipy.stats import unitary_group
 from pyscf.lib import chkfile
 from scipy.linalg import expm
 import matplotlib
+from pathlib import Path
+import os
 
 
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
@@ -72,6 +74,18 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     nl = 1
     max_iter = 10000
 
+    
+    directory = os.getcwd() + "/"
+    name = "data_H5_new"
+
+    j,k = 0,0
+    while j < 30:
+        if os.path.exists("%s/%s_%s.npz" % (directory,name,j)):
+            k = j
+        j+=1
+
+    data_file = Path("%s_%s.npz" % (name,k))
+
     print("WF optimization:")
     print("Method:", method)
     print("Is spin conserving:", spin_consv)
@@ -83,6 +97,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Convergence tolerance:", tolerance)
     print("Number of layers:", nl)
     print("Max iterations:", max_iter)
+    print("Name of data file:", data_file)
 
 
     WF = GeneralizedWaveFunctionUPS(
@@ -105,10 +120,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF.energy_elec
 
     np.savez(
-        "data_H5_6-31g_maxiter5000.npz",
+        data_file,
         c_mo=WF.c_mo,
-        theta_real=WF.thetas_real,
-        theta_imag=WF.thetas_imag
+        thetas_real=WF.thetas_real,
+        thetas_imag=WF.thetas_imag
         )
 
 
