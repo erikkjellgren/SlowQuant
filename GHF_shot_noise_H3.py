@@ -37,6 +37,10 @@ from qiskit_aer.noise import NoiseModel
 def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     """.........."""
     print("active space:", {active_space})
+    print("Basis", {basis})
+    print("Geometry", {geometry})
+    print("Spin", {spin})
+    print("Charge",{charge})
     # PySCF
     mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
     mol.build()
@@ -54,17 +58,48 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     g_eri = mol.intor("int2e")
 
     mapper = JordanWignerMapper()
-    backend = FakeTorino()
-    sampler = SamplerV2(options={"backend_options":{"noise_model":NoiseModel.from_backend(backend)}})
+    backend = None
+    sampler = SamplerV2()
+
+    method = "fUCCSD"
+    spin_consv = False
+    active_k = True
+    orb_opt = True
+    optimizer = "l-bfgs-b"
+    rd_seed = 42
+    bounds = [-0.5,0.5]
+    tolerance = 1e-10
+    nl = 1
+    shots = 10000
+    M0 = True
+    post_select = False
+    max_iter = 10000
+
+    print("WF optimization:")
+    print("Method:", method)
+    print("Backend:",backend)
+    print("Shots:", shots)
+    print("M0:", M0)
+    print("Post selection:", post_select)
+    print("Is spin conserving:", spin_consv)
+    print("Include Active kappa:", active_k)
+    print("Orbital optimization:", orb_opt)
+    print("Optimizer:",optimizer)
+    print("Random seed:", rd_seed)
+    print("Bounds for initiation of thetas:", bounds)
+    print("Convergence tolerance:", tolerance)
+    print("Number of layers:", nl)
+    print("Max iterations:", max_iter)
     
 
     QI1 = QuantumInterface(
         sampler,
-        "fUCCSD", # Ansatz
+        method, # Ansatz
         mapper,
-        ansatz_options = {"n_layers": 1, "is_spin_conserving" : False},
-        shots = 20000,
-        do_M_ansatz0=True, # default is false
+        ansatz_options = {"n_layers": nl, "is_spin_conserving" : spin_consv},
+        shots = shots,
+        do_M_ansatz0=M0, # default is false
+        do_postselection=post_select,
     )
 
     qWF1 = GeneralizedWaveFunctionCircuit(
@@ -74,47 +109,20 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         h_core,
         g_eri,
         QI1,
-        include_active_kappa = True,
+        include_active_kappa = active_k,
     )
 
     QI1.get_info()
 
-    np.random.seed(42)
-    new_thetas_real = np.random.uniform(-0.05, 0.05, len(qWF1.thetas_real)).tolist()
+    np.random.seed(rd_seed)
+    new_thetas_real = np.random.uniform(bounds[0], bounds[1], len(qWF1.thetas_real)).tolist()
     new_thetas_imag = np.zeros_like(qWF1.thetas_imag)
 
     qWF1.set_thetas_initial(new_thetas_real, new_thetas_imag)
 
-    qWF1.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10)
+    qWF1.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol=tolerance, maxiter = max_iter)
 
     qWF1.energy_elec
-
-
-
-    '''QI2 = QuantumInterface(
-        SamplerV2(),
-        "fUCCSD", # Ansatz
-        mapper,
-        ansatz_options = {"n_layers": 1, "is_spin_conserving" : False},
-        shots = 100,
-        do_M_ansatz0=True, # default is false
-    )
-
-    qWF2 = GeneralizedWaveFunctionCircuit(
-        mol.nelectron,
-        active_space,
-        qWF1.c_mo,
-        h_core,
-        g_eri,
-        QI2,
-        include_active_kappa = True,
-    )
-
-    QI2.get_info()
-
-    qWF2.set_thetas(qWF1.thetas_real, qWF2.thetas_imag)
-
-    qWF2.energy_elec()'''
 
     
 
@@ -124,7 +132,7 @@ def h3():
     geometry = """H  0.000000   0.000000       0.000000;
                   H  1.000000   0.000000       0.000000;
                   H  0.500000   0.8660254038   0.000000"""
-    basis = "def-2-svp"
+    basis = "6-31g"
     active_space = ((2, 1), 6)
     charge = 0
     spin = 1
@@ -145,4 +153,4 @@ def h2():
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
 
-h2()
+h3()
