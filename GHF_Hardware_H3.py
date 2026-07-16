@@ -42,69 +42,80 @@ print("We will use the quantum device: ", backend)
 
 def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     """.........."""
-    print("active space:", {active_space})
+    print("Active space:", {active_space})
+    print("Basis", {basis})
+    print("Geometry", {geometry})
+    print("Spin", {spin})
+    print("Charge",{charge})
+
     # PySCF
     mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
     mol.build()
 
-    mf = scf.GHF(mol)
-    mf.conv_tol = 1e-10        # Energy convergence (Hartree)
-    mf.conv_tol_grad = 1e-10   # Optional: gradient convergence
-    mf.max_cycle = 1000
-
-    mf.kernel()
-
-    c_mo = np.array(mf.mo_coeff,dtype=complex)
-
     h_core = mol.intor("int1e_kin") + mol.intor("int1e_nuc")
     g_eri = mol.intor("int2e")
-
-    WF = GeneralizedWaveFunctionUPS(
-        active_space,
-        c_mo,
-        mol,
-        "fUCCSD",
-        ansatz_options = {"n_layers": 1, "is_spin_conserving" : False},
-        include_active_kappa=True,
-    )
-
-    np.random.seed(42)
-    new_thetas_real = np.random.uniform(-0.05, 0.05, len(WF.thetas_real)).tolist()
-    new_thetas_imag = np.zeros_like(WF.thetas_imag)
-
-    WF.set_thetas(new_thetas_real, new_thetas_imag)
-
-    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol = 1e-10)
-
-    WF.energy_elec
-
-
 
     mapper = JordanWignerMapper()
     sampler = SamplerV2(mode=backend)
 
+    method = "fUCCSD"
+    spin_consv = False
+    active_k = True
+    orb_opt = True
+    optimizer = "l-bfgs-b"
+    rd_seed = 42
+    bounds = [-0.5,0.5]
+    tolerance = 1e-10
+    nl = 1
+    shots = 50000
+    M0 = True
+    post_select = False
+    max_iter = 10000
+
+    print("Started from classical thetas from 'data_H3_6-31g.npz' corresponding to GHF_paper_annika_H3_01.out")
+
+    print("WF optimization:")
+    print("Method:", method)
+    print("Backend:",backend)
+    print("Shots:", shots)
+    print("M0:", M0)
+    print("Post selection:", post_select)
+    print("Is spin conserving:", spin_consv)
+    print("Include Active kappa:", active_k)
+    print("Orbital optimization:", orb_opt)
+    print("Optimizer:",optimizer)
+    print("Random seed:", rd_seed)
+    print("Bounds for initiation of thetas:", bounds)
+    print("Convergence tolerance:", tolerance)
+    print("Number of layers:", nl)
+    #print("Max iterations:", max_iter)
+    
+
     QI = QuantumInterface(
         sampler,
-        "fUCCSD", # Ansatz
+        method, # Ansatz
         mapper,
-        ansatz_options = {"n_layers": 1, "is_spin_conserving" : False},
-        shots = 20000,
-        do_M_ansatz0=True, # default is false
+        ansatz_options = {"n_layers": nl, "is_spin_conserving" : spin_consv},
+        shots = shots,
+        do_M_ansatz0=M0, # default is false
     )
+
+    data = np.load("data_H3_6-31g.npz")
+
 
     qWF = GeneralizedWaveFunctionCircuit(
         mol.nelectron,
         active_space,
-        WF.c_mo,
+        data["c_mo"],
         h_core,
         g_eri,
         QI,
-        include_active_kappa = True,
+        include_active_kappa = active_k,
     )
 
     QI.get_info()
 
-    qWF.set_thetas_initial(WF.thetas_real, WF.thetas_imag)
+    qWF.set_thetas_initial(data["theta_real"], data["theta_imag"])
 
     qWF.energy_elec
 
@@ -114,7 +125,7 @@ def h3():
     geometry = """H  0.000000   0.000000       0.000000;
                   H  1.000000   0.000000       0.000000;
                   H  0.500000   0.8660254038   0.000000"""
-    basis = "def-2-svp"
+    basis = "6-31g"
     active_space = ((2, 1), 6)
     charge = 0
     spin = 1
