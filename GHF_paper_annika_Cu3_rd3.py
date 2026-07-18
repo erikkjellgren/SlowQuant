@@ -79,6 +79,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     directory = os.getcwd() + "/"
     name = "data_Cu3_rd3"
 
+    if k < 10:
+        k = f"0{k}"
+
     j,k = 0,0
     while j < 30:
         if os.path.exists("%s/%s_%s.npz" % (directory,name,j)):

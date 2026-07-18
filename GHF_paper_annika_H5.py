@@ -76,13 +76,16 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     
     directory = os.getcwd() + "/"
-    name = "data_H5_new"
+    name = "data_H5_def2svp"
 
     j,k = 0,0
     while j < 30:
         if os.path.exists("%s/%s_%s.npz" % (directory,name,j)):
             k = j
         j+=1
+
+    if k < 10:
+        k = f"0{k}"
 
     data_file = Path("%s_%s.npz" % (name,k))
 
@@ -117,7 +120,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     WF.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter=max_iter)
 
-    WF.energy_elec
+    print("Final electronic energy:", WF.energy_elec)
 
     np.savez(
         data_file,
@@ -148,7 +151,7 @@ def h5():
                     H  -0.688191   0.500000   0.000000
                     H  -0.688191  -0.500000   0.000000
                     H   0.262866  -0.809017   0.000000  """
-    basis = "6-31g"
+    basis = "def-2-svp"
     active_space = ((3, 2), 10)
     charge = 0
     spin = 1

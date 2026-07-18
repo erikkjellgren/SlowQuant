@@ -1192,3 +1192,14 @@ def get_orbital_response_static_property_gradient(
             prop_grad[idx, :] += mo[:, N, P] * RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             prop_grad[idx, :] -= mo[:, P, M] * RDM1(P, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
     return  prop_grad
+
+
+def get_Sz(c_mo, rdm1, num_spin_orbs, num_inactive_spin_orbs, num_active_spin_orbs, S_int):
+    tmp = 0
+    for P in range(0, num_spin_orbs):
+        for Q in range(0, num_spin_orbs):
+            tmp += (S_int[0][P,Q] - S_int[1][P,Q])* RDM1(P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) 
+    return 0.5 * tmp.real
+
+def get_S2(self, S_int):
+        return 0

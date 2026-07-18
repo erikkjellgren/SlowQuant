@@ -13,6 +13,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     generalized_one_electron_transform,
     generalized_two_electron_transform,
     DHF_one_electron_transform,
+    generalized_one_electron_transform_spin_separated,
 )
 from slowquant.unitary_coupled_cluster.generalized_integral_manager import IntegralManager
 
@@ -21,6 +22,9 @@ from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_electronic_energy_generalized,
     get_orbital_gradient_expvalue_real_imag,
     get_orbital_gradient_generalized_real_imag,
+    get_S2,
+    get_Sz,
+
 )
 from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import (
     generalized_construct_ups_state_test_erik,
@@ -1282,3 +1286,11 @@ class GeneralizedWaveFunctionUPS:
         return get_orbital_gradient_expvalue_real_imag(
             self.ci_coeffs, self.ci_info, self.h_mo, self.g_mo, self.num_spin_orbs, self.kappa_spin_idx
         )
+    
+    def calc_Sz(self, S_int):
+        S_int_MO = generalized_one_electron_transform_spin_separated(self.c_mo, S_int)
+        return get_Sz(self.c_mo, self.rdm1, self.num_spin_orbs, self.num_inactive_spin_orbs, self.num_active_spin_orbs, S_int_MO)
+        
+    
+    def calc_S2(self, S_int):
+        return get_Sz()

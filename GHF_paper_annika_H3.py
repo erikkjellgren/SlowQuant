@@ -61,6 +61,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     mf.kernel()
 
+    ovlp_int = mol.intor("int1e_ovlp")
+
     c_mo = np.array(mf.mo_coeff,dtype=complex)
 
     method = "fUCCSD"
@@ -75,13 +77,16 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     max_iter = 10000
 
     directory = os.getcwd() + "/"
-    name = "data_H3_new"
+    name = "data_H3_def2svp"
 
     j,k = 0,0
     while j < 30:
         if os.path.exists("%s/%s_%s.npz" % (directory,name,j)):
             k = j
         j+=1
+
+    if k < 10:
+        k = f"0{k}"
 
     data_file = Path("%s_%s.npz" % (name,k))
 
@@ -116,7 +121,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     WF.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter=max_iter)
 
-    WF.energy_elec
+    print("Final electronic energy:", WF.energy_elec)
+    #print("Approximate value for S^2:",WF.calc_S2(ovlp_int))
+    print("Approximate value for S_z:",WF.calc_Sz(ovlp_int))
 
     np.savez(
         data_file,
@@ -132,7 +139,7 @@ def h3():
     geometry = """H  0.000000   0.000000       0.000000;
                   H  1.000000   0.000000       0.000000;
                   H  0.500000   0.8660254038   0.000000"""
-    basis = "6-31g"
+    basis = "def-2-svp"
     active_space = ((2, 1), 6)
     charge = 0
     spin = 1

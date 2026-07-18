@@ -83,6 +83,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
             k = j
         j+=1
 
+    if k < 10:
+        k = f"0{k}"
+
     data_file = Path("%s_%s.npz" % (name,k))
 
     print("WF optimization:")
@@ -171,7 +174,7 @@ def h7():
                     H  -1.038362  -0.500000   0.000000
                     H  -0.256328  -1.123490   0.000000
                     H   0.718499  -0.900969   0.000000  """
-    basis = "6-31g"
+    basis = "def-2-svp"
     active_space = ((4, 3), 14)
     charge = 0
     spin = 1

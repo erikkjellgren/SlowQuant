@@ -85,6 +85,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
             k = j
         j+=1
 
+    if k < 10:
+        k = f"0{k}"
+
     data_file = Path("%s_%s.npz" % (name,k))
 
 
