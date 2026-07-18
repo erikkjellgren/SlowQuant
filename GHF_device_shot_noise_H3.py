@@ -5,6 +5,8 @@ from scipy.stats import unitary_group
 from pyscf.lib import chkfile
 from scipy.linalg import expm
 import matplotlib
+from pathlib import Path
+import os
 
 
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
@@ -90,7 +92,20 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Convergence tolerance:", tolerance)
     print("Number of layers:", nl)
     print("Max iterations:", max_iter)
-    
+
+    directory = os.getcwd() + "/"
+    name = "data_H3_device_shot_def2svp"
+
+    j,k = 0,0
+    while j < 30:
+        if os.path.exists("%s/%s_%s.npz" % (directory,name,j)):
+            k = j
+        j+=1
+
+    if k < 10:
+        k = f"0{k}"
+
+    data_file = Path("%s_%s.npz" % (name,k))   
 
     QI1 = QuantumInterface(
         sampler,
@@ -125,10 +140,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     qWF1.energy_elec
 
     np.savez(
-        "data_H3_device_shot_noise.npz",
+        data_file,
         c_mo=qWF1.c_mo,
-        theta_real=qWF1.thetas_real,
-        theta_imag=qWF1.thetas_imag
+        thetas_real=qWF1.thetas_real,
+        thetas_imag=qWF1.thetas_imag
         )
 
     
@@ -139,7 +154,7 @@ def h3():
     geometry = """H  0.000000   0.000000       0.000000;
                   H  1.000000   0.000000       0.000000;
                   H  0.500000   0.8660254038   0.000000"""
-    basis = "6-31g"
+    basis = "def-2-svp"
     active_space = ((2, 1), 6)
     charge = 0
     spin = 1

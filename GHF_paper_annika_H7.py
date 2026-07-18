@@ -122,13 +122,6 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Final electronic energy:", WF.energy_elec)
 
     np.savez(
-        "data_H7_new_EXTRA",
-        c_mo=WF.c_mo,
-        thetas_real=WF.thetas_real,
-        thetas_imag=WF.thetas_imag
-        )
-
-    np.savez(
         data_file,
         c_mo=WF.c_mo,
         thetas_real=WF.thetas_real,
