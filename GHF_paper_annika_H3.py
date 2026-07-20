@@ -113,17 +113,21 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         include_active_kappa=active_k,
     )
 
+    print("Approximate value for S_z before optimization:", WF.calc_Sz(ovlp_int))
+    print("Approximate value for S^2 before optimization:", WF.calc_S2(ovlp_int))
+
     np.random.seed(rd_seed)
     new_thetas_real = np.random.uniform(bounds[0], bounds[1], len(WF.thetas_real)).tolist()
     new_thetas_imag = np.zeros_like(WF.thetas_imag)
 
     WF.set_thetas(new_thetas_real, new_thetas_imag)
 
-    WF.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter=max_iter)
+    #WF.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter=max_iter)
 
     print("Final electronic energy:", WF.energy_elec)
-    #print("Approximate value for S^2:",WF.calc_S2(ovlp_int))
-    print("Approximate value for S_z:",WF.calc_Sz(ovlp_int))
+    print("Approximate value for S^2:", WF.calc_S2(ovlp_int))
+    print("Approximate value for S_z:", WF.calc_Sz(ovlp_int))
+    print("2s+1:", WF.calc_multiplicity(ovlp_int))
 
     np.savez(
         data_file,

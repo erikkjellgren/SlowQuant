@@ -7,13 +7,14 @@ import pyscf
 
 import numpy as np
 import scipy
+from scipy.optimize import root_scalar
 
 from slowquant.SlowQuant import SlowQuant
 from slowquant.molecularintegrals.integralfunctions import (
     generalized_one_electron_transform,
     generalized_two_electron_transform,
     DHF_one_electron_transform,
-    generalized_one_electron_transform_spin_separated,
+    generalized_1e_transform_spin_separated,
 )
 from slowquant.unitary_coupled_cluster.generalized_integral_manager import IntegralManager
 
@@ -1288,9 +1289,20 @@ class GeneralizedWaveFunctionUPS:
         )
     
     def calc_Sz(self, S_int):
-        S_int_MO = generalized_one_electron_transform_spin_separated(self.c_mo, S_int)
-        return get_Sz(self.c_mo, self.rdm1, self.num_spin_orbs, self.num_inactive_spin_orbs, self.num_active_spin_orbs, S_int_MO)
+        S_int_MO = generalized_1e_transform_spin_separated(self.c_mo, S_int)
+        return get_Sz(self.rdm1, self.num_inactive_spin_orbs, self.num_active_spin_orbs, S_int_MO)
         
     
     def calc_S2(self, S_int):
-        return get_Sz()
+        S_int_MO = generalized_1e_transform_spin_separated(self.c_mo, S_int)
+        return get_S2(self.rdm1, self.rdm2, self.num_inactive_spin_orbs, self.num_active_spin_orbs, S_int_MO)
+    
+    def calc_multiplicity(self, S_int):
+        S2 = self.calc_S2(S_int)
+        
+        def f(S):
+            return (S * (S + 1))**2 - S2
+
+        S = float(root_scalar(f, bracket=[0, 1], method="brentq"))
+
+        return 2*S + 1

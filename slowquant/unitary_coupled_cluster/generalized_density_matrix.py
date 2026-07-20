@@ -1194,12 +1194,29 @@ def get_orbital_response_static_property_gradient(
     return  prop_grad
 
 
-def get_Sz(c_mo, rdm1, num_spin_orbs, num_inactive_spin_orbs, num_active_spin_orbs, S_int):
+def get_Sz(rdm1, num_inactive_spin_orbs, num_active_spin_orbs, S_int):
     tmp = 0
-    for P in range(0, num_spin_orbs):
-        for Q in range(0, num_spin_orbs):
-            tmp += (S_int[0][P,Q] - S_int[1][P,Q])* RDM1(P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) 
+    for P in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+        for Q in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+            tmp += (S_int[0][P,Q] - S_int[3][P,Q]) * RDM1(P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) 
     return 0.5 * tmp.real
 
-def get_S2(self, S_int):
-        return 0
+def get_S2(rdm1, rdm2, num_inactive_spin_orbs, num_active_spin_orbs, S_int):
+    tmp1 = 0
+    for P in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+        for Q in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+            for S in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+                tmp1 += ((0.25 * (S_int[0][P,Q] - S_int[3][P,Q]) * (S_int[0][Q,S] - S_int[3][Q,S]) 
+                         + 0.5 * (S_int[2][P,Q] * S_int[1][Q,S] + S_int[1][P,Q] * S_int[2][Q,S])) 
+                         * RDM1(P, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)) 
+
+    tmp2 = 0
+    for P in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+        for Q in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+            for R in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+                for S in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+                    tmp2 += ((0.25 * (S_int[0][P,Q] - S_int[3][P,Q]) * (S_int[0][R,S] - S_int[3][R,S]) 
+                            + 0.5 * (S_int[2][P,Q] * S_int[1][R,S] + S_int[1][P,Q] * S_int[2][R,S]))
+                            * RDM2(P, Q, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)) 
+
+    return 0.5 * tmp1.real
