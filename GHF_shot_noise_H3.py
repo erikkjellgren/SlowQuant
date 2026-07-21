@@ -93,14 +93,18 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Number of layers:", nl)
     print("Max iterations:", max_iter)
 
-    directory = os.getcwd() + "/"
+    directory = os.getcwd()
     name = "data_H3_shot_def2svp"
 
     j,k = 0,0
     while j < 30:
-        if os.path.exists("%s/%s_%s.npz" % (directory,name,j)):
-            k = j
-        j+=1
+        if j < 10:
+            if os.path.exists("%s/%s_0%s.npz" % (directory, name, j)):
+                k = j + 1
+        else:
+            if os.path.exists("%s/%s_%s.npz" % (directory, name, j)):
+                k = j +1
+        j += 1
 
     if k < 10:
         k = f"0{k}"

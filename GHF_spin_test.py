@@ -33,6 +33,57 @@ from slowquant.qiskit_interface.generalized_interface import QuantumInterface
 from qiskit_nature.second_q.operators import FermionicOp
 from qiskit.quantum_info import SparsePauliOp
 
+from functools import reduce
+
+
+def spin_square2(s, mo1, occ):
+    mo = mo1[:, occ > 0]
+    nao = mo.shape[0] // 2
+    if isinstance(s, np.ndarray):
+        assert (s.size == nao**2 or np.allclose(s[:nao,:nao], s[nao:,nao:]))
+        s = s[:nao,:nao]
+    mo_a = mo[:nao]
+    mo_b = mo[nao:]
+    saa = reduce(np.dot, (mo_a.conj().T, s, mo_a))
+    sbb = reduce(np.dot, (mo_b.conj().T, s, mo_b))
+    sab = reduce(np.dot, (mo_a.conj().T, s, mo_b))
+    sba = sab.conj().T
+    nocc_a = saa.trace()
+    nocc_b = sbb.trace()
+    ssxy = (nocc_a+nocc_b) * .5
+    ssxy+= sba.trace() * sab.trace() - np.einsum('ij,ji->', sab, sba)
+    ssz  = (nocc_a+nocc_b) * .25
+    ssz += (nocc_a-nocc_b)**2 * .25
+    tmp  = saa - sbb
+    ssz -= np.einsum('ij,ji', tmp, tmp) * .25
+    ss = (ssxy + ssz).real
+    s = np.sqrt(ss+.25) - .5
+    return ss, s*2+1
+
+def spin_square(s, mo1, occ):
+    mo = mo1[:, occ > 0]
+    nao = mo.shape[0] // 2
+    if isinstance(s, np.ndarray):
+        assert (s.size == nao**2 or np.allclose(s[:nao,:nao], s[nao:,nao:]))
+        s = s[:nao,:nao]
+    mo_a = mo[:nao]
+    mo_b = mo[nao:]
+    saa = reduce(np.dot, (mo_a.conj().T, s, mo_a))
+    sbb = reduce(np.dot, (mo_b.conj().T, s, mo_b))
+    sab = reduce(np.dot, (mo_a.conj().T, s, mo_b))
+    sba = sab.conj().T
+    nocc_a = saa.trace()
+    nocc_b = sbb.trace()
+    ssxy = (nocc_a+nocc_b) * .5
+    ssxy+= sba.trace() * sab.trace() - np.einsum('ij,ji->', sba, sab)
+    ssz  = (nocc_a+nocc_b) * .25
+    ssz += (nocc_a-nocc_b)**2 * .25
+    tmp  = saa - sbb
+    ssz -= np.einsum('ij,ji', tmp, tmp) * .25
+    ss = (ssxy + ssz).real
+    s = np.sqrt(ss+.25) - .5
+    return ss, s*2+1
+
 
 
 def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
@@ -43,8 +94,28 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Spin", {spin})
     print("Charge",{charge})
     # PySCF
-    mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
+    mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin, cart = False)
     mol.build()
+
+    uhf = scf.UHF(mol)
+    uhf.chkfile = "/home/annika4ee/SlowQuant/uhf_guess.chk"
+    uhf.kernel()
+    nmo = uhf.mo_coeff[0].shape[1]
+    # small random anti-Hermitian
+    epsilon = 0.3 #0.3 # controls "step size"
+    X = np.random.randn(nmo, nmo) + 1j*np.random.randn(nmo, nmo)
+    A = epsilon * (X - X.conj().T)/2  # make anti-Hermitian
+    # unitary
+    U_small = expm(A)
+    c_guess = (uhf.mo_coeff[0] @ U_small, uhf.mo_coeff[1] @ U_small)
+    # load original chkfile content (optional)
+    data = chkfile.load("/home/annika4ee/SlowQuant/uhf_guess.chk",'scf')
+    # overwrite the MO coefficients
+    data['mo_coeff'] = c_guess
+    # dump everything back into a new chkfile
+    chkfile.dump('/home/annika4ee/SlowQuant/uhf_guess.chk','scf', data)
+
+
 
     # GHF
     tole = 1e-10
@@ -52,16 +123,31 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     print("GHF")
     print("Convergence tolerance energy:", tole)
-    print("Convergence tolerance energy:", tolg)
+    print("Convergence tolerance gradient:", tolg)
 
     mf = scf.GHF(mol)
+    mf.chkfile = '/home/annika4ee/SlowQuant/uhf_guess.chk'
+    mf.init_guess = "chkfile"
     mf.conv_tol = tole        # Energy convergence (Hartree)
     mf.conv_tol_grad = tolg   # Optional: gradient convergence
     mf.max_cycle = 1000
 
     mf.kernel()
 
+    print("GHF electronic energy:", mf.energy_elec()[0])
+
+    ovlp_int = mol.intor("int1e_ovlp_sph")
+
     c_mo = np.array(mf.mo_coeff,dtype=complex)
+
+    # small random anti-Hermitian
+    eps = 0.5  # controls "step size"
+    X_anti = np.random.randn(c_mo.shape[0],c_mo.shape[0]) + 1j*np.random.randn(c_mo.shape[0],c_mo.shape[0])
+    A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian
+
+    U_step = expm(A_mat)
+
+    c_u = c_mo @ U_step
 
     method = "fUCCSD"
     spin_consv = False
@@ -71,12 +157,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     rd_seed = 42
     bounds = [-0.5,0.5]
     tolerance = 1e-10
-    nl = 1
+    nl = 0
     max_iter = 10000
 
-    
     directory = os.getcwd()
-    name = "data_H5_6-31g"
+    name = "Spin_test"
 
     j,k = 0,0
     while j < 30:
@@ -91,7 +176,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     if k < 10:
         k = f"0{k}"
 
-    data_file = Path("%s_%s.npz" % (name,k))
+    data_file = Path("%s_%s.npz" % (name, k))
 
     print("WF optimization:")
     print("Method:", method)
@@ -103,11 +188,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Bounds for initiation of thetas:", bounds)
     print("Convergence tolerance:", tolerance)
     print("Number of layers:", nl)
-    print("Max iterations:", max_iter)
-    print("Name of data file:", data_file)
+    print("Max iterations:",max_iter)
+    print("Name of data file:",data_file)
 
-
-    WF = GeneralizedWaveFunctionUPS(
+    WF2 = GeneralizedWaveFunctionUPS(
         active_space,
         c_mo,
         mol,
@@ -116,31 +200,52 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         include_active_kappa=active_k,
     )
 
-    np.random.seed(rd_seed)
-    new_thetas_real = np.random.uniform(bounds[0], bounds[1], len(WF.thetas_real)).tolist()
-    new_thetas_imag = np.zeros_like(WF.thetas_imag)
+    print("Approximate value for S^2:", np.round(WF2.calc_S2(ovlp_int), 5))
+    print("Approximate value for S_z:", np.round(WF2.calc_Sz(ovlp_int), 5))
+    print("2S+1:", np.round(WF2.calc_multiplicity(ovlp_int), 5))
+    print("S:", np.round(WF2.calc_S(ovlp_int), 5))
 
-    WF.set_thetas(new_thetas_real, new_thetas_imag)
 
-    WF.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter=max_iter)
+    WF = GeneralizedWaveFunctionUPS(
+        active_space,
+        c_u,
+        mol,
+        method,
+        ansatz_options = {"n_layers": nl, "is_spin_conserving" : spin_consv},
+        include_active_kappa=active_k,
+    )
+
+    # np.random.seed(rd_seed)
+    # new_thetas_real = np.random.uniform(bounds[0], bounds[1], len(WF.thetas_real)).tolist()
+    # new_thetas_imag = np.zeros_like(WF.thetas_imag)
+
+    # WF.set_thetas(new_thetas_real, new_thetas_imag)
+
+    WF.run_wf_optimization_1step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter=max_iter)
 
     print("Final electronic energy:", WF.energy_elec)
-
-    np.savez(
-        data_file,
-        c_mo=WF.c_mo,
-        thetas_real=WF.thetas_real,
-        thetas_imag=WF.thetas_imag
-        )
+    print("Approximate value for S^2:", np.round(WF.calc_S2(ovlp_int), 5))
+    print("Approximate value for S_z:", np.round(WF.calc_Sz(ovlp_int), 5))
+    print("2S+1:", np.round(WF.calc_multiplicity(ovlp_int), 5))
+    print("S:", np.round(WF.calc_S(ovlp_int), 5))
 
 
+    #print(np.round(WF.c_mo, 3))
+
+
+    # np.savez(
+    #     data_file,
+    #     c_mo=WF.c_mo,
+    #     thetas_real=WF.thetas_real,
+    #     thetas_imag=WF.thetas_imag
+    #     )
 
 
 def h3():
     geometry = """H  0.000000   0.000000       0.000000;
                   H  1.000000   0.000000       0.000000;
                   H  0.500000   0.8660254038   0.000000"""
-    basis = "def-2-svp"
+    basis = "def2svp"
     active_space = ((2, 1), 6)
     charge = 0
     spin = 1
@@ -155,7 +260,7 @@ def h5():
                     H  -0.688191   0.500000   0.000000
                     H  -0.688191  -0.500000   0.000000
                     H   0.262866  -0.809017   0.000000  """
-    basis = "6-31g"
+    basis = "def-2-svp"
     active_space = ((3, 2), 10)
     charge = 0
     spin = 1
@@ -205,4 +310,14 @@ def Cu3():
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
 
-h5()
+def OH():
+    geometry = "O 0.0 0.0 0.0; H  0.0 0.0 0.9697"
+    basis = "sto-3g"
+    active_space = ((2, 1), 6)
+    spin = 1
+    charge = 0
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+
+h3()

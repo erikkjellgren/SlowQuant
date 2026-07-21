@@ -76,14 +76,18 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     nl = 1
     max_iter = 10000
 
-    directory = os.getcwd() + "/"
-    name = "data_H3_def2svp"
+    directory = os.getcwd() 
+    name = "data_H3"
 
     j,k = 0,0
     while j < 30:
-        if os.path.exists("%s/%s_%s.npz" % (directory,name,j)):
-            k = j
-        j+=1
+        if j < 10:
+            if os.path.exists("%s/%s_0%s.npz" % (directory, name, j)):
+                k = j + 1
+        else:
+            if os.path.exists("%s/%s_%s.npz" % (directory, name, j)):
+                k = j +1
+        j += 1
 
     if k < 10:
         k = f"0{k}"
@@ -113,16 +117,13 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         include_active_kappa=active_k,
     )
 
-    print("Approximate value for S_z before optimization:", WF.calc_Sz(ovlp_int))
-    print("Approximate value for S^2 before optimization:", WF.calc_S2(ovlp_int))
-
     np.random.seed(rd_seed)
     new_thetas_real = np.random.uniform(bounds[0], bounds[1], len(WF.thetas_real)).tolist()
     new_thetas_imag = np.zeros_like(WF.thetas_imag)
 
     WF.set_thetas(new_thetas_real, new_thetas_imag)
 
-    #WF.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter=max_iter)
+    WF.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter=max_iter)
 
     print("Final electronic energy:", WF.energy_elec)
     print("Approximate value for S^2:", WF.calc_S2(ovlp_int))
@@ -204,6 +205,16 @@ def Cu3():
     active_space = ((2, 1), 6)
     charge = 0
     spin = 1
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+
+def OH():
+    geometry = "O 0.0 0.0 0.0; H  0.0 0.0 0.9697"
+    basis = "sto-3g"
+    active_space = ((3, 2), 8)
+    spin = 1
+    charge = 0
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )

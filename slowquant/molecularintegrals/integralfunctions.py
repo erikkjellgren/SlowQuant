@@ -275,8 +275,7 @@ def generalized_one_electron_transform(C: np.ndarray, int_1e_inp: np.ndarray, x2
         return cont1 + cont2
     
 
-def generalized_1e_transform_spin_separated(C: np.ndarray, int_1e_inp: np.ndarray, x2c: bool=False) -> np.ndarray:
-    """int_1e_inp = int_1e_kin+int_1e_nuc"""    
+def generalized_1e_transform_spin_separated(C: np.ndarray, int_1e_inp: np.ndarray) -> np.ndarray:   
     cont1 = np.einsum(
         "aP,bQ, ab->PQ",
         C[: int(C.shape[0] / 2)].conj(),
@@ -294,7 +293,7 @@ def generalized_1e_transform_spin_separated(C: np.ndarray, int_1e_inp: np.ndarra
     cont3 = np.einsum(
         "aP,bQ, ab->PQ",
         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
-        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
+        C[: int(C.shape[0] / 2)],
         int_1e_inp,
         optimize=["einsum_path", (0, 2), (0, 1)],
     )  # beta alpha

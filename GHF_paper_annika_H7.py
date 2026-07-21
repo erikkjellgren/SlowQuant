@@ -74,14 +74,18 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     nl = 1
     max_iter=10000
 
-    directory = os.getcwd() + "/"
-    name = "data_H7_new"
+    directory = os.getcwd()
+    name = "data_H7_6-31g"
 
     j,k = 0,0
     while j < 30:
-        if os.path.exists("%s/%s_%s.npz" % (directory,name,j)):
-            k = j
-        j+=1
+        if j < 10:
+            if os.path.exists("%s/%s_0%s.npz" % (directory, name, j)):
+                k = j + 1
+        else:
+            if os.path.exists("%s/%s_%s.npz" % (directory, name, j)):
+                k = j +1
+        j += 1
 
     if k < 10:
         k = f"0{k}"
@@ -167,7 +171,7 @@ def h7():
                     H  -1.038362  -0.500000   0.000000
                     H  -0.256328  -1.123490   0.000000
                     H   0.718499  -0.900969   0.000000  """
-    basis = "def-2-svp"
+    basis = "6-31g"
     active_space = ((4, 3), 14)
     charge = 0
     spin = 1

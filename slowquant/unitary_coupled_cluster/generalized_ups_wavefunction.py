@@ -25,6 +25,9 @@ from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_orbital_gradient_generalized_real_imag,
     get_S2,
     get_Sz,
+    get_nr_elec,
+    get_S2_article,
+    get_S2_old,
 
 )
 from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import (
@@ -558,8 +561,8 @@ class GeneralizedWaveFunctionUPS:
                             self._rdm2[R_idx, S_idx, P_idx, Q_idx] = val  # type: ignore
                             self._rdm2[S_idx, R_idx, Q_idx, P_idx] = val.conjugate()  # type: ignore
 
-                            # self._rdm2[R_idx, Q_idx, P_idx, S_idx] = -val  # type: ignore
-                            # self._rdm2[P_idx, S_idx, R_idx, Q_idx] = -val  # type: ignore
+                            #self._rdm2[R_idx, Q_idx, P_idx, S_idx] = -val  # type: ignore
+                            #self._rdm2[P_idx, S_idx, R_idx, Q_idx] = -val  # type: ignore
 
         return self._rdm2
 
@@ -1291,18 +1294,49 @@ class GeneralizedWaveFunctionUPS:
     def calc_Sz(self, S_int):
         S_int_MO = generalized_1e_transform_spin_separated(self.c_mo, S_int)
         return get_Sz(self.rdm1, self.num_inactive_spin_orbs, self.num_active_spin_orbs, S_int_MO)
-        
+    
+    def calc_S2_old(self, S_int):
+        S_int_MO = generalized_1e_transform_spin_separated(self.c_mo, S_int)
+        return get_S2_old(self.rdm1, self.rdm2, self.num_inactive_spin_orbs, self.num_active_spin_orbs, S_int_MO) 
     
     def calc_S2(self, S_int):
         S_int_MO = generalized_1e_transform_spin_separated(self.c_mo, S_int)
-        return get_S2(self.rdm1, self.rdm2, self.num_inactive_spin_orbs, self.num_active_spin_orbs, S_int_MO)
+        return get_S2(self.rdm1, self.rdm2, self.num_inactive_spin_orbs, self.num_active_spin_orbs, S_int_MO) 
+    
+    def calc_S2_article(self, S_int):
+        S_int_MO = generalized_1e_transform_spin_separated(self.c_mo, S_int)
+        return get_S2_article(self.rdm1, self.rdm2, self.num_inactive_spin_orbs, self.num_active_spin_orbs, S_int_MO) 
     
     def calc_multiplicity(self, S_int):
         S2 = self.calc_S2(S_int)
-        
-        def f(S):
-            return (S * (S + 1))**2 - S2
 
-        S = float(root_scalar(f, bracket=[0, 1], method="brentq"))
+        # Protect against tiny negative values due to numerical noise
+        if S2 < 0 and abs(S2) < 1e-10:
+            S2 = 0.0
+        elif S2 < 0:
+            raise ValueError(f"Invalid <S^2> = {S2}")
+
+        S = (-1 + np.sqrt(1 + 4*S2)) / 2
 
         return 2*S + 1
+    
+    def calc_S(self, S_int):
+        S2 = self.calc_S2(S_int)
+
+        # Protect against tiny negative values due to numerical noise
+        if S2 < 0 and abs(S2) < 1e-10:
+            S2 = 0.0
+        elif S2 < 0:
+            raise ValueError(f"Invalid <S^2> = {S2}")
+
+        S = (-1 + np.sqrt(1 + 4*S2)) / 2
+
+        return S
+    
+    def calc_nr_elec(self):
+        N = get_nr_elec(self.num_inactive_spin_orbs, self.num_active_spin_orbs, self.rdm1)
+        if np.abs(N.imag) > 1e-10:
+            print("Warning! Complex Nr of electrons!!")
+            return N
+        else:
+            return N.real
