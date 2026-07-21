@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from functools import partial
+from functools import (partial, reduce,)
 from typing import Any
 
 import numpy as np
@@ -13,6 +13,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
     two_electron_integral_transform_split,
+    generalized_1e_transform_spin_separated,
 )
 from slowquant.SlowQuant import SlowQuant
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
@@ -35,6 +36,7 @@ from slowquant.unitary_coupled_cluster.unrestricted_density_matrix import (
     get_orbital_gradient_unrestricted,
     get_orbital_response_hessian_block_unrestricted,
     get_orbital_response_metric_sigma_unrestricted,
+    get_spin_square,
 )
 from slowquant.unitary_coupled_cluster.unrestricted_operators import (
     unrestricted_hamiltonian_0i_0a,
@@ -49,6 +51,8 @@ from slowquant.unitary_coupled_cluster.util import (
     iterate_t2,
     iterate_t2_generalized,
 )
+from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
+
 
 
 class UnrestrictedWaveFunctionUPS:
@@ -1587,3 +1591,18 @@ class UnrestrictedWaveFunctionUPS:
                 gradient[idx] = alpha
                 gradient[idx + len(wf.kappa_idx)] = beta
         return gradient
+
+    
+    def spin_square(self, S_ovl) -> tuple[float, float]:
+        S = generalized_1e_transform_spin_separated(self.c_a_mo, self.c_b_mo, S_ovl)
+        return get_spin_square(
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+            self.num_active_elec_alpha,
+            self.num_active_elec_beta,
+            self.rdm1aa,
+            self.rdm1bb,
+            self.rdm2aabb,
+            self.rdm2bbaa,
+            S,
+            )

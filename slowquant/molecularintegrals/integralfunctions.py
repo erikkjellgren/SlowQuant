@@ -195,6 +195,37 @@ def one_electron_integral_transform(C: np.ndarray, int1e: np.ndarray) -> np.ndar
     """
     return np.einsum("ai,bj,ab->ij", C, C, int1e, optimize=["einsum_path", (0, 2), (0, 1)])
 
+def generalized_1e_transform_spin_separated(C_a: np.ndarray, C_b: np.ndarray, int_1e_inp: np.ndarray) -> np.ndarray:  
+    cont1 = np.einsum(
+        "aP,bQ, ab->PQ",
+        C_a.conj(),
+        C_a,
+        int_1e_inp,
+        optimize=["einsum_path", (0, 2), (0, 1)],
+    )  # alpha alpha
+    cont2 = np.einsum(
+        "aP,bQ, ab->PQ",
+        C_a.conj(),
+        C_b,
+        int_1e_inp,
+        optimize=["einsum_path", (0, 2), (0, 1)],
+    )  # alpha beta
+    cont3 = np.einsum(
+        "aP,bQ, ab->PQ",
+        C_b.conj(),
+        C_a,
+        int_1e_inp,
+        optimize=["einsum_path", (0, 2), (0, 1)],
+    )  # beta alpha
+    cont4 = np.einsum(
+        "aP,bQ, ab->PQ",
+        C_b.conj(),
+        C_b,
+        int_1e_inp,
+        optimize=["einsum_path", (0, 2), (0, 1)],
+    )  # beta beta
+    return (cont1, cont2, cont3, cont4)
+
 
 def two_electron_integral_transform(C: np.ndarray, int2e: np.ndarray) -> np.ndarray:
     """Transform two-electron integrals from AO to MO.

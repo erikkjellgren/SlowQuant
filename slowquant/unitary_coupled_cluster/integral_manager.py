@@ -123,3 +123,17 @@ class IntegralManager:
             raise ValueError("Got unknown integral object, {type(self.int_obj)}")
         self._h_ao = h_core
         return h_core
+
+    @property
+    def overlap(self) -> np.ndarray:
+        """Overlap integral in AO."""
+        if isinstance(self._overlap, np.ndarray):
+            return self._overlap
+        if isinstance(self.int_obj, SlowQuant):
+            overlap_int = self.int_obj.integral.overlap_matrix
+        elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
+            overlap_int = self.int_obj.intor("int1e_ovlp")
+        else:
+            raise ValueError("Got unknown integral object, {type(self.int_obj)}")
+        self._overlap = overlap_int
+        return overlap_int

@@ -1,6 +1,6 @@
 import numba as nb
 import numpy as np
-
+from slowquant.molecularintegrals.integralfunctions import generalized_1e_transform_spin_separated
 
 @nb.jit(nopython=True)
 def RDM1xx(p: int, q: int, num_inactive_orbs: int, num_active_orbs: int, rdm1xx: np.ndarray) -> float:
@@ -39,7 +39,6 @@ def RDM1xx(p: int, q: int, num_inactive_orbs: int, num_active_orbs: int, rdm1xx:
         return 0
     # One inactive and one active index
     return 0
-
 
 @nb.jit(nopython=True)
 def RDM2xxxx(
@@ -1311,3 +1310,48 @@ def get_orbital_response_hessian_block_unrestricted(
                                 p, q, r, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
                             )
     return A1e + (1 / 2 * A2e)
+
+
+def get_spin_square(
+        num_inactive_orbs : int,
+        num_active_orbs: int,
+        num_active_elec_alpha: int,
+        num_active_elec_beta: int,
+        rdm1aa: np.ndarray,
+        rdm1bb: np.ndarray,
+        rdm2aabb: np.ndarray,
+        rdm2bbaa: np.ndarray,
+        S: np.ndarray,
+        ) -> tuple[float, float]:
+    
+    r"""Calculate S^2 (spin square) and spin multiplicity (2s+1).
+
+    .. math::
+       \hat{S}^2  = \frac{1}{2}\hat{N} + \frac{1}{4}(\hat{N}_{\alpha} - \hat{N}_{\beta})^2 
+                    + \frac{1}{2} \sum_{pqrs} (-S^{\alpha\beta}_{p\alpha, q\beta}S^{\beta\alpha}_{r\beta, s\alpha} \hat{a}^{\dagger}_{p\alpha}\hat{a}^{\dagger}_{r\beta}\hat{a}_{q\beta}\hat{a}_{s\alpha} - S^{\beta\alpha}_{p\beta, q\alpha}S^{\beta\alpha}_{r\alpha, s\beta}\hat{a}^{\dagger}_{p\beta}\hat{a}^{\dagger}_{r\alpha}\hat{a}_{q\alpha}\hat{a}_{s\beta})
+    Args:
+       num_inactive_orbs: number of inactive spatial orbitals
+       num_active:orbs: number of active spatial orbitals
+       num_active_elec_alpha: number of active alpha electrons
+       num_active_elec_beta: number of active beta electrons
+       rdms: Unresticted reduced density matrix class.
+       S: Overlap matrix of molecular orbitals
+
+    Returns:
+        Returns S^2 and 2S+1.
+    """
+
+    tmp1 = 0.5 * ((num_inactive_orbs + num_active_elec_alpha) + (num_inactive_orbs + num_active_elec_beta))
+    tmp1 += 0.25 * ((num_inactive_orbs + num_active_elec_alpha) - (num_inactive_orbs + num_active_elec_beta))**2
+    tmp2 = 0
+    for p in range(num_inactive_orbs + num_active_orbs):
+        for q in range(num_inactive_orbs + num_active_orbs):
+            for r in range(num_inactive_orbs + num_active_orbs):
+                for s in range(num_inactive_orbs + num_active_orbs):
+                    tmp2 -= 0.5 * (S[1][p,q] * S[2][r,s] * RDM2xxyy(p, r, q, s, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb))
+                    tmp2 -= 0.5 * (S[1][r,s] * S[2][p,q] * RDM2xxyy(p, r, q, s, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa))
+    
+    ss = tmp1 + tmp2
+    s = (-1 + np.sqrt(1 + 4 * ss))/2
+
+    return ss, 2*s+1

@@ -1,4 +1,5 @@
 import numpy as np
+import pyscf
 from pyscf import gto, scf
 
 from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import (
@@ -136,3 +137,27 @@ def test_hfc_oh() -> None:
 
     assert abs(a_iso[0] - -368.2159748785761) < 10**-8
     assert abs(a_iso[1] - 1766.1752889356255) < 10**-8
+
+def test_spin_square() -> None:
+
+    mol = pyscf.M(atom="O 0.0 0.0 0.0; H  0.0 0.0 0.9697", basis="sto-3g", unit="angstrom", spin=1)
+    uhf = pyscf.scf.UHF(mol).run()
+    uhf.kernel()
+    
+    overlap = mol.intor("int1e_ovlp")
+
+    UWF = UnrestrictedWaveFunctionUPS(
+    ((2, 1), 3),
+    uhf.mo_coeff,
+    mol,
+    ansatz="fuccsd",
+    ansatz_options={"n_layers": 0},
+    include_active_kappa=True,
+    )
+
+    ss, spin_mul = UWF.spin_square(S_ovl=overlap)
+
+    assert abs(ss - 0.753255844) < 10**8
+    assert abs(ss - 0.75325584) < 10**8
+    assert abs(spin_mul - 2.0032531981726693) < 10**8
+    assert abs(spin_mul - 2.0032532) < 10**7
