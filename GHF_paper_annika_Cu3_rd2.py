@@ -54,7 +54,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     print("GHF")
     print("Convergence tolerance energy:", tole)
-    print("Convergence tolerance energy:", tolg)
+    print("Convergence tolerance gradient:", tolg)
 
     mf = scf.GHF(mol)
     mf.conv_tol = tole        # Energy convergence (Hartree)

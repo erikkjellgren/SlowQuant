@@ -47,6 +47,14 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
     mol.build()
 
+    # GHF
+    tole = 1e-10
+    tolg = 1e-8
+
+    print("GHF")
+    print("Convergence tolerance energy:", tole)
+    print("Convergence tolerance gradient:", tolg)
+
     mf = scf.GHF(mol)
     mf.conv_tol = 1e-10        # Energy convergence (Hartree)
     mf.conv_tol_grad = 1e-8   # Optional: gradient convergence
