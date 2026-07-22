@@ -135,6 +135,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     mf.kernel()
 
     print("GHF electronic energy:", mf.energy_elec()[0])
+    print("GHF nuclear energy:", mf.energy_nuc())
 
     ovlp_int = mol.intor("int1e_ovlp_sph")
 
