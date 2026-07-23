@@ -139,65 +139,37 @@ class LinearResponseBaseClass:
             #    raise ValueError("Negative eigenvalue in Hessian.")
             print("WARNING: Negative eigenvalue in Hessian")
 
-        S = np.zeros((size * 2, size * 2))
-        S[:size, :size] = self.Sigma
-        S[:size, size:] = self.Delta
-        S[size:, :size] = -self.Delta
-        S[size:, size:] = -self.Sigma
+        S2 = np.zeros((size * 2, size * 2))
+        S2[:size, :size] = self.Sigma
+        S2[:size, size:] = self.Delta
+        S2[size:, :size] = -self.Delta
+        S2[size:, size:] = -self.Sigma
         print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}")
 
-        self.hessian = E2
-        print("removed", ((len(self.q_ops) + len(self.G_ops)) * 2) - len(self.hessian))
-        self.metric = S
-        eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)
+        lam, V = scipy.linalg.eigh(S2)                       # S2 real symmetric PSD -> real eigen-decomposition
+        thresh = max(1e-10 * np.max(np.abs(lam)), 1e-12)
+        keep = np.abs(lam) > thresh
+        print("removed parameters",  np.sum(~keep))
 
-        # for i in range(len(eigval)):
-        #     # print("eigenvalue", eigval[idx])
-        #     # print(max(abs(eigvec[:, idx])), np.argmax(max(abs(eigvec[:,idx]))))
-        #     vec=eigvec[:,i]
-        #     # for j in range(len(vec)):
-        #     #     print(vec[j], self.operator_labels[j])
-        #     print("eigenval", eigval[i])
-        #     # print(max(abs(vec)), np.argmax(abs(vec)))
-        #     # k = np.argmax(np.abs(vec))
-        #     print('Max value eigvec', max(abs(vec)), 'Max value eigvec index', np.argmax(abs(vec)))
-        #     k = np.argmax(np.abs(vec))
-        #     # print("dominant operator:", self.operator_labels[k])
-        # eigval, eigvec, sigma_eigs, keep = solve_lr_drop_sigma_null(self.hessian, self.metric, cut=1e-10)
-        # print("dropped directions:", np.sum(~keep))
-        # print("kept directions:", np.sum(keep))
-        # print("all eigenvalues", eigval)
-        # print("eigenvectors", eigvec)
+        X = V[:, keep] / np.sqrt(np.abs(lam[keep]))     # real projector, n x m  (m = numerical rank of S2)
+        J = np.diag(np.sign(lam[keep]))
+        E_reduced = X.conj().T @ E2 @ X         # conj().T matters: E2 is Hermitian, possibly complex
+
+        eigval, y = scipy.linalg.eig(E_reduced, J)                  # standard Hermitian eigenproblem, well-conditioned
+        eigvec = X @ y                               # eigenvectors back in the original n-dim space
+
+        self.metric = S2
+        self.hessian = E2
+
         sorting = np.argsort(eigval)
         self.excitation_energies = np.real(eigval[sorting][size:])
         self.response_vectors = np.real(eigvec[:, sorting][:, size:])
-        print(self.response_vectors)
         self.normed_response_vectors = np.zeros_like(self.response_vectors)
 
-        # Dont know what i am doing here....
-        # for i in range(len(self.response_vectors)):
-        #     for p in range()
-        #     val = expectation_value(
-        #         self.response_vectors[i],
-        #         [],
-        #         self.response_vectors[i],
-        #         *self.index_info
-        #         )
-
-        self.num_q = self.q_ops_finite
-        self.num_G = size - self.num_q
         self.num_qG = size
 
-        # self.Z_q = self.response_vectors[: self.num_q, :]
-        # self.Z_G = self.response_vectors[self.num_q : self.num_q + self.num_G, :]
-        # self.Y_q = self.response_vectors[self.num_q + self.num_G : 2 * self.num_q + self.num_G]
-        # self.Y_G = self.response_vectors[2 * self.num_q + self.num_G :]
         self.Z_qG = self.response_vectors[: self.num_qG, :]
         self.Y_qG = self.response_vectors[self.num_qG :]
-        # self.Z_q_normed = np.zeros_like(self.Z_q)
-        # self.Z_G_normed = np.zeros_like(self.Z_G)
-        # self.Y_q_normed = np.zeros_like(self.Y_q)
-        # self.Y_G_normed = np.zeros_like(self.Y_G)
         self.Z_qG_normed = np.zeros_like(self.Z_qG)
         self.Y_qG_normed = np.zeros_like(self.Y_qG)
 
@@ -206,16 +178,11 @@ class LinearResponseBaseClass:
             if norm < 10**-10:
                 print(f"WARNING: State number {state_number} could not be normalized. Norm of {norm}.")
                 continue
-            # self.Z_q_normed[:, state_number] = self.Z_q[:, state_number] * (1 / norm) ** 0.5
-            # self.Z_G_normed[:, state_number] = self.Z_G[:, state_number] * (1 / norm) ** 0.5
-            # self.Y_q_normed[:, state_number] = self.Y_q[:, state_number] * (1 / norm) ** 0.5
-            # self.Y_G_normed[:, state_number] = self.Y_G[:, state_number] * (1 / norm) ** 0.5
             self.Z_qG_normed[:, state_number] = self.Z_qG[:, state_number] * (1 / norm) ** 0.5
             self.Y_qG_normed[:, state_number] = self.Y_qG[:, state_number] * (1 / norm) ** 0.5
             self.normed_response_vectors[:, state_number] = (
                 self.response_vectors[:, state_number] * (1 / norm) ** 0.5
             )
-        # print(self.Z_qG_normed)
 
     def get_excited_state_norm(self) -> np.ndarray:
         """Calculate the norm of excited states.

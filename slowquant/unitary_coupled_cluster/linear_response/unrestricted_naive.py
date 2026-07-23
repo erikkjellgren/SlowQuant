@@ -38,8 +38,6 @@ class LinearResponseUPS(LinearResponseBaseClass):
         """
         super().__init__(wave_function, excitations)
 
-        # Screen for A_ii = 0
-        finite_excitations = []
         if len(self.q_ops) != 0:
             A = get_orbital_response_hessian_block_unrestricted(
                 self.wf.haa_mo,
@@ -59,30 +57,6 @@ class LinearResponseUPS(LinearResponseBaseClass):
                 self.wf.rdm2aabb,
                 self.wf.rdm2bbaa,
             )
-        # Man behøver ikke regne hele A, men det er bare lige nemt at gøre for qq
-        for i in range(len(self.q_ops)):
-            if abs(A[i, i]) > 10**-6:  # whatever rimeligt threshold
-                finite_excitations.append(True)
-            else:
-                finite_excitations.append(False)
-        self.q_ops_finite = sum(bool(x) for x in finite_excitations)
-        for i, G in enumerate(self.G_ops):
-            GI_ket = propagate_state([G], self.wf.ci_coeffs, *self.index_info)
-            HGI_ket = propagate_state([self.H_0i_0a, G], self.wf.ci_coeffs, *self.index_info)
-            # <0| GId H GJ |0>
-            A = expectation_value(
-                GI_ket,
-                [],
-                HGI_ket,
-                *self.index_info,
-            )
-            if abs(A) > 10**-6:  # whatever rimeligt threshold
-                finite_excitations.append(True)
-            else:
-                finite_excitations.append(False)
-        self.G_ops_finite = sum(bool(x) for x in finite_excitations[len(self.q_ops) :])
-
-        finite_excitations_idx = np.array(finite_excitations)
         idx_shift = len(self.q_ops)
         # G_shift = int(len(self.G_ops) / 2)
         # q_shift = int(len(self.q_ops) / 2)
@@ -512,20 +486,6 @@ class LinearResponseUPS(LinearResponseBaseClass):
                     *self.index_info,
                 )
                 self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = val
-        print("inden", len(self.A))
-        self.A = self.A[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape(
-            (np.sum(finite_excitations_idx), np.sum(finite_excitations_idx))
-        )
-        self.B = self.B[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape(
-            (np.sum(finite_excitations_idx), np.sum(finite_excitations_idx))
-        )
-        self.Sigma = self.Sigma[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape(
-            (np.sum(finite_excitations_idx), np.sum(finite_excitations_idx))
-        )
-        self.Delta = np.zeros(
-            (len(self.Sigma), len(self.Sigma))
-        )  # Delta er defineret her fordi den ellers har forkert dimension i unrestricted_lr_baseclass.py
-        print("efter", len(self.A))
 
     def get_transition_dipole(self) -> np.ndarray:
         """Calculate transition dipole moment.
