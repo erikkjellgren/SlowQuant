@@ -1192,3 +1192,140 @@ def get_orbital_response_static_property_gradient(
             prop_grad[idx, :] += mo[:, N, P] * RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             prop_grad[idx, :] -= mo[:, P, M] * RDM1(P, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
     return  prop_grad
+
+
+def get_Sz(rdm1, num_inactive_spin_orbs, num_active_spin_orbs, S_int):
+    tmp = 0
+    for P in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+        for Q in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+            tmp += (S_int[0][P,Q] - S_int[3][P,Q]) * RDM1(P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) 
+    return 0.5 * tmp.real
+
+def get_Sx(rdm1, num_inactive_spin_orbs, num_active_spin_orbs, S_int):
+    tmp = 0
+    for P in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+        for Q in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+            tmp += (S_int[2][P,Q] + S_int[1][P,Q]) * RDM1(P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) 
+    return 0.5 * tmp.real 
+
+def get_Sy(rdm1, num_inactive_spin_orbs, num_active_spin_orbs, S_int):
+    tmp = 0
+    for P in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+        for Q in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+            tmp += (S_int[2][P,Q] - S_int[1][P,Q]) * RDM1(P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) 
+    return (0.5 * 1j * tmp).real
+
+
+def get_S2_old(rdm1, rdm2, num_inactive_spin_orbs, num_active_spin_orbs, num_virtual_spin_orbs, S_int):
+    tmp1 = 0
+    for P in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+        for Q in range(0, num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs):
+            for S in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+                tmp1 += ((0.25 * (S_int[0][P,Q] - S_int[3][P,Q]) * (S_int[0][Q,S] - S_int[3][Q,S]) 
+                         + 0.5 * (S_int[1][P,Q] * S_int[2][Q,S]  +  S_int[2][P,Q] * S_int[1][Q,S])) 
+                         * RDM1(P, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)) 
+
+    tmp2 = 0
+    for P in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+        for Q in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+            for R in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+                for S in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+                    tmp2 += ((0.25 * (S_int[0][P,Q] - S_int[3][P,Q]) * (S_int[0][R,S] - S_int[3][R,S]) 
+                            + 0.50 * (S_int[1][P,Q] * S_int[2][R,S]  +  S_int[2][P,Q] * S_int[1][R,S]))
+                            * RDM2(P, Q, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)) 
+                    
+    print("1RDM part:", tmp1)
+
+    return tmp1.real + tmp2.real
+
+def get_S2(rdm1, rdm2, num_inactive_spin_orbs, num_active_spin_orbs, S_int):
+    N = get_nr_elec(num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+
+    tmp2 = 0
+    for P in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+        for Q in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+            for R in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+                for S in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+                    tmp2 += ((0.25 * (S_int[0][P,Q] - S_int[3][P,Q]) * (S_int[0][R,S] - S_int[3][R,S]) 
+                            + 0.50 * (S_int[1][P,Q] * S_int[2][R,S]  +  S_int[2][P,Q] * S_int[1][R,S]))
+                            * RDM2(P, Q, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)) 
+
+    return 0.75 * N.real + tmp2.real
+
+def get_XY_YZ_ZX_RDM2(rdm1, rdm2, num_inactive_spin_orbs, num_active_spin_orbs, S_int):
+    XY, YZ, ZX, YX, ZY, XZ, XX, YY, ZZ = 0, 0, 0, 0, 0, 0, 0, 0, 0
+    for P in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+        for Q in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+            for R in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+                for S in range(0, num_inactive_spin_orbs + num_active_spin_orbs):
+                    XY += ((S_int[2][P,Q] + S_int[1][P,Q]) * (S_int[2][R,S] - S_int[1][R,S]) 
+                            * RDM2(P, Q, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)) 
+                    
+                    YZ += ((S_int[2][P,Q] - S_int[1][P,Q]) * (S_int[0][R,S] - S_int[3][R,S]) 
+                            * RDM2(P, Q, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)) 
+                    
+                    ZX += ((S_int[0][P,Q] - S_int[3][P,Q]) * (S_int[2][R,S] + S_int[1][R,S]) 
+                            * RDM2(P, Q, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)) 
+                    
+
+                    YX += ((S_int[2][R,S] + S_int[1][R,S]) * (S_int[2][P,Q] - S_int[1][P,Q]) 
+                            * RDM2(P, Q, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)) 
+                    
+                    ZY += ((S_int[2][R,S] - S_int[1][R,S]) * (S_int[0][P,Q] - S_int[3][P,Q]) 
+                            * RDM2(P, Q, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)) 
+                    
+                    XZ += ((S_int[0][R,S] - S_int[3][R,S]) * (S_int[2][P,Q] + S_int[1][P,Q]) 
+                            * RDM2(P, Q, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)) 
+                    
+
+
+                    XX += ((S_int[2][R,S] + S_int[1][R,S]) * (S_int[2][P,Q] + S_int[1][P,Q]) 
+                            * RDM2(P, Q, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)) 
+                    
+                    YY += ((S_int[2][R,S] - S_int[1][R,S]) * (S_int[2][P,Q] - S_int[1][P,Q]) 
+                            * RDM2(P, Q, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)) 
+                    
+                    ZZ += ((S_int[0][R,S] - S_int[3][R,S]) * (S_int[0][P,Q] - S_int[3][P,Q]) 
+                            * RDM2(P, Q, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)) 
+                    
+    return 0.25 * 1j * XY, 0.25 * 1j * YZ, 0.25 * ZX, 0.25 * 1j * YX, 0.25 * 1j * ZY, 0.25 * XZ, 0.25 * XX, 0.25 * 1j * YY, 0.25 * ZZ
+
+def get_nr_elec(num_inactive_spin_orbs, num_active_spin_orbs, rdm1):
+    nelec = 0
+    for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
+        nelec += RDM1(P, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+    return nelec
+
+def get_mu0(rdm1, rdm2, num_inactive_spin_orbs, num_active_spin_orbs, S_int):
+    XY, YZ, ZX , YX, ZY, XZ, XX, YY, ZZ = get_XY_YZ_ZX_RDM2(rdm1, rdm2, num_inactive_spin_orbs, num_active_spin_orbs, S_int)
+    N = get_nr_elec(num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+    S_X2 = 0.25 * N + XX
+    S_Y2 = 0.25 * N + YY
+    S_Z2 = 0.25 * N + ZZ
+    X = get_Sx(rdm1, num_inactive_spin_orbs, num_active_spin_orbs, S_int)
+    Y = get_Sy(rdm1, num_inactive_spin_orbs, num_active_spin_orbs, S_int)
+    Z = get_Sz(rdm1, num_inactive_spin_orbs, num_active_spin_orbs, S_int)
+
+    chi = np.array([X,Y,Z]).T
+
+    X_mat = np.array([[S_X2, XY, XZ],
+                      [YX, S_Y2, YZ],
+                      [ZX, ZY, S_Z2]])
+    
+    A = X_mat.real - np.outer(chi, chi.T)
+
+    eigval_A = np.linalg.eigvals(A)
+
+    # Debugging:
+    # print("A", np.round(A.real, 10))
+    # print("X", np.round(X_mat.real, 10))
+    # print("Outer", np.round(np.outer(chi, chi.T), 10))
+    # print("Eigval", np.round(eigval_A, 5))
+
+    return np.min(eigval_A.real)
+
+def get_e0(rdm1, rdm2, num_inactive_spin_orbs, num_active_spin_orbs, S_int):
+    X = get_Sx(rdm1, num_inactive_spin_orbs, num_active_spin_orbs, S_int)
+    Y = get_Sy(rdm1, num_inactive_spin_orbs, num_active_spin_orbs, S_int)
+    Z = get_Sz(rdm1, num_inactive_spin_orbs, num_active_spin_orbs, S_int)
+    return np.sqrt(X**2 + Y**2 + Z**2)
