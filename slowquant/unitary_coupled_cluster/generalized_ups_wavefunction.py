@@ -1365,7 +1365,7 @@ class GeneralizedWaveFunctionUPS:
         print()
         print("Full characterization of spin for a generalized wavefunction:")
         print("─" * 60)
-        print("Be aware that a generalized WF breaks S\u00B2 and Sz symmetry!")
+        print("WARNING: A generalized WF breaks S\u00B2 and Sz symmetry!")
         print("The wavefunction should therefore be characterized by \u03F5\u2080 and \u03bc\u2080")
         print()
 
@@ -1387,7 +1387,7 @@ class GeneralizedWaveFunctionUPS:
         print("└" + "─"*(label_width+2) + "┴" + "─"*14 + "┘")
 
         print()
-        print("\u03F5\u2080 is the Euclidean norm of the vector (<Sx>, <Sy>, <Sz>),")
+        print("\u03F5\u2080 is the Euclidean norm of the vector (<Sx>, <Sy>, <Sz>)\u1d40,")
         print("and it determines unpaired spin in the direction of maximum unpaired spin.")
         print("If \u03F5\u2080 is an allowed value of Sz for the system and \u03bc\u2080 = 0, the solution is collinear.")
         print("If \u03bc\u2080 \u2260 0, the solution is non-collinear!")
