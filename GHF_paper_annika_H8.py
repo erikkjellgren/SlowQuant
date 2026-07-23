@@ -151,7 +151,7 @@ def h8():
                     H   0.984056  -0.984056   0.984056
                     H   0.984056   0.984056  -0.984056"""
     basis = "6-31g"
-    active_space = ((3, 3), 16)
+    active_space = ((3, 3), 16) # maks 8-9 i 20 siger Pernille, gtUPS og tiled-M0 for 
     charge = 2
     spin = 0
 
