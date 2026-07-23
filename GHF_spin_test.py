@@ -201,10 +201,14 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         include_active_kappa=active_k,
     )
 
-    print("Approximate value for S^2:", np.round(WF2.calc_S2(ovlp_int), 5))
-    print("Approximate value for S_z:", np.round(WF2.calc_Sz(ovlp_int), 5))
-    print("2S+1:", np.round(WF2.calc_multiplicity(ovlp_int), 5))
-    print("S:", np.round(WF2.calc_S(ovlp_int), 5))
+    # print("Approximate value for S^2:", np.round(WF2.calc_S2(ovlp_int), 5))
+    # print("Approximate value for S_z:", np.round(WF2.calc_Sz(ovlp_int), 5))
+    # print("2S+1:", np.round(WF2.calc_multiplicity(ovlp_int), 5))
+    # print("S:", np.round(WF2.calc_S(ovlp_int), 5))
+    # print("mu0 value:", np.round(WF2.calc_mu0(ovlp_int), 5))
+    # print("e0:", np.round(WF2.calc_e0(ovlp_int), 5))
+
+    WF2.spin_analysis()
 
 
     WF = GeneralizedWaveFunctionUPS(
@@ -216,19 +220,22 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         include_active_kappa=active_k,
     )
 
-    # np.random.seed(rd_seed)
-    # new_thetas_real = np.random.uniform(bounds[0], bounds[1], len(WF.thetas_real)).tolist()
-    # new_thetas_imag = np.zeros_like(WF.thetas_imag)
+    np.random.seed(rd_seed)
+    new_thetas_real = np.random.uniform(bounds[0], bounds[1], len(WF.thetas_real)).tolist()
+    new_thetas_imag = np.zeros_like(WF.thetas_imag)
 
-    # WF.set_thetas(new_thetas_real, new_thetas_imag)
+    WF.set_thetas(new_thetas_real, new_thetas_imag)
 
     WF.run_wf_optimization_1step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter=max_iter)
 
-    print("Final electronic energy:", WF.energy_elec)
-    print("Approximate value for S^2:", np.round(WF.calc_S2(ovlp_int), 5))
-    print("Approximate value for S_z:", np.round(WF.calc_Sz(ovlp_int), 5))
-    print("2S+1:", np.round(WF.calc_multiplicity(ovlp_int), 5))
-    print("S:", np.round(WF.calc_S(ovlp_int), 5))
+    # print("Final electronic energy:", WF.energy_elec)
+    # print("Approximate value for S^2:", np.round(WF.calc_S2(ovlp_int), 5))
+    # print("Approximate value for S_z:", np.round(WF.calc_Sz(ovlp_int), 5))
+    # print("2S+1:", np.round(WF.calc_multiplicity(ovlp_int), 5))
+    # print("S:", np.round(WF.calc_S(ovlp_int), 5))
+    # print("mu_0 value:", np.round(WF.calc_mu0(ovlp_int), 5))
+    # print("eps0:", np.round(WF.calc_e0(ovlp_int), 5))
+    WF.spin_analysis()
 
 
     #print(np.round(WF.c_mo, 3))
@@ -313,7 +320,7 @@ def Cu3():
 
 def OH():
     geometry = "O 0.0 0.0 0.0; H  0.0 0.0 0.9697"
-    basis = "sto-3g"
+    basis = "6-31g"
     active_space = ((2, 1), 6)
     spin = 1
     charge = 0
@@ -321,4 +328,4 @@ def OH():
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
 
-h3()
+OH()
