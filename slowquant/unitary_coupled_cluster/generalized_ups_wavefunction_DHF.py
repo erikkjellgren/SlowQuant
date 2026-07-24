@@ -12,6 +12,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     generalized_two_electron_transform,
     DHF_one_electron_transform,
     DHF_two_electron_transform,
+    generalized_1e_transform_spin_separated,
 )
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_generalized, get_indexing_DHF
 from slowquant.unitary_coupled_cluster.generalized_density_matrix_DHF import (
@@ -1928,15 +1929,15 @@ class GeneralizedWaveFunctionUPS:
 
 
     def calc_Sz(self, S_int):
-            S_int_MO = generalized_1e_transform_spin_separated(self.c_mo, S_int)
+            S_int_MO = generalized_1e_transform_spin_separated(self.c_mo[:,self.num_spin_orbs_NES:], S_int)
             return get_Sz(self.rdm1, self.num_inactive_spin_orbs, self.num_active_spin_orbs, S_int_MO)
         
     def calc_S2_old(self, S_int):
-        S_int_MO = generalized_1e_transform_spin_separated(self.c_mo, S_int)
+        S_int_MO = generalized_1e_transform_spin_separated(self.c_mo[:,self.num_spin_orbs_NES:], S_int)
         return get_S2_old(self.rdm1, self.rdm2, self.num_inactive_spin_orbs, self.num_active_spin_orbs, self.num_virtual_spin_orbs, S_int_MO) 
     
     def calc_S2(self, S_int):
-        S_int_MO = generalized_1e_transform_spin_separated(self.c_mo, S_int)
+        S_int_MO = generalized_1e_transform_spin_separated(self.c_mo[:,self.num_spin_orbs_NES:], S_int)
         return get_S2(self.rdm1, self.rdm2, self.num_inactive_spin_orbs, self.num_active_spin_orbs, S_int_MO) 
     
     def calc_multiplicity(self, S_int):
@@ -1975,16 +1976,15 @@ class GeneralizedWaveFunctionUPS:
 
 
     def calc_mu0(self, S_int):
-        S_int_MO = generalized_1e_transform_spin_separated(self.c_mo, S_int)
+        S_int_MO = generalized_1e_transform_spin_separated(self.c_mo[:,self.num_spin_orbs_NES:], S_int)
         return get_mu0(self.rdm1, self.rdm2, self.num_inactive_spin_orbs, self.num_active_spin_orbs, S_int_MO) 
     
     def calc_e0(self, S_int):
-        S_int_MO = generalized_1e_transform_spin_separated(self.c_mo, S_int)
+        S_int_MO = generalized_1e_transform_spin_separated(self.c_mo[:,self.num_spin_orbs_NES:], S_int)
         return get_e0(self.rdm1, self.rdm2, self.num_inactive_spin_orbs, self.num_active_spin_orbs, S_int_MO) 
 
 
-    def spin_analysis(self):
-        S_int = self.int_gen.overlap
+    def spin_analysis(self, S_int):
         S2 = self.calc_S2(S_int)
         # Protect against tiny negative values due to numerical noise
         if S2 < 0 and abs(S2) < 1e-10:

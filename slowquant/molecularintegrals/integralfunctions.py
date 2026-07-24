@@ -353,6 +353,38 @@ def DHF_two_electron_transform(C: np.ndarray, int_2e_inp: np.array) -> np.ndarra
     )
     return cont1 + cont2 + cont3 + cont4
 
+def generalized_1e_transform_spin_separated(C: np.ndarray, int_1e_inp: np.ndarray) -> np.ndarray:   
+    cont1 = np.einsum(
+        "aP,bQ, ab->PQ",
+        C[: int(C.shape[0] / 2)].conj(),
+        C[: int(C.shape[0] / 2)],
+        int_1e_inp,
+        optimize=["einsum_path", (0, 2), (0, 1)],
+    )  # alpha alpha
+    cont2 = np.einsum(
+        "aP,bQ, ab->PQ",
+        C[: int(C.shape[0] / 2)].conj(),
+        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
+        int_1e_inp,
+        optimize=["einsum_path", (0, 2), (0, 1)],
+    )  # alpha beta
+    cont3 = np.einsum(
+        "aP,bQ, ab->PQ",
+        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
+        C[: int(C.shape[0] / 2)],
+        int_1e_inp,
+        optimize=["einsum_path", (0, 2), (0, 1)],
+    )  # beta alpha
+    cont4 = np.einsum(
+        "aP,bQ, ab->PQ",
+        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
+        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
+        int_1e_inp,
+        optimize=["einsum_path", (0, 2), (0, 1)],
+    )  # beta beta
+    return (cont1, cont2, cont3, cont4)
+
+
 
 # def generalized_two_electron_transform(C: np.ndarray, int_2e_inp_spinor: np.ndarray) -> np.ndarray: #change name AE
 #     # C: (nao2c, nmo), eri_ao: (nao2c,nao2c,nao2c,nao2c)

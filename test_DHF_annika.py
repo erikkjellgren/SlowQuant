@@ -820,8 +820,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     C_U = C_MO @ U_step
 
+    S_int = mol.intor("int1e_ovlp")
 
-    WF = GeneralizedWaveFunctionUPS(
+    WF2 = GeneralizedWaveFunctionUPS(
         mol.nelectron,
         active_space,
         C_MO,
@@ -829,7 +830,22 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         h_core,
         g_eri,
         "fUCCSD",
-        {"n_layers": 1, "is_spin_conserving" : False},
+        {"n_layers": 0, "is_spin_conserving" : False},
+        include_active_kappa=True,
+    )
+
+    WF2.spin_analysis(S_int)
+
+
+    WF = GeneralizedWaveFunctionUPS(
+        mol.nelectron,
+        active_space,
+        #C_MO,
+        C_U,
+        h_core,
+        g_eri,
+        "fUCCSD",
+        {"n_layers": 0, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
@@ -931,6 +947,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-8, maxiter = 1000)
 
+    WF.spin_analysis(S_int)
+
     gradient_ee = get_orbital_gradient_generalized_real_imag(
                 WF.h_mo,
                 WF.g_mo,
@@ -1026,7 +1044,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # print(WF.kappa_no_activeactive_spin_idx_resp)'''
 
-    LR = generalized_naive_DHF.LinearResponse(WF, excitations="SD")
+    LR = generalized_naive_DHF.LinearResponse(WF, excitations="S")
 
     LR.calc_excitation_energies()
     print("Excitation energies:", LR.excitation_energies)
@@ -1125,7 +1143,7 @@ def H3():
     spin = 1
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
-    )s
+    )
 
 def LiH():
     geometry = """H  0.0   0.0  0.0;
@@ -1254,4 +1272,4 @@ def N3():
 
 ###RUN SCRIPT###
 
-CuH()
+HF()
