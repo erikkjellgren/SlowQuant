@@ -56,3 +56,42 @@ indent-style = "space"
 line-ending = "lf"
 docstring-code-format = true
 skip-magic-trailing-comma = false
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "SlowQuant"
+version = "0.1.0"
+description = "A quantum chemistry package"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "BSD 3"}
+
+authors = [
+    {name = "Erik Kjellgren, Karl Michael Ziems"}
+]
+
+dependencies = [
+    "networkx>=3.0", # Latest major
+    "numba>=0.60", # Python 3.10
+    "numpy>=2.0", # Latest major
+    "pyscf>=2.4", # Issue with deepcopy in earlier version
+    "scipy>=1.13", # Python 3.10
+    "sympy>=1.9", # Python 3.10
+    "qiskit==2.1.1", # Known to work
+    "qiskit-aer==0.17.2", # Known to work
+    "qiskit-ibm-provider==0.11.0", # Known to work
+    "qiskit-ibm-runtime==0.41.1", # Known to work
+    "qiskit-nature==0.7.2", # Known to work
+]
+
+[project.urls]
+Homepage = "https://github.com/erikkjellgren/SlowQuant"
+
+[tool.setuptools]
+package-dir = {"" = "slowquant"}
+
+[tool.setuptools.packages.find]
+where = ["slowquant"]
