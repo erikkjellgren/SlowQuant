@@ -1,3 +1,7 @@
+# Usage:
+#    docker build --build-arg CACHE_BUST=$(date +%s) -f Dockerfile -t slowquant-docker .
+#    docker run --rm slowquant-docker:latest
+
 FROM python:3.10-slim
 
 # Install git and build tools
