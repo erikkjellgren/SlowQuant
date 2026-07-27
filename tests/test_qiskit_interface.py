@@ -30,14 +30,11 @@ from slowquant.unitary_coupled_cluster.sa_ups_wavefunction import WaveFunctionSA
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
-backend = FakeTorino()
-basis_1q = [g for g in backend.target.operation_names if g in ("rz", "sx", "x", "id")]
-basis_2q = [g for g in backend.target.operation_names if g in ("ecr", "cz", "cx")]
 noise_model = NoiseModel()
-noise_model.add_all_qubit_quantum_error(depolarizing_error(0.005, 1), basis_1q)
-noise_model.add_all_qubit_quantum_error(depolarizing_error(0.02, 2), basis_2q)
-noise_model.add_all_qubit_quantum_error(amplitude_damping_error(0.02), basis_1q, warnings=False)
-noise_model.add_all_qubit_quantum_error(phase_damping_error(0.03), basis_1q, warnings=False)
+noise_model.add_all_qubit_quantum_error(depolarizing_error(0.005, 1), ["u1", "u2", "u3"])
+noise_model.add_all_qubit_quantum_error(depolarizing_error(0.02, 2), ["cx"])
+noise_model.add_all_qubit_quantum_error(amplitude_damping_error(0.02), ["u1", "u2", "u3"], warnings=False)
+noise_model.add_all_qubit_quantum_error(phase_damping_error(0.03), ["u1", "u2", "u3"], warnings=False)
 noise_model.add_all_qubit_readout_error(ReadoutError([[0.95, 0.05], [0.1, 0.9]]))
 
 
