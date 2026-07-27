@@ -74,9 +74,9 @@ authors = [
 ]
 
 dependencies = [
-    "networkx>=3.0", # Requires NetworkX 3 API
+    "networkx>=3.0", # Only supporting latest major
     "numba>=0.60", # NumPy 2.0 support
-    "numpy>=2.0", # Requires NumPy 2 API
+    "numpy>=2.0", # Only supporting latest major
     "pyscf>=2.4", # Older versions have Mole deepcopy issues
     "scipy>=1.13", # NumPy 2.0 support
     "sympy>=1.9", # Python 3.10 support
