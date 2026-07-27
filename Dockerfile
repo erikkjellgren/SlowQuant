@@ -4,11 +4,6 @@
 
 FROM python:3.10-slim
 
-# Install git and build tools
-RUN apt-get update && \
-    apt-get install -y git && \
-    rm -rf /var/lib/apt/lists/*
-
 # Upgrade pip and install build tools
 RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir build pytest
@@ -33,7 +28,12 @@ RUN echo "$CACHE_BUST"
 WORKDIR /test
 
 # Clone SlowQuant
-RUN git clone --depth 1 --branch pip https://github.com/erikkjellgren/SlowQuant.git
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git && \
+    git clone --depth 1 --branch pip https://github.com/erikkjellgren/SlowQuant.git /test/SlowQuant && \
+    apt-get purge -y git && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /test/SlowQuant
 
