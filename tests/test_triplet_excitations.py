@@ -1,5 +1,5 @@
 import slowquant.SlowQuant as sq
-from slowquant.unitary_coupled_cluster.linear_response import naive_triplet
+from slowquant.unitary_coupled_cluster.linear_response import naive
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
@@ -15,16 +15,12 @@ def get_triplet_excita(geometry, basis, active_space, unit='bohr'):
     # HF
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
 
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         active_space,
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
     )
 
@@ -35,7 +31,7 @@ def get_triplet_excita(geometry, basis, active_space, unit='bohr'):
         WF.run_wf_optimization_1step('SLSQP', True)
 
     # Linear Response
-    LR = naive_triplet.LinearResponse(WF, excitations="SD")
+    LR = naive.LinearResponse(WF, excitations="SD", triplet=True)
     LR.calc_excitation_energies()
 
     print('Triplet excitation energies (hartree):')
@@ -138,3 +134,7 @@ def test_H10_sto3g_naive_triplet():
     assert abs(excita[29] - 2.504838) < thresh
     assert abs(excita[30] - 2.564356) < thresh
     assert abs(excita[31] - 2.751666) < thresh
+
+test_H2_sto3g_naive_triplet()
+test_LiH_sto3g_naive_triplet()
+test_H10_sto3g_naive_triplet()

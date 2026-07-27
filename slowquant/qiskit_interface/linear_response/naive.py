@@ -1,5 +1,3 @@
-from collections.abc import Sequence
-
 import numpy as np
 
 from slowquant.molecularintegrals.integralfunctions import (
@@ -14,8 +12,9 @@ from slowquant.qiskit_interface.util import Clique
 from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient_response,
     get_orbital_response_hessian_block,
+    get_triplet_orbital_response_hessian_block,
     get_orbital_response_metric_sigma,
-    get_orbital_response_property_gradient,
+    get_orbital_response_property_gradient_response,
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.operators import (
@@ -88,26 +87,50 @@ class quantumLR(quantumLRBaseClass):
         # qq
         if self.num_q != 0:
             if do_rdm:
-                self.A[: self.num_q, : self.num_q] = get_orbital_response_hessian_block(
-                    self.wf.h_mo,
-                    self.wf.g_mo,
-                    self.wf.kappa_no_activeactive_idx_dagger,
-                    self.wf.kappa_no_activeactive_idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.rdm1,
-                    self.wf.rdm2,
-                )
-                self.B[: self.num_q, : self.num_q] = get_orbital_response_hessian_block(
-                    self.wf.h_mo,
-                    self.wf.g_mo,
-                    self.wf.kappa_no_activeactive_idx_dagger,
-                    self.wf.kappa_no_activeactive_idx_dagger,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.rdm1,
-                    self.wf.rdm2,
-                )
+                if not self.triplet:
+                    self.A[: self.num_q, : self.num_q] = get_orbital_response_hessian_block(
+                        self.wf.h_mo,
+                        self.wf.g_mo,
+                        self.wf.kappa_no_activeactive_idx_dagger,
+                        self.wf.kappa_no_activeactive_idx,
+                        self.wf.num_inactive_orbs,
+                        self.wf.num_active_orbs,
+                        self.wf.rdm1,
+                        self.wf.rdm2,
+                    )
+                    self.B[: self.num_q, : self.num_q] = get_orbital_response_hessian_block(
+                        self.wf.h_mo,
+                        self.wf.g_mo,
+                        self.wf.kappa_no_activeactive_idx_dagger,
+                        self.wf.kappa_no_activeactive_idx_dagger,
+                        self.wf.num_inactive_orbs,
+                        self.wf.num_active_orbs,
+                        self.wf.rdm1,
+                        self.wf.rdm2,
+                    )
+                else:
+                    self.A[: len(self.q_ops), : len(self.q_ops)] = get_triplet_orbital_response_hessian_block(
+                        self.wf.h_mo,
+                        self.wf.g_mo,
+                        self.wf.kappa_no_activeactive_idx_dagger,
+                        self.wf.kappa_no_activeactive_idx,
+                        self.wf.num_inactive_orbs,
+                        self.wf.num_active_orbs,
+                        self.wf.rdm1,
+                        self.wf.rdm2,
+                        self.wf.t_rdm2,
+                    )
+                    self.B[: len(self.q_ops), : len(self.q_ops)] = get_triplet_orbital_response_hessian_block(
+                        self.wf.h_mo,
+                        self.wf.g_mo,
+                        self.wf.kappa_no_activeactive_idx_dagger,
+                        self.wf.kappa_no_activeactive_idx_dagger,
+                        self.wf.num_inactive_orbs,
+                        self.wf.num_active_orbs,
+                        self.wf.rdm1,
+                        self.wf.rdm2,
+                        self.wf.t_rdm2,
+                    ) 
                 self.Sigma[: self.num_q, : self.num_q] = get_orbital_response_metric_sigma(
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
@@ -149,15 +172,8 @@ class quantumLR(quantumLRBaseClass):
                         self.wf.QI.quantum_expectation_value(
                             (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
                         )
-                        - 1
-                        / 2
-                        * self.wf.QI.quantum_expectation_value(
+                        - self.wf.QI.quantum_expectation_value(
                             (self.H_1i_1a * qJ * GI.dagger).get_folded_operator(*self.orbs)
-                        )
-                        - 1
-                        / 2
-                        * self.wf.QI.quantum_expectation_value(
-                            (self.H_1i_1a * GI.dagger * qJ).get_folded_operator(*self.orbs)
                         )
                     )
                     self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
@@ -166,15 +182,8 @@ class quantumLR(quantumLRBaseClass):
                         self.wf.QI.quantum_expectation_value(
                             (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs)
                         )
-                        - 1
-                        / 2
-                        * self.wf.QI.quantum_expectation_value(
+                        - self.wf.QI.quantum_expectation_value(
                             (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
-                        )
-                        - 1
-                        / 2
-                        * self.wf.QI.quantum_expectation_value(
-                            (qJ.dagger * GI.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
                         )
                     )
                     self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
@@ -463,19 +472,14 @@ class quantumLR(quantumLRBaseClass):
         self._analyze_std(A, B, Sigma, verbose=verbose, cv=cv, save=save)
         return A, B, Sigma
 
-    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_transition_dipole(self) -> np.ndarray:
         """Calculate transition dipole moment.
-
-        Args:
-            dipole_integrals: Dipole integrals ordered as (x,y,z).
 
         Returns:
             Transition dipole moment.
         """
-        if len(dipole_integrals) != 3:
-            raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
         number_excitations = len(self.excitation_energies)
-
+        dipole_integrals = self.wf.int_gen.electric_dipole
         mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
         muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
         muz = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[2])
@@ -496,7 +500,7 @@ class quantumLR(quantumLRBaseClass):
             q_part_y = 0.0
             q_part_z = 0.0
             if self.num_q != 0:
-                q_part_x = get_orbital_response_property_gradient(
+                q_part_x = get_orbital_response_property_gradient_response(
                     mux,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
@@ -506,7 +510,7 @@ class quantumLR(quantumLRBaseClass):
                     state_number,
                     number_excitations,
                 )
-                q_part_y = get_orbital_response_property_gradient(
+                q_part_y = get_orbital_response_property_gradient_response(
                     muy,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
@@ -516,7 +520,7 @@ class quantumLR(quantumLRBaseClass):
                     state_number,
                     number_excitations,
                 )
-                q_part_z = get_orbital_response_property_gradient(
+                q_part_z = get_orbital_response_property_gradient_response(
                     muz,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,

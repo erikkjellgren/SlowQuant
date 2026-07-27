@@ -1,5 +1,3 @@
-from collections.abc import Sequence
-
 import numpy as np
 import scipy
 
@@ -11,12 +9,15 @@ from slowquant.unitary_coupled_cluster.operators import (
     G6,
     G1_sa,
     G2_sa,
+    G1_tsa,
+    G2_tsa,
     hamiltonian_0i_0a,
     hamiltonian_1i_1a,
 )
 from slowquant.unitary_coupled_cluster.util import (
     iterate_t1_sa,
     iterate_t2_sa,
+    iterate_t2_tsa,
     iterate_t3,
     iterate_t4,
     iterate_t5,
@@ -29,12 +30,14 @@ class quantumLRBaseClass:
         self,
         wf: WaveFunctionCircuit,
         excitations: str,
+        triplet: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wf: Wavefunction object.
             excitations: Which excitation orders to include in response.
+            triplet: If the linear response should be triplet spin-adapted
         """
         self.wf = wf
         # Create operators
@@ -47,12 +50,22 @@ class quantumLRBaseClass:
         self.q_ops = []
         excitations = excitations.lower()
 
+        self.triplet = triplet
+        if not self.triplet: # singlet spin-adaptation
+            G1 = G1_sa
+            iterate_t2 = iterate_t2_sa
+            G2 = G2_sa
+        else: # triplet spin-adaptation
+            G1 = G1_tsa
+            iterate_t2 = iterate_t2_tsa
+            G2 = G2_tsa
+
         if "s" in excitations:
             for a, i, _ in iterate_t1_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
-                self.G_ops.append(G1_sa(i, a))
+                self.G_ops.append(G1(i, a))
         if "d" in excitations:
-            for a, i, b, j, _, op_type in iterate_t2_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
-                self.G_ops.append(G2_sa(i, j, a, b, op_type))
+            for a, i, b, j, _, op_type in iterate_t2(self.wf.active_occ_idx, self.wf.active_unocc_idx):
+                self.G_ops.append(G2(i, j, a, b, op_type))
         if "t" in excitations:
             for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
                 self.G_ops.append(G3(i, j, k, a, b, c))
@@ -73,7 +86,7 @@ class quantumLRBaseClass:
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
         # q
         for p, q in wf.kappa_no_activeactive_idx:
-            self.q_ops.append(G1_sa(p, q))
+            self.q_ops.append(G1(p, q))
 
         num_parameters = len(self.q_ops) + len(self.G_ops)
         self.num_params = num_parameters
@@ -384,30 +397,24 @@ class quantumLRBaseClass:
 
         return norms
 
-    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_transition_dipole(self) -> np.ndarray:
         """Calculate transition dipole moment.
-
-        Args:
-            dipole_integrals: Dipole integrals (x,y,z) in AO basis.
 
         Returns:
             Transition dipole moments.
         """
         raise NotImplementedError
 
-    def get_oscillator_strength(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_oscillator_strength(self) -> np.ndarray:
         r"""Calculate oscillator strength.
 
         .. math::
             f_n = \frac{2}{3}e_n\left|\left<0\left|\hat{\mu}\right|n\right>\right|^2
 
-        Args:
-            dipole_integrals: Dipole integrals (x,y,z) in AO basis.
-
         Returns:
             Oscillator Strength.
         """
-        transition_dipoles = self.get_transition_dipole(dipole_integrals)
+        transition_dipoles = self.get_transition_dipole()
         osc_strs = np.zeros(len(transition_dipoles))
         for idx, (excitation_energy, transition_dipole) in enumerate(
             zip(self.excitation_energies, transition_dipoles)

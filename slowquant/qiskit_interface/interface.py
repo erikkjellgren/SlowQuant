@@ -6,8 +6,7 @@ from collections import defaultdict
 from typing import Any
 
 import numpy as np
-from qiskit import QuantumCircuit
-from qiskit.circuit import ClassicalRegister
+from qiskit.circuit import ClassicalRegister, QuantumCircuit
 from qiskit.primitives import (
     BaseEstimatorV1,
     BaseEstimatorV2,
@@ -22,7 +21,7 @@ from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
-from slowquant.qiskit_interface.custom_ansatz import SDSfUCC, fUCC, tUPS
+from slowquant.qiskit_interface.operators_circuits import upslayout2circuit
 from slowquant.qiskit_interface.util import (
     Clique,
     MitigationFlags,
@@ -33,10 +32,12 @@ from slowquant.qiskit_interface.util import (
     get_determinant_superposition_reference,
     get_reordering_sign,
     layout_conserving_compose,
+    pauliop_to_dict,
     postselection,
     to_CBS_measurement,
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
+from slowquant.unitary_coupled_cluster.util import UpsStructure
 
 
 class QuantumInterface:
@@ -48,7 +49,7 @@ class QuantumInterface:
     def __init__(
         self,
         primitive: BaseSamplerV1 | BaseSamplerV2,
-        ansatz: str | QuantumCircuit,
+        ansatz: str | QuantumCircuit | UpsStructure,
         mapper: FermionicMapper,
         ISA: bool = False,
         pass_manager_options: dict[str, Any] | None = None,
@@ -79,24 +80,26 @@ class QuantumInterface:
         if ansatz_options is None:
             ansatz_options = {}
         allowed_ansatz = (
-            "fpUCCD",
-            "fUCCD",
-            "tUPS",
-            "fUCCSD",
-            "QNP",
-            "kSAfUpCCGSD",
-            "SDSfUCCSD",
-            "kSASDSfUpCCGSD",
-            "fUCC",
-            "SDSfUCC",
-            "HF",
+            "fuccpd",
+            "fuccd",
+            "tups",
+            "fuccsd",
+            "qnp",
+            "ksafupccgsd",
+            "sdsfuccsd",
+            "ksasdsfupccgsd",
+            "fucc",
+            "hf",
         )
-        if not isinstance(ansatz, QuantumCircuit) and ansatz not in allowed_ansatz:
-            raise ValueError(
-                "The chosen Ansatz is not available. Choose from: ",
-                allowed_ansatz,
-                "or pass custom QuantumCircuit object",
-            )
+        if isinstance(ansatz, str):
+            if ansatz.lower() not in allowed_ansatz:
+                raise ValueError(
+                    "The chosen Ansatz is not available. Choose from: ",
+                    allowed_ansatz,
+                )
+
+        elif not isinstance(ansatz, (QuantumCircuit, UpsStructure)):
+            raise TypeError(f"Got unknown ansatz type: {type(ansatz)}")
         if pass_manager_options is None:
             pass_manager_options = {}
         if isinstance(primitive, (BaseEstimatorV1, BaseEstimatorV2)):
@@ -128,16 +131,32 @@ class QuantumInterface:
         self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
         self._M_shots = None  # define a separate number of shots for M
 
-    def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int]) -> None:
+    def construct_circuit(
+        self,
+        occ_idx: list[int],
+        unocc_idx: list[int],
+        occ_spin_idx: list[int],
+        unocc_spin_idx: list[int],
+        num_orbs: int,
+        num_elec: tuple[int, int],
+    ) -> None:
         """Construct qiskit circuit.
 
         Args:
-            num_orbs: Number of orbitals in spatial basis.
+            occ_idx: Strongly occupied spatial orbital indices.
+            unocc_idx: Weakly occupied spatial orbital indices.
+            occ_spin_idx: Stongly occupied spin orbital indices.
+            unocc_spin_idx: Weakly occupied spin orbital indices.
+            num_orbs: Number of spatial orbitals.
             num_elec: Number of electrons (alpha, beta).
         """
         self.num_orbs = num_orbs
         self.num_spin_orbs = 2 * num_orbs
         self.num_elec = num_elec
+        self.occ_idx = occ_idx.copy()
+        self.unocc_idx = unocc_idx.copy()
+        self.occ_spin_idx = occ_spin_idx.copy()
+        self.unocc_spin_idx = unocc_spin_idx.copy()
         self.grad_param_R: dict[
             str, int
         ] = {}  # Contains information about the parameterization needed for gradient evaluations.
@@ -169,65 +188,91 @@ class QuantumInterface:
                 "QI was initialized with a custom QuantumCircuit object. This is assumed to be the Ansatz (without state preparation circuit)"
             )
             self.circuit = self.ansatz
-        elif self.ansatz == "fpUCCD":
-            self.ansatz_options["pD"] = True
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
-        elif self.ansatz == "fUCCD":
-            self.ansatz_options["D"] = True
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
-        elif self.ansatz == "HF":
-            if len(self.ansatz_options) != 0:
-                raise ValueError(f"No options available for HF got {self.ansatz_options}")
-            self.circuit = QuantumCircuit(self.num_qubits)  # empty ansatz circuit
-        elif self.ansatz == "tUPS":
-            self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
-        elif self.ansatz == "QNP":
-            self.ansatz_options["do_qnp"] = True
-            self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
-        elif self.ansatz == "fUCCSD":
-            self.ansatz_options["S"] = True
-            self.ansatz_options["D"] = True
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
-        elif self.ansatz == "kSAfUpCCGSD":
-            self.ansatz_options["SAGS"] = True
-            self.ansatz_options["GpD"] = True
-            self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
-        elif self.ansatz == "SDSfUCCSD":
-            self.ansatz_options["D"] = True
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = SDSfUCC(
-                num_orbs, self.num_elec, self.mapper, self.ansatz_options
-            )
-        elif self.ansatz == "kSASDSfUpCCGSD":
-            self.ansatz_options["GpD"] = True
-            self.circuit, self.grad_param_R = SDSfUCC(
-                num_orbs, self.num_elec, self.mapper, self.ansatz_options
-            )
-        elif self.ansatz == "fUCC":
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
-        elif self.ansatz == "SDSfUCC":
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = SDSfUCC(
-                num_orbs, self.num_elec, self.mapper, self.ansatz_options
-            )
+        elif isinstance(self.ansatz, str):
+            if (
+                self.ansatz.lower() == "tups"
+                and "do_pp" in self.ansatz_options.keys()
+                and self.ansatz_options["do_pp"]
+            ):
+                # HF in pp-tUPS ordering
+                if not isinstance(self.mapper, JordanWignerMapper):
+                    raise ValueError(f"pp-tUPS only implemented for JW mapper, got: {type(self.mapper)}")
+                if np.sum(num_elec) != num_orbs:
+                    raise ValueError(
+                        f"pp-tUPS only implemented for number of electrons and number of orbitals being the same, got: ({np.sum(num_elec)}, {num_orbs}), (elec, orbs)"
+                    )
+                self.state_circuit = QuantumCircuit(2 * num_orbs)
+                for p in range(0, 2 * num_orbs):
+                    if p % 2 == 0:
+                        self.state_circuit.x(p)
+            else:
+                self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
         else:
-            raise ValueError(f"Unknown ansatz: {self.ansatz}")
+            self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
+        self.num_qubits = self.state_circuit.num_qubits
+
+        # Ansatz Circuit
+        if isinstance(self.ansatz, QuantumCircuit):
+            print(
+                "QI was initialized with a custom QuantumCircuit object. This is assumed to be the Ansatz (without state preparation circuit)"
+            )
+            self.circuit = self.ansatz
+        elif isinstance(self.ansatz, UpsStructure):
+            self.circuit, self.grad_param_R = upslayout2circuit(self.ansatz, self.num_orbs, self.mapper)
+        elif isinstance(self.ansatz, str):
+            ups_layout = UpsStructure()
+            if self.ansatz.lower() in ("fucc", "fuccpd", "fuccd", "fuccsd", "ksafupccgsd"):
+                if self.ansatz.lower() == "fuccpd":
+                    self.ansatz_options["pD"] = True
+                elif self.ansatz.lower() == "fuccd":
+                    self.ansatz_options["D"] = True
+                elif self.ansatz.lower() == "fuccsd":
+                    self.ansatz_options["S"] = True
+                    self.ansatz_options["D"] = True
+                elif self.ansatz.lower() == "ksafupccgsd":
+                    self.ansatz_options["SAGS"] = True
+                    self.ansatz_options["GpD"] = True
+                if "n_layers" not in self.ansatz_options.keys():
+                    # default option
+                    self.ansatz_options["n_layers"] = 1
+                ups_layout.create_fUCC(
+                    occ_idx,
+                    unocc_idx,
+                    occ_spin_idx,
+                    unocc_spin_idx,
+                    num_orbs,
+                    self.ansatz_options,
+                )
+            elif self.ansatz.lower() == "hf":
+                if len(self.ansatz_options) != 0:
+                    raise ValueError(f"No options available for HF got {self.ansatz_options}")
+            elif self.ansatz.lower() in ("tups", "qnp"):
+                if self.ansatz.lower() == "tups":
+                    self.ansatz_options["do_tups"] = True
+                elif self.ansatz.lower() == "qnp":
+                    self.ansatz_options["do_qnp"] = True
+                ups_layout.create_tiled(self.num_orbs, self.ansatz_options)
+            elif self.ansatz.lower() in ("sdsfuccsd", "ksasdsfupccgsd"):
+                if self.ansatz.lower() == "sdsfuccsd":
+                    self.ansatz_options["D"] = True
+                elif self.ansatz.lower() == "ksasdsfupccgsd":
+                    self.ansatz_options["GpD"] = True
+                if "n_layers" not in self.ansatz_options.keys():
+                    # default option
+                    self.ansatz_options["n_layers"] = 1
+                ups_layout.create_SDSfUCC(
+                    occ_idx,
+                    unocc_idx,
+                    occ_spin_idx,
+                    unocc_spin_idx,
+                    num_orbs,
+                    self.ansatz_options,
+                )
+            else:
+                raise ValueError(f"Unknown ansatz: {self.ansatz}")
+            self.circuit, self.grad_param_R = upslayout2circuit(ups_layout, self.num_orbs, self.mapper)
+        else:
+            raise TypeError(f"Unknown ansatz type: {type(self.ansatz)}")
 
         # Check that R parameter for gradient is consistent with the paramter names.
         if len(self.grad_param_R) == 0:
@@ -367,7 +412,14 @@ class QuantumInterface:
         # In case of switching to new PassManager in later workflow
         if pass_manager_options is not None and hasattr(self, "circuit") and not redo_ISA:
             print("Change in PassManager. Reconstructing circuit.")
-            self.construct_circuit(self.num_orbs, self.num_elec)
+            self.construct_circuit(
+                self.occ_idx,
+                self.unocc_idx,
+                self.occ_spin_idx,
+                self.unocc_spin_idx,
+                self.num_orbs,
+                self.num_elec,
+            )
 
     def redo_M_mitigation(self, shots: int | None = None) -> None:
         """Redo M_mitigation.
@@ -1130,9 +1182,10 @@ class QuantumInterface:
         op: FermionicOperator | SparsePauliOp,
         do_cliques: bool = True,
         no_coeffs: bool = False,
+        do_no_corr: bool = False,
         custom_parameters: list[float] | None = None,
     ) -> float:
-        """Calculate variance (std**2) of expectation value of circuit and observables.
+        """Calculate sample variance (std**2) of expectation value of circuit and observables.
 
         This works either by accessing the saver distributions or by claculating each expectation value from scratch.
         If they are calculated from scratch, no error mitigation can be applied.
@@ -1141,6 +1194,7 @@ class QuantumInterface:
             op: SlowQuant fermionic operator.
             do_cliques: boolean if cliques are used. They are accessed via the saver.
             no_coeffs: boolean if coefficients of each Pauli string are used or all st to 1.
+            do_no_corr: If True, no correlation between Pauli strings in a clique is considered.
             custom_parameters: optional custom circuit parameters.
 
         Returns:
@@ -1169,24 +1223,62 @@ class QuantumInterface:
         # Loop over all Pauli strings in observable and build final result with coefficients
         result = 0.0
         paulis_str = [str(x) for x in observables.paulis]
-        for pauli, coeff in zip(paulis_str, observables.coeffs):
-            if no_coeffs:
-                coeff = 1
-            # Get distribution from cliques
-            if do_cliques:
+
+        if not do_cliques:
+            # No cliques are used (no QWC / grouping)
+            # Each pauli string measurement is independent random variable
+            for pauli, coeff in zip(paulis_str, observables.coeffs):
+                if no_coeffs:
+                    coeff = 1
+                p1 = self._sampler_distribution_p1(pauli, run_parameters)
+                var_p = 4 * coeff.real**2 * (p1 - p1**2)  # variance formula expressed in p1 probability
+                result += var_p
+        elif not do_no_corr:
+            # Pauli strings in a group are not independent.
+            # Use approach of defining group random variable
+
+            # loop over cliques
+            groups = self.saver[det_int].get_groups(paulis_str)
+            coeff_dict = pauliop_to_dict(observables)  # look-up for coeffs
+
+            result = 0.0
+            for group, group_paulis in groups.items():
+                # \sum_b p(b) (\sum_l c_l <b|P_l|b>)^2 - (\sum_b p(b) \sum_l c_l <b|P_l|b>)^2
+                # loop over each bitstring in group distribution (first sum over b)
+                sample_mean = 0.0
+                sample_mean_sq = 0.0
+                for key, value in (
+                    self.saver[det_int].get_distr_heads([group], self.mitigation_flags)[0].items()
+                ):  # get group/clique head distribution
+                    # loop over paulis in group (second sum over l): group random variable
+                    group_var = 0.0
+                    for pauli in group_paulis:
+                        group_var += coeff_dict[pauli] * get_bitstring_sign(
+                            pauli, key
+                        )  # \sum_l c_l <b|P_l|b>
+
+                    sample_mean += value * group_var  # \sum_b p(b) \sum_l c_l <b|P_l|b>
+                    sample_mean_sq += value * group_var**2  # \sum_b p(b) (\sum_l c_l <b|P_l|b>)^2
+                result += sample_mean_sq - sample_mean**2  # add group variances
+        else:
+            # Pauli strings in a group are considered independent.
+            # Loop over all Pauli strings in observable and build final result with coefficients
+            for pauli, coeff in zip(paulis_str, observables.coeffs):
+                if no_coeffs:
+                    coeff = 1
+                # Get distribution from cliques
                 dist = self.saver[det_int].get_distr(pauli, self.mitigation_flags)
                 # Calculate p1: Probability of measuring one
                 p1 = 0.0
                 for key, value in dist.items():
                     if get_bitstring_sign(pauli, key) == 1:
                         p1 += value
-            else:
-                p1 = self._sampler_distribution_p1(pauli, run_parameters)
-            if self.shots is None:
-                var_p = 4 * np.abs(coeff.real) ** 2 * np.abs(p1 - p1**2)
-            else:
-                var_p = 4 * np.abs(coeff.real) ** 2 * np.abs(p1 - p1**2) / (self.shots)
-            result += var_p
+                var_p = 4 * coeff.real**2 * (p1 - p1**2)
+                result += var_p
+
+        if self.shots is not None:
+            result = result / self.shots
+
         return result
 
     def _apply_M_mitigation(

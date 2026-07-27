@@ -1,5 +1,3 @@
-from collections.abc import Sequence
-
 import numpy as np
 
 from slowquant.molecularintegrals.integralfunctions import (
@@ -12,7 +10,7 @@ from slowquant.qiskit_interface.linear_response.lr_baseclass import (
 )
 from slowquant.qiskit_interface.util import Clique
 from slowquant.unitary_coupled_cluster.density_matrix import (
-    get_orbital_response_property_gradient,
+    get_orbital_response_property_gradient_response,
 )
 from slowquant.unitary_coupled_cluster.operators import (
     hamiltonian_2i_2a,
@@ -390,19 +388,14 @@ class quantumLR(quantumLRBaseClass):
         self._analyze_std(A, B, Sigma, verbose=verbose, cv=cv, save=save)
         return A, B, Sigma
 
-    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_transition_dipole(self) -> np.ndarray:
         """Calculate transition dipole moment.
-
-        Args:
-            dipole_integrals: Dipole integrals ordered as (x,y,z).
 
         Returns:
             Transition dipole moment.
         """
-        if len(dipole_integrals) != 3:
-            raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
         number_excitations = len(self.excitation_energies)
-
+        dipole_integrals = self.wf.int_gen.electric_dipole
         mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
         muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
         muz = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[2])
@@ -416,7 +409,7 @@ class quantumLR(quantumLRBaseClass):
             q_part_y = 0.0
             q_part_z = 0.0
             if self.num_q != 0:
-                q_part_x = get_orbital_response_property_gradient(
+                q_part_x = get_orbital_response_property_gradient_response(
                     mux,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
@@ -426,7 +419,7 @@ class quantumLR(quantumLRBaseClass):
                     state_number,
                     number_excitations,
                 )
-                q_part_y = get_orbital_response_property_gradient(
+                q_part_y = get_orbital_response_property_gradient_response(
                     muy,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
@@ -436,7 +429,7 @@ class quantumLR(quantumLRBaseClass):
                     state_number,
                     number_excitations,
                 )
-                q_part_z = get_orbital_response_property_gradient(
+                q_part_z = get_orbital_response_property_gradient_response(
                     muz,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,

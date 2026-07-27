@@ -1,5 +1,3 @@
-from collections.abc import Sequence
-
 import numpy as np
 import scipy
 
@@ -12,6 +10,8 @@ from slowquant.unitary_coupled_cluster.operators import (
     G6,
     G1_sa,
     G2_sa,
+    G1_tsa,
+    G2_tsa,
     hamiltonian_0i_0a,
     hamiltonian_1i_1a,
 )
@@ -22,6 +22,7 @@ from slowquant.unitary_coupled_cluster.util import (
     UpsStructure,
     iterate_t1_sa,
     iterate_t2_sa,
+    iterate_t2_tsa,
     iterate_t3,
     iterate_t4,
     iterate_t5,
@@ -36,6 +37,7 @@ class LinearResponseBaseClass:
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
+        triplet: bool,
         tda: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
@@ -43,6 +45,7 @@ class LinearResponseBaseClass:
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
+            triplet: If the linear response should be triplet spin-adapted.
             tda: Whether to use Tamm-Dancoff Approximation.
         """
         self.wf = wave_function
@@ -65,13 +68,32 @@ class LinearResponseBaseClass:
         self.q_ops: list[FermionicOperator] = []
         excitations = excitations.lower()
         self.tda = tda
+        self.triplet = triplet
+        if not self.triplet: # singlet spin-adaptation
+            G1 = G1_sa
+            iterate_t2 = iterate_t2_sa
+            G2 = G2_sa
+        else: # triplet spin-adaptation
+            G1 = G1_tsa
+            iterate_t2 = iterate_t2_tsa
+            G2 = G2_tsa
+
+        self.triplet = triplet
+        if not self.triplet: # singlet spin-adaptation
+            G1 = G1_sa
+            iterate_t2 = iterate_t2_sa
+            G2 = G2_sa
+        else: # triplet spin-adaptation
+            G1 = G1_tsa
+            iterate_t2 = iterate_t2_tsa
+            G2 = G2_tsa
 
         if "s" in excitations:
             for a, i, _ in iterate_t1_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
-                self.G_ops.append(G1_sa(i, a))
+                self.G_ops.append(G1(i, a))
         if "d" in excitations:
-            for a, i, b, j, _, op_type in iterate_t2_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
-                self.G_ops.append(G2_sa(i, j, a, b, op_type))
+            for a, i, b, j, _, op_type in iterate_t2(self.wf.active_occ_idx, self.wf.active_unocc_idx):
+                self.G_ops.append(G2(i, j, a, b, op_type))
         if "t" in excitations:
             for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
                 self.G_ops.append(G3(i, j, k, a, b, c))
@@ -91,7 +113,7 @@ class LinearResponseBaseClass:
             ):
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
         for p, q in self.wf.kappa_no_activeactive_idx:
-            self.q_ops.append(G1_sa(p, q))
+            self.q_ops.append(G1(p, q))
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters))
@@ -192,30 +214,24 @@ class LinearResponseBaseClass:
 
         return norms
 
-    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_transition_dipole(self) -> np.ndarray:
         """Calculate transition dipole moment.
-
-        Args:
-            dipole_integrals: Dipole integrals (x,y,z) in AO basis.
 
         Returns:
             Transition dipole moment.
         """
         raise NotImplementedError
 
-    def get_oscillator_strength(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_oscillator_strength(self) -> np.ndarray:
         r"""Calculate oscillator strength.
 
         .. math::
             f_n = \frac{2}{3}e_n\left|\left<0\left|\hat{\mu}\right|n\right>\right|^2
 
-        Args:
-            dipole_integrals: Dipole integrals (x,y,z) in AO basis.
-
         Returns:
             Oscillator Strength.
         """
-        transition_dipoles = self.get_transition_dipole(dipole_integrals)
+        transition_dipoles = self.get_transition_dipole()
         osc_strs = np.zeros(len(transition_dipoles))
         for idx, (excitation_energy, transition_dipole) in enumerate(
             zip(self.excitation_energies, transition_dipoles)
@@ -231,9 +247,6 @@ class LinearResponseBaseClass:
 
     def get_formatted_oscillator_strength(self) -> str:
         """Create table of excitation energies and oscillator strengths.
-
-        Args:
-            dipole_integrals: Dipole integrals (x,y,z) in AO basis.
 
         Returns:
             Nicely formatted table.
@@ -255,3 +268,48 @@ class LinearResponseBaseClass:
             osc_str = f"{osc_strength:1.6f}"
             output += f"{str(i + 1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
         return output
+
+    def get_polarisability(self, freq=0) -> np.ndarray:
+        """Calculate the frequency dependent polarisability tensor.
+
+        Returns:
+            Polarisability tensor.
+        """
+        if not hasattr(self, "hessian") or not hasattr(self, "metric"):
+            self.calc_excitation_energies()
+
+        prop_grad = self.get_property_gradient(self.wf.int_gen.electric_dipole)
+        response = scipy.linalg.solve(self.hessian - freq * self.metric, prop_grad)
+
+        return np.einsum('ix,iy->xy', prop_grad, response)
+
+    def get_paramagnetic_shielding(self) -> np.ndarray:
+        """Calculate the paramagnetic shielding tensor of each nuclei.
+
+        Returns:
+            Paramagnetic shielding tensor for each nuclei.
+        """
+        if not hasattr(self, "hessian"):
+            self.calc_excitation_energies()
+
+        atoms = self.wf.int_gen.atom_coordinates
+        para_shield = np.zeros((len(atoms), 3, 3))
+
+        for i in range(len(atoms)):
+            origin = atoms[i,:]
+
+            # PSO
+            property_gradient = self.get_property_gradient(
+                self.wf.int_gen.orbital_paramagnetic(origin)
+                )
+            response_vector = scipy.linalg.solve(self.hessian, property_gradient)
+
+            # Anguar Momentum
+            property_gradient = self.get_property_gradient(
+                self.wf.int_gen.angular_momentum(origin)
+                )
+
+            # Paramagnetic shielding tensor
+            para_shield[i,:,:] -= np.einsum('ix,iy->xy', response_vector, property_gradient)
+
+        return para_shield

@@ -1,10 +1,12 @@
 import numpy as np
 from pyscf.data import nist
 import pyscf
-from scipy.linalg import solve
 
-import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.naive as naivelr
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
+from slowquant.molecularintegrals.integralfunctions import one_electron_integral_transform
+from slowquant.unitary_coupled_cluster.operators import one_elec_op_0i_0a
+from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
 
 
 def get_shield(geometry, basis, active_space, charge=0, unit='bohr'):
@@ -18,11 +20,9 @@ def get_shield(geometry, basis, active_space, charge=0, unit='bohr'):
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nelectron,
         active_space,
         mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         "SD",
     )
 
@@ -33,47 +33,29 @@ def get_shield(geometry, basis, active_space, charge=0, unit='bohr'):
         WF.run_wf_optimization_1step('SLSQP', True)
     print("Energy elec", WF.energy_elec)
 
-
-    # full space 1-RDM
-    RDM1 = np.zeros((WF.num_inactive_orbs + WF.num_active_orbs + WF.num_virtual_orbs, WF.num_inactive_orbs + WF.num_active_orbs + WF.num_virtual_orbs))
-    RDM1[:WF.num_inactive_orbs,:WF.num_inactive_orbs] += np.eye(WF.num_inactive_orbs) * 2
-    RDM1[WF.num_inactive_orbs:WF.num_inactive_orbs + WF.num_active_orbs,WF.num_inactive_orbs:WF.num_inactive_orbs + WF.num_active_orbs] += WF.rdm1
-
     # Diamagnetic term
-    dia = np.zeros((mol.natm, 3, 3))
+    atoms = WF.int_gen.atom_coordinates
+    dia = np.zeros((len(atoms), 3, 3))
 
-    for i in range(mol.natm):
-        mol.set_common_orig(mol.atom_coord(i))
-        mol.set_rinv_origin(mol.atom_coord(i))
+    for i in range(len(atoms)):
+        dia_i = []
+        origin = atoms[i,:]
+        dia_ao = WF.int_gen.diamagnetic_shielding(common_orig=origin, rinv_orig=origin)
 
-        dia_ao = mol.intor('int1e_cg_a11part', comp=9)
-        mo_integrals = np.einsum('uj,xuv,vi->xij', WF.c_mo, dia_ao, WF.c_mo)
-        e11 = np.einsum('xij,ij->x', mo_integrals, RDM1).reshape(3,3)
-        dia[i,:,:] = e11 - e11.trace() * np.eye(3)
+        for comp in dia_ao:
+            dia_mo = one_electron_integral_transform(WF.c_mo, comp)
+            dia_op = one_elec_op_0i_0a(dia_mo, WF.num_inactive_orbs, WF.num_active_orbs)
+            dia_i.append(expectation_value(WF.ci_coeffs, [dia_op], WF.ci_coeffs, WF.ci_info))
 
+        dia_i = np.array(dia_i).reshape((3,3))
+        dia[i,:,:] = dia_i - dia_i.trace() * np.eye(3)
 
-    # Singlet Linear Response
-    LR = naive.LinearResponse(WF, excitations="SD")
+    # Paramagnetic term
+    LR = naivelr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
+    para = LR.get_paramagnetic_shielding()
 
-    #Paramagnetic term
-    para = np.zeros_like(dia)
-
-    for i in range(mol.natm):
-        mol.set_common_orig(mol.atom_coord(i))
-        mol.set_rinv_origin(mol.atom_coord(i))
-
-        # PSO
-        ao = mol.intor('int1e_prinvxp', 3)
-        property_gradient = LR.get_property_gradient(ao)
-        pso = solve(LR.hessian, property_gradient)
-        # Anguar Momentum
-        ao = mol.intor('int1e_cg_irxp', 3) / 2
-        am = LR.get_property_gradient(ao)
-        # Paramagnetic term
-        para[i,:,:] -= np.einsum('ix,iy->xy', pso, am)
-
-
+    # Converting units
     sigma_dia   = np.einsum('xii->x', dia  * nist.ALPHA**2 * 1e6) / 3
     sigma_para  = np.einsum('xii->x', para * nist.ALPHA**2 * 1e6) / 3
     sigma_total = sigma_dia + sigma_para
@@ -118,4 +100,3 @@ def test_LiH_sto3g_naive():
     # Check shielding constant - reference dalton mcscf
     assert abs(38.7983 - sigma[0]) < thresh
     assert abs(72.9730 - sigma[1]) < thresh
-

@@ -1,5 +1,3 @@
-from collections.abc import Sequence
-
 import numpy as np
 
 from slowquant.molecularintegrals.integralfunctions import (
@@ -8,8 +6,9 @@ from slowquant.molecularintegrals.integralfunctions import (
 from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient_response,
     get_orbital_response_hessian_block,
+    get_triplet_orbital_response_hessian_block,
     get_orbital_response_metric_sigma,
-    get_orbital_response_property_gradient,
+    get_orbital_response_property_gradient_response,
 )
 from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
     LinearResponseBaseClass,
@@ -28,6 +27,7 @@ class LinearResponse(LinearResponseBaseClass):
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
+        triplet: bool = False,
         tda: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
@@ -35,9 +35,10 @@ class LinearResponse(LinearResponseBaseClass):
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
+            triplet: If the linear response should be triplet spin-adapted.
             tda: Whether to use Tamm-Dancoff approximation.
         """
-        super().__init__(wave_function, excitations, tda)
+        super().__init__(wave_function, excitations, triplet, tda)
 
         idx_shift = len(self.q_ops)
         print("Gs", len(self.G_ops))
@@ -83,27 +84,52 @@ class LinearResponse(LinearResponseBaseClass):
                 raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
         if len(self.q_ops) != 0:
             # Do orbital-orbital blocks
-            self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.kappa_no_activeactive_idx_dagger,
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.rdm1,
-                self.wf.rdm2,
-            )
-            if not self.tda:
-                self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
-                            self.wf.h_mo,
+            if not self.triplet:
+                self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
+                    self.wf.h_mo,
+                    self.wf.g_mo,
+                    self.wf.kappa_no_activeactive_idx_dagger,
+                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.wf.rdm2,
+                )
+                if not self.tda:
+                    self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
+                                    self.wf.h_mo,
+                                self.wf.g_mo,
+                                self.wf.kappa_no_activeactive_idx_dagger,
+                                self.wf.kappa_no_activeactive_idx_dagger,
+                                self.wf.num_inactive_orbs,
+                                self.wf.num_active_orbs,
+                            self.wf.rdm1,
+                            self.wf.rdm2,
+                    )
+            else:
+                self.A[: len(self.q_ops), : len(self.q_ops)] = get_triplet_orbital_response_hessian_block(
+                    self.wf.h_mo,
+                    self.wf.g_mo,
+                    self.wf.kappa_no_activeactive_idx_dagger,
+                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.wf.rdm2,
+                    self.wf.t_rdm2,
+                )
+                if not self.tda:
+                    self.B[: len(self.q_ops), : len(self.q_ops)] = get_triplet_orbital_response_hessian_block(
+                        self.wf.h_mo,
                         self.wf.g_mo,
                         self.wf.kappa_no_activeactive_idx_dagger,
                         self.wf.kappa_no_activeactive_idx_dagger,
                         self.wf.num_inactive_orbs,
                         self.wf.num_active_orbs,
-                    self.wf.rdm1,
-                    self.wf.rdm2,
-                    )
+                        self.wf.rdm1,
+                        self.wf.rdm2,
+                        self.wf.t_rdm2,
+                        )
             self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
                 self.wf.kappa_no_activeactive_idx,
                 self.wf.num_inactive_orbs,
@@ -126,16 +152,12 @@ class LinearResponse(LinearResponseBaseClass):
                 self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = val
                 if not self.tda:
                     # Make B
-                    # - 1/2<CSF| Gd Ud qd H |0>
-                    val = (
-                        -1
-                        / 2
-                        * expectation_value(
+                    # - <CSF| Gd Ud qd H |0>
+                    val = - expectation_value(
                             G_ket,
                             [],
                             UdqdH_ket,
                             *self.index_info,
-                        )
                     )
                     self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = val
         for j, GJ in enumerate(self.G_ops):
@@ -160,18 +182,14 @@ class LinearResponse(LinearResponseBaseClass):
                 if i == j:
                     self.Sigma[i + idx_shift, j + idx_shift] = 1
 
-    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_transition_dipole(self) -> np.ndarray:
         """Calculate transition dipole moment.
-
-        Args:
-            dipole_integrals: Dipole integrals ordered as (x,y,z).
 
         Returns:
             Transition dipole moment.
         """
-        if len(dipole_integrals) != 3:
-            raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
         number_excitations = len(self.excitation_energies)
+        dipole_integrals = self.wf.int_gen.electric_dipole
         mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
         muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
         muz = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[2])
@@ -202,7 +220,7 @@ class LinearResponse(LinearResponseBaseClass):
             q_part_y = 0.0
             q_part_z = 0.0
             if len(self.q_ops) != 0:
-                q_part_x = get_orbital_response_property_gradient(
+                q_part_x = get_orbital_response_property_gradient_response(
                     mux,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
@@ -212,7 +230,7 @@ class LinearResponse(LinearResponseBaseClass):
                     state_number,
                     number_excitations,
                 )
-                q_part_y = get_orbital_response_property_gradient(
+                q_part_y = get_orbital_response_property_gradient_response(
                     muy,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
@@ -222,7 +240,7 @@ class LinearResponse(LinearResponseBaseClass):
                     state_number,
                     number_excitations,
                 )
-                q_part_z = get_orbital_response_property_gradient(
+                q_part_z = get_orbital_response_property_gradient_response(
                     muz,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
