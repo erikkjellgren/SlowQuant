@@ -74,17 +74,17 @@ authors = [
 ]
 
 dependencies = [
-    "networkx>=3.0", # Only supporting latest major
-    "numba>=0.60", # NumPy 2.0 support
-    "numpy>=2.0", # Only supporting latest major
-    "pyscf>=2.4", # Older versions have Mole deepcopy issues
-    "scipy>=1.13", # NumPy 2.0 support
-    "sympy>=1.9", # Python 3.10 support
-    "qiskit==2.1.1", # Known to work
-    "qiskit-aer==0.17.2", # Known to work
+    #"networkx>=3.0", # Only supporting latest major
+    #"numba>=0.60", # NumPy 2.0 support
+    #"numpy>=2.0", # Only supporting latest major
+    #"pyscf>=2.4", # Older versions have Mole deepcopy issues
+    #"scipy>=1.13", # NumPy 2.0 support
+    #"sympy>=1.9", # Python 3.10 support
+    #"qiskit==2.0", # Known to work
+    #"qiskit-aer==0.17", # Known to work
     #"qiskit-ibm-provider==0.11.0", # Known to work
-    #"qiskit-ibm-runtime==0.41.1", # Known to work
-    "qiskit-nature==0.7.2", # Known to work
+    #"qiskit-ibm-runtime==0.37", # Known to work
+    #"qiskit-nature==0.7", # Known to work
 ]
 
 [project.urls]
