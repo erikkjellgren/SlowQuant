@@ -92,3 +92,8 @@ Homepage = "https://github.com/erikkjellgren/SlowQuant"
 
 [tool.setuptools.packages.find]
 include = ["slowquant*"]
+
+[tool.setuptools.package-data]
+slowquant = [
+    "molecule/basisset/*.basis"
+]
