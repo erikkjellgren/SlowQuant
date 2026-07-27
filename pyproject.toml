@@ -1,7 +1,7 @@
 [tool.ruff]
 line-length = 110
 indent-width = 4
-target-version = "py313"
+target-version = "py314"
 
 # Enable rules to cover flake8, isort, pylint, pydocstyle, etc.
 lint.select = [
@@ -90,8 +90,5 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/erikkjellgren/SlowQuant"
 
-[tool.setuptools]
-package-dir = {"" = "slowquant"}
-
 [tool.setuptools.packages.find]
-where = ["slowquant"]
+include = ["slowquant*"]
