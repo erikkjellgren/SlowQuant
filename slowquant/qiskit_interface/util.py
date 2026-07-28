@@ -1,4 +1,5 @@
-import networkx as nx
+from collections import deque
+
 import numpy as np
 from qiskit.circuit import QuantumCircuit
 from qiskit.quantum_info import SparsePauliOp
@@ -7,7 +8,7 @@ from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 
 
-def to_CBS_measurement(op: str, transpiled: None | list[QuantumCircuit] = None) -> QuantumCircuit:
+def to_CBS_measurement(op: str, transpiled: list[QuantumCircuit] | None = None) -> QuantumCircuit:
     r"""Convert a Pauli string to Pauli measurement circuit.
 
     This is achieved by the following transformation:
@@ -696,6 +697,9 @@ def correct_distribution_with_layout(
 def find_best_path(coupling_map: CouplingMap, start: int, target: int) -> list[int]:
     """Find the best path between two qubits using the coupling map.
 
+    The best path is found by performing a standard breath first search,
+    https://en.wikipedia.org/wiki/Breadth-first_search#Pseudocode
+
     Args:
         coupling_map: The coupling map defining valid connections.
         start: Starting qubit.
@@ -704,17 +708,36 @@ def find_best_path(coupling_map: CouplingMap, start: int, target: int) -> list[i
     Returns:
         List of qubits representing the path from start to target.
     """
-    # Convert the coupling map to a NetworkX graph
-    graph = nx.Graph()
-    graph.add_edges_from(coupling_map.get_edges())
+    if start == target:
+        return [start]
 
-    # Find the shortest path between start and target
-    try:
-        path = nx.shortest_path(graph, source=start, target=target)
-    except nx.NetworkXNoPath as e:
-        raise ValueError(f"No valid path between qubit {start} and qubit {target}") from e
+    # Build the adjacency map
+    adjacency_map: dict[int, list[int]] = {}
+    for u, v in coupling_map.get_edges():
+        adjacency_map.setdefault(u, []).append(v)
+        adjacency_map.setdefault(v, []).append(u)
 
-    return path
+    # Breadth-First Search to find the shortest path
+    queue = deque([start])
+    parent: dict[int, int | None] = {start: None}
+    while queue:
+        current = queue.popleft()
+        if current == target:
+            break
+        for neighbor in adjacency_map.get(current, []):
+            if neighbor not in parent:
+                parent[neighbor] = current
+                queue.append(neighbor)
+    else:
+        raise ValueError(f"No valid path between qubit {start} and qubit {target}")
+
+    # Reconstruct the path from target back to start
+    path = []
+    curr: int | None = target
+    while curr is not None:
+        path.append(curr)
+        curr = parent[curr]
+    return path[::-1]
 
 
 def add_permutation_gate(circuit: QuantumCircuit, permutation: list[int], coupling_map: CouplingMap) -> None:
