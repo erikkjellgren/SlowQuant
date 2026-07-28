@@ -237,20 +237,37 @@ def RDM2(
         # if p < num_NES or q < num_NES or r < num_NES or s < num_NES:
         #     return 0+0j
 
-        # inactive orbitals
+
+        # All inactive index
+        val = 0 + 0j
         if p == q and r == s:
-            val = 1+0j
-        else:
-            val = 0+0j
-
-        if p == s and r == q:
-            val -= 1+0j
-
+            val += (1 + 0j)
+        if q == r and p == s:
+            val -= (1 - 0j)
         return val
-    
     # Everything else
-    #print(p,q,r,s)
     return 0+0j
+
+
+
+
+    #     # inactive orbitals
+    #     if p == q and r == s:
+    #         val = 1+0j
+    #     else:
+    #         val = 0+0j
+
+    #     if p == s and r == q:
+    #         val -= 1+0j
+
+    #     return val
+    
+    # # Everything else
+    # #print(p,q,r,s)
+    # return 0+0j
+
+
+
 
 @nb.jit(nopython=True)
 def RDM2_PES(
@@ -407,7 +424,7 @@ def get_electronic_energy_generalized(
     return energy.real
 
 @nb.jit(nopython=True)
-def get_electronic_energy_generalized(
+def get_electronic_energy_generalized_tester(
     h_int: np.ndarray,
     g_int: np.ndarray,
     num_NES: int,

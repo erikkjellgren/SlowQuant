@@ -1005,6 +1005,14 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-8, maxiter = 1000)
 
+    # print("rdm2 PySCF")
+    # with np.printoptions(precision=4):
+    #             print(np.round(WF2.rdm2, 4))
+
+    # print("rdm2 Mine")
+    # with np.printoptions(precision=4):
+    #         print(np.round(WF.rdm2, 4))
+
     # D_pyscf = C_MO @ C_MO.conj().T
 
     # D_mine = WF.c_mo @ WF.c_mo.conj().T
