@@ -39,6 +39,10 @@ from slowquant.qiskit_interface.util import (
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.util import UpsStructure
 
+from qiskit.transpiler import PassManager
+from qiskit.transpiler.passes import BasisTranslator, Optimize1qGatesDecomposition
+from qiskit.circuit.equivalence_library import SessionEquivalenceLibrary
+
 
 class QuantumInterface:
     """Quantum interface class.
@@ -111,6 +115,7 @@ class QuantumInterface:
         self.max_shots_per_run = max_shots_per_run
         self._primitive = primitive
         self.pass_manager_options = pass_manager_options
+        self._cbs_pass_manager: None | PassManager = None  # Added lightweight CBS pass manager
         self.ISA = ISA
         self.shots = shots
         self.mapper = mapper
@@ -408,6 +413,16 @@ class QuantumInterface:
             optimization_method=self.pass_manager_options.get("optimization_method"),
         )
 
+        # Initialize lightweight pass manager for single-qubit CBS measurements without layout passes
+        cbs_basis_gates = getattr(self, "basis_gates", None)
+        if cbs_basis_gates is None and hasattr(self._pass_manager, "target") and self._pass_manager.target is not None:
+            cbs_basis_gates = list(self._pass_manager.target.operation_names)
+        
+        self._cbs_pass_manager = PassManager([
+            BasisTranslator(SessionEquivalenceLibrary, target_basis=cbs_basis_gates),
+            Optimize1qGatesDecomposition(basis=cbs_basis_gates)
+        ])
+
         # Check if circuit has been set and PassManager options were updated
         # In case of switching to new PassManager in later workflow
         if pass_manager_options is not None and hasattr(self, "circuit") and not redo_ISA:
@@ -544,10 +559,10 @@ class QuantumInterface:
                 optimization_method=self.pass_manager_options.get("optimization_method"),
             )
 
-        # Transpile X and Y measurement gates: only translation to basis gates and optimization.
+        # Transpile X and Y measurement gates using the dedicated lightweight pass manager
         self._transp_xy = [
-            self._pass_manager.optimization.run(self._pass_manager.translation.run(to_CBS_measurement("X"))),
-            self._pass_manager.optimization.run(self._pass_manager.translation.run(to_CBS_measurement("Y"))),
+            self._cbs_pass_manager.run(to_CBS_measurement("X")),
+            self._cbs_pass_manager.run(to_CBS_measurement("Y")),
         ]
 
         return circuit_return
