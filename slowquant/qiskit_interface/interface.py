@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 from qiskit.circuit import ClassicalRegister, QuantumCircuit
+from qiskit.circuit.equivalence_library import SessionEquivalenceLibrary
 from qiskit.primitives import (
     BaseEstimatorV1,
     BaseEstimatorV2,
@@ -15,6 +16,7 @@ from qiskit.primitives import (
 )
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import PassManager
+from qiskit.transpiler.passes import BasisTranslator, Optimize1qGatesDecomposition
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_nature.second_q.circuit.library import HartreeFock
 from qiskit_nature.second_q.mappers import JordanWignerMapper
@@ -39,10 +41,6 @@ from slowquant.qiskit_interface.util import (
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.util import UpsStructure
 
-from qiskit.transpiler import PassManager
-from qiskit.transpiler.passes import BasisTranslator, Optimize1qGatesDecomposition
-from qiskit.circuit.equivalence_library import SessionEquivalenceLibrary
-
 
 class QuantumInterface:
     """Quantum interface class.
@@ -58,7 +56,7 @@ class QuantumInterface:
         ISA: bool = False,
         pass_manager_options: dict[str, Any] | None = None,
         ansatz_options: dict[str, Any] | None = None,
-        shots: None | int = None,
+        shots: int | None = None,
         max_shots_per_run: int = 100000,
         do_M_mitigation: bool = False,
         do_M_ansatz0: bool = False,
@@ -115,7 +113,7 @@ class QuantumInterface:
         self.max_shots_per_run = max_shots_per_run
         self._primitive = primitive
         self.pass_manager_options = pass_manager_options
-        self._cbs_pass_manager: None | PassManager = None  # Added lightweight CBS pass manager
+        self._cbs_pass_manager: PassManager | None = None  # Added lightweight CBS pass manager
         self.ISA = ISA
         self.shots = shots
         self.mapper = mapper
@@ -415,13 +413,19 @@ class QuantumInterface:
 
         # Initialize lightweight pass manager for single-qubit CBS measurements without layout passes
         cbs_basis_gates = getattr(self, "basis_gates", None)
-        if cbs_basis_gates is None and hasattr(self._pass_manager, "target") and self._pass_manager.target is not None:
+        if (
+            cbs_basis_gates is None
+            and hasattr(self._pass_manager, "target")
+            and self._pass_manager.target is not None
+        ):
             cbs_basis_gates = list(self._pass_manager.target.operation_names)
-        
-        self._cbs_pass_manager = PassManager([
-            BasisTranslator(SessionEquivalenceLibrary, target_basis=cbs_basis_gates),
-            Optimize1qGatesDecomposition(basis=cbs_basis_gates)
-        ])
+
+        self._cbs_pass_manager = PassManager(
+            [
+                BasisTranslator(SessionEquivalenceLibrary, target_basis=cbs_basis_gates),
+                Optimize1qGatesDecomposition(basis=cbs_basis_gates),
+            ]
+        )
 
         # Check if circuit has been set and PassManager options were updated
         # In case of switching to new PassManager in later workflow
@@ -515,9 +519,10 @@ class QuantumInterface:
         Returns:
             Transpiled Circuit.
         """
-        if self._pass_manager is None:
+        if self._pass_manager is None or self._cbs_pass_manager is None:
             self.update_pass_manager()
             assert self._pass_manager is not None
+            assert self._cbs_pass_manager is not None
 
         circuit_return = self._pass_manager.run(circuit)
         # Get layout indices. Ordered q0, q1, ... qN
@@ -1006,7 +1011,7 @@ class QuantumInterface:
         op: FermionicOperator | SparsePauliOp,
         run_circuit: QuantumCircuit | None = None,
         det: str | None = None,
-        circuit_M: None | QuantumCircuit = None,
+        circuit_M: QuantumCircuit | None = None,
         csfs_option: int = 1,
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
@@ -1111,7 +1116,7 @@ class QuantumInterface:
         run_parameters: list[float],
         run_circuit: QuantumCircuit,
         do_cliques: bool = True,
-        circuit_M: None | QuantumCircuit = None,
+        circuit_M: QuantumCircuit | None = None,
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
@@ -1484,7 +1489,7 @@ class QuantumInterface:
         return dist_combined
 
     def _sampler_distributions(
-        self, pauli: str, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
+        self, pauli: str, run_parameters: list[float], custom_circ: QuantumCircuit | None = None
     ) -> dict[int, float]:
         r"""Get results from a sampler distribution for one given Pauli string.
 
@@ -1535,7 +1540,7 @@ class QuantumInterface:
         return distr
 
     def _sampler_distribution_p1(
-        self, pauli: str, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
+        self, pauli: str, run_parameters: list[float], custom_circ: QuantumCircuit | None = None
     ) -> float:
         """Sample the probability of measuring one for a given Pauli string.
 
@@ -1555,7 +1560,7 @@ class QuantumInterface:
                 p1 += value
         return p1
 
-    def _make_Minv(self, shots: None | int = None, custom_ansatz: None | QuantumCircuit = None) -> np.ndarray:
+    def _make_Minv(self, shots: int | None = None, custom_ansatz: QuantumCircuit | None = None) -> np.ndarray:
         r"""Make inverse of read-out correlation matrix with one device call.
 
         The read-out correlation matrix is of the form (for two qubits):
