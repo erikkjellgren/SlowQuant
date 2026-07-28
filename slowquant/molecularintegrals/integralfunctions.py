@@ -310,7 +310,7 @@ def generalized_two_electron_transform(C: np.ndarray, int_2e_inp: np.ndarray) ->
     )
     return cont1 + cont2 + cont3 + cont4
 
-def DHF_two_electron_transform(C: np.ndarray, int_2e_inp: np.array) -> np.ndarray:
+def DHF_two_electron_transform(C: np.ndarray, int_2e_inp: np.ndarray) -> np.ndarray:
     # LLLL
     cont1 = np.einsum(
         "aP,bQ,cR,dS,abcd->PQRS",
