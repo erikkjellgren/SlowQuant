@@ -151,8 +151,9 @@ class LinearResponseBaseClass:
         E2[:size, size:] = self.B
         E2[size:, :size] = self.B.conjugate() #AE added conjugtate 
         E2[size:, size:] = self.A.conjugate() #AE added conjugtate 
-        
-        # print(E2)
+
+        with np.printoptions(precision=4):
+            print(np.round(E2, 4))
         (
             hess_eigval,
             _,

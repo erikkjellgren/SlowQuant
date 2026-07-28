@@ -1341,14 +1341,14 @@ def get_orbital_response_hessian_block(
             # 1e contribution
             A1e[idx1, idx2] += h[N, T] * RDM1(M, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             A1e[idx1, idx2] += h[U, M] * RDM1(T, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-            for P in range(num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+            for P in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
                 if M == U:
                     A1e[idx1, idx2] -= h[N, P] * RDM1(T, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
                 if T == N:
                     A1e[idx1, idx2] -= h[P, M] * RDM1(P, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             # 2e contribution
-            for P in range(num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
-                for Q in range(num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+            for P in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+                for Q in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
                     A2e[idx1, idx2] += g[U, M, P, Q] * RDM2(
                         T, N, P, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )                 
@@ -1385,9 +1385,9 @@ def get_orbital_response_hessian_block(
                     A2e[idx1, idx2] += g[P, Q, N, T] * RDM2(
                         M, U, P, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
-            for P in range(num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
-                for Q in range(num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
-                    for R in range(num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+            for P in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+                for Q in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+                    for R in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
                         if M == U:
                             A2e[idx1, idx2] -= g[N, P, Q, R] * RDM2(
                                 T, P, Q, R, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2

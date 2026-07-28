@@ -812,7 +812,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
     # small random anti-Hermitian
-    eps = 0.001  # controls "step size"
+    eps = 0.0005  # controls "step size"
     X_anti = np.random.randn(C_MO.shape[0],C_MO.shape[0]) + 1j*np.random.randn(C_MO.shape[0],C_MO.shape[0])
     A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian
 
@@ -822,6 +822,57 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     S_int = mol.intor("int1e_ovlp")
 
+
+
+    C_MO = mf.mo_coeff
+    S_ovlp = mf.get_ovlp()
+
+    def theta(C):
+        """
+        Time reversal for PySCF 4c ordering:
+        [large 2c spinor block, small 2c spinor block]
+        """
+
+        nao, nmo = C.shape
+
+        if nao % 2 != 0:
+            raise ValueError("Expected even number of 4c AO functions")
+
+        n2 = nao // 2
+
+        out = np.zeros_like(C)
+
+        # large component block
+        L = C[:n2].conj()
+        out[:n2:2, :] = -L[1::2, :]
+        out[1:n2:2, :] =  L[0::2, :]
+
+        # small component block
+        S = C[n2:].conj()
+        out[n2::2, :] = -S[1::2, :]
+        out[n2+1::2, :] = S[0::2, :]
+
+        return out
+
+    
+    Cbar = theta(C_MO)
+
+    M = C_MO.conj().T @ S_ovlp @ Cbar
+
+    K_pairs = []
+    M_values = []
+
+    for p in range(C_MO.shape[1]):
+        q = int(np.argmax(abs(M[p,:])))
+        if (p,q) not in K_pairs and (q,p) not in K_pairs: 
+            K_pairs.append((p,q))
+            M_values.append(np.max(abs(M[p,:])))
+
+    print("Kramers pairs")
+    print(K_pairs)
+    print(M_values)
+
+
     WF2 = GeneralizedWaveFunctionUPS(
         mol.nelectron,
         active_space,
@@ -829,12 +880,17 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         #C_U,
         h_core,
         g_eri,
+        K_pairs,
+        False,
+        S_ovlp,
         "fUCCSD",
         {"n_layers": 0, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
-    WF2.spin_analysis(S_int)
+    print("Kramers rotations:")
+    print(WF2.kappa_spin_idx)
+    print(WF2.kappa_spin_idx_ep)
 
 
     WF = GeneralizedWaveFunctionUPS(
@@ -844,6 +900,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         C_U,
         h_core,
         g_eri,
+        K_pairs,
+        False,
+        S_ovlp,
         "fUCCSD",
         {"n_layers": 0, "is_spin_conserving" : False},
         include_active_kappa=True,
@@ -943,36 +1002,46 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     #WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
 
-    
 
     WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-8, maxiter = 1000)
 
-    WF.spin_analysis(S_int)
+    # D_pyscf = C_MO @ C_MO.conj().T
 
-    gradient_ee = get_orbital_gradient_generalized_real_imag(
-                WF.h_mo,
-                WF.g_mo,
-                WF.kappa_spin_idx,
-                WF.num_spin_orbs_NES,
-                WF.num_inactive_spin_orbs,
-                WF.num_active_spin_orbs,
-                WF.rdm1,
-                WF.rdm2,
-            )
+    # D_mine = WF2.c_mo @ WF2.c_mo.conj().T
 
-    gradient_ep = - get_orbital_gradient_generalized_real_imag(
-                WF.h_mo_ep,
-                WF.g_mo_ep,
-                WF.kappa_spin_idx_ep,
-                WF.num_spin_orbs_NES,
-                WF.num_inactive_spin_orbs,
-                WF.num_active_spin_orbs,
-                WF.rdm1,
-                WF.rdm2,
-            )
+    # print("D PySCF")
+    # with np.printoptions(precision=4):
+    #             print(np.round(D_pyscf, 4))
+
+    # print("D Mine")
+    # with np.printoptions(precision=4):
+    #         print(np.round(D_mine, 4))
+
+
+    '''# gradient_ee = get_orbital_gradient_generalized_real_imag(
+    #             WF.h_mo,
+    #             WF.g_mo,
+    #             WF.kappa_spin_idx,
+    #             WF.num_spin_orbs_NES,
+    #             WF.num_inactive_spin_orbs,
+    #             WF.num_active_spin_orbs,
+    #             WF.rdm1,
+    #             WF.rdm2,
+    #         )
+
+    # gradient_ep = - get_orbital_gradient_generalized_real_imag(
+    #             WF.h_mo_ep,
+    #             WF.g_mo_ep,
+    #             WF.kappa_spin_idx_ep,
+    #             WF.num_spin_orbs_NES,
+    #             WF.num_inactive_spin_orbs,
+    #             WF.num_active_spin_orbs,
+    #             WF.rdm1,
+    #             WF.rdm2,
+    #         )
     
-    print("max gradient ee", np.max(np.abs(gradient_ee)))
-    print("max gradient ep", np.max(np.abs(gradient_ep)))
+    # print("max gradient ee", np.max(np.abs(gradient_ee)))
+    # print("max gradient ep", np.max(np.abs(gradient_ep)))'''
 
     #print(WF._calc_gradient_optimization_DHF(WF.kappa_real + WF.kappa_imag, theta_optimization=False, kappa_ee_optimization=True,kappa_ep_optimization=True))
 
@@ -1044,6 +1113,37 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # print(WF.kappa_no_activeactive_spin_idx_resp)'''
 
+
+    # with np.printoptions(precision=4):
+    #     print(np.round(WF2.c_mo, 4))
+    #     print(np.round(WF.c_mo, 4))
+
+
+
+
+    LR = generalized_naive_DHF.LinearResponse(WF2, excitations="S")
+    
+    LR.calc_excitation_energies()
+    print("Excitation energies:", LR.excitation_energies)
+    #print(np.round(LR.get_transition_dipole(dip_int).real,5))
+    #print(LR.get_oscillator_strengths(dip_int))
+
+
+    # h1_shield = make_h1_ao_shield(mol)
+    # h2_shield = make_h2_ao_shield(mol)
+    # hb_shield = make_h_B_ao(mol)
+    # g_ssss, g_lsss = make_h_B_2e_ao(mol)
+
+    # shieldings = LR.get_shieldings_4comp_iso(h1_shield, h2_shield, hb_shield, g_ssss, g_lsss)
+    # print("Shieldings:")
+    # print(shieldings)
+
+    SSCC = LR.get_SSCC_4comp_iso(h1, h2)
+    for I in range(SSCC.shape[0]):
+        for J in range(I+1, SSCC.shape[1]):
+            print(f"K({mol.atom_symbol(I)}{I} - {mol.atom_symbol(J)}{J}) = {SSCC[I,J]:.5f} Hz")
+
+
     LR = generalized_naive_DHF.LinearResponse(WF, excitations="S")
 
     LR.calc_excitation_energies()
@@ -1088,12 +1188,14 @@ def H2():
                             H   1.1785   -0.5748    1.0355
                             """  #0.74
     #basis = "cc-pvdz"
+
     #J_631g = bse.get_basis('6-31g-J', elements=['H'], fmt='nwchem')
-    raw = {atom: gto.parse(bse.get_basis('6-31G-J', elements=[Z], fmt='nwchem', header=False))
-       for atom, Z in [('H', 1)]}   # do this per element you use
-    fixed_basis = split_general_contraction(raw)
-    basis = fixed_basis
-    #basis = "631-g"
+    # raw = {atom: gto.parse(bse.get_basis('6-31G-J', elements=[Z], fmt='nwchem', header=False))
+    #    for atom, Z in [('H', 1)]}   # do this per element you use
+    # fixed_basis = split_general_contraction(raw)
+    # basis = fixed_basis
+
+    basis = "631-g"
     #dyall_v2z = bse.get_basis('dyall-v2z', elements=['H'], fmt='nwchem')
     # with open('dyall2zp_H.nwchem', 'w') as f:
     #     f.write(dyall_v2z)
@@ -1101,7 +1203,8 @@ def H2():
     #basis = dyall_v2z
     #basis = "sto-3g"
     #basis = "sto-6g"
-    active_space = ((1, 1), 8)
+    #active_space = ((1, 1), 8)
+    active_space = ((1, 1), 2)
     #active_space = (2, 4)
     charge = 0
     spin = 0
@@ -1272,4 +1375,4 @@ def N3():
 
 ###RUN SCRIPT###
 
-HF()
+H2()
