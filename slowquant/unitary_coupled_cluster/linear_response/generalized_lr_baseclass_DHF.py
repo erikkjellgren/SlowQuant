@@ -152,8 +152,6 @@ class LinearResponseBaseClass:
         E2[size:, :size] = self.B.conjugate() #AE added conjugtate 
         E2[size:, size:] = self.A.conjugate() #AE added conjugtate 
 
-        with np.printoptions(precision=4):
-            print(np.round(E2, 4))
         (
             hess_eigval,
             _,
@@ -300,6 +298,7 @@ class LinearResponseBaseClass:
             self.normed_response_vectors[:, state_number] = (
                 self.response_vectors[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real)  #AE added abs
             )
+        #return E2
 
 
     def get_excited_state_norm(self) -> np.ndarray:

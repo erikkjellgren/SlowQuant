@@ -1007,7 +1007,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # D_pyscf = C_MO @ C_MO.conj().T
 
-    # D_mine = WF2.c_mo @ WF2.c_mo.conj().T
+    # D_mine = WF.c_mo @ WF.c_mo.conj().T
 
     # print("D PySCF")
     # with np.printoptions(precision=4):
@@ -1166,6 +1166,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     for I in range(SSCC.shape[0]):
         for J in range(I+1, SSCC.shape[1]):
             print(f"K({mol.atom_symbol(I)}{I} - {mol.atom_symbol(J)}{J}) = {SSCC[I,J]:.5f} Hz")
+
+
+    # with np.printoptions(precision=4):
+    #     print(np.round(np.subtract(E21, E22), 4))
 
 
 def split_general_contraction(basis_dict):

@@ -1392,7 +1392,7 @@ def get_orbital_response_hessian_block(
                             A2e[idx1, idx2] -= g[N, P, Q, R] * RDM2(
                                 T, P, Q, R, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                             )
-                            A2e[idx1, idx2] += g[P,Q,N,R]* RDM2(
+                            A2e[idx1, idx2] += g[P, Q, N, R] * RDM2(
                                 T, Q, P, R, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                             )
                         if T == N:
