@@ -54,7 +54,7 @@ class QuantumInterface:
         ISA: bool = False,
         pass_manager_options: dict[str, Any] | None = None,
         ansatz_options: dict[str, Any] | None = None,
-        shots: None | int = None,
+        shots: int | None = None,
         max_shots_per_run: int = 100000,
         do_M_mitigation: bool = False,
         do_M_ansatz0: bool = False,
@@ -166,47 +166,36 @@ class QuantumInterface:
             self.state_circuit: QuantumCircuit = QuantumCircuit(
                 self.ansatz.num_qubits
             )  # empty state as custom circuit is passed
-        elif self.ansatz == "tUPS" and "do_pp" in self.ansatz_options.keys() and self.ansatz_options["do_pp"]:
+        elif "do_pp" in self.ansatz_options.keys() and self.ansatz_options["do_pp"]:
             # HF in pp-tUPS ordering
             if not isinstance(self.mapper, JordanWignerMapper):
                 raise ValueError(f"pp-tUPS only implemented for JW mapper, got: {type(self.mapper)}")
-            if np.sum(num_elec) != num_orbs:
-                raise ValueError(
-                    f"pp-tUPS only implemented for number of electrons and number of orbitals being the same, got: ({np.sum(num_elec)}, {num_orbs}), (elec, orbs)"
-                )
-            self.state_circuit = QuantumCircuit(2 * num_orbs)
-            for p in range(0, 2 * num_orbs):
-                if p % 2 == 0:
-                    self.state_circuit.x(p)
-        else:
-            self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
-        self.num_qubits = self.state_circuit.num_qubits
-
-        # Ansatz Circuit
-        if isinstance(self.ansatz, QuantumCircuit):
-            print(
-                "QI was initialized with a custom QuantumCircuit object. This is assumed to be the Ansatz (without state preparation circuit)"
-            )
-            self.circuit = self.ansatz
-        elif isinstance(self.ansatz, str):
-            if (
-                self.ansatz.lower() == "tups"
-                and "do_pp" in self.ansatz_options.keys()
-                and self.ansatz_options["do_pp"]
+            # Obtain pp determinant
+            pp_det = ""
+            spin_orb = 0
+            elec_count = self.num_elec[0] + self.num_elec[1]
+            while spin_orb < self.num_spin_orbs:
+                if (
+                    elec_count >= 2
+                    and (self.num_spin_orbs - spin_orb) >= 4
+                    and elec_count <= (self.num_spin_orbs - spin_orb - 2)
+                ):
+                    pp_det += "1100"
+                    elec_count -= 2
+                    spin_orb += 4
+                elif elec_count == 0:
+                    pp_det += "0"
+                    spin_orb += 1
+                elif elec_count != 0:
+                    pp_det += "1"
+                    spin_orb += 1
+                    elec_count -= 1
+            print("State preparation: perfect-pairing determinant found as:", pp_det)
+            if len(pp_det) != self.num_spin_orbs or pp_det.count("1") != (
+                self.num_elec[0] + self.num_elec[1]
             ):
-                # HF in pp-tUPS ordering
-                if not isinstance(self.mapper, JordanWignerMapper):
-                    raise ValueError(f"pp-tUPS only implemented for JW mapper, got: {type(self.mapper)}")
-                if np.sum(num_elec) != num_orbs:
-                    raise ValueError(
-                        f"pp-tUPS only implemented for number of electrons and number of orbitals being the same, got: ({np.sum(num_elec)}, {num_orbs}), (elec, orbs)"
-                    )
-                self.state_circuit = QuantumCircuit(2 * num_orbs)
-                for p in range(0, 2 * num_orbs):
-                    if p % 2 == 0:
-                        self.state_circuit.x(p)
-            else:
-                self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
+                raise ValueError("Perfect pairing determinant violates orbital or electron numbers")
+            self.state_circuit = get_determinant_reference(pp_det, self.num_orbs, self.mapper)
         else:
             self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
         self.num_qubits = self.state_circuit.num_qubits
@@ -991,7 +980,7 @@ class QuantumInterface:
         op: FermionicOperator | SparsePauliOp,
         run_circuit: QuantumCircuit | None = None,
         det: str | None = None,
-        circuit_M: None | QuantumCircuit = None,
+        circuit_M: QuantumCircuit | None = None,
         csfs_option: int = 1,
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
@@ -1096,7 +1085,7 @@ class QuantumInterface:
         run_parameters: list[float],
         run_circuit: QuantumCircuit,
         do_cliques: bool = True,
-        circuit_M: None | QuantumCircuit = None,
+        circuit_M: QuantumCircuit | None = None,
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
@@ -1469,7 +1458,7 @@ class QuantumInterface:
         return dist_combined
 
     def _sampler_distributions(
-        self, pauli: str, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
+        self, pauli: str, run_parameters: list[float], custom_circ: QuantumCircuit | None = None
     ) -> dict[int, float]:
         r"""Get results from a sampler distribution for one given Pauli string.
 
@@ -1520,7 +1509,7 @@ class QuantumInterface:
         return distr
 
     def _sampler_distribution_p1(
-        self, pauli: str, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
+        self, pauli: str, run_parameters: list[float], custom_circ: QuantumCircuit | None = None
     ) -> float:
         """Sample the probability of measuring one for a given Pauli string.
 
@@ -1540,7 +1529,7 @@ class QuantumInterface:
                 p1 += value
         return p1
 
-    def _make_Minv(self, shots: None | int = None, custom_ansatz: None | QuantumCircuit = None) -> np.ndarray:
+    def _make_Minv(self, shots: int | None = None, custom_ansatz: QuantumCircuit | None = None) -> np.ndarray:
         r"""Make inverse of read-out correlation matrix with one device call.
 
         The read-out correlation matrix is of the form (for two qubits):

@@ -38,6 +38,7 @@ class WaveFunctionCircuit:
         integral_generator: SlowQuant | pyscf.gto.mole.Mole,
         quantum_interface: QuantumInterface,
         include_active_kappa: bool = False,
+        force_no_pp_mos: bool = False,
     ) -> None:
         """Initialize circuit based UPS wave function.
 
@@ -48,6 +49,7 @@ class WaveFunctionCircuit:
             integral_generator: Integral generator object.
             quantum_interface: QuantumInterface.
             include_active_kappa: Include active-active orbital rotations.
+            force_no_pp_mos: Switch of pp rotation of MOs even if do_pp is requested in QI.
         """
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
@@ -56,7 +58,6 @@ class WaveFunctionCircuit:
                 "WARNING: A QI with a custom Ansatz was passed. VQE will only work with COBYLA and COBYQA optimizer."
             )
         self.int_gen = IntegralManager(integral_generator)
-        self._c_mo = mo_coeffs
         self.inactive_spin_idx = []
         self.virtual_spin_idx = []
         self.active_spin_idx = []
@@ -72,6 +73,8 @@ class WaveFunctionCircuit:
         self.num_spin_orbs = 2 * len(self.int_gen.kinetic_energy)
         self.num_orbs = len(self.int_gen.kinetic_energy)
         self.num_active_elec = cas[0]
+        if self.num_active_elec % 2 != 0:
+            raise ValueError("Number of active electrons has to be even")
         self.num_active_elec_alpha = self.num_active_elec // 2
         self.num_active_elec_beta = self.num_active_elec // 2
         self.num_active_spin_orbs = 0
@@ -191,7 +194,48 @@ class WaveFunctionCircuit:
         self.kappa_no_activeactive_idx_dagger = np.array(kappa_no_activeactive_idx_dagger, dtype=int)
         self.kappa_redundant_idx = np.array(kappa_redundant_idx, dtype=int)
         self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
-        # Setup Qiskit stuff
+        # Re-order MOs for perfect pairing
+        if (
+            "do_pp" in quantum_interface.ansatz_options.keys()
+            and quantum_interface.ansatz_options["do_pp"]
+            and not force_no_pp_mos
+        ):
+            hf_det = "1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec)
+            # Obtain pp determinant
+            pp_det = ""
+            spin_orb = 0
+            elec_count = self.num_active_elec
+            while spin_orb < self.num_active_spin_orbs:
+                if (
+                    elec_count >= 2
+                    and (self.num_active_spin_orbs - spin_orb) >= 4
+                    and elec_count <= (self.num_active_spin_orbs - spin_orb - 2)
+                ):
+                    pp_det += "1100"
+                    elec_count -= 2
+                    spin_orb += 4
+                elif elec_count == 0:
+                    pp_det += "0"
+                    spin_orb += 1
+                elif elec_count != 0:
+                    pp_det += "1"
+                    spin_orb += 1
+                    elec_count -= 1
+            print("MO rotations: perfect-pairing determinant found as:", pp_det)
+            if len(pp_det) != self.num_active_spin_orbs or pp_det.count("1") != self.num_active_elec:
+                raise ValueError("Perfect pairing determinant violates orbital or electron numbers")
+
+            # Swap mo coefficients to resembles pp layout
+            hole = [i for i, (h, p) in enumerate(zip(hf_det, pp_det)) if h == "1" and p == "0"]
+            part = [i for i, (h, p) in enumerate(zip(hf_det, pp_det)) if h == "0" and p == "1"]
+            hole_spatial = sorted(set(i // 2 + self.num_inactive_orbs for i in hole))
+            part_spatial = sorted(set(i // 2 + self.num_inactive_orbs for i in part))
+            pp_mo_coeffs = mo_coeffs.copy()
+            pp_mo_coeffs[:, hole_spatial + part_spatial] = pp_mo_coeffs[:, part_spatial + hole_spatial]
+            self._c_mo = pp_mo_coeffs
+        else:
+            self._c_mo = mo_coeffs
+        # Setup Quantum Interface
         self.QI = quantum_interface
         self.QI.construct_circuit(
             self.active_occ_idx_shifted,
