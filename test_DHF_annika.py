@@ -741,7 +741,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     #print(type(mf))   # should be _SecondOrderDHF
 
-    mf = scf.DHF(mol)
+    mf = scf.dhf.DHF(mol)
 
 
     mf.conv_tol = 1e-8        # Energy convergence (Hartree)
@@ -812,7 +812,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
     # small random anti-Hermitian
-    eps = 0.0005  # controls "step size"
+    eps = 0.01  # controls "step size"
     X_anti = np.random.randn(C_MO.shape[0],C_MO.shape[0]) + 1j*np.random.randn(C_MO.shape[0],C_MO.shape[0])
     A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian
 
@@ -1122,17 +1122,150 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # print(WF.kappa_no_activeactive_spin_idx_resp)'''
 
 
+
+    U = WF2.c_mo.conj().T @ S_ovlp @ WF.c_mo
+
+    # with np.printoptions(precision=4):
+    #     print(np.round(U, 4))
+
+    # with np.printoptions(precision=4):
+    #     print(np.round(U.conj().T @ U, 4))
+
     # with np.printoptions(precision=4):
     #     print(np.round(WF2.c_mo, 4))
     #     print(np.round(WF.c_mo, 4))
 
+    def time_reversal_matrix(n_spatial):
+        """
+        Time reversal operator in the Dirac representation.
+
+        Basis ordering assumed:
+            (large alpha, large beta, small alpha, small beta)
+            for each spatial basis function
+
+        Returns the matrix part of T, excluding complex conjugation.
+        """
+        sigma_y = np.array(
+            [[0, -1j],
+            [1j, 0]],
+            dtype=complex
+        )
+
+        block = np.zeros((4, 4), dtype=complex)
+        block[:2, :2] = sigma_y
+        block[2:, 2:] = sigma_y
+
+        # T = -i sigma_y K
+        return -1j * np.kron(np.eye(n_spatial), block)
 
 
+    def check_kramers_symmetry(C, S, occ_idx):
+        """
+        Check Kramers symmetry of a DHF determinant.
 
-    LR = generalized_naive_DHF.LinearResponse(WF2, excitations="S")
+        Parameters
+        ----------
+        C : ndarray
+            4-component MO coefficient matrix
+            shape (n4c, nmo)
+
+        S : ndarray
+            4-component overlap matrix
+            shape (n4c, n4c)
+
+        occ_idx : list/int array
+            occupied orbital indices
+
+        Returns
+        -------
+        deviation : float
+            ||P - TPT^-1||
+        """
+
+        n4c = C.shape[0]
+        n_spatial = n4c // 4
+
+        Tmat = time_reversal_matrix(n_spatial)
+
+        # occupied projector
+        C_occ = C[:, occ_idx]
+
+        P = C_occ @ C_occ.conj().T @ S
+
+        # Time reversed density:
+        # T P T^-1 = Tmat P* Tmat^\dagger
+        P_TR = Tmat @ P.conj() @ Tmat.conj().T
+
+        deviation = np.linalg.norm(P - P_TR)
+
+        print("Kramers breaking measure =", deviation)
+        print("relative =", deviation / np.linalg.norm(P))
+
+        return deviation
+
+    occ_idx = [WF.num_spin_orbs_NES,
+          WF.num_spin_orbs_NES + 1]
+
+    check_kramers_symmetry(WF.c_mo, S_ovlp, occ_idx)
+
+    def time_reverse(spinor):
+        """
+        Time reversal for a 4-component Dirac spinor basis.
+
+        Assumes basis ordering:
+        [L alpha, L beta, S alpha, S beta]
+        for each spatial AO.
+
+        spinor length = 4 * nao
+        """
+
+        nao = len(spinor) // 4
+
+        T4 = np.array([
+            [0, -1j, 0, 0],
+            [1j,  0, 0, 0],
+            [0,  0, 0, -1j],
+            [0,  0, 1j,  0],
+        ], dtype=complex)
+
+        T = np.kron(np.eye(nao), T4)
+
+        return T @ spinor.conj()
+
+
+    def check_kramers_pair(alpha, beta, S=None):
+
+        beta_from_alpha = time_reverse(alpha)
+
+        if S is None:
+            overlap = np.vdot(beta, beta_from_alpha)
+            norm = np.linalg.norm(beta)*np.linalg.norm(beta_from_alpha)
+
+        else:
+            overlap = beta.conj().T @ S @ beta_from_alpha
+            norm = np.sqrt(
+                np.real(beta.conj().T @ S @ beta)
+                *
+                np.real(beta_from_alpha.conj().T @ S @ beta_from_alpha)
+            )
+
+        overlap /= norm
+
+        print("Kramers overlap =", overlap)
+        print("Deviation =", np.sqrt(max(0,1-abs(overlap)**2)))
+
+        return overlap
+
+    alpha_occ = WF.c_mo[:, 4]
+    beta_occ  = WF.c_mo[:, 5]
+
+    check_kramers_pair(alpha_occ, beta_occ, S_ovlp)
+
+
+    LR2 = generalized_naive_DHF.LinearResponse(WF2, excitations="S")
     
-    LR.calc_excitation_energies()
-    print("Excitation energies:", LR.excitation_energies)
+    LR2.calc_excitation_energies()
+    print("Excitation energies:", LR2.excitation_energies)
     #print(np.round(LR.get_transition_dipole(dip_int).real,5))
     #print(LR.get_oscillator_strengths(dip_int))
 
@@ -1146,10 +1279,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # print("Shieldings:")
     # print(shieldings)
 
-    SSCC = LR.get_SSCC_4comp_iso(h1, h2)
-    for I in range(SSCC.shape[0]):
-        for J in range(I+1, SSCC.shape[1]):
-            print(f"K({mol.atom_symbol(I)}{I} - {mol.atom_symbol(J)}{J}) = {SSCC[I,J]:.5f} Hz")
+    SSCC2 = LR2.get_SSCC_4comp_iso(h1, h2)
+    for I in range(SSCC2.shape[0]):
+        for J in range(I+1, SSCC2.shape[1]):
+            print(f"K({mol.atom_symbol(I)}{I} - {mol.atom_symbol(J)}{J}) = {SSCC2[I,J]:.5f} Hz")
 
 
     LR = generalized_naive_DHF.LinearResponse(WF, excitations="S")
@@ -1176,8 +1309,44 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
             print(f"K({mol.atom_symbol(I)}{I} - {mol.atom_symbol(J)}{J}) = {SSCC[I,J]:.5f} Hz")
 
 
-    # with np.printoptions(precision=4):
-    #     print(np.round(np.subtract(E21, E22), 4))
+
+
+    # kappa = WF.kappa_no_activeactive_spin_idx
+    # kappa_dag = WF.kappa_no_activeactive_spin_idx_dagger
+
+    # n = len(kappa)
+
+    # D = np.zeros((n,n), dtype=complex)  # dagger side
+    # E = np.zeros((n,n), dtype=complex)  # normal side
+
+    # # D[new dagger, old dagger]
+    # for i, (T, Uidx) in enumerate(kappa_dag):
+    #     for j, (M, N) in enumerate(kappa_dag):
+    #         D[i,j] = np.conj(U[M,T]) * U[N,Uidx]
+
+    # # E[new normal, old normal]
+    # for i, (T, Uidx) in enumerate(kappa):
+    #     for j, (M, N) in enumerate(kappa):
+    #         E[i,j] = np.conj(U[M,T]) * U[N,Uidx]
+
+
+    # A_transformed = D @ LR2.A @ E.T
+    # B_transformed = D @ LR2.B @ D.T
+
+    # print(np.max(np.abs(A_transformed - LR.A)))
+    # print(np.max(np.abs(B_transformed - LR.B)))
+
+
+
+
+
+    # nNES = WF.num_spin_orbs_NES
+    # nocc = WF.num_inactive_spin_orbs + WF.num_active_spin_orbs
+
+    # print("occ→virt", np.linalg.norm(U[nNES:nNES+nocc, nNES+nocc:]))
+    # print("virt→occ", np.linalg.norm(U[nNES+nocc:, nNES:nNES+nocc]))
+    # print("NES→occ ", np.linalg.norm(U[:nNES, nNES:nNES+nocc]))
+    # print("occ→NES ", np.linalg.norm(U[nNES:nNES+nocc, :nNES]))
 
 
 def split_general_contraction(basis_dict):
@@ -1207,13 +1376,13 @@ def H2():
     # fixed_basis = split_general_contraction(raw)
     # basis = fixed_basis
 
-    basis = "631-g"
+    #basis = "631-g"
     #dyall_v2z = bse.get_basis('dyall-v2z', elements=['H'], fmt='nwchem')
     # with open('dyall2zp_H.nwchem', 'w') as f:
     #     f.write(dyall_v2z)
     #     f.close()
     #basis = dyall_v2z
-    #basis = "sto-3g"
+    basis = "sto-3g"
     #basis = "sto-6g"
     #active_space = ((1, 1), 8)
     active_space = ((1, 1), 2)
@@ -1252,7 +1421,7 @@ def H3():
     basis = "631-g"
     #basis = "sto-3g"
     #basis = "def-2-svp"
-    active_space = ((2, 1), 6)
+    active_space = ((2, 1), 3)
     #active_space = (2, 4)
     charge = 0
     spin = 1

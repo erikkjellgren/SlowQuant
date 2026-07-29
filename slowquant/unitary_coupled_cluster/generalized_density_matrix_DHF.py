@@ -1321,7 +1321,7 @@ def get_orbital_response_property_gradient_real_imag(
     return prop_grad
 
 
-@nb.jit(nopython=True)
+#@nb.jit(nopython=True)
 def get_orbital_response_hessian_block(
     h: np.ndarray,
     g: np.ndarray,
@@ -1353,16 +1353,43 @@ def get_orbital_response_hessian_block(
     """
     A1e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)), dtype=np.complex128)
     A2e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)),  dtype=np.complex128)
+    A1e_eq = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)), dtype=np.complex128)
+    A1e_eq1 = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)), dtype=np.complex128)
+    A1e_eq2 = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)), dtype=np.complex128)
+    A2e_eq = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)),  dtype=np.complex128)
     for idx1, (T, U) in enumerate(kappa_spin_idx1):
         for idx2, (M, N) in enumerate(kappa_spin_idx2):
             # 1e contribution
             A1e[idx1, idx2] += h[N, T] * RDM1(M, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             A1e[idx1, idx2] += h[U, M] * RDM1(T, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+
+            A1e_eq[idx1, idx2] += h[N, T] * RDM1(M, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            A1e_eq[idx1, idx2] += h[U, M] * RDM1(T, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            A1e_eq1[idx1, idx2] += h[N, T] * RDM1(M, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            A1e_eq2[idx1, idx2] += h[U, M] * RDM1(T, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+
+            if RDM1(M, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1).real != 0:
+                print("idx1, idx2")
+                print(idx1, idx2)
+                print("M, U")
+                print(M, U)
+                print("RDM1(M,U)")
+                print(RDM1(M, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1))
+                print("H(N,T)")
+                print(h[N, T])
+
             for P in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
                 if M == U:
                     A1e[idx1, idx2] -= h[N, P] * RDM1(T, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
                 if T == N:
                     A1e[idx1, idx2] -= h[P, M] * RDM1(P, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+
+
+                # if M == U:
+                #     A1e_eq[idx1, idx2] -= h[N, P] * RDM1(T, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+                # if T == N:
+                #     A1e_eq[idx1, idx2] -= h[P, M] * RDM1(P, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+                
             # 2e contribution
             for P in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
                 for Q in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
@@ -1420,6 +1447,38 @@ def get_orbital_response_hessian_block(
                                 P, U, R, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                             )
 
+
+
+                        # if M == U:
+                        #     A2e_eq[idx1, idx2] -= g[N, P, Q, R] * RDM2(
+                        #         T, P, Q, R, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                        #     )
+                        #     A2e_eq[idx1, idx2] += g[P, Q, N, R] * RDM2(
+                        #         T, Q, P, R, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                        #     )
+                        # if T == N:
+                        #     A2e_eq[idx1, idx2] -= g[P, M, Q, R] * RDM2(
+                        #         P, U, Q, R, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                        #     )
+                        #     A2e_eq[idx1, idx2] += g[P, Q, R, M] * RDM2(
+                        #         P, U, R, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                        #     )
+
+    
+    with np.printoptions(precision=4):
+        print("1e eq")
+        print(np.round(A1e_eq, 4))
+        print("1e eq1")
+        print(np.round(A1e_eq1, 4))
+        #print("1e eq2")
+        #print(np.round(A1e_eq2, 4))
+        # print("1 electron")
+        # print(np.round(A1e, 4))
+        # print("2 electron")
+        # print(np.round(A2e, 4))
+        # print("Total")
+        # print(np.round(A1e + 0.5*A2e, 4))
+            
 
 
     #if A1e.imag.any() > 1e-10 or A2e.imag.any() > 1e-10:
