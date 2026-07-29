@@ -311,6 +311,7 @@ class WaveFunctionUPS:
         self.ci_coeffs = np.copy(self.ref_coeffs)
         # Construct UPS Structure
         self.ups_layout = UpsStructure()
+        self.ansatz_options.setdefault("excitations", [])
         if ansatz.lower() in ("tups", "qnp"):
             if ansatz.lower() == "tups":
                 self.ansatz_options["do_tups"] = True
@@ -319,16 +320,16 @@ class WaveFunctionUPS:
             self.ups_layout.create_tiled(self.num_active_orbs, self.ansatz_options)
         elif ansatz.lower() in ("fucc", "fuccsd", "ksafupccgsd", "fuccpd", "safuccsd"):
             if ansatz.lower() == "fuccsd":
-                self.ansatz_options["S"] = True
-                self.ansatz_options["D"] = True
+                self.ansatz_options["excitations"].append("S")
+                self.ansatz_options["excitations"].append("D")
             elif ansatz.lower() == "ksafupccgsd":
-                self.ansatz_options["SAGS"] = True
-                self.ansatz_options["GpD"] = True
-            elif ansatz.lower() == "fuccspd":
-                self.ansatz_options["pD"] = True
+                self.ansatz_options["excitations"].append("SAGS")
+                self.ansatz_options["excitations"].append("GpD")
+            elif ansatz.lower() == "fuccpd":
+                self.ansatz_options["excitations"].append("pD")
             elif ansatz.lower() == "safuccspd":
-                self.ansatz_options["SAS"] = True
-                self.ansatz_options["SAD"] = True
+                self.ansatz_options["excitations"].append("SAS")
+                self.ansatz_options["excitations"].append("SAD")
             # Default options
             self.ansatz_options.setdefault("n_layers", 1)
             self.ups_layout.create_fUCC(
@@ -341,9 +342,9 @@ class WaveFunctionUPS:
             )
         elif ansatz.lower() in ("sdsfuccsd", "ksasdsfupccgsd"):
             if ansatz.lower() == "sdsfuccsd":
-                self.ansatz_options["D"] = True
+                self.ansatz_options["excitations"].append("D")
             elif ansatz.lower() == "ksasdsfupccgsd":
-                self.ansatz_options["GpD"] = True
+                self.ansatz_options["excitations"].append("GpD")
             # Default options
             self.ansatz_options.setdefault("n_layers", 1)
             self.ups_layout.create_SDSfUCC(
