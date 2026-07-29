@@ -259,7 +259,7 @@ class WaveFunctionUPS:
                 self.active_unocc_idx.append(orb_idx)
             else:
                 raise ValueError(
-                    f"Got unknown option for resolve_unpaired_idx, {ansatz_options['resolve_unpaired_idx']}, excepted 'both', 'occ' or 'unocc'."
+                    f"Got unknown option for resolve_unpaired_idx, {wavefunction_options['resolve_unpaired_idx']}, excepted 'both', 'occ' or 'unocc'."
                 )
         self.active_idx_shifted = [x - self.num_inactive_orbs for x in self.active_idx]
         self.active_occ_idx_shifted = [x - self.num_inactive_orbs for x in self.active_occ_idx]
@@ -466,7 +466,7 @@ class WaveFunctionUPS:
             One-electron reduced density matrix.
         """
         if self._rdm1 is None:
-            self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs))
+            self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs), dtype=float)
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
@@ -495,7 +495,8 @@ class WaveFunctionUPS:
                     self.num_active_orbs,
                     self.num_active_orbs,
                     self.num_active_orbs,
-                )
+                ),
+                dtype=float,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
@@ -545,7 +546,8 @@ class WaveFunctionUPS:
                     self.num_active_orbs,
                     self.num_active_orbs,
                     self.num_active_orbs,
-                )
+                ),
+                dtype=float,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
@@ -607,7 +609,8 @@ class WaveFunctionUPS:
                     self.num_active_orbs,
                     self.num_active_orbs,
                     self.num_active_orbs,
-                )
+                ),
+                dtype=float,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
@@ -709,16 +712,13 @@ class WaveFunctionUPS:
                                             self._rdm4[n_, m_, u_, t_, s_, r_, q_, p_] = val  # type: ignore
         return self._rdm4
 
-    def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
+    def check_orthonormality(self) -> None:
         r"""Check orthonormality of orbitals.
 
         .. math::
             \boldsymbol{I} = \boldsymbol{C}_\text{MO}\boldsymbol{S}\boldsymbol{C}_\text{MO}^T
-
-        Args:
-            overlap_integral: Overlap integral in AO basis.
         """
-        S_ortho = one_electron_integral_transform(self.c_mo, overlap_integral)
+        S_ortho = one_electron_integral_transform(self.c_mo, self.int_gen.overlap)
         one = np.identity(len(S_ortho))
         diff = np.abs(S_ortho - one)
         print("Max ortho-normal diff:", np.max(diff))
