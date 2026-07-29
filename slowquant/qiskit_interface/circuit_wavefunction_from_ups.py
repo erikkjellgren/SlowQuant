@@ -19,7 +19,7 @@ def circuit_wavefunction_from_ups(
     mapper: FermionicMapper,
     ISA: bool = False,
     pass_manager_options: dict[str, Any] | None = None,
-    shots: None | int = None,
+    shots: int | None = None,
     max_shots_per_run: int = 100000,
     do_M_mitigation: bool = False,
     do_M_ansatz0: bool = False,
