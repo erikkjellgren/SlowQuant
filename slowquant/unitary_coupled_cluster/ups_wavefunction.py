@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import time
 from functools import partial
 from typing import Any
@@ -32,13 +33,12 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
 from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UpsStructure
-import copy
 
 
 class WaveFunctionUPS:
     def __init__(
         self,
-        active_space: tuple[int, int] | tuple[tuple[int,int], int],
+        active_space: tuple[int, int] | tuple[tuple[int, int], int],
         mo_coeffs: np.ndarray,
         integral_generator: SlowQuant | pyscf.gto.mole.Mole,
         ansatz: str,
@@ -78,10 +78,18 @@ class WaveFunctionUPS:
         if wavefunction_options is None:
             wavefunction_options = {}
         self.wavefunction_options = copy.deepcopy(wavefunction_options)
-        valid_options = ("do_pp", "resolve_unpaired_idx", "include_active_kappa", "reference_determiant", "pp_no_reoder_mo")
+        valid_options = (
+            "do_pp",
+            "resolve_unpaired_idx",
+            "include_active_kappa",
+            "reference_determiant",
+            "pp_no_reoder_mo",
+        )
         for option in wavefunction_options:
             if option not in wavefunction_options:
-                raise ValueError(f"Got unknown option for UPS wave function, {option}. Valid options are: {valid_options}")
+                raise ValueError(
+                    f"Got unknown option for UPS wave function, {option}. Valid options are: {valid_options}"
+                )
         # Default options
         self.wavefunction_options.setdefault("resolve_unpaired_idx", "both")
         self.wavefunction_options.setdefault("include_active_kappa", True)
@@ -90,30 +98,36 @@ class WaveFunctionUPS:
         if len(active_space) != 2:
             raise ValueError(f"cas must have two elements, got {len(active_space)} elements.")
         if isinstance(active_space[0], int):
-            if active_space[0]%2 == 0:
-                cas = ((active_space[0]//2, active_space[0]//2), active_space[1])
+            if active_space[0] % 2 == 0:
+                cas = ((active_space[0] // 2, active_space[0] // 2), active_space[1])
             else:
                 # Uneven number of electrons mean one electron must be unpaired.
-                cas = ((active_space[0]//2 + 1, active_space[0]//2), active_space[1])
+                cas = ((active_space[0] // 2 + 1, active_space[0] // 2), active_space[1])
         else:
             cas = ((active_space[0][0], active_space[0][1]), active_space[1])
         # Init stuff
         self.int_gen = IntegralManager(integral_generator)
         if np.sum(cas[0]) > self.int_gen.num_elec:
             raise ValueError("More active electrons than total number electrons.")
-        if (np.sum(cas[0])%2 == 0 and self.int_gen.num_elec%2 == 1) or (np.sum(cas[0])%2 == 1 and self.int_gen.num_elec%2 == 0):
+        if (np.sum(cas[0]) % 2 == 0 and self.int_gen.num_elec % 2 == 1) or (
+            np.sum(cas[0]) % 2 == 1 and self.int_gen.num_elec % 2 == 0
+        ):
             raise ValueError("Specified CAS gives odd number of electrons in inactive space.")
         self.num_inactive_spin_orbs = self.int_gen.num_elec - int(np.sum(cas[0]))
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
         self.num_active_orbs = cas[1]
-        self.num_active_spin_orbs = 2*self.num_active_orbs
+        self.num_active_spin_orbs = 2 * self.num_active_orbs
         self.num_active_orbs = self.num_active_spin_orbs // 2
-        self.num_virtual_orbs = len(self.int_gen.kinetic_energy) - self.num_inactive_orbs - self.num_active_orbs
+        self.num_virtual_orbs = (
+            len(self.int_gen.kinetic_energy) - self.num_inactive_orbs - self.num_active_orbs
+        )
         if self.num_virtual_orbs < 0:
-            raise ValueError("Number of inactive + number of active orbitals is larger than total number of orbitals.")
-        self.num_virtual_spin_orbs = 2*self.num_virtual_orbs
+            raise ValueError(
+                "Number of inactive + number of active orbitals is larger than total number of orbitals."
+            )
+        self.num_virtual_spin_orbs = 2 * self.num_virtual_orbs
         self.num_orbs = self.num_inactive_orbs + self.num_active_orbs + self.num_virtual_orbs
-        self.num_spin_orbs = 2*self.num_orbs
+        self.num_spin_orbs = 2 * self.num_orbs
         self.num_active_elec_alpha = cas[0][0]
         self.num_active_elec_beta = cas[0][1]
         self.num_active_elec = self.num_active_elec_alpha + self.num_active_elec_beta
@@ -132,9 +146,13 @@ class WaveFunctionUPS:
         self._pp = self.wavefunction_options["do_pp"]
         if self.wavefunction_options["do_pp"]:
             if "reference_determiant" in self.wavefunction_options.keys():
-                raise ValueError("Both 'do_pp' and 'reference_determiant' are requested in 'wavefunction_options'.")
+                raise ValueError(
+                    "Both 'do_pp' and 'reference_determiant' are requested in 'wavefunction_options'."
+                )
             if self.num_active_elec_alpha != self.num_active_elec_beta:
-                raise ValueError("perfect-pairing is only defined for equal number of alpha and beta electrons.")
+                raise ValueError(
+                    "perfect-pairing is only defined for equal number of alpha and beta electrons."
+                )
             # Obtain pp determinant
             pp_det = ""
             spin_orb = 0
@@ -175,16 +193,20 @@ class WaveFunctionUPS:
         elif "reference_determiant" in self.wavefunction_options.keys():
             ref_det = self.wavefunction_options["reference_determiant"]
             if len(ref_det) != self.num_active_spin_orbs:
-                raise ValueError(f"Reference determinant is {len(ref_det)} spin orbitals and the active space is {self.num_active_spin_orbs} spin orbitals.")
+                raise ValueError(
+                    f"Reference determinant is {len(ref_det)} spin orbitals and the active space is {self.num_active_spin_orbs} spin orbitals."
+                )
             ref_alpha = 0
             ref_beta = 0
             for i, idx in ref_det:
-                if i%2 == 0 and idx == "1":
+                if i % 2 == 0 and idx == "1":
                     ref_alpha += 1
                 elif idx == "1":
                     ref_beta += 1
             if ref_alpha != self.num_active_elec_alpha or ref_beta != self.num_active_elec_beta:
-                raise ValueError("Number of electrons ({ref_alpha}, {ref_beta}) is different from the active space ({self.num_active_elec_alpha, self.num_active_elec_beta}).")
+                raise ValueError(
+                    "Number of electrons ({ref_alpha}, {ref_beta}) is different from the active space ({self.num_active_elec_alpha, self.num_active_elec_beta})."
+                )
         else:
             ref_det = ""
             for i in range(self.num_active_orbs):
@@ -192,14 +214,17 @@ class WaveFunctionUPS:
                     ref_det += "1"
                 else:
                     ref_det += "0"
-                if i < self.num_active_elec_beta: 
+                if i < self.num_active_elec_beta:
                     ref_det += "1"
                 else:
                     ref_det += "0"
         # Construct spin orbital indices
         self.inactive_spin_idx = [x for x in range(self.num_inactive_spin_orbs)]
         self.active_spin_idx = [x + self.num_inactive_spin_orbs for x in range(self.num_active_spin_orbs)]
-        self.virtual_spin_idx = [x + self.num_inactive_spin_orbs + self.num_active_spin_orbs for x in range(self.num_virtual_spin_orbs)]
+        self.virtual_spin_idx = [
+            x + self.num_inactive_spin_orbs + self.num_active_spin_orbs
+            for x in range(self.num_virtual_spin_orbs)
+        ]
         self.active_occ_spin_idx = []
         self.active_unocc_spin_idx = []
         for i, orb_idx in enumerate(self.active_spin_idx):
@@ -209,28 +234,33 @@ class WaveFunctionUPS:
                 self.active_unocc_spin_idx.append(orb_idx)
         self.active_spin_idx_shifted = [x - self.num_inactive_spin_orbs for x in self.active_spin_idx]
         self.active_occ_spin_idx_shifted = [x - self.num_inactive_spin_orbs for x in self.active_occ_spin_idx]
-        self.active_unocc_spin_idx_shifted = [x - self.num_inactive_spin_orbs for x in self.active_unocc_spin_idx]
+        self.active_unocc_spin_idx_shifted = [
+            x - self.num_inactive_spin_orbs for x in self.active_unocc_spin_idx
+        ]
         # Construct spatial idx
         self.inactive_idx = [x for x in range(self.num_inactive_orbs)]
         self.active_idx = [x + self.num_inactive_orbs for x in range(self.num_active_orbs)]
-        self.virtual_idx = [x + self.num_inactive_orbs + self.num_active_orbs for x in range(self.num_virtual_orbs)]
+        self.virtual_idx = [
+            x + self.num_inactive_orbs + self.num_active_orbs for x in range(self.num_virtual_orbs)
+        ]
         self.active_occ_idx = []
         self.active_unocc_idx = []
         for i, orb_idx in enumerate(self.active_idx):
-            if ref_det[2*i] == "1" and ref_det[2*i+1] == "1":
+            if ref_det[2 * i] == "1" and ref_det[2 * i + 1] == "1":
                 self.active_occ_idx.append(orb_idx)
-            elif ref_det[2*i] == "0" and ref_det[2*i+1] == "0":
+            elif ref_det[2 * i] == "0" and ref_det[2 * i + 1] == "0":
+                self.active_unocc_idx.append(orb_idx)
+            elif self.wavefunction_options["resolve_unpaired_idx"] == "both":
+                self.active_occ_idx.append(orb_idx)
+                self.active_unocc_idx.append(orb_idx)
+            elif self.wavefunction_options["resolve_unpaired_idx"] == "occ":
+                self.active_occ_idx.append(orb_idx)
+            elif self.wavefunction_options["resolve_unpaired_idx"] == "unocc":
                 self.active_unocc_idx.append(orb_idx)
             else:
-                if self.wavefunction_options["resolve_unpaired_idx"] == "both":
-                    self.active_occ_idx.append(orb_idx)
-                    self.active_unocc_idx.append(orb_idx)
-                elif self.wavefunction_options["resolve_unpaired_idx"] == "occ":
-                    self.active_occ_idx.append(orb_idx)
-                elif self.wavefunction_options["resolve_unpaired_idx"] == "unocc":
-                    self.active_unocc_idx.append(orb_idx)
-                else:
-                    raise ValueError(f"Got unknown option for resolve_unpaired_idx, {ansatz_options['resolve_unpaired_idx']}, excepted 'both', 'occ' or 'unocc'.")
+                raise ValueError(
+                    f"Got unknown option for resolve_unpaired_idx, {ansatz_options['resolve_unpaired_idx']}, excepted 'both', 'occ' or 'unocc'."
+                )
         self.active_idx_shifted = [x - self.num_inactive_orbs for x in self.active_idx]
         self.active_occ_idx_shifted = [x - self.num_inactive_orbs for x in self.active_occ_idx]
         self.active_unocc_idx_shifted = [x - self.num_inactive_orbs for x in self.active_unocc_idx]
@@ -239,7 +269,6 @@ class WaveFunctionUPS:
         kappa_idx = []
         kappa_no_activeactive_idx = []
         kappa_no_activeactive_idx_dagger = []
-        kappa_redundant_idx = []
         self._kappa_old = []
         # kappa can be optimized in spatial basis
         # Loop over all q>p orb combinations and find redundant kappas
@@ -247,14 +276,11 @@ class WaveFunctionUPS:
             for q in range(p + 1, self.num_orbs):
                 # find redundant kappas
                 if p in self.inactive_idx and q in self.inactive_idx:
-                    kappa_redundant_idx.append((p, q))
                     continue
                 if p in self.virtual_idx and q in self.virtual_idx:
-                    kappa_redundant_idx.append((p, q))
                     continue
                 if not self._include_active_kappa:
                     if p in self.active_idx and q in self.active_idx:
-                        kappa_redundant_idx.append((p, q))
                         continue
                 if not (p in self.active_idx and q in self.active_idx):
                     kappa_no_activeactive_idx.append((p, q))
@@ -276,7 +302,6 @@ class WaveFunctionUPS:
         self.kappa_idx = np.array(kappa_idx, dtype=int)
         self.kappa_no_activeactive_idx = np.array(kappa_no_activeactive_idx, dtype=int)
         self.kappa_no_activeactive_idx_dagger = np.array(kappa_no_activeactive_idx_dagger, dtype=int)
-        self.kappa_redundant_idx = np.array(kappa_redundant_idx, dtype=int)
         self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
         # Construct determinant basis
         self.ci_info = get_indexing(
@@ -443,17 +468,17 @@ class WaveFunctionUPS:
         if self._rdm1 is None:
             self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs))
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                p_idx = p - self.num_inactive_orbs
+                p_ = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
-                    q_idx = q - self.num_inactive_orbs
+                    q_ = q - self.num_inactive_orbs
                     val = expectation_value(
                         self.ci_coeffs,
                         [Epq(p, q)],
                         self.ci_coeffs,
                         self.ci_info,
                     )
-                    self._rdm1[p_idx, q_idx] = val  # type: ignore
-                    self._rdm1[q_idx, p_idx] = val  # type: ignore
+                    self._rdm1[p_, q_] = val  # type: ignore
+                    self._rdm1[q_, p_] = val  # type: ignore
         return self._rdm1
 
     @property
@@ -473,11 +498,11 @@ class WaveFunctionUPS:
                 )
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                p_idx = p - self.num_inactive_orbs
+                p_ = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
-                    q_idx = q - self.num_inactive_orbs
+                    q_ = q - self.num_inactive_orbs
                     for r in range(self.num_inactive_orbs, p + 1):
-                        r_idx = r - self.num_inactive_orbs
+                        r_ = r - self.num_inactive_orbs
                         if p == q:
                             s_lim = r + 1
                         elif p == r:
@@ -487,7 +512,7 @@ class WaveFunctionUPS:
                         else:
                             s_lim = p + 1
                         for s in range(self.num_inactive_orbs, s_lim):
-                            s_idx = s - self.num_inactive_orbs
+                            s_ = s - self.num_inactive_orbs
                             val = expectation_value(
                                 self.ci_coeffs,
                                 [Epq(p, q) * Epq(r, s)],
@@ -495,11 +520,11 @@ class WaveFunctionUPS:
                                 self.ci_info,
                             )
                             if q == r:
-                                val -= self.rdm1[p_idx, s_idx]
-                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
-                            self._rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore
-                            self._rdm2[q_idx, p_idx, s_idx, r_idx] = val  # type: ignore
-                            self._rdm2[s_idx, r_idx, q_idx, p_idx] = val  # type: ignore
+                                val -= self.rdm1[p_, s_]
+                            self._rdm2[p_, q_, r_, s_] = val  # type: ignore
+                            self._rdm2[r_, s_, p_, q_] = val  # type: ignore
+                            self._rdm2[q_, p_, s_, r_] = val  # type: ignore
+                            self._rdm2[s_, r_, q_, p_] = val  # type: ignore
         return self._rdm2
 
     @property
@@ -523,17 +548,17 @@ class WaveFunctionUPS:
                 )
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                p_idx = p - self.num_inactive_orbs
+                p_ = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
-                    q_idx = q - self.num_inactive_orbs
+                    q_ = q - self.num_inactive_orbs
                     for r in range(self.num_inactive_orbs, p + 1):
-                        r_idx = r - self.num_inactive_orbs
+                        r_ = r - self.num_inactive_orbs
                         for s in range(self.num_inactive_orbs, p + 1):
-                            s_idx = s - self.num_inactive_orbs
+                            s_ = s - self.num_inactive_orbs
                             for t in range(self.num_inactive_orbs, r + 1):
-                                t_idx = t - self.num_inactive_orbs
+                                t_ = t - self.num_inactive_orbs
                                 for u in range(self.num_inactive_orbs, p + 1):
-                                    u_idx = u - self.num_inactive_orbs
+                                    u_ = u - self.num_inactive_orbs
                                     val = expectation_value(
                                         self.ci_coeffs,
                                         [Epq(p, q), Epq(r, s), Epq(t, u)],
@@ -541,25 +566,25 @@ class WaveFunctionUPS:
                                         self.ci_info,
                                     )
                                     if t == s:
-                                        val -= self.rdm2[p_idx, q_idx, r_idx, u_idx]
+                                        val -= self.rdm2[p_, q_, r_, u_]
                                     if r == q:
-                                        val -= self.rdm2[p_idx, s_idx, t_idx, u_idx]
+                                        val -= self.rdm2[p_, s_, t_, u_]
                                     if t == q:
-                                        val -= self.rdm2[p_idx, u_idx, r_idx, s_idx]
+                                        val -= self.rdm2[p_, u_, r_, s_]
                                     if t == s and r == q:
-                                        val -= self.rdm1[p_idx, u_idx]
-                                    self._rdm3[p_idx, q_idx, r_idx, s_idx, t_idx, u_idx] = val  # type: ignore
-                                    self._rdm3[p_idx, q_idx, t_idx, u_idx, r_idx, s_idx] = val  # type: ignore
-                                    self._rdm3[r_idx, s_idx, p_idx, q_idx, t_idx, u_idx] = val  # type: ignore
-                                    self._rdm3[r_idx, s_idx, t_idx, u_idx, p_idx, q_idx] = val  # type: ignore
-                                    self._rdm3[t_idx, u_idx, p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
-                                    self._rdm3[t_idx, u_idx, r_idx, s_idx, p_idx, q_idx] = val  # type: ignore
-                                    self._rdm3[q_idx, p_idx, s_idx, r_idx, u_idx, t_idx] = val  # type: ignore
-                                    self._rdm3[q_idx, p_idx, u_idx, t_idx, s_idx, r_idx] = val  # type: ignore
-                                    self._rdm3[s_idx, r_idx, q_idx, p_idx, u_idx, t_idx] = val  # type: ignore
-                                    self._rdm3[s_idx, r_idx, u_idx, t_idx, q_idx, p_idx] = val  # type: ignore
-                                    self._rdm3[u_idx, t_idx, q_idx, p_idx, s_idx, r_idx] = val  # type: ignore
-                                    self._rdm3[u_idx, t_idx, s_idx, r_idx, q_idx, p_idx] = val  # type: ignore
+                                        val -= self.rdm1[p_, u_]
+                                    self._rdm3[p_, q_, r_, s_, t_, u_] = val  # type: ignore
+                                    self._rdm3[p_, q_, t_, u_, r_, s_] = val  # type: ignore
+                                    self._rdm3[r_, s_, p_, q_, t_, u_] = val  # type: ignore
+                                    self._rdm3[r_, s_, t_, u_, p_, q_] = val  # type: ignore
+                                    self._rdm3[t_, u_, p_, q_, r_, s_] = val  # type: ignore
+                                    self._rdm3[t_, u_, r_, s_, p_, q_] = val  # type: ignore
+                                    self._rdm3[q_, p_, s_, r_, u_, t_] = val  # type: ignore
+                                    self._rdm3[q_, p_, u_, t_, s_, r_] = val  # type: ignore
+                                    self._rdm3[s_, r_, q_, p_, u_, t_] = val  # type: ignore
+                                    self._rdm3[s_, r_, u_, t_, q_, p_] = val  # type: ignore
+                                    self._rdm3[u_, t_, q_, p_, s_, r_] = val  # type: ignore
+                                    self._rdm3[u_, t_, s_, r_, q_, p_] = val  # type: ignore
         return self._rdm3
 
     @property
@@ -585,21 +610,21 @@ class WaveFunctionUPS:
                 )
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                p_idx = p - self.num_inactive_orbs
+                p_ = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
-                    q_idx = q - self.num_inactive_orbs
+                    q_ = q - self.num_inactive_orbs
                     for r in range(self.num_inactive_orbs, p + 1):
-                        r_idx = r - self.num_inactive_orbs
+                        r_ = r - self.num_inactive_orbs
                         for s in range(self.num_inactive_orbs, p + 1):
-                            s_idx = s - self.num_inactive_orbs
+                            s_ = s - self.num_inactive_orbs
                             for t in range(self.num_inactive_orbs, r + 1):
-                                t_idx = t - self.num_inactive_orbs
+                                t_ = t - self.num_inactive_orbs
                                 for u in range(self.num_inactive_orbs, p + 1):
-                                    u_idx = u - self.num_inactive_orbs
+                                    u_ = u - self.num_inactive_orbs
                                     for m in range(self.num_inactive_orbs, t + 1):
-                                        m_idx = m - self.num_inactive_orbs
+                                        m_ = m - self.num_inactive_orbs
                                         for n in range(self.num_inactive_orbs, p + 1):
-                                            n_idx = n - self.num_inactive_orbs
+                                            n_ = n - self.num_inactive_orbs
                                             val = expectation_value(
                                                 self.ci_coeffs,
                                                 [Epq(p, q), Epq(r, s), Epq(t, u), Epq(m, n)],
@@ -607,177 +632,81 @@ class WaveFunctionUPS:
                                                 self.ci_info,
                                             )
                                             if r == q:
-                                                val -= self.rdm3[p_idx, s_idx, t_idx, u_idx, m_idx, n_idx]
+                                                val -= self.rdm3[p_, s_, t_, u_, m_, n_]
                                             if t == q:
-                                                val -= self.rdm3[p_idx, u_idx, r_idx, s_idx, m_idx, n_idx]
+                                                val -= self.rdm3[p_, u_, r_, s_, m_, n_]
                                             if m == q:
-                                                val -= self.rdm3[p_idx, n_idx, r_idx, s_idx, t_idx, u_idx]
+                                                val -= self.rdm3[p_, n_, r_, s_, t_, u_]
                                             if m == u:
-                                                val -= self.rdm3[p_idx, q_idx, r_idx, s_idx, t_idx, n_idx]
+                                                val -= self.rdm3[p_, q_, r_, s_, t_, n_]
                                             if t == s:
-                                                val -= self.rdm3[p_idx, q_idx, r_idx, u_idx, m_idx, n_idx]
+                                                val -= self.rdm3[p_, q_, r_, u_, m_, n_]
                                             if m == s:
-                                                val -= self.rdm3[p_idx, q_idx, r_idx, n_idx, t_idx, u_idx]
+                                                val -= self.rdm3[p_, q_, r_, n_, t_, u_]
                                             if m == u and r == q:
-                                                val -= self.rdm2[p_idx, s_idx, t_idx, n_idx]
+                                                val -= self.rdm2[p_, s_, t_, n_]
                                             if m == u and t == q:
-                                                val -= self.rdm2[p_idx, n_idx, r_idx, s_idx]
+                                                val -= self.rdm2[p_, n_, r_, s_]
                                             if t == s and m == u:
-                                                val -= self.rdm2[p_idx, q_idx, r_idx, n_idx]
+                                                val -= self.rdm2[p_, q_, r_, n_]
                                             if t == s and r == q:
-                                                val -= self.rdm2[p_idx, u_idx, m_idx, n_idx]
+                                                val -= self.rdm2[p_, u_, m_, n_]
                                             if t == s and m == q:
-                                                val -= self.rdm2[p_idx, n_idx, r_idx, u_idx]
+                                                val -= self.rdm2[p_, n_, r_, u_]
                                             if m == s and r == q:
-                                                val -= self.rdm2[p_idx, n_idx, t_idx, u_idx]
+                                                val -= self.rdm2[p_, n_, t_, u_]
                                             if m == s and t == q:
-                                                val -= self.rdm2[p_idx, u_idx, r_idx, n_idx]
+                                                val -= self.rdm2[p_, u_, r_, n_]
                                             if m == u and t == s and r == q:
-                                                val -= self.rdm1[p_idx, n_idx]
-                                            self._rdm4[  # type: ignore
-                                                p_idx, q_idx, r_idx, s_idx, t_idx, u_idx, m_idx, n_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                p_idx, q_idx, r_idx, s_idx, m_idx, n_idx, t_idx, u_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                p_idx, q_idx, t_idx, u_idx, r_idx, s_idx, m_idx, n_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                p_idx, q_idx, t_idx, u_idx, m_idx, n_idx, r_idx, s_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                p_idx, q_idx, m_idx, n_idx, r_idx, s_idx, t_idx, u_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                p_idx, q_idx, m_idx, n_idx, t_idx, u_idx, r_idx, s_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                r_idx, s_idx, p_idx, q_idx, t_idx, u_idx, m_idx, n_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                r_idx, s_idx, p_idx, q_idx, m_idx, n_idx, t_idx, u_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                r_idx, s_idx, t_idx, u_idx, p_idx, q_idx, m_idx, n_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                r_idx, s_idx, t_idx, u_idx, m_idx, n_idx, p_idx, q_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                r_idx, s_idx, m_idx, n_idx, p_idx, q_idx, t_idx, u_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                r_idx, s_idx, m_idx, n_idx, t_idx, u_idx, p_idx, q_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                t_idx, u_idx, p_idx, q_idx, r_idx, s_idx, m_idx, n_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                t_idx, u_idx, p_idx, q_idx, m_idx, n_idx, r_idx, s_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                t_idx, u_idx, r_idx, s_idx, p_idx, q_idx, m_idx, n_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                t_idx, u_idx, r_idx, s_idx, m_idx, n_idx, p_idx, q_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                t_idx, u_idx, m_idx, n_idx, p_idx, q_idx, r_idx, s_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                t_idx, u_idx, m_idx, n_idx, r_idx, s_idx, p_idx, q_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                m_idx, n_idx, p_idx, q_idx, r_idx, s_idx, t_idx, u_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                m_idx, n_idx, p_idx, q_idx, t_idx, u_idx, r_idx, s_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                m_idx, n_idx, r_idx, s_idx, p_idx, q_idx, t_idx, u_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                m_idx, n_idx, r_idx, s_idx, t_idx, u_idx, p_idx, q_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                m_idx, n_idx, t_idx, u_idx, p_idx, q_idx, r_idx, s_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                m_idx, n_idx, t_idx, u_idx, r_idx, s_idx, p_idx, q_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                q_idx, p_idx, s_idx, r_idx, u_idx, t_idx, n_idx, m_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                q_idx, p_idx, s_idx, r_idx, n_idx, m_idx, u_idx, t_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                q_idx, p_idx, u_idx, t_idx, s_idx, r_idx, n_idx, m_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                q_idx, p_idx, u_idx, t_idx, n_idx, m_idx, s_idx, r_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                q_idx, p_idx, n_idx, m_idx, s_idx, r_idx, u_idx, t_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                q_idx, p_idx, n_idx, m_idx, u_idx, t_idx, s_idx, r_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                s_idx, r_idx, q_idx, p_idx, u_idx, t_idx, n_idx, m_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                s_idx, r_idx, q_idx, p_idx, n_idx, m_idx, u_idx, t_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                s_idx, r_idx, u_idx, t_idx, q_idx, p_idx, n_idx, m_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                s_idx, r_idx, u_idx, t_idx, n_idx, m_idx, q_idx, p_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                s_idx, r_idx, n_idx, m_idx, q_idx, p_idx, u_idx, t_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                s_idx, r_idx, n_idx, m_idx, u_idx, t_idx, q_idx, p_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                u_idx, t_idx, q_idx, p_idx, s_idx, r_idx, n_idx, m_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                u_idx, t_idx, q_idx, p_idx, n_idx, m_idx, s_idx, r_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                u_idx, t_idx, s_idx, r_idx, q_idx, p_idx, n_idx, m_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                u_idx, t_idx, s_idx, r_idx, n_idx, m_idx, q_idx, p_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                u_idx, t_idx, n_idx, m_idx, q_idx, p_idx, s_idx, r_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                u_idx, t_idx, n_idx, m_idx, s_idx, r_idx, q_idx, p_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                n_idx, m_idx, q_idx, p_idx, s_idx, r_idx, u_idx, t_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                n_idx, m_idx, q_idx, p_idx, u_idx, t_idx, s_idx, r_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                n_idx, m_idx, s_idx, r_idx, q_idx, p_idx, u_idx, t_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                n_idx, m_idx, s_idx, r_idx, u_idx, t_idx, q_idx, p_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                n_idx, m_idx, u_idx, t_idx, q_idx, p_idx, s_idx, r_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                n_idx, m_idx, u_idx, t_idx, s_idx, r_idx, q_idx, p_idx
-                                            ] = val
+                                                val -= self.rdm1[p_, n_]
+                                            self._rdm4[p_, q_, r_, s_, t_, u_, m_, n_] = val  # type: ignore
+                                            self._rdm4[p_, q_, r_, s_, m_, n_, t_, u_] = val  # type: ignore
+                                            self._rdm4[p_, q_, t_, u_, r_, s_, m_, n_] = val  # type: ignore
+                                            self._rdm4[p_, q_, t_, u_, m_, n_, r_, s_] = val  # type: ignore
+                                            self._rdm4[p_, q_, m_, n_, r_, s_, t_, u_] = val  # type: ignore
+                                            self._rdm4[p_, q_, m_, n_, t_, u_, r_, s_] = val  # type: ignore
+                                            self._rdm4[r_, s_, p_, q_, t_, u_, m_, n_] = val  # type: ignore
+                                            self._rdm4[r_, s_, p_, q_, m_, n_, t_, u_] = val  # type: ignore
+                                            self._rdm4[r_, s_, t_, u_, p_, q_, m_, n_] = val  # type: ignore
+                                            self._rdm4[r_, s_, t_, u_, m_, n_, p_, q_] = val  # type: ignore
+                                            self._rdm4[r_, s_, m_, n_, p_, q_, t_, u_] = val  # type: ignore
+                                            self._rdm4[r_, s_, m_, n_, t_, u_, p_, q_] = val  # type: ignore
+                                            self._rdm4[t_, u_, p_, q_, r_, s_, m_, n_] = val  # type: ignore
+                                            self._rdm4[t_, u_, p_, q_, m_, n_, r_, s_] = val  # type: ignore
+                                            self._rdm4[t_, u_, r_, s_, p_, q_, m_, n_] = val  # type: ignore
+                                            self._rdm4[t_, u_, r_, s_, m_, n_, p_, q_] = val  # type: ignore
+                                            self._rdm4[t_, u_, m_, n_, p_, q_, r_, s_] = val  # type: ignore
+                                            self._rdm4[t_, u_, m_, n_, r_, s_, p_, q_] = val  # type: ignore
+                                            self._rdm4[m_, n_, p_, q_, r_, s_, t_, u_] = val  # type: ignore
+                                            self._rdm4[m_, n_, p_, q_, t_, u_, r_, s_] = val  # type: ignore
+                                            self._rdm4[m_, n_, r_, s_, p_, q_, t_, u_] = val  # type: ignore
+                                            self._rdm4[m_, n_, r_, s_, t_, u_, p_, q_] = val  # type: ignore
+                                            self._rdm4[m_, n_, t_, u_, p_, q_, r_, s_] = val  # type: ignore
+                                            self._rdm4[m_, n_, t_, u_, r_, s_, p_, q_] = val  # type: ignore
+                                            self._rdm4[q_, p_, s_, r_, u_, t_, n_, m_] = val  # type: ignore
+                                            self._rdm4[q_, p_, s_, r_, n_, m_, u_, t_] = val  # type: ignore
+                                            self._rdm4[q_, p_, u_, t_, s_, r_, n_, m_] = val  # type: ignore
+                                            self._rdm4[q_, p_, u_, t_, n_, m_, s_, r_] = val  # type: ignore
+                                            self._rdm4[q_, p_, n_, m_, s_, r_, u_, t_] = val  # type: ignore
+                                            self._rdm4[q_, p_, n_, m_, u_, t_, s_, r_] = val  # type: ignore
+                                            self._rdm4[s_, r_, q_, p_, u_, t_, n_, m_] = val  # type: ignore
+                                            self._rdm4[s_, r_, q_, p_, n_, m_, u_, t_] = val  # type: ignore
+                                            self._rdm4[s_, r_, u_, t_, q_, p_, n_, m_] = val  # type: ignore
+                                            self._rdm4[s_, r_, u_, t_, n_, m_, q_, p_] = val  # type: ignore
+                                            self._rdm4[s_, r_, n_, m_, q_, p_, u_, t_] = val  # type: ignore
+                                            self._rdm4[s_, r_, n_, m_, u_, t_, q_, p_] = val  # type: ignore
+                                            self._rdm4[u_, t_, q_, p_, s_, r_, n_, m_] = val  # type: ignore
+                                            self._rdm4[u_, t_, q_, p_, n_, m_, s_, r_] = val  # type: ignore
+                                            self._rdm4[u_, t_, s_, r_, q_, p_, n_, m_] = val  # type: ignore
+                                            self._rdm4[u_, t_, s_, r_, n_, m_, q_, p_] = val  # type: ignore
+                                            self._rdm4[u_, t_, n_, m_, q_, p_, s_, r_] = val  # type: ignore
+                                            self._rdm4[u_, t_, n_, m_, s_, r_, q_, p_] = val  # type: ignore
+                                            self._rdm4[n_, m_, q_, p_, s_, r_, u_, t_] = val  # type: ignore
+                                            self._rdm4[n_, m_, q_, p_, u_, t_, s_, r_] = val  # type: ignore
+                                            self._rdm4[n_, m_, s_, r_, q_, p_, u_, t_] = val  # type: ignore
+                                            self._rdm4[n_, m_, s_, r_, u_, t_, q_, p_] = val  # type: ignore
+                                            self._rdm4[n_, m_, u_, t_, q_, p_, s_, r_] = val  # type: ignore
+                                            self._rdm4[n_, m_, u_, t_, s_, r_, q_, p_] = val  # type: ignore
         return self._rdm4
 
     def check_orthonormality(self, overlap_integral: np.ndarray) -> None:

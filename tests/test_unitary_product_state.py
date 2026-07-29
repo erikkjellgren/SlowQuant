@@ -381,7 +381,7 @@ def test_pptUPS_h2o() -> None:
         integral_generator,
         "tUPS",  # our circuit Ansatz
         ansatz_options={"n_layers": 1},  # we use 1 layer
-        wavefunction_options={"do_pp": True}
+        wavefunction_options={"do_pp": True},
     )
 
     WF.run_wf_optimization_1step("bfgs", orbital_optimization=False)

@@ -65,7 +65,7 @@ class LinearResponse(LinearResponseBaseClass):
         for i, op in enumerate(self.G_ops):
             G_ket = propagate_state(
                 [op],
-                self.wf.csf_coeffs,
+                self.wf.ref_coeffs,
                 *self.index_info,
             )
             # <0| H U G |CSF>
@@ -112,7 +112,7 @@ class LinearResponse(LinearResponseBaseClass):
         for j, qJ in enumerate(self.q_ops):
             UdHq_ket = propagate_state(["Ud", self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info)
             for i, GI in enumerate(self.G_ops):
-                G_ket = propagate_state([GI], self.wf.csf_coeffs, *self.index_info)
+                G_ket = propagate_state([GI], self.wf.ref_coeffs, *self.index_info)
                 # Make A
                 # <CSF| Gd Ud H q |0>
                 val = expectation_value(
@@ -125,14 +125,14 @@ class LinearResponse(LinearResponseBaseClass):
         for j, GJ in enumerate(self.G_ops):
             UdHUGJ_ket = propagate_state(
                 ["Ud", self.H_0i_0a, "U", GJ],
-                self.wf.csf_coeffs,
+                self.wf.ref_coeffs,
                 *self.index_info,
             )
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
                 # <CSF| GId Ud H U GJ |CSF>
                 val = expectation_value(
-                    self.wf.csf_coeffs,
+                    self.wf.ref_coeffs,
                     [GI.dagger],
                     UdHUGJ_ket,
                     *self.index_info,
@@ -218,7 +218,7 @@ class LinearResponse(LinearResponseBaseClass):
             for i, G in enumerate(self.G_ops):
                 G_ket = propagate_state(
                     [G],
-                    self.wf.csf_coeffs,
+                    self.wf.ref_coeffs,
                     *self.index_info,
                 )
                 # -Z * <0| mux U G | CSF>
