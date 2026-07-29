@@ -44,16 +44,13 @@ def circuit_wavefunction_from_ups(
     Returns:
         Circuit wavefunction.
     """
-    ansatz_options = None
-    if hasattr(ups_wf, "_pp") and ups_wf._pp:
-        ansatz_options = {"do_pp": True}
     QI = QuantumInterface(
         primitive=primitive,
         ansatz=ups_wf.ups_layout,
         mapper=mapper,
         ISA=ISA,
         pass_manager_options=pass_manager_options,
-        ansatz_options=ansatz_options,
+        ansatz_options=None,
         shots=shots,
         max_shots_per_run=max_shots_per_run,
         do_M_mitigation=do_M_mitigation,
@@ -63,23 +60,25 @@ def circuit_wavefunction_from_ups(
     )
     if isinstance(ups_wf, WaveFunctionUPS):
         wf = WaveFunctionCircuit(
-            (ups_wf.num_active_elec, ups_wf.num_active_orbs),
+            ((ups_wf.num_active_elec_alpha, ups_wf.num_active_elec_beta), ups_wf.num_active_orbs),
             ups_wf.c_mo,
             ups_wf.int_gen.int_obj,
             QI,
-            include_active_kappa=ups_wf._include_active_kappa,
-            force_no_pp_mos=True,  # passed MOs are already in pp form.
+            wavefunction_options={
+                "include_active_kappa": ups_wf._include_active_kappa,
+                "reference_determinant": ups_wf._ref_det,
+            },
         )
         wf.thetas = ups_wf.thetas
         return wf
     elif isinstance(ups_wf, WaveFunctionSAUPS):
         sawf = WaveFunctionSACircuit(
-            (ups_wf.num_active_elec, ups_wf.num_active_orbs),
+            ((ups_wf.num_active_elec_alpha, ups_wf.num_active_elec_beta), ups_wf.num_active_orbs),
             ups_wf.c_mo,
             ups_wf.int_gen.int_obj,
             ups_wf._states,
             QI,
-            include_active_kappa=ups_wf._include_active_kappa,
+            wavefunction_options={"include_active_kappa": ups_wf._include_active_kappa},
         )
         sawf.thetas = ups_wf.thetas
         return sawf

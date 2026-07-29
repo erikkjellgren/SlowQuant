@@ -84,7 +84,7 @@ class WaveFunctionUCC:
             "reference_determiant",
         )
         for option in wavefunction_options:
-            if option not in wavefunction_options:
+            if option not in valid_options:
                 raise ValueError(
                     f"Got unknown option for UPS wave function, {option}. Valid options are: {valid_options}"
                 )
