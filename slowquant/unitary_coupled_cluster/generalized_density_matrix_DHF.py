@@ -1377,6 +1377,8 @@ def get_orbital_response_hessian_block(
                 print(RDM1(M, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1))
                 print("H(N,T)")
                 print(h[N, T])
+                print("H(T,N)")
+                print(h[T, N])
 
             for P in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
                 if M == U:
