@@ -501,8 +501,8 @@ def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
     #basis = "cc-pvdz"
-    basis = "631-g"
-    #basis = "sto-3g"
+    #basis = "631-g"
+    basis = "sto-3g"
     #basis = "sto-6g"
     active_space = ((1, 1), 2)
     #active_space = (2, 4)

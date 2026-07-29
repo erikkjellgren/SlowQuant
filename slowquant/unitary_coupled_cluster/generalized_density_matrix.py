@@ -1091,18 +1091,50 @@ def get_orbital_response_hessian_block(
     Returns:
         Hessian-like orbital-orbital block.
     """
-    A1e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx1)), dtype=np.complex128)
-    A2e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx1)),  dtype=np.complex128)
+    A1e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)), dtype=np.complex128)
+    A2e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)),  dtype=np.complex128)
+    A1e_eq = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)), dtype=np.complex128)
+    A1e_eq1 = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)), dtype=np.complex128)
+    A1e_eq2 = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)), dtype=np.complex128)
+    A2e_eq = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)),  dtype=np.complex128)
     for idx1, (T, U) in enumerate(kappa_spin_idx1):
         for idx2, (M, N) in enumerate(kappa_spin_idx2):
             # 1e contribution
             A1e[idx1, idx2] += h[N, T] * RDM1(M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             A1e[idx1, idx2] += h[U, M] * RDM1(T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-            for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
-                if M == U:
-                    A1e[idx1, idx2] -= h[N, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-                if T == N:
-                    A1e[idx1, idx2] -= h[P, M] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+
+            A1e_eq[idx1, idx2] += h[N, T] * RDM1(M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            A1e_eq[idx1, idx2] += h[U, M] * RDM1(T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            A1e_eq1[idx1, idx2] += h[N, T] * RDM1(M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            A1e_eq2[idx1, idx2] += h[U, M] * RDM1(T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+
+            if RDM1(M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1).real != 0:
+                print("idx1, idx2")
+                print(idx1, idx2)
+                print("M, U")
+                print(M, U)
+                print("RDM1(M,U)")
+                print(RDM1(M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1))
+                print("H(N,T)")
+                print(h[N, T])
+                print("H(T,N)")
+                print(h[T, N])
+
+    # A1e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx1)), dtype=np.complex128)
+    # A2e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx1)),  dtype=np.complex128)
+    # for idx1, (T, U) in enumerate(kappa_spin_idx1):
+    #     for idx2, (M, N) in enumerate(kappa_spin_idx2):
+    #         # 1e contribution
+    #         A1e[idx1, idx2] += h[N, T] * RDM1(M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+    #         A1e[idx1, idx2] += h[U, M] * RDM1(T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+    #         for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
+    #             if M == U:
+    #                 A1e[idx1, idx2] -= h[N, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+    #             if T == N:
+    #                 A1e[idx1, idx2] -= h[P, M] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+
+
+
             # 2e contribution
             for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
                 for Q in range(num_inactive_spin_orbs + num_active_spin_orbs):
@@ -1159,6 +1191,8 @@ def get_orbital_response_hessian_block(
                             A2e[idx1, idx2] += g[P, Q, R, M] * RDM2(
                                 P, U, R, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                             )
+
+
     #if A1e.imag.any() > 1e-10 or A2e.imag.any() > 1e-10:
         #print("Warning: Response Hessian is complex!")
     return A1e + (1/2)*A2e
