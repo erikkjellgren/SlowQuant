@@ -34,7 +34,6 @@ def test_tups() -> None:
         SQobj,
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
-        include_active_kappa=True,
     )
     WF.run_wf_optimization_1step("BFGS", True)
 
@@ -77,7 +76,6 @@ def test_fucc() -> None:
         SQobj,
         "fUCCSD",
         ansatz_options={},
-        include_active_kappa=True,
     )
     WF.run_wf_optimization_1step("BFGS", True)
 
@@ -118,7 +116,6 @@ def test_ksafupccgsd() -> None:
         SQobj,
         "kSAfUpCCGSD",
         ansatz_options={"n_layers": 1},
-        include_active_kappa=True,
     )
     WF.run_wf_optimization_1step("BFGS", True)
 
@@ -159,7 +156,6 @@ def test_sdsfuccsd() -> None:
         SQobj,
         "SDSfUCCSD",
         ansatz_options={},
-        include_active_kappa=True,
     )
     WF.run_wf_optimization_1step("BFGS", True)
 
@@ -200,7 +196,6 @@ def test_ksasdsfupccgsd() -> None:
         SQobj,
         "kSASDSfUpCCGSD",
         ansatz_options={"n_layers": 1},
-        include_active_kappa=True,
     )
     WF.run_wf_optimization_1step("BFGS", True)
 
@@ -409,7 +404,6 @@ def test_h2_selfconsistent_lr() -> None:
         SQobj,
         ansatz="tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
-        include_active_kappa=True,
     )
 
     WF.run_wf_optimization_1step("BFGS", True)
@@ -455,7 +449,6 @@ def test_h2_statetransfer_lr() -> None:
         SQobj,
         ansatz="tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
-        include_active_kappa=True,
     )
 
     WF.run_wf_optimization_1step("BFGS", True)
@@ -500,7 +493,6 @@ def test_convert_ups_to_circuit() -> None:
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         "fUCCSD",
-        include_active_kappa=True,
     )
     WF.run_wf_optimization_1step("BFGS", True)
     mapper = JordanWignerMapper()
@@ -540,7 +532,6 @@ def test_convert_saups_to_circuit() -> None:
         ),
         "tUPS",
         ansatz_options={"n_layers": 2, "skip_last_singles": True},
-        include_active_kappa=True,
     )
     WF.run_wf_optimization_2step("BFGS", True)
     mapper = JordanWignerMapper()
@@ -575,8 +566,8 @@ def test_pp_ups_to_circuit() -> None:
         mo_coeff,
         integral_generator,
         "tUPS",  # our circuit Ansatz
-        ansatz_options={"n_layers": 1, "do_pp": True, "skip_last_singles": True},  # we use 1 layer
-        include_active_kappa=True,
+        ansatz_options={"n_layers": 1, "skip_last_singles": True},  # we use 1 layer
+        wavefunction_options={"do_pp": True},
     )
 
     WF.run_wf_optimization_1step("bfgs", orbital_optimization=True)

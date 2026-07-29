@@ -705,7 +705,6 @@ def test_mitigation_nocm() -> None:
         SQobj,
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
-        include_active_kappa=True,
     )
     WF.run_wf_optimization_1step("BFGS", True)
 
@@ -770,7 +769,6 @@ def test_mitigation() -> None:
         SQobj,
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
-        include_active_kappa=True,
     )
     WF.run_wf_optimization_1step("BFGS", True)
 
@@ -1123,7 +1121,6 @@ def test_variance_nocm() -> None:
         SQobj,
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
-        include_active_kappa=True,
     )
     WF.run_wf_optimization_1step("BFGS", True)
 
@@ -1176,7 +1173,6 @@ def test_variance() -> None:
         SQobj,
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
-        include_active_kappa=True,
     )
     WF.run_wf_optimization_1step("BFGS", True)
 

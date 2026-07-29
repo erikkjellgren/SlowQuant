@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Sequence
 from functools import partial
 from typing import Any
 
@@ -33,132 +32,208 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
 from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UpsStructure
+import copy
 
 
 class WaveFunctionUPS:
     def __init__(
         self,
-        cas: Sequence[int],
+        active_space: tuple[int, int] | tuple[tuple[int,int], int],
         mo_coeffs: np.ndarray,
         integral_generator: SlowQuant | pyscf.gto.mole.Mole,
         ansatz: str,
         ansatz_options: dict[str, Any] | None = None,
-        include_active_kappa: bool = False,
+        wavefunction_options: dict[str, Any] | None = None,
     ) -> None:
         """Initialize for UPS wave function.
 
+        Wavefunction Options:
+            * do_pp [bool]: Make perfect-pairing reference determinant.
+                            Will also reorder the orbitalers to match the determinant.
+                            (default: False)
+            * pp_no_reoder_mo [bool]: Turn off orbital reordering during pp.
+                                      (default: False)
+            * include_active_kappa [bool]: Include active-active orbital rotations.
+                                           (default: True)
+            * resolve_unpaired_idx [str]: Specify how to resolve spatial index with respect to occupation of reference determinant.
+                                          'both', include spatial index in both occ and unocc idx list.
+                                          'occ', include spatial index only in occ idx list.
+                                          'unocc', include spatial index only in unocc idx list.
+                                          (default: 'both')
+            * reference_determiant [str]: Specify a reference determinant for the active space part.
+                                          1 specifying occupied orbital and 0 specifying unoccupied orbital.
+
         Args:
-            cas: CAS(num_active_elec, num_active_orbs),
+            active_space: (num_active_elec, num_active_orbs) or ((num_active_elec_alpha, num_active_elec_beta), num_active_orbs),
                  orbitals are counted in spatial basis.
             mo_coeffs: Initial orbital coefficients.
             integral_generator: Integral generator object.
             ansatz: Name of ansatz.
             ansatz_options: Ansatz options.
-            include_active_kappa: Include active-active orbital rotations.
+            wavefunction_options: Wavefunction options.
         """
         if ansatz_options is None:
             ansatz_options = {}
-        if len(cas) != 2:
-            raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
+        self.ansatz_options = copy.deepcopy(ansatz_options)
+        if wavefunction_options is None:
+            wavefunction_options = {}
+        self.wavefunction_options = copy.deepcopy(wavefunction_options)
+        valid_options = ("do_pp", "resolve_unpaired_idx", "include_active_kappa", "reference_determiant", "pp_no_reoder_mo")
+        for option in wavefunction_options:
+            if option not in wavefunction_options:
+                raise ValueError(f"Got unknown option for UPS wave function, {option}. Valid options are: {valid_options}")
+        # Default options
+        self.wavefunction_options.setdefault("resolve_unpaired_idx", "both")
+        self.wavefunction_options.setdefault("include_active_kappa", True)
+        self.wavefunction_options.setdefault("do_pp", False)
+        self.wavefunction_options.setdefault("pp_no_reoder_mo", False)
+        if len(active_space) != 2:
+            raise ValueError(f"cas must have two elements, got {len(active_space)} elements.")
+        if isinstance(active_space[0], int):
+            if active_space[0]%2 == 0:
+                cas = ((active_space[0]//2, active_space[0]//2), active_space[1])
+            else:
+                # Uneven number of electrons mean one electron must be unpaired.
+                cas = ((active_space[0]//2 + 1, active_space[0]//2), active_space[1])
+        else:
+            cas = ((active_space[0][0], active_space[0][1]), active_space[1])
         # Init stuff
         self.int_gen = IntegralManager(integral_generator)
-        self.inactive_spin_idx = []
-        self.virtual_spin_idx = []
-        self.active_spin_idx = []
-        self.active_occ_spin_idx = []
-        self.active_unocc_spin_idx = []
-        self.active_spin_idx_shifted = []
-        self.active_occ_spin_idx_shifted = []
-        self.active_unocc_spin_idx_shifted = []
-        self.active_idx_shifted = []
-        self.active_occ_idx_shifted = []
-        self.active_unocc_idx_shifted = []
-        self.num_spin_orbs = 2 * len(self.int_gen.kinetic_energy)
-        self.num_orbs = len(self.int_gen.kinetic_energy)
-        self.num_active_elec = 0
-        self.num_active_spin_orbs = 0
-        self.num_inactive_spin_orbs = 0
-        self.num_virtual_spin_orbs = 0
+        if np.sum(cas[0]) > self.int_gen.num_elec:
+            raise ValueError("More active electrons than total number electrons.")
+        if (np.sum(cas[0])%2 == 0 and self.int_gen.num_elec%2 == 1) or (np.sum(cas[0])%2 == 1 and self.int_gen.num_elec%2 == 0):
+            raise ValueError("Specified CAS gives odd number of electrons in inactive space.")
+        self.num_inactive_spin_orbs = self.int_gen.num_elec - int(np.sum(cas[0]))
+        self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
+        self.num_active_orbs = cas[1]
+        self.num_active_spin_orbs = 2*self.num_active_orbs
+        self.num_active_orbs = self.num_active_spin_orbs // 2
+        self.num_virtual_orbs = len(self.int_gen.kinetic_energy) - self.num_inactive_orbs - self.num_active_orbs
+        if self.num_virtual_orbs < 0:
+            raise ValueError("Number of inactive + number of active orbitals is larger than total number of orbitals.")
+        self.num_virtual_spin_orbs = 2*self.num_virtual_orbs
+        self.num_orbs = self.num_inactive_orbs + self.num_active_orbs + self.num_virtual_orbs
+        self.num_spin_orbs = 2*self.num_orbs
+        self.num_active_elec_alpha = cas[0][0]
+        self.num_active_elec_beta = cas[0][1]
+        self.num_active_elec = self.num_active_elec_alpha + self.num_active_elec_beta
         self._rdm1 = None
         self._rdm2 = None
+        self._rdm3 = None
+        self._rdm4 = None
         self._h_mo = None
         self._g_mo = None
         self._energy_elec: float | None = None
-        self.ansatz_options = ansatz_options
         self.num_energy_evals = 0
+        self._c_mo = mo_coeffs
         # Used when converting to circuit wavefunction.
-        self._include_active_kappa = include_active_kappa
-        # Construct spin orbital spaces and indices
-        active_space = []
-        orbital_counter = 0
-        num_elec = self.int_gen.num_elec
-        for i in range(num_elec - cas[0], num_elec):
-            active_space.append(i)
-            orbital_counter += 1
-        for i in range(num_elec, num_elec + 2 * cas[1] - orbital_counter):
-            active_space.append(i)
-        for i in range(num_elec):
-            if i in active_space:
-                self.active_spin_idx.append(i)
-                self.active_occ_spin_idx.append(i)
-                self.num_active_spin_orbs += 1
-                self.num_active_elec += 1
+        self._include_active_kappa = self.wavefunction_options["include_active_kappa"]
+        # Reference wave function
+        self._pp = self.wavefunction_options["do_pp"]
+        if self.wavefunction_options["do_pp"]:
+            if "reference_determiant" in self.wavefunction_options.keys():
+                raise ValueError("Both 'do_pp' and 'reference_determiant' are requested in 'wavefunction_options'.")
+            if self.num_active_elec_alpha != self.num_active_elec_beta:
+                raise ValueError("perfect-pairing is only defined for equal number of alpha and beta electrons.")
+            # Obtain pp determinant
+            pp_det = ""
+            spin_orb = 0
+            elec_count = self.num_active_elec
+            while spin_orb < self.num_active_spin_orbs:
+                if (
+                    elec_count >= 2
+                    and (self.num_active_spin_orbs - spin_orb) >= 4
+                    and elec_count <= (self.num_active_spin_orbs - spin_orb - 2)
+                ):
+                    pp_det += "1100"
+                    elec_count -= 2
+                    spin_orb += 4
+                elif elec_count == 0:
+                    pp_det += "0"
+                    spin_orb += 1
+                elif elec_count != 0:
+                    pp_det += "1"
+                    spin_orb += 1
+                    elec_count -= 1
+            if len(pp_det) != self.num_active_spin_orbs or pp_det.count("1") != self.num_active_elec:
+                raise ValueError("Perfect pairing determinant violates orbital or electron numbers")
+
+            # Swap mo coefficients to resembles pp layout
+            if not self.wavefunction_options["pp_no_reoder_mo"]:
+                hf_det = "1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec)
+                hole = [i for i, (h, p) in enumerate(zip(hf_det, pp_det)) if h == "1" and p == "0"]
+                part = [i for i, (h, p) in enumerate(zip(hf_det, pp_det)) if h == "0" and p == "1"]
+                hole_spatial = sorted(set(i // 2 + self.num_inactive_orbs for i in hole))
+                part_spatial = sorted(set(i // 2 + self.num_inactive_orbs for i in part))
+                pp_mo_coeffs = mo_coeffs.copy()
+                pp_mo_coeffs[:, hole_spatial + part_spatial] = pp_mo_coeffs[:, part_spatial + hole_spatial]
+                # Note self._c_mo is set previously but overwritten here.
+                self._c_mo = pp_mo_coeffs
+
+            # Assign weight to reference
+            ref_det = pp_det
+        elif "reference_determiant" in self.wavefunction_options.keys():
+            ref_det = self.wavefunction_options["reference_determiant"]
+            if len(ref_det) != self.num_active_spin_orbs:
+                raise ValueError(f"Reference determinant is {len(ref_det)} spin orbitals and the active space is {self.num_active_spin_orbs} spin orbitals.")
+            ref_alpha = 0
+            ref_beta = 0
+            for i, idx in ref_det:
+                if i%2 == 0 and idx == "1":
+                    ref_alpha += 1
+                elif idx == "1":
+                    ref_beta += 1
+            if ref_alpha != self.num_active_elec_alpha or ref_beta != self.num_active_elec_beta:
+                raise ValueError("Number of electrons ({ref_alpha}, {ref_beta}) is different from the active space ({self.num_active_elec_alpha, self.num_active_elec_beta}).")
+        else:
+            ref_det = ""
+            for i in range(self.num_active_orbs):
+                if i < self.num_active_elec_alpha:
+                    ref_det += "1"
+                else:
+                    ref_det += "0"
+                if i < self.num_active_elec_beta: 
+                    ref_det += "1"
+                else:
+                    ref_det += "0"
+        # Construct spin orbital indices
+        self.inactive_spin_idx = [x for x in range(self.num_inactive_spin_orbs)]
+        self.active_spin_idx = [x + self.num_inactive_spin_orbs for x in range(self.num_active_spin_orbs)]
+        self.virtual_spin_idx = [x + self.num_inactive_spin_orbs + self.num_active_spin_orbs for x in range(self.num_virtual_spin_orbs)]
+        self.active_occ_spin_idx = []
+        self.active_unocc_spin_idx = []
+        for i, orb_idx in enumerate(self.active_spin_idx):
+            if ref_det[i] == "1":
+                self.active_occ_spin_idx.append(orb_idx)
             else:
-                self.inactive_spin_idx.append(i)
-                self.num_inactive_spin_orbs += 1
-        for i in range(num_elec, self.num_spin_orbs):
-            if i in active_space:
-                self.active_spin_idx.append(i)
-                self.active_unocc_spin_idx.append(i)
-                self.num_active_spin_orbs += 1
-            else:
-                self.virtual_spin_idx.append(i)
-                self.num_virtual_spin_orbs += 1
-        if self.num_active_elec % 2 != 0:
-            raise ValueError("Number of active electrons has to be even")
-        self.num_active_elec_alpha = self.num_active_elec // 2
-        self.num_active_elec_beta = self.num_active_elec // 2
-        self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
-        self.num_active_orbs = self.num_active_spin_orbs // 2
-        self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
+                self.active_unocc_spin_idx.append(orb_idx)
+        self.active_spin_idx_shifted = [x - self.num_inactive_spin_orbs for x in self.active_spin_idx]
+        self.active_occ_spin_idx_shifted = [x - self.num_inactive_spin_orbs for x in self.active_occ_spin_idx]
+        self.active_unocc_spin_idx_shifted = [x - self.num_inactive_spin_orbs for x in self.active_unocc_spin_idx]
         # Construct spatial idx
-        self.inactive_idx: list[int] = []
-        self.virtual_idx: list[int] = []
-        self.active_idx: list[int] = []
-        self.active_occ_idx: list[int] = []
-        self.active_unocc_idx: list[int] = []
-        for idx in self.inactive_spin_idx:
-            if idx // 2 not in self.inactive_idx:
-                self.inactive_idx.append(idx // 2)
-        for idx in self.active_spin_idx:
-            if idx // 2 not in self.active_idx:
-                self.active_idx.append(idx // 2)
-        for idx in self.virtual_spin_idx:
-            if idx // 2 not in self.virtual_idx:
-                self.virtual_idx.append(idx // 2)
-        for idx in self.active_occ_spin_idx:
-            if idx // 2 not in self.active_occ_idx:
-                self.active_occ_idx.append(idx // 2)
-        for idx in self.active_unocc_spin_idx:
-            if idx // 2 not in self.active_unocc_idx:
-                self.active_unocc_idx.append(idx // 2)
-        # Make shifted indices
-        if len(self.active_spin_idx) != 0:
-            active_shift = np.min(self.active_spin_idx)
-            for active_idx in self.active_spin_idx:
-                self.active_spin_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_occ_spin_idx:
-                self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_unocc_spin_idx:
-                self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
-        if len(self.active_idx) != 0:
-            active_shift = np.min(self.active_idx)
-            for active_idx in self.active_idx:
-                self.active_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_occ_idx:
-                self.active_occ_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_unocc_idx:
-                self.active_unocc_idx_shifted.append(active_idx - active_shift)
+        self.inactive_idx = [x for x in range(self.num_inactive_orbs)]
+        self.active_idx = [x + self.num_inactive_orbs for x in range(self.num_active_orbs)]
+        self.virtual_idx = [x + self.num_inactive_orbs + self.num_active_orbs for x in range(self.num_virtual_orbs)]
+        self.active_occ_idx = []
+        self.active_unocc_idx = []
+        for i, orb_idx in enumerate(self.active_idx):
+            if ref_det[2*i] == "1" and ref_det[2*i+1] == "1":
+                self.active_occ_idx.append(orb_idx)
+            elif ref_det[2*i] == "0" and ref_det[2*i+1] == "0":
+                self.active_unocc_idx.append(orb_idx)
+            else:
+                if self.wavefunction_options["resolve_unpaired_idx"] == "both":
+                    self.active_occ_idx.append(orb_idx)
+                    self.active_unocc_idx.append(orb_idx)
+                elif self.wavefunction_options["resolve_unpaired_idx"] == "occ":
+                    self.active_occ_idx.append(orb_idx)
+                elif self.wavefunction_options["resolve_unpaired_idx"] == "unocc":
+                    self.active_unocc_idx.append(orb_idx)
+                else:
+                    raise ValueError(f"Got unknown option for resolve_unpaired_idx, {ansatz_options['resolve_unpaired_idx']}, excepted 'both', 'occ' or 'unocc'.")
+        self.active_idx_shifted = [x - self.num_inactive_orbs for x in self.active_idx]
+        self.active_occ_idx_shifted = [x - self.num_inactive_orbs for x in self.active_occ_idx]
+        self.active_unocc_idx_shifted = [x - self.num_inactive_orbs for x in self.active_unocc_idx]
         # Find non-redundant kappas
         self._kappa = []
         kappa_idx = []
@@ -177,7 +252,7 @@ class WaveFunctionUPS:
                 if p in self.virtual_idx and q in self.virtual_idx:
                     kappa_redundant_idx.append((p, q))
                     continue
-                if not include_active_kappa:
+                if not self._include_active_kappa:
                     if p in self.active_idx and q in self.active_idx:
                         kappa_redundant_idx.append((p, q))
                         continue
@@ -212,56 +287,10 @@ class WaveFunctionUPS:
             self.num_active_elec_beta,
         )
         self.num_det = len(self.ci_info.idx2det)
-        self.csf_coeffs = np.zeros(self.num_det)
-
-        hf_det = "1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec)
-        self._pp = False
-        if (
-            ansatz.lower() == "tups"
-            and "do_pp" in self.ansatz_options.keys()
-            and self.ansatz_options["do_pp"]
-        ):
-            # Obtain pp determinant
-            pp_det = ""
-            spin_orb = 0
-            elec_count = self.num_active_elec
-            while spin_orb < self.num_active_spin_orbs:
-                if (
-                    elec_count >= 2
-                    and (self.num_active_spin_orbs - spin_orb) >= 4
-                    and elec_count <= (self.num_active_spin_orbs - spin_orb - 2)
-                ):
-                    pp_det += "1100"
-                    elec_count -= 2
-                    spin_orb += 4
-                elif elec_count == 0:
-                    pp_det += "0"
-                    spin_orb += 1
-                elif elec_count != 0:
-                    pp_det += "1"
-                    spin_orb += 1
-                    elec_count -= 1
-            print("perfect-pairing determinant found as:", pp_det)
-            if len(pp_det) != self.num_active_spin_orbs or pp_det.count("1") != self.num_active_elec:
-                raise ValueError("Perfect pairing determinant violates orbital or electron numbers")
-
-            # Swap mo coefficients to resembles pp layout
-            hole = [i for i, (h, p) in enumerate(zip(hf_det, pp_det)) if h == "1" and p == "0"]
-            part = [i for i, (h, p) in enumerate(zip(hf_det, pp_det)) if h == "0" and p == "1"]
-            hole_spatial = sorted(set(i // 2 + self.num_inactive_orbs for i in hole))
-            part_spatial = sorted(set(i // 2 + self.num_inactive_orbs for i in part))
-            pp_mo_coeffs = mo_coeffs.copy()
-            pp_mo_coeffs[:, hole_spatial + part_spatial] = pp_mo_coeffs[:, part_spatial + hole_spatial]
-            self._c_mo = pp_mo_coeffs
-
-            # Assign weight to reference
-            self.csf_coeffs[self.ci_info.det2idx[int(pp_det, 2)]] = 1
-            self._pp = True
-        else:
-            self.csf_coeffs[self.ci_info.det2idx[int(hf_det, 2)]] = 1
-            self._c_mo = mo_coeffs
-
-        self.ci_coeffs = np.copy(self.csf_coeffs)
+        self.ref_coeffs = np.zeros(self.num_det, dtype=float)
+        print("Reference (active) determinant:", ref_det)
+        self.ref_coeffs[self.ci_info.det2idx[int(ref_det, 2)]] = 1
+        self.ci_coeffs = np.copy(self.ref_coeffs)
         # Construct UPS Structure
         self.ups_layout = UpsStructure()
         if ansatz.lower() in ("tups", "qnp"):
@@ -282,9 +311,8 @@ class WaveFunctionUPS:
             elif ansatz.lower() == "safuccspd":
                 self.ansatz_options["SAS"] = True
                 self.ansatz_options["SAD"] = True
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
+            # Default options
+            self.ansatz_options.setdefault("n_layers", 1)
             self.ups_layout.create_fUCC(
                 self.active_occ_idx_shifted,
                 self.active_unocc_idx_shifted,
@@ -298,9 +326,8 @@ class WaveFunctionUPS:
                 self.ansatz_options["D"] = True
             elif ansatz.lower() == "ksasdsfupccgsd":
                 self.ansatz_options["GpD"] = True
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
+            # Default options
+            self.ansatz_options.setdefault("n_layers", 1)
             self.ups_layout.create_SDSfUCC(
                 self.active_occ_idx_shifted,
                 self.active_unocc_idx_shifted,
@@ -358,7 +385,7 @@ class WaveFunctionUPS:
         self._energy_elec = None
         self._thetas = theta_vals.copy()
         self.ci_coeffs = construct_ups_state(
-            self.csf_coeffs,
+            self.ref_coeffs,
             self.ci_info,
             self.thetas,
             self.ups_layout,
@@ -1108,8 +1135,8 @@ class WaveFunctionUPS:
                 dagger=True,
             )
             # CSF reference state on ket
-            ket_vec = np.copy(self.csf_coeffs)
-            ket_vec_tmp = np.copy(self.csf_coeffs)
+            ket_vec = np.copy(self.ref_coeffs)
+            ket_vec_tmp = np.copy(self.ref_coeffs)
             # Calculate analytical derivative w.r.t. each theta using gradient_action function
             for i in range(len(self.thetas)):
                 # Derivative action w.r.t. i-th theta on CSF ket
@@ -1161,7 +1188,7 @@ class WaveFunctionUPS:
         thetas_local = np.asarray(parameters)
 
         # Prepare reference state up to theta_idx
-        state_vec = np.copy(self.csf_coeffs)
+        state_vec = np.copy(self.ref_coeffs)
         for i in range(0, theta_idx):
             state_vec = propagate_unitary(state_vec, i, self.ci_info, thetas_local, self.ups_layout)
 

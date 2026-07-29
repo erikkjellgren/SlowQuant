@@ -107,7 +107,6 @@ def test_h2_431g_oouccd() -> None:
         A.hartree_fock.mo_coeff,
         A,
         "D",
-        include_active_kappa=True,
     )
     WF.run_wf_optimization_1step("BFGS", True)
     assert abs(WF.energy_elec - (-1.860533598715)) < 10**-8
@@ -154,7 +153,6 @@ def test_h4_sto3g_oouccd() -> None:
         A.hartree_fock.mo_coeff,
         A,
         "D",
-        include_active_kappa=True,
     )
     WF.run_wf_optimization_1step("BFGS", True)
     assert abs(WF.energy_elec - (-5.211066791547)) < 10**-8

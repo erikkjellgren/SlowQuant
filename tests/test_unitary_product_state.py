@@ -27,7 +27,6 @@ def test_ups_naivelr() -> None:
         SQobj,
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
-        include_active_kappa=True,
     )
     WF.run_wf_optimization_1step("BFGS", True)
     LR = naivelr.LinearResponse(WF, excitations="SD")
@@ -145,7 +144,6 @@ def test_ups_water_44() -> None:
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         "fUCCSD",
-        include_active_kappa=True,
     )
     WF.run_wf_optimization_1step("bfgs", True)
     # Changed threshold from 10-8 to 10-6, due to loss of precision in optimizer.
@@ -186,7 +184,6 @@ def test_saups_h2_3states() -> None:
         ),
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
-        include_active_kappa=True,
     )
 
     WF.run_wf_optimization_1step("BFGS", True)
@@ -230,7 +227,6 @@ def test_saups_h3_3states() -> None:
         ),
         "tUPS",
         ansatz_options={"n_layers": 2, "skip_last_singles": True},
-        include_active_kappa=True,
     )
 
     WF.run_wf_optimization_2step("BFGS", True)
@@ -306,7 +302,6 @@ def test_ups_water_44_threaded() -> None:
         SQobj,
         "fUCCSD",
         ansatz_options={},
-        include_active_kappa=True,
     )
     WF.run_wf_optimization_1step("SLSQP", True)
     assert abs(WF.energy_elec - -83.97256228053688) < 10**-8
@@ -346,7 +341,6 @@ def test_saups_h3_3states_threaded() -> None:
         ),
         "tUPS",
         ansatz_options={"n_layers": 2, "skip_last_singles": True},
-        include_active_kappa=True,
     )
 
     WF.run_wf_optimization_2step("BFGS", True)
@@ -386,7 +380,8 @@ def test_pptUPS_h2o() -> None:
         mo_coeff,
         integral_generator,
         "tUPS",  # our circuit Ansatz
-        ansatz_options={"n_layers": 1, "do_pp": True},  # we use 1 layer
+        ansatz_options={"n_layers": 1},  # we use 1 layer
+        wavefunction_options={"do_pp": True}
     )
 
     WF.run_wf_optimization_1step("bfgs", orbital_optimization=False)
