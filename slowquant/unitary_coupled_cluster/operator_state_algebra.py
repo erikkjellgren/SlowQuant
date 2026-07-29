@@ -985,7 +985,7 @@ def construct_ups_state(
                     do_folding=False,
                 )
             )
-        elif exc_type in ("single", "double", "sa_double_1"):
+        elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
             # Create T matrix
             if exc_type == "single":
                 (i, a) = np.array(exc_indices) + 2 * offset
@@ -993,6 +993,18 @@ def construct_ups_state(
             elif exc_type == "double":
                 (i, j, a, b) = np.array(exc_indices) + 2 * offset
                 T = G2(i, j, a, b, True)
+            elif exc_type == "triple":
+                (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
+                T = G3(i, j, k, a, b, c, True)
+            elif exc_type == "quadruple":
+                (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
+                T = G4(i, j, k, l, a, b, c, d, True)
+            elif exc_type == "quintuple":
+                (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + 2 * offset
+                T = G5(i, j, k, l, m, a, b, c, d, e, True)
+            elif exc_type == "sextuple":
+                (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + 2 * offset
+                T = G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
             elif exc_type == "sa_double_1":
                 (i, j, a, b) = np.array(exc_indices) + offset
                 T = G2_sa(i, j, a, b, 1, True)
@@ -1425,7 +1437,7 @@ def construct_ups_state_SA(
                     do_folding=False,
                 )
             )
-        elif exc_type in ("single", "double", "sa_double_1"):
+        elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
             # Create T matrix
             if exc_type == "single":
                 (i, a) = np.array(exc_indices) + 2 * offset
@@ -1433,6 +1445,18 @@ def construct_ups_state_SA(
             elif exc_type == "double":
                 (i, j, a, b) = np.array(exc_indices) + 2 * offset
                 T = G2(i, j, a, b, True)
+            elif exc_type == "triple":
+                (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
+                T = G3(i, j, k, a, b, c, True)
+            elif exc_type == "quadruple":
+                (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
+                T = G4(i, j, k, l, a, b, c, d, True)
+            elif exc_type == "quintuple":
+                (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + 2 * offset
+                T = G5(i, j, k, l, m, a, b, c, d, e, True)
+            elif exc_type == "sextuple":
+                (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + 2 * offset
+                T = G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
             elif exc_type == "sa_double_1":
                 (i, j, a, b) = np.array(exc_indices) + offset
                 T = G2_sa(i, j, a, b, 1, True)
@@ -1855,7 +1879,7 @@ def propagate_unitary(
                 do_folding=False,
             )
         )
-    elif exc_type in ("single", "double", "sa_double_1"):
+    elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
         # Create T matrix
         if exc_type == "single":
             (i, a) = np.array(exc_indices) + 2 * offset
@@ -1863,6 +1887,18 @@ def propagate_unitary(
         elif exc_type == "double":
             (i, j, a, b) = np.array(exc_indices) + 2 * offset
             T = G2(i, j, a, b, True)
+        elif exc_type == "triple":
+            (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
+            T = G3(i, j, k, a, b, c, True)
+        elif exc_type == "quadruple":
+            (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
+            T = G4(i, j, k, l, a, b, c, d, True)
+        elif exc_type == "quintuple":
+            (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + 2 * offset
+            T = G5(i, j, k, l, m, a, b, c, d, e, True)
+        elif exc_type == "sextuple":
+            (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + 2 * offset
+            T = G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
         elif exc_type == "sa_double_1":
             (i, j, a, b) = np.array(exc_indices) + offset
             T = G2_sa(i, j, a, b, 1, True)
@@ -2288,7 +2324,7 @@ def propagate_unitary_SA(
                 do_folding=False,
             )
         )
-    elif exc_type in ("single", "double", "sa_double_1"):
+    elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
         # Create T matrix
         if exc_type == "single":
             (i, a) = np.array(exc_indices) + 2 * offset
@@ -2296,6 +2332,18 @@ def propagate_unitary_SA(
         elif exc_type == "double":
             (i, j, a, b) = np.array(exc_indices) + 2 * offset
             T = G2(i, j, a, b, True)
+        elif exc_type == "triple":
+            (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
+            T = G3(i, j, k, a, b, c, True)
+        elif exc_type == "quadruple":
+            (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
+            T = G4(i, j, k, l, a, b, c, d, True)
+        elif exc_type == "quintuple":
+            (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + 2 * offset
+            T = G5(i, j, k, l, m, a, b, c, d, e, True)
+        elif exc_type == "sextuple":
+            (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + 2 * offset
+            T = G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
         elif exc_type == "sa_double_1":
             (i, j, a, b) = np.array(exc_indices) + offset
             T = G2_sa(i, j, a, b, 1, True)
@@ -2704,6 +2752,10 @@ def get_grad_action(
     elif exc_type in (
         "single",
         "double",
+        "triple",
+        "quadruple",
+        "quintuple",
+        "sextuple",
         "sa_double_1",
         "sa_double_2",
         "sa_double_3",
@@ -2717,6 +2769,18 @@ def get_grad_action(
         elif exc_type == "double":
             (i, j, a, b) = np.array(exc_indices) + 2 * offset
             T = G2(i, j, a, b, True)
+        elif exc_type == "triple":
+            (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
+            T = G3(i, j, k, a, b, c, True)
+        elif exc_type == "quadruple":
+            (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
+            T = G4(i, j, k, l, a, b, c, d, True)
+        elif exc_type == "quintuple":
+            (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + 2 * offset
+            T = G5(i, j, k, l, m, a, b, c, d, e, True)
+        elif exc_type == "sextuple":
+            (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + 2 * offset
+            T = G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
         elif exc_type == "sa_double_1":
             (i, j, a, b) = np.array(exc_indices) + offset
             T = G2_sa(i, j, a, b, 1, True)
@@ -2799,6 +2863,10 @@ def get_grad_action_SA(
     elif exc_type in (
         "single",
         "double",
+        "triple",
+        "quadruple",
+        "quintuple",
+        "sextuple",
         "sa_double_1",
         "sa_double_2",
         "sa_double_3",
@@ -2812,6 +2880,18 @@ def get_grad_action_SA(
         elif exc_type == "double":
             (i, j, a, b) = np.array(exc_indices) + 2 * offset
             T = G2(i, j, a, b, True)
+        elif exc_type == "triple":
+            (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
+            T = G3(i, j, k, a, b, c, True)
+        elif exc_type == "quadruple":
+            (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
+            T = G4(i, j, k, l, a, b, c, d, True)
+        elif exc_type == "quintuple":
+            (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + 2 * offset
+            T = G5(i, j, k, l, m, a, b, c, d, e, True)
+        elif exc_type == "sextuple":
+            (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + 2 * offset
+            T = G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
         elif exc_type == "sa_double_1":
             (i, j, a, b) = np.array(exc_indices) + offset
             T = G2_sa(i, j, a, b, 1, True)
