@@ -111,7 +111,6 @@ def test_h2_431g_oouccd() -> None:
         A.hartree_fock.mo_coeff,
         A,
         excitations=["SAD"],
-        wavefunction_options={"include_active_kappa": False},
     )
     WF.run_wf_optimization(True)
     assert abs(WF.energy_elec - (-1.860533598715)) < 10**-8
@@ -159,7 +158,6 @@ def test_h4_sto3g_oouccd() -> None:
         A.hartree_fock.mo_coeff,
         A,
         excitations=["SAD"],
-        wavefunction_options={"include_active_kappa": False},
     )
     WF.run_wf_optimization(True)
     assert abs(WF.energy_elec - (-5.211066791547)) < 10**-8

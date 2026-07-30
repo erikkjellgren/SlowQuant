@@ -53,11 +53,11 @@ def test_LiH_naive() -> None:
         (2, 2),
         rhf.mo_coeff,
         mol,
-        "SD",
+        excitations=["SAS", "SAD"],
     )
 
     # Optimize WF
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(True)
 
     # Optimize WF with QSQ
     sampler = SamplerAer()
@@ -72,7 +72,7 @@ def test_LiH_naive() -> None:
         QI,
     )
 
-    qWF.run_wf_optimization_2step("rotosolve", True)
+    qWF.run_wf_optimization(True, optimization_options={"opt_type": "2step", "theta_optimizer": "rotosolve"})
 
     # LR with SQ
     LR = naive.LinearResponse(WF, excitations="SD")
@@ -120,9 +120,9 @@ def test_LiH_projected() -> None:
         (2, 2),
         rhf.mo_coeff,
         mol,
-        "SD",
+        excitations=["SAS", "SAD"],
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(True)
 
     # CircuitWF with QSQ
     sampler = SamplerAer()

@@ -185,6 +185,7 @@ class QuantumInterface:
         elif isinstance(self.ansatz, str):
             ups_layout = UpsStructure()
             if self.ansatz.lower() in ("fucc", "fuccpd", "fuccd", "fuccsd", "ksafupccgsd"):
+                self.ansatz_options.setdefault("excitations", [])
                 if self.ansatz.lower() == "fuccpd":
                     self.ansatz_options["excitations"].append("pD")
                 elif self.ansatz.lower() == "fuccd":
@@ -215,6 +216,7 @@ class QuantumInterface:
                     self.ansatz_options["do_qnp"] = True
                 ups_layout.create_tiled(self.num_orbs, self.ansatz_options)
             elif self.ansatz.lower() in ("sdsfuccsd", "ksasdsfupccgsd"):
+                self.ansatz_options.setdefault("excitations", [])
                 if self.ansatz.lower() == "sdsfuccsd":
                     self.ansatz_options["excitations"].append("D")
                 elif self.ansatz.lower() == "ksasdsfupccgsd":
