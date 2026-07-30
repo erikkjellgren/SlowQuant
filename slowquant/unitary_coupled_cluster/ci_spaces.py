@@ -95,7 +95,7 @@ def get_indexing(
         num_virtual_orbs,
         num_active_elec_alpha,
         num_active_elec_beta,
-        np.array(idx2det, dtype=int),
+        np.array(idx2det, dtype=np.int64),
         det2idx,
     )
 
@@ -252,7 +252,7 @@ def get_indexing_extended(
         0,
         num_active_elec_alpha + num_inactive_orbs,
         num_active_elec_beta + num_inactive_orbs,
-        np.array(idx2det, dtype=int),
+        np.array(idx2det, dtype=np.int64),
         det2idx,
     )
     ci_info.space_extension_offset = num_inactive_orbs

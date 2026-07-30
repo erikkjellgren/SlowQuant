@@ -1,6 +1,7 @@
+import copy
 import time
-from collections.abc import Sequence
 from functools import partial
+from typing import Any
 
 import numpy as np
 import pyscf
@@ -33,53 +34,76 @@ from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 class WaveFunctionCircuit:
     def __init__(
         self,
-        cas: Sequence[int],
+        active_space: tuple[int, int] | tuple[tuple[int, int], int],
         mo_coeffs: np.ndarray,
         integral_generator: SlowQuant | pyscf.gto.mole.Mole,
         quantum_interface: QuantumInterface,
-        include_active_kappa: bool = False,
-        force_no_pp_mos: bool = False,
+        wavefunction_options: dict[str, Any] | None = None,
     ) -> None:
         """Initialize circuit based UPS wave function.
 
         Args:
-            cas: CAS(num_active_elec, num_active_orbs),
+            active_space: (num_active_elec, num_active_orbs) or ((num_active_elec_alpha, num_active_elec_beta), num_active_orbs),
                  orbitals are counted in spatial basis.
             mo_coeffs: Initial orbital coefficients.
             integral_generator: Integral generator object.
             quantum_interface: QuantumInterface.
-            include_active_kappa: Include active-active orbital rotations.
-            force_no_pp_mos: Switch of pp rotation of MOs even if do_pp is requested in QI.
+            wavefunction_options: Wavefunction options.
         """
-        if len(cas) != 2:
-            raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
-        if isinstance(quantum_interface.ansatz, QuantumCircuit):
-            print(
-                "WARNING: A QI with a custom Ansatz was passed. VQE will only work with COBYLA and COBYQA optimizer."
-            )
+        if wavefunction_options is None:
+            wavefunction_options = {}
+        self.wavefunction_options = copy.deepcopy(wavefunction_options)
+        valid_options = (
+            "do_pp",
+            "resolve_unpaired_idx",
+            "include_active_kappa",
+            "reference_determinant",
+        )
+        for option in wavefunction_options:
+            if option not in valid_options:
+                raise ValueError(
+                    f"Got unknown option for UPS wave function, {option}. Valid options are: {valid_options}"
+                )
+        # Default options
+        self.wavefunction_options.setdefault("resolve_unpaired_idx", "both")
+        self.wavefunction_options.setdefault("include_active_kappa", True)
+        self.wavefunction_options.setdefault("do_pp", False)
+        if len(active_space) != 2:
+            raise ValueError(f"cas must have two elements, got {len(active_space)} elements.")
+        if isinstance(active_space[0], int):
+            if active_space[0] % 2 == 0:
+                cas = ((active_space[0] // 2, active_space[0] // 2), active_space[1])
+            else:
+                # Uneven number of electrons mean one electron must be unpaired.
+                cas = ((active_space[0] // 2 + 1, active_space[0] // 2), active_space[1])
+        else:
+            cas = ((active_space[0][0], active_space[0][1]), active_space[1])
+        # Init stuff
         self.int_gen = IntegralManager(integral_generator)
-        self.inactive_spin_idx = []
-        self.virtual_spin_idx = []
-        self.active_spin_idx = []
-        self.active_occ_spin_idx = []
-        self.active_unocc_spin_idx = []
-        self.active_spin_idx_shifted = []
-        self.active_occ_spin_idx_shifted = []
-        self.active_unocc_spin_idx_shifted = []
-        self.active_idx_shifted = []
-        self.active_occ_idx_shifted = []
-        self.active_unocc_idx_shifted = []
-        self.num_elec = self.int_gen.num_elec
-        self.num_spin_orbs = 2 * len(self.int_gen.kinetic_energy)
-        self.num_orbs = len(self.int_gen.kinetic_energy)
-        self.num_active_elec = cas[0]
-        if self.num_active_elec % 2 != 0:
-            raise ValueError("Number of active electrons has to be even")
-        self.num_active_elec_alpha = self.num_active_elec // 2
-        self.num_active_elec_beta = self.num_active_elec // 2
-        self.num_active_spin_orbs = 0
-        self.num_inactive_spin_orbs = 0
-        self.num_virtual_spin_orbs = 0
+        if np.sum(cas[0]) > self.int_gen.num_elec:
+            raise ValueError("More active electrons than total number electrons.")
+        if (np.sum(cas[0]) % 2 == 0 and self.int_gen.num_elec % 2 == 1) or (
+            np.sum(cas[0]) % 2 == 1 and self.int_gen.num_elec % 2 == 0
+        ):
+            raise ValueError("Specified CAS gives odd number of electrons in inactive space.")
+        self.num_inactive_spin_orbs = self.int_gen.num_elec - int(np.sum(cas[0]))
+        self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
+        self.num_active_orbs = cas[1]
+        self.num_active_spin_orbs = 2 * self.num_active_orbs
+        self.num_active_orbs = self.num_active_spin_orbs // 2
+        self.num_virtual_orbs = (
+            len(self.int_gen.kinetic_energy) - self.num_inactive_orbs - self.num_active_orbs
+        )
+        if self.num_virtual_orbs < 0:
+            raise ValueError(
+                "Number of inactive + number of active orbitals is larger than total number of orbitals."
+            )
+        self.num_virtual_spin_orbs = 2 * self.num_virtual_orbs
+        self.num_orbs = self.num_inactive_orbs + self.num_active_orbs + self.num_virtual_orbs
+        self.num_spin_orbs = 2 * self.num_orbs
+        self.num_active_elec_alpha = cas[0][0]
+        self.num_active_elec_beta = cas[0][1]
+        self.num_active_elec = self.num_active_elec_alpha + self.num_active_elec_beta
         self._rdm1 = None
         self._rdm2 = None
         self._rdm3 = None
@@ -87,120 +111,19 @@ class WaveFunctionCircuit:
         self._h_mo = None
         self._g_mo = None
         self._energy_elec: float | None = None
-        self.num_energy_evals = 0  # number of energy measurements on quanutm
-        active_space = []
-        orbital_counter = 0
-        num_elec = self.int_gen.num_elec
-        for i in range(num_elec - cas[0], num_elec):
-            active_space.append(i)
-            orbital_counter += 1
-        for i in range(num_elec, num_elec + 2 * cas[1] - orbital_counter):
-            active_space.append(i)
-        for i in range(num_elec):
-            if i in active_space:
-                self.active_spin_idx.append(i)
-                self.active_occ_spin_idx.append(i)
-                self.num_active_spin_orbs += 1
-            else:
-                self.inactive_spin_idx.append(i)
-                self.num_inactive_spin_orbs += 1
-        for i in range(num_elec, self.num_spin_orbs):
-            if i in active_space:
-                self.active_spin_idx.append(i)
-                self.active_unocc_spin_idx.append(i)
-                self.num_active_spin_orbs += 1
-            else:
-                self.virtual_spin_idx.append(i)
-                self.num_virtual_spin_orbs += 1
-        self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
-        self.num_active_orbs = self.num_active_spin_orbs // 2
-        self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
-        # Construct spatial idx
-        self.inactive_idx: list[int] = []
-        self.virtual_idx: list[int] = []
-        self.active_idx: list[int] = []
-        self.active_occ_idx: list[int] = []
-        self.active_unocc_idx: list[int] = []
-        for idx in self.inactive_spin_idx:
-            if idx // 2 not in self.inactive_idx:
-                self.inactive_idx.append(idx // 2)
-        for idx in self.active_spin_idx:
-            if idx // 2 not in self.active_idx:
-                self.active_idx.append(idx // 2)
-        for idx in self.virtual_spin_idx:
-            if idx // 2 not in self.virtual_idx:
-                self.virtual_idx.append(idx // 2)
-        for idx in self.active_occ_spin_idx:
-            if idx // 2 not in self.active_occ_idx:
-                self.active_occ_idx.append(idx // 2)
-        for idx in self.active_unocc_spin_idx:
-            if idx // 2 not in self.active_unocc_idx:
-                self.active_unocc_idx.append(idx // 2)
-        # Make shifted indices
-        if len(self.active_spin_idx) != 0:
-            active_shift = np.min(self.active_spin_idx)
-            for active_idx in self.active_spin_idx:
-                self.active_spin_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_occ_spin_idx:
-                self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_unocc_spin_idx:
-                self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
-        if len(self.active_idx) != 0:
-            active_shift = np.min(self.active_idx)
-            for active_idx in self.active_idx:
-                self.active_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_occ_idx:
-                self.active_occ_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_unocc_idx:
-                self.active_unocc_idx_shifted.append(active_idx - active_shift)
-        # Find non-redundant kappas
-        self._kappa = []
-        kappa_idx = []
-        kappa_no_activeactive_idx = []
-        kappa_no_activeactive_idx_dagger = []
-        kappa_redundant_idx = []
-        self._kappa_old = []
-        # kappa can be optimized in spatial basis
-        for p in range(0, self.num_orbs):
-            for q in range(p + 1, self.num_orbs):
-                if p in self.inactive_idx and q in self.inactive_idx:
-                    kappa_redundant_idx.append((p, q))
-                    continue
-                if p in self.virtual_idx and q in self.virtual_idx:
-                    kappa_redundant_idx.append((p, q))
-                    continue
-                if not include_active_kappa:
-                    if p in self.active_idx and q in self.active_idx:
-                        kappa_redundant_idx.append((p, q))
-                        continue
-                if not (p in self.active_idx and q in self.active_idx):
-                    kappa_no_activeactive_idx.append((p, q))
-                    kappa_no_activeactive_idx_dagger.append((q, p))
-                self._kappa.append(0.0)
-                self._kappa_old.append(0.0)
-                kappa_idx.append((p, q))
-        # HF like orbital rotation indices
-        kappa_hf_like_idx = []
-        for p in range(0, self.num_orbs):
-            for q in range(p + 1, self.num_orbs):
-                if p in self.inactive_idx and q in self.virtual_idx:
-                    kappa_hf_like_idx.append((p, q))
-                elif p in self.inactive_idx and q in self.active_unocc_idx:
-                    kappa_hf_like_idx.append((p, q))
-                elif p in self.active_occ_idx and q in self.virtual_idx:
-                    kappa_hf_like_idx.append((p, q))
-        self.kappa_idx = np.array(kappa_idx, dtype=int)
-        self.kappa_no_activeactive_idx = np.array(kappa_no_activeactive_idx, dtype=int)
-        self.kappa_no_activeactive_idx_dagger = np.array(kappa_no_activeactive_idx_dagger, dtype=int)
-        self.kappa_redundant_idx = np.array(kappa_redundant_idx, dtype=int)
-        self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
-        # Re-order MOs for perfect pairing
-        if (
-            "do_pp" in quantum_interface.ansatz_options.keys()
-            and quantum_interface.ansatz_options["do_pp"]
-            and not force_no_pp_mos
-        ):
-            hf_det = "1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec)
+        self.num_energy_evals = 0
+        self._c_mo = mo_coeffs
+        # Reference wave function
+        self._pp = self.wavefunction_options["do_pp"]
+        if self.wavefunction_options["do_pp"]:
+            if "reference_determinant" in self.wavefunction_options.keys():
+                raise ValueError(
+                    "Both 'do_pp' and 'reference_determinant' are requested in 'wavefunction_options'."
+                )
+            if self.num_active_elec_alpha != self.num_active_elec_beta:
+                raise ValueError(
+                    "perfect-pairing is only defined for equal number of alpha and beta electrons."
+                )
             # Obtain pp determinant
             pp_det = ""
             spin_orb = 0
@@ -221,20 +144,142 @@ class WaveFunctionCircuit:
                     pp_det += "1"
                     spin_orb += 1
                     elec_count -= 1
-            print("MO rotations: perfect-pairing determinant found as:", pp_det)
             if len(pp_det) != self.num_active_spin_orbs or pp_det.count("1") != self.num_active_elec:
                 raise ValueError("Perfect pairing determinant violates orbital or electron numbers")
 
             # Swap mo coefficients to resembles pp layout
+            hf_det = "1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec)
             hole = [i for i, (h, p) in enumerate(zip(hf_det, pp_det)) if h == "1" and p == "0"]
             part = [i for i, (h, p) in enumerate(zip(hf_det, pp_det)) if h == "0" and p == "1"]
             hole_spatial = sorted(set(i // 2 + self.num_inactive_orbs for i in hole))
             part_spatial = sorted(set(i // 2 + self.num_inactive_orbs for i in part))
             pp_mo_coeffs = mo_coeffs.copy()
             pp_mo_coeffs[:, hole_spatial + part_spatial] = pp_mo_coeffs[:, part_spatial + hole_spatial]
+            # Note self._c_mo is set previously but overwritten here.
             self._c_mo = pp_mo_coeffs
+
+            # Assign weight to reference
+            ref_det = pp_det
+        elif "reference_determinant" in self.wavefunction_options.keys():
+            ref_det = self.wavefunction_options["reference_determinant"]
+            if len(ref_det) != self.num_active_spin_orbs:
+                raise ValueError(
+                    f"Reference determinant is {len(ref_det)} spin orbitals and the active space is {self.num_active_spin_orbs} spin orbitals."
+                )
+            ref_alpha = 0
+            ref_beta = 0
+            for i, idx in ref_det:
+                if i % 2 == 0 and idx == "1":
+                    ref_alpha += 1
+                elif idx == "1":
+                    ref_beta += 1
+            if ref_alpha != self.num_active_elec_alpha or ref_beta != self.num_active_elec_beta:
+                raise ValueError(
+                    "Number of electrons ({ref_alpha}, {ref_beta}) is different from the active space ({self.num_active_elec_alpha, self.num_active_elec_beta})."
+                )
         else:
-            self._c_mo = mo_coeffs
+            ref_det = ""
+            for i in range(self.num_active_orbs):
+                if i < self.num_active_elec_alpha:
+                    ref_det += "1"
+                else:
+                    ref_det += "0"
+                if i < self.num_active_elec_beta:
+                    ref_det += "1"
+                else:
+                    ref_det += "0"
+        # Construct spin orbital indices
+        self.inactive_spin_idx = [x for x in range(self.num_inactive_spin_orbs)]
+        self.active_spin_idx = [x + self.num_inactive_spin_orbs for x in range(self.num_active_spin_orbs)]
+        self.virtual_spin_idx = [
+            x + self.num_inactive_spin_orbs + self.num_active_spin_orbs
+            for x in range(self.num_virtual_spin_orbs)
+        ]
+        self.active_occ_spin_idx = []
+        self.active_unocc_spin_idx = []
+        for i, orb_idx in enumerate(self.active_spin_idx):
+            if ref_det[i] == "1":
+                self.active_occ_spin_idx.append(orb_idx)
+            else:
+                self.active_unocc_spin_idx.append(orb_idx)
+        self.active_spin_idx_shifted = [x - self.num_inactive_spin_orbs for x in self.active_spin_idx]
+        self.active_occ_spin_idx_shifted = [x - self.num_inactive_spin_orbs for x in self.active_occ_spin_idx]
+        self.active_unocc_spin_idx_shifted = [
+            x - self.num_inactive_spin_orbs for x in self.active_unocc_spin_idx
+        ]
+        # Construct spatial idx
+        self.inactive_idx = [x for x in range(self.num_inactive_orbs)]
+        self.active_idx = [x + self.num_inactive_orbs for x in range(self.num_active_orbs)]
+        self.virtual_idx = [
+            x + self.num_inactive_orbs + self.num_active_orbs for x in range(self.num_virtual_orbs)
+        ]
+        self.active_occ_idx = []
+        self.active_unocc_idx = []
+        for i, orb_idx in enumerate(self.active_idx):
+            if ref_det[2 * i] == "1" and ref_det[2 * i + 1] == "1":
+                self.active_occ_idx.append(orb_idx)
+            elif ref_det[2 * i] == "0" and ref_det[2 * i + 1] == "0":
+                self.active_unocc_idx.append(orb_idx)
+            elif self.wavefunction_options["resolve_unpaired_idx"] == "both":
+                self.active_occ_idx.append(orb_idx)
+                self.active_unocc_idx.append(orb_idx)
+            elif self.wavefunction_options["resolve_unpaired_idx"] == "occ":
+                self.active_occ_idx.append(orb_idx)
+            elif self.wavefunction_options["resolve_unpaired_idx"] == "unocc":
+                self.active_unocc_idx.append(orb_idx)
+            else:
+                raise ValueError(
+                    f"Got unknown option for resolve_unpaired_idx, {wavefunction_options['resolve_unpaired_idx']}, excpected 'both', 'occ' or 'unocc'."
+                )
+        self.active_idx_shifted = [x - self.num_inactive_orbs for x in self.active_idx]
+        self.active_occ_idx_shifted = [x - self.num_inactive_orbs for x in self.active_occ_idx]
+        self.active_unocc_idx_shifted = [x - self.num_inactive_orbs for x in self.active_unocc_idx]
+        # Find non-redundant kappas
+        self._kappa = []
+        kappa_idx = []
+        kappa_no_activeactive_idx = []
+        kappa_no_activeactive_idx_dagger = []
+        self._kappa_old = []
+        # kappa can be optimized in spatial basis
+        # Loop over all q>p orb combinations and find redundant kappas
+        for p in range(0, self.num_orbs):
+            for q in range(p + 1, self.num_orbs):
+                # find redundant kappas
+                if p in self.inactive_idx and q in self.inactive_idx:
+                    continue
+                if p in self.virtual_idx and q in self.virtual_idx:
+                    continue
+                if not self.wavefunction_options["include_active_kappa"]:
+                    if p in self.active_idx and q in self.active_idx:
+                        continue
+                if not (p in self.active_idx and q in self.active_idx):
+                    kappa_no_activeactive_idx.append((p, q))
+                    kappa_no_activeactive_idx_dagger.append((q, p))
+                # the rest is non-redundant
+                self._kappa.append(0.0)
+                self._kappa_old.append(0.0)
+                kappa_idx.append((p, q))
+        # HF like orbital rotation indices
+        kappa_hf_like_idx = []
+        for p in range(0, self.num_orbs):
+            for q in range(p + 1, self.num_orbs):
+                if p in self.inactive_idx and q in self.virtual_idx:
+                    kappa_hf_like_idx.append((p, q))
+                elif p in self.inactive_idx and q in self.active_unocc_idx:
+                    kappa_hf_like_idx.append((p, q))
+                elif p in self.active_occ_idx and q in self.virtual_idx:
+                    kappa_hf_like_idx.append((p, q))
+        self.kappa_idx = np.array(kappa_idx, dtype=np.int64)
+        self.kappa_no_activeactive_idx = np.array(kappa_no_activeactive_idx, dtype=np.int64)
+        self.kappa_no_activeactive_idx_dagger = np.array(kappa_no_activeactive_idx_dagger, dtype=np.int64)
+        self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=np.int64)
+        hf_det = "1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec)
+        if ref_det == hf_det:
+            # If the refernce determinant is just Hartree-Fock,
+            # then reconstruct it inside QI to allow for other mappers than JW.
+            self.ref_det = None
+        else:
+            self.ref_det = ref_det
         # Setup Quantum Interface
         self.QI = quantum_interface
         self.QI.construct_circuit(
@@ -244,6 +289,7 @@ class WaveFunctionCircuit:
             self.active_unocc_spin_idx_shifted,
             self.num_active_orbs,
             (self.num_active_elec_alpha, self.num_active_elec_beta),
+            ref_det=self.ref_det,
         )
 
     @property
@@ -380,6 +426,7 @@ class WaveFunctionCircuit:
             self.active_unocc_spin_idx_shifted,
             self.num_active_orbs,
             (self.num_active_elec_alpha, self.num_active_elec_beta),
+            ref_det=self.ref_det,
         )
 
     @property
@@ -395,17 +442,17 @@ class WaveFunctionCircuit:
             One-electron reduced density matrix.
         """
         if self._rdm1 is None:
-            self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs))
+            self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs), dtype=np.float64)
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                p_idx = p - self.num_inactive_orbs
+                p_ = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
-                    q_idx = q - self.num_inactive_orbs
+                    q_ = q - self.num_inactive_orbs
                     rdm1_op = Epq(p, q).get_folded_operator(
                         self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                     )
                     val = self.QI.quantum_expectation_value(rdm1_op)
-                    self._rdm1[p_idx, q_idx] = val  # type: ignore [index]
-                    self._rdm1[q_idx, p_idx] = val  # type: ignore [index]
+                    self._rdm1[p_, q_] = val  # type: ignore [index]
+                    self._rdm1[q_, p_] = val  # type: ignore [index]
         return self._rdm1
 
     @property
@@ -427,14 +474,15 @@ class WaveFunctionCircuit:
                     self.num_active_orbs,
                     self.num_active_orbs,
                     self.num_active_orbs,
-                )
+                ),
+                dtype=np.float64,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                p_idx = p - self.num_inactive_orbs
+                p_ = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
-                    q_idx = q - self.num_inactive_orbs
+                    q_ = q - self.num_inactive_orbs
                     for r in range(self.num_inactive_orbs, p + 1):
-                        r_idx = r - self.num_inactive_orbs
+                        r_ = r - self.num_inactive_orbs
                         if p == q:
                             s_lim = r + 1
                         elif p == r:
@@ -444,17 +492,17 @@ class WaveFunctionCircuit:
                         else:
                             s_lim = p + 1
                         for s in range(self.num_inactive_orbs, s_lim):
-                            s_idx = s - self.num_inactive_orbs
+                            s_ = s - self.num_inactive_orbs
                             pdm2_op = (Epq(p, q) * Epq(r, s)).get_folded_operator(
                                 self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                             )
                             val = self.QI.quantum_expectation_value(pdm2_op)
                             if q == r:
-                                val -= self.rdm1[p_idx, s_idx]
-                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore [index]
-                            self._rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore [index]
-                            self._rdm2[q_idx, p_idx, s_idx, r_idx] = val  # type: ignore [index]
-                            self._rdm2[s_idx, r_idx, q_idx, p_idx] = val  # type: ignore [index]
+                                val -= self.rdm1[p_, s_]
+                            self._rdm2[p_, q_, r_, s_] = val  # type: ignore
+                            self._rdm2[r_, s_, p_, q_] = val  # type: ignore
+                            self._rdm2[q_, p_, s_, r_] = val  # type: ignore
+                            self._rdm2[s_, r_, q_, p_] = val  # type: ignore
         return self._rdm2
 
     @property
@@ -478,44 +526,45 @@ class WaveFunctionCircuit:
                     self.num_active_orbs,
                     self.num_active_orbs,
                     self.num_active_orbs,
-                )
+                ),
+                dtype=np.float64,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                p_idx = p - self.num_inactive_orbs
+                p_ = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
-                    q_idx = q - self.num_inactive_orbs
+                    q_ = q - self.num_inactive_orbs
                     for r in range(self.num_inactive_orbs, p + 1):
-                        r_idx = r - self.num_inactive_orbs
+                        r_ = r - self.num_inactive_orbs
                         for s in range(self.num_inactive_orbs, p + 1):
-                            s_idx = s - self.num_inactive_orbs
+                            s_ = s - self.num_inactive_orbs
                             for t in range(self.num_inactive_orbs, r + 1):
-                                t_idx = t - self.num_inactive_orbs
+                                t_ = t - self.num_inactive_orbs
                                 for u in range(self.num_inactive_orbs, p + 1):
-                                    u_idx = u - self.num_inactive_orbs
+                                    u_ = u - self.num_inactive_orbs
                                     pdm3_op = (Epq(p, q) * Epq(r, s) * Epq(t, u)).get_folded_operator(
                                         self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                                     )
                                     val = self.QI.quantum_expectation_value(pdm3_op)
                                     if t == s:
-                                        val -= self.rdm2[p_idx, q_idx, r_idx, u_idx]
+                                        val -= self.rdm2[p_, q_, r_, u_]
                                     if r == q:
-                                        val -= self.rdm2[p_idx, s_idx, t_idx, u_idx]
+                                        val -= self.rdm2[p_, s_, t_, u_]
                                     if t == q:
-                                        val -= self.rdm2[p_idx, u_idx, r_idx, s_idx]
+                                        val -= self.rdm2[p_, u_, r_, s_]
                                     if t == s and r == q:
-                                        val -= self.rdm1[p_idx, u_idx]
-                                    self._rdm3[p_idx, q_idx, r_idx, s_idx, t_idx, u_idx] = val  # type: ignore
-                                    self._rdm3[p_idx, q_idx, t_idx, u_idx, r_idx, s_idx] = val  # type: ignore
-                                    self._rdm3[r_idx, s_idx, p_idx, q_idx, t_idx, u_idx] = val  # type: ignore
-                                    self._rdm3[r_idx, s_idx, t_idx, u_idx, p_idx, q_idx] = val  # type: ignore
-                                    self._rdm3[t_idx, u_idx, p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
-                                    self._rdm3[t_idx, u_idx, r_idx, s_idx, p_idx, q_idx] = val  # type: ignore
-                                    self._rdm3[q_idx, p_idx, s_idx, r_idx, u_idx, t_idx] = val  # type: ignore
-                                    self._rdm3[q_idx, p_idx, u_idx, t_idx, s_idx, r_idx] = val  # type: ignore
-                                    self._rdm3[s_idx, r_idx, q_idx, p_idx, u_idx, t_idx] = val  # type: ignore
-                                    self._rdm3[s_idx, r_idx, u_idx, t_idx, q_idx, p_idx] = val  # type: ignore
-                                    self._rdm3[u_idx, t_idx, q_idx, p_idx, s_idx, r_idx] = val  # type: ignore
-                                    self._rdm3[u_idx, t_idx, s_idx, r_idx, q_idx, p_idx] = val  # type: ignore
+                                        val -= self.rdm1[p_, u_]
+                                    self._rdm3[p_, q_, r_, s_, t_, u_] = val  # type: ignore
+                                    self._rdm3[p_, q_, t_, u_, r_, s_] = val  # type: ignore
+                                    self._rdm3[r_, s_, p_, q_, t_, u_] = val  # type: ignore
+                                    self._rdm3[r_, s_, t_, u_, p_, q_] = val  # type: ignore
+                                    self._rdm3[t_, u_, p_, q_, r_, s_] = val  # type: ignore
+                                    self._rdm3[t_, u_, r_, s_, p_, q_] = val  # type: ignore
+                                    self._rdm3[q_, p_, s_, r_, u_, t_] = val  # type: ignore
+                                    self._rdm3[q_, p_, u_, t_, s_, r_] = val  # type: ignore
+                                    self._rdm3[s_, r_, q_, p_, u_, t_] = val  # type: ignore
+                                    self._rdm3[s_, r_, u_, t_, q_, p_] = val  # type: ignore
+                                    self._rdm3[u_, t_, q_, p_, s_, r_] = val  # type: ignore
+                                    self._rdm3[u_, t_, s_, r_, q_, p_] = val  # type: ignore
         return self._rdm3
 
     @property
@@ -541,24 +590,25 @@ class WaveFunctionCircuit:
                     self.num_active_orbs,
                     self.num_active_orbs,
                     self.num_active_orbs,
-                )
+                ),
+                dtype=np.float64,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                p_idx = p - self.num_inactive_orbs
+                p_ = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
-                    q_idx = q - self.num_inactive_orbs
+                    q_ = q - self.num_inactive_orbs
                     for r in range(self.num_inactive_orbs, p + 1):
-                        r_idx = r - self.num_inactive_orbs
+                        r_ = r - self.num_inactive_orbs
                         for s in range(self.num_inactive_orbs, p + 1):
-                            s_idx = s - self.num_inactive_orbs
+                            s_ = s - self.num_inactive_orbs
                             for t in range(self.num_inactive_orbs, r + 1):
-                                t_idx = t - self.num_inactive_orbs
+                                t_ = t - self.num_inactive_orbs
                                 for u in range(self.num_inactive_orbs, p + 1):
-                                    u_idx = u - self.num_inactive_orbs
+                                    u_ = u - self.num_inactive_orbs
                                     for m in range(self.num_inactive_orbs, t + 1):
-                                        m_idx = m - self.num_inactive_orbs
+                                        m_ = m - self.num_inactive_orbs
                                         for n in range(self.num_inactive_orbs, p + 1):
-                                            n_idx = n - self.num_inactive_orbs
+                                            n_ = n - self.num_inactive_orbs
                                             pdm4_op = (
                                                 Epq(p, q) * Epq(r, s) * Epq(t, u) * Epq(m, n)
                                             ).get_folded_operator(
@@ -568,177 +618,81 @@ class WaveFunctionCircuit:
                                             )
                                             val = self.QI.quantum_expectation_value(pdm4_op)
                                             if r == q:
-                                                val -= self.rdm3[p_idx, s_idx, t_idx, u_idx, m_idx, n_idx]
+                                                val -= self.rdm3[p_, s_, t_, u_, m_, n_]
                                             if t == q:
-                                                val -= self.rdm3[p_idx, u_idx, r_idx, s_idx, m_idx, n_idx]
+                                                val -= self.rdm3[p_, u_, r_, s_, m_, n_]
                                             if m == q:
-                                                val -= self.rdm3[p_idx, n_idx, r_idx, s_idx, t_idx, u_idx]
+                                                val -= self.rdm3[p_, n_, r_, s_, t_, u_]
                                             if m == u:
-                                                val -= self.rdm3[p_idx, q_idx, r_idx, s_idx, t_idx, n_idx]
+                                                val -= self.rdm3[p_, q_, r_, s_, t_, n_]
                                             if t == s:
-                                                val -= self.rdm3[p_idx, q_idx, r_idx, u_idx, m_idx, n_idx]
+                                                val -= self.rdm3[p_, q_, r_, u_, m_, n_]
                                             if m == s:
-                                                val -= self.rdm3[p_idx, q_idx, r_idx, n_idx, t_idx, u_idx]
+                                                val -= self.rdm3[p_, q_, r_, n_, t_, u_]
                                             if m == u and r == q:
-                                                val -= self.rdm2[p_idx, s_idx, t_idx, n_idx]
+                                                val -= self.rdm2[p_, s_, t_, n_]
                                             if m == u and t == q:
-                                                val -= self.rdm2[p_idx, n_idx, r_idx, s_idx]
+                                                val -= self.rdm2[p_, n_, r_, s_]
                                             if t == s and m == u:
-                                                val -= self.rdm2[p_idx, q_idx, r_idx, n_idx]
+                                                val -= self.rdm2[p_, q_, r_, n_]
                                             if t == s and r == q:
-                                                val -= self.rdm2[p_idx, u_idx, m_idx, n_idx]
+                                                val -= self.rdm2[p_, u_, m_, n_]
                                             if t == s and m == q:
-                                                val -= self.rdm2[p_idx, n_idx, r_idx, u_idx]
+                                                val -= self.rdm2[p_, n_, r_, u_]
                                             if m == s and r == q:
-                                                val -= self.rdm2[p_idx, n_idx, t_idx, u_idx]
+                                                val -= self.rdm2[p_, n_, t_, u_]
                                             if m == s and t == q:
-                                                val -= self.rdm2[p_idx, u_idx, r_idx, n_idx]
+                                                val -= self.rdm2[p_, u_, r_, n_]
                                             if m == u and t == s and r == q:
-                                                val -= self.rdm1[p_idx, n_idx]
-                                            self._rdm4[  # type: ignore
-                                                p_idx, q_idx, r_idx, s_idx, t_idx, u_idx, m_idx, n_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                p_idx, q_idx, r_idx, s_idx, m_idx, n_idx, t_idx, u_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                p_idx, q_idx, t_idx, u_idx, r_idx, s_idx, m_idx, n_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                p_idx, q_idx, t_idx, u_idx, m_idx, n_idx, r_idx, s_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                p_idx, q_idx, m_idx, n_idx, r_idx, s_idx, t_idx, u_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                p_idx, q_idx, m_idx, n_idx, t_idx, u_idx, r_idx, s_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                r_idx, s_idx, p_idx, q_idx, t_idx, u_idx, m_idx, n_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                r_idx, s_idx, p_idx, q_idx, m_idx, n_idx, t_idx, u_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                r_idx, s_idx, t_idx, u_idx, p_idx, q_idx, m_idx, n_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                r_idx, s_idx, t_idx, u_idx, m_idx, n_idx, p_idx, q_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                r_idx, s_idx, m_idx, n_idx, p_idx, q_idx, t_idx, u_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                r_idx, s_idx, m_idx, n_idx, t_idx, u_idx, p_idx, q_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                t_idx, u_idx, p_idx, q_idx, r_idx, s_idx, m_idx, n_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                t_idx, u_idx, p_idx, q_idx, m_idx, n_idx, r_idx, s_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                t_idx, u_idx, r_idx, s_idx, p_idx, q_idx, m_idx, n_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                t_idx, u_idx, r_idx, s_idx, m_idx, n_idx, p_idx, q_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                t_idx, u_idx, m_idx, n_idx, p_idx, q_idx, r_idx, s_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                t_idx, u_idx, m_idx, n_idx, r_idx, s_idx, p_idx, q_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                m_idx, n_idx, p_idx, q_idx, r_idx, s_idx, t_idx, u_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                m_idx, n_idx, p_idx, q_idx, t_idx, u_idx, r_idx, s_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                m_idx, n_idx, r_idx, s_idx, p_idx, q_idx, t_idx, u_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                m_idx, n_idx, r_idx, s_idx, t_idx, u_idx, p_idx, q_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                m_idx, n_idx, t_idx, u_idx, p_idx, q_idx, r_idx, s_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                m_idx, n_idx, t_idx, u_idx, r_idx, s_idx, p_idx, q_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                q_idx, p_idx, s_idx, r_idx, u_idx, t_idx, n_idx, m_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                q_idx, p_idx, s_idx, r_idx, n_idx, m_idx, u_idx, t_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                q_idx, p_idx, u_idx, t_idx, s_idx, r_idx, n_idx, m_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                q_idx, p_idx, u_idx, t_idx, n_idx, m_idx, s_idx, r_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                q_idx, p_idx, n_idx, m_idx, s_idx, r_idx, u_idx, t_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                q_idx, p_idx, n_idx, m_idx, u_idx, t_idx, s_idx, r_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                s_idx, r_idx, q_idx, p_idx, u_idx, t_idx, n_idx, m_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                s_idx, r_idx, q_idx, p_idx, n_idx, m_idx, u_idx, t_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                s_idx, r_idx, u_idx, t_idx, q_idx, p_idx, n_idx, m_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                s_idx, r_idx, u_idx, t_idx, n_idx, m_idx, q_idx, p_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                s_idx, r_idx, n_idx, m_idx, q_idx, p_idx, u_idx, t_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                s_idx, r_idx, n_idx, m_idx, u_idx, t_idx, q_idx, p_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                u_idx, t_idx, q_idx, p_idx, s_idx, r_idx, n_idx, m_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                u_idx, t_idx, q_idx, p_idx, n_idx, m_idx, s_idx, r_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                u_idx, t_idx, s_idx, r_idx, q_idx, p_idx, n_idx, m_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                u_idx, t_idx, s_idx, r_idx, n_idx, m_idx, q_idx, p_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                u_idx, t_idx, n_idx, m_idx, q_idx, p_idx, s_idx, r_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                u_idx, t_idx, n_idx, m_idx, s_idx, r_idx, q_idx, p_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                n_idx, m_idx, q_idx, p_idx, s_idx, r_idx, u_idx, t_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                n_idx, m_idx, q_idx, p_idx, u_idx, t_idx, s_idx, r_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                n_idx, m_idx, s_idx, r_idx, q_idx, p_idx, u_idx, t_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                n_idx, m_idx, s_idx, r_idx, u_idx, t_idx, q_idx, p_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                n_idx, m_idx, u_idx, t_idx, q_idx, p_idx, s_idx, r_idx
-                                            ] = val
-                                            self._rdm4[  # type: ignore
-                                                n_idx, m_idx, u_idx, t_idx, s_idx, r_idx, q_idx, p_idx
-                                            ] = val
+                                                val -= self.rdm1[p_, n_]
+                                            self._rdm4[p_, q_, r_, s_, t_, u_, m_, n_] = val  # type: ignore
+                                            self._rdm4[p_, q_, r_, s_, m_, n_, t_, u_] = val  # type: ignore
+                                            self._rdm4[p_, q_, t_, u_, r_, s_, m_, n_] = val  # type: ignore
+                                            self._rdm4[p_, q_, t_, u_, m_, n_, r_, s_] = val  # type: ignore
+                                            self._rdm4[p_, q_, m_, n_, r_, s_, t_, u_] = val  # type: ignore
+                                            self._rdm4[p_, q_, m_, n_, t_, u_, r_, s_] = val  # type: ignore
+                                            self._rdm4[r_, s_, p_, q_, t_, u_, m_, n_] = val  # type: ignore
+                                            self._rdm4[r_, s_, p_, q_, m_, n_, t_, u_] = val  # type: ignore
+                                            self._rdm4[r_, s_, t_, u_, p_, q_, m_, n_] = val  # type: ignore
+                                            self._rdm4[r_, s_, t_, u_, m_, n_, p_, q_] = val  # type: ignore
+                                            self._rdm4[r_, s_, m_, n_, p_, q_, t_, u_] = val  # type: ignore
+                                            self._rdm4[r_, s_, m_, n_, t_, u_, p_, q_] = val  # type: ignore
+                                            self._rdm4[t_, u_, p_, q_, r_, s_, m_, n_] = val  # type: ignore
+                                            self._rdm4[t_, u_, p_, q_, m_, n_, r_, s_] = val  # type: ignore
+                                            self._rdm4[t_, u_, r_, s_, p_, q_, m_, n_] = val  # type: ignore
+                                            self._rdm4[t_, u_, r_, s_, m_, n_, p_, q_] = val  # type: ignore
+                                            self._rdm4[t_, u_, m_, n_, p_, q_, r_, s_] = val  # type: ignore
+                                            self._rdm4[t_, u_, m_, n_, r_, s_, p_, q_] = val  # type: ignore
+                                            self._rdm4[m_, n_, p_, q_, r_, s_, t_, u_] = val  # type: ignore
+                                            self._rdm4[m_, n_, p_, q_, t_, u_, r_, s_] = val  # type: ignore
+                                            self._rdm4[m_, n_, r_, s_, p_, q_, t_, u_] = val  # type: ignore
+                                            self._rdm4[m_, n_, r_, s_, t_, u_, p_, q_] = val  # type: ignore
+                                            self._rdm4[m_, n_, t_, u_, p_, q_, r_, s_] = val  # type: ignore
+                                            self._rdm4[m_, n_, t_, u_, r_, s_, p_, q_] = val  # type: ignore
+                                            self._rdm4[q_, p_, s_, r_, u_, t_, n_, m_] = val  # type: ignore
+                                            self._rdm4[q_, p_, s_, r_, n_, m_, u_, t_] = val  # type: ignore
+                                            self._rdm4[q_, p_, u_, t_, s_, r_, n_, m_] = val  # type: ignore
+                                            self._rdm4[q_, p_, u_, t_, n_, m_, s_, r_] = val  # type: ignore
+                                            self._rdm4[q_, p_, n_, m_, s_, r_, u_, t_] = val  # type: ignore
+                                            self._rdm4[q_, p_, n_, m_, u_, t_, s_, r_] = val  # type: ignore
+                                            self._rdm4[s_, r_, q_, p_, u_, t_, n_, m_] = val  # type: ignore
+                                            self._rdm4[s_, r_, q_, p_, n_, m_, u_, t_] = val  # type: ignore
+                                            self._rdm4[s_, r_, u_, t_, q_, p_, n_, m_] = val  # type: ignore
+                                            self._rdm4[s_, r_, u_, t_, n_, m_, q_, p_] = val  # type: ignore
+                                            self._rdm4[s_, r_, n_, m_, q_, p_, u_, t_] = val  # type: ignore
+                                            self._rdm4[s_, r_, n_, m_, u_, t_, q_, p_] = val  # type: ignore
+                                            self._rdm4[u_, t_, q_, p_, s_, r_, n_, m_] = val  # type: ignore
+                                            self._rdm4[u_, t_, q_, p_, n_, m_, s_, r_] = val  # type: ignore
+                                            self._rdm4[u_, t_, s_, r_, q_, p_, n_, m_] = val  # type: ignore
+                                            self._rdm4[u_, t_, s_, r_, n_, m_, q_, p_] = val  # type: ignore
+                                            self._rdm4[u_, t_, n_, m_, q_, p_, s_, r_] = val  # type: ignore
+                                            self._rdm4[u_, t_, n_, m_, s_, r_, q_, p_] = val  # type: ignore
+                                            self._rdm4[n_, m_, q_, p_, s_, r_, u_, t_] = val  # type: ignore
+                                            self._rdm4[n_, m_, q_, p_, u_, t_, s_, r_] = val  # type: ignore
+                                            self._rdm4[n_, m_, s_, r_, q_, p_, u_, t_] = val  # type: ignore
+                                            self._rdm4[n_, m_, s_, r_, u_, t_, q_, p_] = val  # type: ignore
+                                            self._rdm4[n_, m_, u_, t_, q_, p_, s_, r_] = val  # type: ignore
+                                            self._rdm4[n_, m_, u_, t_, s_, r_, q_, p_] = val  # type: ignore
         return self._rdm4
 
     def precalc_rdm_paulis(self, rdm_order: int) -> None:
@@ -832,16 +786,13 @@ class WaveFunctionCircuit:
             SparsePauliOp(cumulated_paulis, np.ones(len(cumulated_paulis)))  # type: ignore[arg-type]
         )
 
-    def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
+    def check_orthonormality(self) -> None:
         r"""Check orthonormality of orbitals.
 
         .. math::
             \boldsymbol{I} = \boldsymbol{C}_\text{MO}\boldsymbol{S}\boldsymbol{C}_\text{MO}^T
-
-        Args:
-            overlap_integral: Overlap integral in AO basis.
         """
-        S_ortho = one_electron_integral_transform(self.c_mo, overlap_integral)
+        S_ortho = one_electron_integral_transform(self.c_mo, self.int_gen.overlap)
         one = np.identity(len(S_ortho))
         diff = np.abs(S_ortho - one)
         print("Max ortho-normal diff:", np.max(diff))
@@ -881,42 +832,123 @@ class WaveFunctionCircuit:
         energy_elec = self.QI.quantum_expectation_value(H)
         return energy_elec
 
-    def run_wf_optimization_2step(
+    def run_wf_optimization(
         self,
-        optimizer_name: str,
         orbital_optimization: bool = False,
         tol: float = 1e-10,
         maxiter: int = 1000,
-        is_silent_subiterations: bool = False,
-        print_std: bool = False,
+        optimization_options: dict[str, Any] | None = None,
     ) -> None:
-        """Run two step optimization of wave function.
+        """Run variational optimization of wavefunction.
+
+        Optimization options:
+            * theta_optimization [bool]: Perform theta optimization.
+                                         (default: True)
+            * theta_optimizer [str]: Optimizer used for theta optimization.
+                                     (default: BFGS)
+            * orbital_optimizer [str]: Optimizer used for orbital optimization.
+                                     (default: BFGS)
+            * 1step_optimizer [str]: Optimizer used for 1step optimizer.
+                                     (fallback: copy theta_optimizer)
+            * opt_type [str]: Optimization type, can be '1step' or '2step'.
+                              (default: 1step)
+            * is_silent_subiterations [bool]: Silence sub iterations in 2step.
+                                              (default: False)
+            * print_std [bool]: Print standard deviation of the electronic Hamiltonian during optimization.
+                                (default: False)
 
         Args:
-            optimizer_name: Name of optimizer.
             orbital_optimization: Perform orbital optimization.
-            tol: Convergence tolerance.
+            tol: Tolerance for finishing the optimization.
             maxiter: Maximum number of iterations.
-            is_silent_subiterations: Silence subiterations.
-            print_std: Print standard deviation of the electronic Hamiltonian during optimization.
+            optimization_options: Additional optimization options.
         """
-        if isinstance(self.QI.ansatz, QuantumCircuit) and optimizer_name.lower() not in ("cobyla", "cobyqa"):
-            raise ValueError("Custom Ansatz in QI only works with COBYLA and COBYQA as optimizer.")
+        if optimization_options is None:
+            optimization_options = {}
+        self._optimization_options = copy.deepcopy(optimization_options)
+        valid_options = (
+            "theta_optimization",
+            "theta_optimizer",
+            "orbital_optimizer",
+            "opt_type",
+            "is_silent_subiterations",
+            "1step_optimizer",
+            "print_std",
+        )
+        for option in self._optimization_options:
+            if option not in valid_options:
+                raise ValueError(
+                    f"Got unknown option for optimization, {option}. Valid options are: {valid_options}"
+                )
+        self._optimization_options["tol"] = tol
+        self._optimization_options["maxiter"] = int(maxiter)
+        self._optimization_options["orbital_optimization"] = orbital_optimization
+        self._optimization_options.setdefault("theta_optimization", True)
+        self._optimization_options.setdefault("theta_optimizer", "BFGS")
+        self._optimization_options.setdefault("orbital_optimizer", "BFGS")
+        self._optimization_options.setdefault("opt_type", "1step")
+        self._optimization_options.setdefault("is_silent_subiterations", False)
+        self._optimization_options.setdefault("print_std", False)
+        if len(self.kappa) == 0 and self._optimization_options["orbital_optimization"]:
+            print("No kappa parameters turning off orbital optimization.")
+        if len(self.thetas) == 0 and self._optimization_options["theta_optimization"]:
+            print("No thetas parameters turning off theta optimization.")
+        if self._optimization_options["opt_type"].lower() == "2step" and (
+            not self._optimization_options["orbital_optimization"]
+            or not self._optimization_options["theta_optimization"]
+        ):
+            if not self._optimization_options["orbital_optimization"]:
+                print("Orbital optimization not requested changing optimizer type to 1step.")
+                self._optimization_options["opt_type"] = "1step"
+            elif not self._optimization_options["theta_optimization"]:
+                print("theta optimization not requested changing optimizer type to 1step.")
+                self._optimization_options["opt_type"] = "1step"
+        if (
+            self._optimization_options["opt_type"].lower() == "1step"
+            and "1step_optimizer" not in self._optimization_options.keys()
+        ):
+            print(
+                "'1step_optimizer' was not specifed. Using the optimizer specified as 'theta_optimizer': {self._optimization_options['theta_optimizer']}"
+            )
+            self._optimization_options["1step_optimizer"] = self._optimization_options["theta_optimizer"]
+        if self._optimization_options["theta_optimization"] and isinstance(self.QI.ansatz, QuantumCircuit):
+            if self._optimization_options["opt_type"].lower() == "1step" and self._optimization_options[
+                "1step_optimizer"
+            ].lower() not in ("cobyla", "cobyqa"):
+                raise ValueError("Custom Ansatz in QI only works with COBYLA and COBYQA as optimizer.")
+            elif self._optimization_options["opt_type"].lower() == "2step" and self._optimization_options[
+                "theta_optimizer"
+            ].lower() not in ("cobyla", "cobyqa"):
+                raise ValueError("Custom Ansatz in QI only works with COBYLA and COBYQA as optimizer.")
         print("### Parameters information:")
-        if orbital_optimization:
+        if self._optimization_options["orbital_optimization"]:
             print(f"### Number kappa: {len(self.kappa)}")
-        print(f"### Number theta: {len(self.thetas)}")
+        if self._optimization_options["theta_optimization"]:
+            print("### Number theta: {len(self.thetas)}")
+        if self._optimization_options["opt_type"].lower() == "1step":
+            self._run_wf_optimization_1step()
+        elif self._optimization_options["opt_type"].lower() == "2step":
+            self._run_wf_optimization_1step()
+        else:
+            raise ValueError(
+                f"Got unknown 'opt_type', {[self._optimization_options['opt_type']]} excepted '1step' or '2step'."
+            )
+
+    def _run_wf_optimization_2step(
+        self,
+    ) -> None:
+        """Run two step optimization of wave function."""
         e_old = 1e12
         print("Full optimization")
         print("Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #")
-        for full_iter in range(0, int(maxiter)):
+        for full_iter in range(0, self._optimization_options["maxiter"]):
             full_start = time.time()
 
             # Do ansatz optimization
-            if not is_silent_subiterations:
+            if not self._optimization_options["is_silent_subiterations"]:
                 print("--------Ansatz optimization")
                 subheader = "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
-                if print_std:
+                if self._optimization_options["print_std"]:
                     subheader += " | Std(H)"
                 print(subheader)
 
@@ -932,11 +964,11 @@ class WaveFunctionCircuit:
             )
             optimizer = Optimizers(
                 energy_theta,
-                optimizer_name,
+                self._optimization_options["theta_optimizer"],
                 grad=gradient_theta,
-                maxiter=maxiter,
-                tol=tol,
-                is_silent=is_silent_subiterations,
+                maxiter=self._optimization_options["maxiter"],
+                tol=self._optimization_options["tol"],
+                is_silent=self._optimization_options["is_silent_subiterations"],
                 energy_eval_callback=lambda: self.num_energy_evals,
                 std_callback=(
                     (
@@ -948,7 +980,7 @@ class WaveFunctionCircuit:
                             )
                         )
                     )
-                    if print_std
+                    if self._optimization_options["print_std"]
                     else None
                 ),
             )
@@ -958,108 +990,80 @@ class WaveFunctionCircuit:
             )
             self.thetas = res.x.tolist()
 
-            if orbital_optimization and len(self.kappa) != 0:
-                if not is_silent_subiterations:
-                    print("--------Orbital optimization")
-                    subheader = "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
-                    if print_std:
-                        subheader += " | Std(H)"
-                    print(subheader)
+            if not self._optimization_options["is_silent_subiterations"]:
+                print("--------Orbital optimization")
+                subheader = "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+                if self._optimization_options["print_std"]:
+                    subheader += " | Std(H)"
+                print(subheader)
 
-                energy_oo = partial(
-                    self._calc_energy_optimization,
-                    theta_optimization=False,
-                    kappa_optimization=True,
-                )
-                gradient_oo = partial(
-                    self._calc_gradient_optimization,
-                    theta_optimization=False,
-                    kappa_optimization=True,
-                )
+            energy_oo = partial(
+                self._calc_energy_optimization,
+                theta_optimization=False,
+                kappa_optimization=True,
+            )
+            gradient_oo = partial(
+                self._calc_gradient_optimization,
+                theta_optimization=False,
+                kappa_optimization=True,
+            )
 
-                optimizer = Optimizers(
-                    energy_oo,
-                    "l-bfgs-b",
-                    grad=gradient_oo,
-                    maxiter=maxiter,
-                    tol=tol,
-                    is_silent=is_silent_subiterations,
-                    energy_eval_callback=lambda: self.num_energy_evals,
-                    std_callback=(
-                        (
-                            lambda: self.QI.quantum_variance(
-                                hamiltonian_0i_0a(
-                                    self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
-                                ).get_folded_operator(
-                                    self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
-                                )
+            optimizer = Optimizers(
+                energy_oo,
+                self._optimization_options["orbital_optimizer"],
+                grad=gradient_oo,
+                maxiter=self._optimization_options["maxiter"],
+                tol=self._optimization_options["tol"],
+                is_silent=self._optimization_options["is_silent_subiterations"],
+                energy_eval_callback=lambda: self.num_energy_evals,
+                std_callback=(
+                    (
+                        lambda: self.QI.quantum_variance(
+                            hamiltonian_0i_0a(
+                                self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
+                            ).get_folded_operator(
+                                self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                             )
                         )
-                        if print_std
-                        else None
-                    ),
-                )
-                res = optimizer.minimize([0.0] * len(self.kappa_idx))
-                for i in range(len(self.kappa)):
-                    self._kappa[i] = 0.0
-                    self._kappa_old[i] = 0.0
-            else:
-                # If there is no orbital optimization, then the algorithm is already converged.
-                e_new = res.fun
-                if orbital_optimization and len(self.kappa) == 0:
-                    print(
-                        "WARNING: No orbital optimization performed, because there is no non-redundant orbital parameters"
                     )
-                break
-
+                    if self._optimization_options["print_std"]
+                    else None
+                ),
+            )
+            res = optimizer.minimize([0.0] * len(self.kappa_idx))
+            for i in range(len(self.kappa)):
+                self._kappa[i] = 0.0
+                self._kappa_old[i] = 0.0
             e_new = res.fun
             time_str = f"{time.time() - full_start:7.2f}"  # type: ignore
             e_str = f"{e_new:3.12f}"
             print(
                 f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {str(self.num_energy_evals).center(11)}"
             )  # type: ignore
-            if abs(e_new - e_old) < tol:
+            if abs(e_new - e_old) < self._optimization_options["tol"]:
                 break
             e_old = e_new
         self._energy_elec = e_new
 
-    def run_wf_optimization_1step(
+    def _run_wf_optimization_1step(
         self,
-        optimizer_name: str,
-        orbital_optimization: bool = False,
-        tol: float = 1e-10,
-        maxiter: int = 1000,
-        print_std: bool = False,
     ) -> None:
-        """Run one step optimization of wave function.
-
-        Args:
-            optimizer_name: Name of optimizer.
-            orbital_optimization: Perform orbital optimization.
-            tol: Convergence tolerance.
-            maxiter: Maximum number of iterations.
-            print_std: Print standard deviation in sub-iteration headers.
-        """
-        if isinstance(self.QI.ansatz, QuantumCircuit) and optimizer_name.lower() not in ("cobyla", "cobyqa"):
-            raise ValueError("Custom Ansatz in QI only works with COBYLA and COBYQA as optimizer.")
-        print("### Parameters information:")
-        if orbital_optimization:
-            print(f"### Number kappa: {len(self.kappa)}")
-        print(f"### Number theta: {len(self.thetas)}")
-        if optimizer_name.lower() == "rotosolve":
-            if orbital_optimization and len(self.kappa) != 0:
-                raise ValueError(
-                    "Cannot use RotoSolve together with orbital optimization in the one-step solver."
-                )
-
+        """Run one step optimization of wave function."""
+        if (
+            self._optimization_options["1step_optimizer"].lower() == "rotosolve"
+            and self._optimization_options["orbital_optimization"]
+        ):
+            raise ValueError(
+                "Cannot use RotoSolve together with orbital optimization in the one-step solver."
+            )
         header = (
             "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
         )
-        if print_std:
+        if self._optimization_options["print_std"]:
             header += " | Std(H)"
         print(header)
-        if orbital_optimization:
-            if len(self.thetas) > 0:
+        if self._optimization_options["orbital_optimization"]:
+            if self._optimization_options["theta_optimization"]:
                 energy = partial(
                     self._calc_energy_optimization,
                     theta_optimization=True,
@@ -1092,8 +1096,8 @@ class WaveFunctionCircuit:
                 theta_optimization=True,
                 kappa_optimization=False,
             )
-        if orbital_optimization:
-            if len(self.thetas) > 0:
+        if self._optimization_options["orbital_optimization"]:
+            if self._optimization_options["theta_optimization"]:
                 parameters = self.kappa + self.thetas
             else:
                 parameters = self.kappa
@@ -1101,10 +1105,10 @@ class WaveFunctionCircuit:
             parameters = self.thetas
         optimizer = Optimizers(
             energy,
-            optimizer_name,
+            self._optimization_options["1step_optimizer"],
             grad=gradient,
-            maxiter=maxiter,
-            tol=tol,
+            maxiter=self._optimization_options["maxiter"],
+            tol=self._optimization_options["tol"],
             energy_eval_callback=lambda: self.num_energy_evals,
             std_callback=(
                 (
@@ -1116,15 +1120,16 @@ class WaveFunctionCircuit:
                         )
                     )
                 )
-                if print_std
+                if self._optimization_options["print_std"]
                 else None
             ),
         )
         res = optimizer.minimize(
             parameters, extra_options={"R": self.QI.grad_param_R, "param_names": self.QI.param_names}
         )
-        if orbital_optimization:
-            self.thetas = res.x[len(self.kappa) :].tolist()
+        if self._optimization_options["orbital_optimization"]:
+            if self._optimization_options["theta_optimization"]:
+                self.thetas = res.x[len(self.kappa) :].tolist()
             for i in range(len(self.kappa)):
                 self._kappa[i] = 0.0
                 self._kappa_old[i] = 0.0

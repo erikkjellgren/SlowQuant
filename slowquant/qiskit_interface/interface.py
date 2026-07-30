@@ -125,7 +125,7 @@ class QuantumInterface:
         self.total_device_calls = 0
         self.total_paulis_evaluated = 0
         self.ansatz_options = ansatz_options
-        self._pass_manager: PassManager = None
+        self._pass_manager: PassManager | None = None
         self.saver: dict[int, Clique] = {}
         self._save_paulis = True  # hard switch to stop using Pauli saving (debugging tool).
         self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
@@ -139,6 +139,7 @@ class QuantumInterface:
         unocc_spin_idx: list[int],
         num_orbs: int,
         num_elec: tuple[int, int],
+        ref_det: str | None = None,
     ) -> None:
         """Construct qiskit circuit.
 
@@ -149,6 +150,7 @@ class QuantumInterface:
             unocc_spin_idx: Weakly occupied spin orbital indices.
             num_orbs: Number of spatial orbitals.
             num_elec: Number of electrons (alpha, beta).
+            ref_det: Reference determinant.
         """
         self.num_orbs = num_orbs
         self.num_spin_orbs = 2 * num_orbs
@@ -166,36 +168,8 @@ class QuantumInterface:
             self.state_circuit: QuantumCircuit = QuantumCircuit(
                 self.ansatz.num_qubits
             )  # empty state as custom circuit is passed
-        elif "do_pp" in self.ansatz_options.keys() and self.ansatz_options["do_pp"]:
-            # HF in pp-tUPS ordering
-            if not isinstance(self.mapper, JordanWignerMapper):
-                raise ValueError(f"pp-tUPS only implemented for JW mapper, got: {type(self.mapper)}")
-            # Obtain pp determinant
-            pp_det = ""
-            spin_orb = 0
-            elec_count = self.num_elec[0] + self.num_elec[1]
-            while spin_orb < self.num_spin_orbs:
-                if (
-                    elec_count >= 2
-                    and (self.num_spin_orbs - spin_orb) >= 4
-                    and elec_count <= (self.num_spin_orbs - spin_orb - 2)
-                ):
-                    pp_det += "1100"
-                    elec_count -= 2
-                    spin_orb += 4
-                elif elec_count == 0:
-                    pp_det += "0"
-                    spin_orb += 1
-                elif elec_count != 0:
-                    pp_det += "1"
-                    spin_orb += 1
-                    elec_count -= 1
-            print("State preparation: perfect-pairing determinant found as:", pp_det)
-            if len(pp_det) != self.num_spin_orbs or pp_det.count("1") != (
-                self.num_elec[0] + self.num_elec[1]
-            ):
-                raise ValueError("Perfect pairing determinant violates orbital or electron numbers")
-            self.state_circuit = get_determinant_reference(pp_det, self.num_orbs, self.mapper)
+        elif ref_det is not None:
+            self.state_circuit = get_determinant_reference(ref_det, self.num_orbs, self.mapper)
         else:
             self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
         self.num_qubits = self.state_circuit.num_qubits
@@ -212,18 +186,17 @@ class QuantumInterface:
             ups_layout = UpsStructure()
             if self.ansatz.lower() in ("fucc", "fuccpd", "fuccd", "fuccsd", "ksafupccgsd"):
                 if self.ansatz.lower() == "fuccpd":
-                    self.ansatz_options["pD"] = True
+                    self.ansatz_options["excitations"].append("pD")
                 elif self.ansatz.lower() == "fuccd":
-                    self.ansatz_options["D"] = True
+                    self.ansatz_options["excitations"].append("D")
                 elif self.ansatz.lower() == "fuccsd":
-                    self.ansatz_options["S"] = True
-                    self.ansatz_options["D"] = True
+                    self.ansatz_options["excitations"].append("S")
+                    self.ansatz_options["excitations"].append("D")
                 elif self.ansatz.lower() == "ksafupccgsd":
-                    self.ansatz_options["SAGS"] = True
-                    self.ansatz_options["GpD"] = True
-                if "n_layers" not in self.ansatz_options.keys():
-                    # default option
-                    self.ansatz_options["n_layers"] = 1
+                    self.ansatz_options["excitations"].append("SAGS")
+                    self.ansatz_options["excitations"].append("GpD")
+                # Default options
+                self.ansatz_options.setdefault("n_layers", 1)
                 ups_layout.create_fUCC(
                     occ_idx,
                     unocc_idx,
@@ -243,12 +216,11 @@ class QuantumInterface:
                 ups_layout.create_tiled(self.num_orbs, self.ansatz_options)
             elif self.ansatz.lower() in ("sdsfuccsd", "ksasdsfupccgsd"):
                 if self.ansatz.lower() == "sdsfuccsd":
-                    self.ansatz_options["D"] = True
+                    self.ansatz_options["excitations"].append("D")
                 elif self.ansatz.lower() == "ksasdsfupccgsd":
-                    self.ansatz_options["GpD"] = True
-                if "n_layers" not in self.ansatz_options.keys():
-                    # default option
-                    self.ansatz_options["n_layers"] = 1
+                    self.ansatz_options["excitations"].append("GpD")
+                # Default options
+                self.ansatz_options.setdefault("n_layers", 1)
                 ups_layout.create_SDSfUCC(
                     occ_idx,
                     unocc_idx,
@@ -888,9 +860,9 @@ class QuantumInterface:
                             del state_corr.data[idx]
                     if self.ISA:
                         # Translate and optimize
-                        state_corr = self._pass_manager.optimization.run(
-                            self._pass_manager.translation.run(state_corr)
-                        )  # type: ignore
+                        state_corr = self._pass_manager.optimization.run(  # type: ignore
+                            self._pass_manager.translation.run(state_corr)  # type: ignore
+                        )
                     # Negate
                     if circuit.layout is not None:
                         circuit_M = circuit.compose(

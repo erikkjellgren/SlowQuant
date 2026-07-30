@@ -203,10 +203,10 @@ class WaveFunctionSAUPS:
                     kappa_hf_like_idx.append((p, q))
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     kappa_hf_like_idx.append((p, q))
-        self.kappa_idx = np.array(kappa_idx, dtype=int)
-        self.kappa_idx_dagger = np.array(kappa_idx_dagger, dtype=int)
-        self.kappa_redundant_idx = np.array(kappa_redundant_idx, dtype=int)
-        self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
+        self.kappa_idx = np.array(kappa_idx, dtype=np.int64)
+        self.kappa_idx_dagger = np.array(kappa_idx_dagger, dtype=np.int64)
+        self.kappa_redundant_idx = np.array(kappa_redundant_idx, dtype=np.int64)
+        self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=np.int64)
         # Construct determinant basis
         self.ci_info = get_indexing(
             self.num_inactive_orbs,

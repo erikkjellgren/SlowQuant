@@ -58,7 +58,7 @@ class WaveFunctionUPS:
                                           'occ', include spatial index only in occ idx list.
                                           'unocc', include spatial index only in unocc idx list.
                                           (default: 'both')
-            * reference_determiant [str]: Specify a reference determinant for the active space part.
+            * reference_determinant [str]: Specify a reference determinant for the active space part.
                                           1 specifying occupied orbital and 0 specifying unoccupied orbital.
 
         Args:
@@ -80,7 +80,7 @@ class WaveFunctionUPS:
             "do_pp",
             "resolve_unpaired_idx",
             "include_active_kappa",
-            "reference_determiant",
+            "reference_determinant",
         )
         for option in wavefunction_options:
             if option not in valid_options:
@@ -139,9 +139,9 @@ class WaveFunctionUPS:
         # Reference wave function
         self._pp = self.wavefunction_options["do_pp"]
         if self.wavefunction_options["do_pp"]:
-            if "reference_determiant" in self.wavefunction_options.keys():
+            if "reference_determinant" in self.wavefunction_options.keys():
                 raise ValueError(
-                    "Both 'do_pp' and 'reference_determiant' are requested in 'wavefunction_options'."
+                    "Both 'do_pp' and 'reference_determinant' are requested in 'wavefunction_options'."
                 )
             if self.num_active_elec_alpha != self.num_active_elec_beta:
                 raise ValueError(
@@ -183,8 +183,8 @@ class WaveFunctionUPS:
 
             # Assign weight to reference
             ref_det = pp_det
-        elif "reference_determiant" in self.wavefunction_options.keys():
-            ref_det = self.wavefunction_options["reference_determiant"]
+        elif "reference_determinant" in self.wavefunction_options.keys():
+            ref_det = self.wavefunction_options["reference_determinant"]
             if len(ref_det) != self.num_active_spin_orbs:
                 raise ValueError(
                     f"Reference determinant is {len(ref_det)} spin orbitals and the active space is {self.num_active_spin_orbs} spin orbitals."
@@ -292,10 +292,10 @@ class WaveFunctionUPS:
                     kappa_hf_like_idx.append((p, q))
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     kappa_hf_like_idx.append((p, q))
-        self.kappa_idx = np.array(kappa_idx, dtype=int)
-        self.kappa_no_activeactive_idx = np.array(kappa_no_activeactive_idx, dtype=int)
-        self.kappa_no_activeactive_idx_dagger = np.array(kappa_no_activeactive_idx_dagger, dtype=int)
-        self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
+        self.kappa_idx = np.array(kappa_idx, dtype=np.int64)
+        self.kappa_no_activeactive_idx = np.array(kappa_no_activeactive_idx, dtype=np.int64)
+        self.kappa_no_activeactive_idx_dagger = np.array(kappa_no_activeactive_idx_dagger, dtype=np.int64)
+        self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=np.int64)
         # Construct determinant basis
         self.ci_info = get_indexing(
             self.num_inactive_orbs,
@@ -305,7 +305,7 @@ class WaveFunctionUPS:
             self.num_active_elec_beta,
         )
         self.num_det = len(self.ci_info.idx2det)
-        self.ref_coeffs = np.zeros(self.num_det, dtype=float)
+        self.ref_coeffs = np.zeros(self.num_det, dtype=np.float64)
         print("Reference (active) determinant:", ref_det)
         self.ref_coeffs[self.ci_info.det2idx[int(ref_det, 2)]] = 1
         self.ci_coeffs = np.copy(self.ref_coeffs)
@@ -463,7 +463,7 @@ class WaveFunctionUPS:
             One-electron reduced density matrix.
         """
         if self._rdm1 is None:
-            self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs), dtype=float)
+            self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs), dtype=np.float64)
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
@@ -493,7 +493,7 @@ class WaveFunctionUPS:
                     self.num_active_orbs,
                     self.num_active_orbs,
                 ),
-                dtype=float,
+                dtype=np.float64,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
@@ -544,7 +544,7 @@ class WaveFunctionUPS:
                     self.num_active_orbs,
                     self.num_active_orbs,
                 ),
-                dtype=float,
+                dtype=np.float64,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
@@ -607,7 +607,7 @@ class WaveFunctionUPS:
                     self.num_active_orbs,
                     self.num_active_orbs,
                 ),
-                dtype=float,
+                dtype=np.float64,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
@@ -823,6 +823,7 @@ class WaveFunctionUPS:
             print(
                 "'1step_optimizer' was not specifed using the optimizer specified as 'theta_optimizer': {self._optimization_options['theta_optimizer']}"
             )
+            self._optimization_options["1step_optimizer"] = self._optimization_options["theta_optimizer"]
         print("### Parameters information:")
         if self._optimization_options["orbital_optimization"]:
             print(f"### Number kappa: {len(self.kappa)}")
@@ -834,7 +835,7 @@ class WaveFunctionUPS:
             self._run_wf_optimization_1step()
         else:
             raise ValueError(
-                f"Got unknown 'opt_type', {[self._optimization_options['opt_type']]} excepted '1step' or '2step'."
+                f"Got unknown 'opt_type', {[self._optimization_options['opt_type']]} excpected '1step' or '2step'."
             )
 
     def _run_wf_optimization_2step(

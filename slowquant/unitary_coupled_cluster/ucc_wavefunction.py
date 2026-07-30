@@ -52,7 +52,7 @@ class WaveFunctionUCC:
                                           'occ', include spatial index only in occ idx list.
                                           'unocc', include spatial index only in unocc idx list.
                                           (default: 'both')
-            * reference_determiant [str]: Specify a reference determinant for the active space part.
+            * reference_determinant [str]: Specify a reference determinant for the active space part.
                                           1 specifying occupied orbital and 0 specifying unoccupied orbital.
 
         Possible excitations:
@@ -81,7 +81,7 @@ class WaveFunctionUCC:
         valid_options = (
             "resolve_unpaired_idx",
             "include_active_kappa",
-            "reference_determiant",
+            "reference_determinant",
         )
         for option in wavefunction_options:
             if option not in valid_options:
@@ -134,13 +134,12 @@ class WaveFunctionUCC:
         self._h_mo = None
         self._g_mo = None
         self._energy_elec: float | None = None
-        self.num_energy_evals = 0
         self._c_mo = mo_coeffs
         # Used when converting to circuit wavefunction.
         self._include_active_kappa = self.wavefunction_options["include_active_kappa"]
         # Reference wave function
-        if "reference_determiant" in self.wavefunction_options.keys():
-            ref_det = self.wavefunction_options["reference_determiant"]
+        if "reference_determinant" in self.wavefunction_options.keys():
+            ref_det = self.wavefunction_options["reference_determinant"]
             if len(ref_det) != self.num_active_spin_orbs:
                 raise ValueError(
                     f"Reference determinant is {len(ref_det)} spin orbitals and the active space is {self.num_active_spin_orbs} spin orbitals."
@@ -208,7 +207,7 @@ class WaveFunctionUCC:
                 self.active_unocc_idx.append(orb_idx)
             else:
                 raise ValueError(
-                    f"Got unknown option for resolve_unpaired_idx, {wavefunction_options['resolve_unpaired_idx']}, excepted 'both', 'occ' or 'unocc'."
+                    f"Got unknown option for resolve_unpaired_idx, {wavefunction_options['resolve_unpaired_idx']}, expected 'both', 'occ' or 'unocc'."
                 )
         self.active_idx_shifted = [x - self.num_inactive_orbs for x in self.active_idx]
         self.active_occ_idx_shifted = [x - self.num_inactive_orbs for x in self.active_occ_idx]
@@ -248,10 +247,10 @@ class WaveFunctionUCC:
                     kappa_hf_like_idx.append((p, q))
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     kappa_hf_like_idx.append((p, q))
-        self.kappa_idx = np.array(kappa_idx, dtype=int)
-        self.kappa_no_activeactive_idx = np.array(kappa_no_activeactive_idx, dtype=int)
-        self.kappa_no_activeactive_idx_dagger = np.array(kappa_no_activeactive_idx_dagger, dtype=int)
-        self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
+        self.kappa_idx = np.array(kappa_idx, dtype=np.int64)
+        self.kappa_no_activeactive_idx = np.array(kappa_no_activeactive_idx, dtype=np.int64)
+        self.kappa_no_activeactive_idx_dagger = np.array(kappa_no_activeactive_idx_dagger, dtype=np.int64)
+        self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=np.int64)
         # Construct determinant basis
         self.ci_info = get_indexing(
             self.num_inactive_orbs,
@@ -261,7 +260,7 @@ class WaveFunctionUCC:
             self.num_active_elec_beta,
         )
         self.num_det = len(self.ci_info.idx2det)
-        self.ref_coeffs = np.zeros(self.num_det, dtype=float)
+        self.ref_coeffs = np.zeros(self.num_det, dtype=np.float64)
         print("Reference (active) determinant:", ref_det)
         self.ref_coeffs[self.ci_info.det2idx[int(ref_det, 2)]] = 1
         self.ci_coeffs = np.copy(self.ref_coeffs)
@@ -380,7 +379,7 @@ class WaveFunctionUCC:
             One-electron reduced density matrix.
         """
         if self._rdm1 is None:
-            self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs), dtype=float)
+            self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs), dtype=np.float64)
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
@@ -410,7 +409,7 @@ class WaveFunctionUCC:
                     self.num_active_orbs,
                     self.num_active_orbs,
                 ),
-                dtype=float,
+                dtype=np.float64,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
@@ -461,7 +460,7 @@ class WaveFunctionUCC:
                     self.num_active_orbs,
                     self.num_active_orbs,
                 ),
-                dtype=float,
+                dtype=np.float64,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
@@ -524,7 +523,7 @@ class WaveFunctionUCC:
                     self.num_active_orbs,
                     self.num_active_orbs,
                 ),
-                dtype=float,
+                dtype=np.float64,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
@@ -660,75 +659,140 @@ class WaveFunctionUCC:
             )
         return self._energy_elec
 
-    def run_wf_optimization_2step(
+    def run_wf_optimization(
         self,
-        optimizer_name: str,
         orbital_optimization: bool = False,
         tol: float = 1e-10,
         maxiter: int = 1000,
-        is_silent_subiterations: bool = False,
+        optimization_options: dict[str, Any] | None = None,
     ) -> None:
-        """Run two step optimization of wave function.
+        """Run variational optimization of wavefunction.
+
+        Optimization options:
+            * theta_optimization [bool]: Perform theta optimization.
+                                         (default: True)
+            * theta_optimizer [str]: Optimizer used for theta optimization.
+                                     (default: BFGS)
+            * orbital_optimizer [str]: Optimizer used for orbital optimization.
+                                     (default: BFGS)
+            * 1step_optimizer [str]: Optimizer used for 1step optimizer.
+                                     (fallback: copy theta_optimizer)
+            * opt_type [str]: Optimization type, can be '1step' or '2step'.
+                              (default: 1step)
+            * is_silent_subiterations [bool]: Silence sub iterations in 2step.
+                                              (default: False)
 
         Args:
-            optimizer_name: Name of optimizer.
             orbital_optimization: Perform orbital optimization.
-            tol: Convergence tolerance.
+            tol: Tolerance for finishing the optimization.
             maxiter: Maximum number of iterations.
-            is_silent_subiterations: Silence subiterations.
+            optimization_options: Additional optimization options.
         """
-        # Init parameters
-        num_kappa = 0
-        if orbital_optimization:
-            num_kappa = len(self.kappa)
-        num_theta1 = 0
-        num_theta2 = 0
-        num_theta3 = 0
-        num_theta4 = 0
-        num_theta5 = 0
-        num_theta6 = 0
-        for exc_type in self.ucc_layout.excitation_operator_type:
-            if exc_type == ("sa_single", "single"):
-                num_theta1 += 1
-            elif exc_type in (
-                "sa_double_1",
-                "sa_double_2",
-                "sa_double_3",
-                "sa_double_4",
-                "sa_double_5",
-                "double",
-            ):
-                num_theta2 += 1
-            elif exc_type == "triple":
-                num_theta3 += 1
-            elif exc_type == "quadruple":
-                num_theta4 += 1
-            elif exc_type == "quintuple":
-                num_theta5 += 1
-            elif exc_type == "sextuple":
-                num_theta6 += 1
-            else:
-                raise ValueError(f"Got unknown excitation type, {exc_type}")
-        # Optimization
-        print("### Parameters information:")
-        print(f"### Number kappa: {num_kappa}")
-        print(f"### Number theta1: {num_theta1}")
-        print(f"### Number theta2: {num_theta2}")
-        print(f"### Number theta3: {num_theta3}")
-        print(f"### Number theta4: {num_theta4}")
-        print(f"### Number theta5: {num_theta5}")
-        print(f"### Number theta6: {num_theta6}")
-        print(
-            f"### Total parameters: {num_kappa + num_theta1 + num_theta2 + num_theta3 + num_theta4 + num_theta5 + num_theta6}\n"
+        if optimization_options is None:
+            optimization_options = {}
+        self._optimization_options = copy.deepcopy(optimization_options)
+        valid_options = (
+            "theta_optimization",
+            "theta_optimizer",
+            "orbital_optimizer",
+            "opt_type",
+            "is_silent_subiterations",
+            "1step_optimizer",
         )
+        for option in self._optimization_options:
+            if option not in valid_options:
+                raise ValueError(
+                    f"Got unknown option for optimization, {option}. Valid options are: {valid_options}"
+                )
+        self._optimization_options["tol"] = tol
+        self._optimization_options["maxiter"] = int(maxiter)
+        self._optimization_options["orbital_optimization"] = orbital_optimization
+        self._optimization_options.setdefault("theta_optimization", True)
+        self._optimization_options.setdefault("theta_optimizer", "BFGS")
+        self._optimization_options.setdefault("orbital_optimizer", "BFGS")
+        self._optimization_options.setdefault("opt_type", "1step")
+        self._optimization_options.setdefault("is_silent_subiterations", False)
+        if len(self.kappa) == 0 and self._optimization_options["orbital_optimization"]:
+            print("No kappa parameters turning off orbital optimization.")
+        if len(self.thetas) == 0 and self._optimization_options["theta_optimization"]:
+            print("No thetas parameters turning off theta optimization.")
+        if self._optimization_options["opt_type"].lower() == "2step" and (
+            not self._optimization_options["orbital_optimization"]
+            or not self._optimization_options["theta_optimization"]
+        ):
+            if not self._optimization_options["orbital_optimization"]:
+                print("Orbital optimization not requested changing optimizer type to 1step.")
+                self._optimization_options["opt_type"] = "1step"
+            elif not self._optimization_options["theta_optimization"]:
+                print("theta optimization not requested changing optimizer type to 1step.")
+                self._optimization_options["opt_type"] = "1step"
+        if (
+            self._optimization_options["opt_type"].lower() == "1step"
+            and "1step_optimizer" not in self._optimization_options.keys()
+        ):
+            print(
+                "'1step_optimizer' was not specifed using the optimizer specified as 'theta_optimizer': {self._optimization_options['theta_optimizer']}"
+            )
+            self._optimization_options["1step_optimizer"] = self._optimization_options["theta_optimizer"]
+        print("### Parameters information:")
+        if self._optimization_options["orbital_optimization"]:
+            print(f"### Number kappa: {len(self.kappa)}")
+        if self._optimization_options["theta_optimization"]:
+            num_theta1 = 0
+            num_theta2 = 0
+            num_theta3 = 0
+            num_theta4 = 0
+            num_theta5 = 0
+            num_theta6 = 0
+            for exc_type in self.ucc_layout.excitation_operator_type:
+                if exc_type == ("sa_single", "single"):
+                    num_theta1 += 1
+                elif exc_type in (
+                    "sa_double_1",
+                    "sa_double_2",
+                    "sa_double_3",
+                    "sa_double_4",
+                    "sa_double_5",
+                    "double",
+                ):
+                    num_theta2 += 1
+                elif exc_type == "triple":
+                    num_theta3 += 1
+                elif exc_type == "quadruple":
+                    num_theta4 += 1
+                elif exc_type == "quintuple":
+                    num_theta5 += 1
+                elif exc_type == "sextuple":
+                    num_theta6 += 1
+                else:
+                    raise ValueError(f"Got unknown excitation type, {exc_type}")
+                print("### Parameters information:")
+                print(f"### Number theta1: {num_theta1}")
+                print(f"### Number theta2: {num_theta2}")
+                print(f"### Number theta3: {num_theta3}")
+                print(f"### Number theta4: {num_theta4}")
+                print(f"### Number theta5: {num_theta5}")
+                print(f"### Number theta6: {num_theta6}")
+        if self._optimization_options["opt_type"].lower() == "1step":
+            self._run_wf_optimization_1step()
+        elif self._optimization_options["opt_type"].lower() == "2step":
+            self._run_wf_optimization_1step()
+        else:
+            raise ValueError(
+                f"Got unknown 'opt_type', {[self._optimization_options['opt_type']]} excepted '1step' or '2step'."
+            )
+
+    def _run_wf_optimization_2step(
+        self,
+    ) -> None:
+        """Run two step optimization of wave function."""
         e_old = 1e12
         print("Full optimization")
         print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
-        for full_iter in range(0, int(maxiter)):
+        for full_iter in range(0, self._optimization_options["maxiter"]):
             full_start = time.time()
-
             # Do ansatz optimization
-            if not is_silent_subiterations:
+            if not self._optimization_options["is_silent_subiterations"]:
                 print("--------UCC optimization")
                 print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
             energy_theta = partial(
@@ -743,126 +807,61 @@ class WaveFunctionUCC:
             )
             optimizer = Optimizers(
                 energy_theta,
-                optimizer_name,
+                self._optimization_options["theta_optimizer"],
                 grad=gradient_theta,
-                maxiter=maxiter,
-                tol=tol,
-                is_silent=is_silent_subiterations,
+                maxiter=self._optimization_options["maxiter"],
+                tol=self._optimization_options["tol"],
+                is_silent=self._optimization_options["is_silent_subiterations"],
             )
             self._old_opt_parameters = np.zeros_like(self.thetas) + 10**20
             self._E_opt_old = 0.0
             res = optimizer.minimize(self.thetas)
             self.thetas = res.x.tolist()
 
-            if orbital_optimization and len(self.kappa) != 0:
-                if not is_silent_subiterations:
-                    print("--------Orbital optimization")
-                    print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
-                energy_oo = partial(
-                    self._calc_energy_optimization,
-                    theta_optimization=False,
-                    kappa_optimization=True,
-                )
-                gradient_oo = partial(
-                    self._calc_gradient_optimization,
-                    theta_optimization=False,
-                    kappa_optimization=True,
-                )
+            if not self._optimization_options["is_silent_subiterations"]:
+                print("--------Orbital optimization")
+                print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+            energy_oo = partial(
+                self._calc_energy_optimization,
+                theta_optimization=False,
+                kappa_optimization=True,
+            )
+            gradient_oo = partial(
+                self._calc_gradient_optimization,
+                theta_optimization=False,
+                kappa_optimization=True,
+            )
 
-                optimizer = Optimizers(
-                    energy_oo,
-                    "l-bfgs-b",
-                    grad=gradient_oo,
-                    maxiter=maxiter,
-                    tol=tol,
-                    is_silent=is_silent_subiterations,
-                )
-                self._old_opt_parameters = np.zeros(len(self.kappa_idx)) + 10**20
-                self._E_opt_old = 0.0
-                res = optimizer.minimize([0.0] * len(self.kappa_idx))
-                for i in range(len(self.kappa)):
-                    self.kappa[i] = 0.0
-                    self._kappa_old[i] = 0.0
-            else:
-                # If theres is no orbital optimization, then the algorithm is already converged.
-                e_new = res.fun
-                if orbital_optimization and len(self.kappa) == 0:
-                    print(
-                        "WARNING: No orbital optimization performed, because there is no non-redundant orbital parameters"
-                    )
-                break
-
+            optimizer = Optimizers(
+                energy_oo,
+                self._optimization_options["orbital_optimizer"],
+                grad=gradient_oo,
+                maxiter=self._optimization_options["maxiter"],
+                tol=self._optimization_options["tol"],
+                is_silent=self._optimization_options["is_silent_subiterations"],
+            )
+            self._old_opt_parameters = np.zeros(len(self.kappa_idx)) + 10**20
+            self._E_opt_old = 0.0
+            res = optimizer.minimize([0.0] * len(self.kappa_idx))
+            for i in range(len(self.kappa)):
+                self._kappa[i] = 0.0
+                self._kappa_old[i] = 0.0
             e_new = res.fun
             time_str = f"{time.time() - full_start:7.2f}"
             e_str = f"{e_new:3.12f}"
             print(f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")
-            if abs(e_new - e_old) < tol:
+            if abs(e_new - e_old) < self._optimization_options["tol"]:
                 break
             e_old = e_new
         self._energy_elec = e_new
 
-    def run_wf_optimization_1step(
+    def _run_wf_optimization_1step(
         self,
-        optimizer_name: str,
-        orbital_optimization: bool = False,
-        tol: float = 1e-10,
-        maxiter: int = 1000,
     ) -> None:
-        """Run one step optimization of wave function.
-
-        Args:
-            optimizer_name: Name of optimizer.
-            orbital_optimization: Perform orbital optimization.
-            tol: Convergence tolerance.
-            maxiter: Maximum number of iterations.
-        """
-        # Init parameters
-        num_kappa = 0
-        if orbital_optimization:
-            num_kappa = len(self.kappa)
-        num_theta1 = 0
-        num_theta2 = 0
-        num_theta3 = 0
-        num_theta4 = 0
-        num_theta5 = 0
-        num_theta6 = 0
-        for exc_type in self.ucc_layout.excitation_operator_type:
-            if exc_type == ("sa_single", "single"):
-                num_theta1 += 1
-            elif exc_type in (
-                "sa_double_1",
-                "sa_double_2",
-                "sa_double_3",
-                "sa_double_4",
-                "sa_double_5",
-                "double",
-            ):
-                num_theta2 += 1
-            elif exc_type == "triple":
-                num_theta3 += 1
-            elif exc_type == "quadruple":
-                num_theta4 += 1
-            elif exc_type == "quintuple":
-                num_theta5 += 1
-            elif exc_type == "sextuple":
-                num_theta6 += 1
-            else:
-                raise ValueError(f"Got unknown excitation type, {exc_type}")
-        # Optimization
-        print("### Parameters information:")
-        print(f"### Number kappa: {num_kappa}")
-        print(f"### Number theta1: {num_theta1}")
-        print(f"### Number theta2: {num_theta2}")
-        print(f"### Number theta3: {num_theta3}")
-        print(f"### Number theta4: {num_theta4}")
-        print(f"### Number theta5: {num_theta5}")
-        print(f"### Number theta6: {num_theta6}")
-        print(
-            f"### Total parameters: {num_kappa + num_theta1 + num_theta2 + num_theta3 + num_theta4 + num_theta5 + num_theta6}\n"
-        )
+        """Run one step optimization of wave function."""
         print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
-        if orbital_optimization:
-            if len(self.thetas) > 0:
+        if self._optimization_options["orbital_optimization"]:
+            if self._optimization_options["theta_optimization"]:
                 energy = partial(
                     self._calc_energy_optimization,
                     theta_optimization=True,
@@ -895,21 +894,26 @@ class WaveFunctionUCC:
                 theta_optimization=True,
                 kappa_optimization=False,
             )
-        if orbital_optimization:
-            if len(self.thetas) > 0:
+        if self._optimization_options["orbital_optimization"]:
+            if self._optimization_options["theta_optimization"]:
                 parameters = self.kappa + self.thetas
             else:
                 parameters = self.kappa
         else:
             parameters = self.thetas
-        optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
+        optimizer = Optimizers(
+            energy,
+            self._optimization_options["1step_optimizer"],
+            grad=gradient,
+            maxiter=self._optimization_options["maxiter"],
+            tol=self._optimization_options["tol"],
+        )
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
-        res = optimizer.minimize(
-            parameters,
-        )
-        if orbital_optimization:
-            self.thetas = res.x[len(self.kappa) :].tolist()
+        res = optimizer.minimize(parameters)
+        if self._optimization_options["orbital_optimization"]:
+            if self._optimization_options["theta_optimization"]:
+                self.thetas = res.x[len(self.kappa) :].tolist()
             for i in range(len(self.kappa)):
                 self._kappa[i] = 0.0
                 self._kappa_old[i] = 0.0
