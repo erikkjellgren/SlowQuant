@@ -203,10 +203,10 @@ class WaveFunctionSAUPS:
                     kappa_hf_like_idx.append((p, q))
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     kappa_hf_like_idx.append((p, q))
-        self.kappa_idx = np.array(kappa_idx, dtype=np.int64)
-        self.kappa_idx_dagger = np.array(kappa_idx_dagger, dtype=np.int64)
-        self.kappa_redundant_idx = np.array(kappa_redundant_idx, dtype=np.int64)
-        self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=np.int64)
+        self.kappa_idx = np.array(kappa_idx, dtype=int)
+        self.kappa_idx_dagger = np.array(kappa_idx_dagger, dtype=int)
+        self.kappa_redundant_idx = np.array(kappa_redundant_idx, dtype=int)
+        self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
         # Construct determinant basis
         self.ci_info = get_indexing(
             self.num_inactive_orbs,
@@ -218,7 +218,7 @@ class WaveFunctionSAUPS:
         self.num_det = len(self.ci_info.idx2det)
         # SA details
         self.num_states = len(states[0])
-        self.csf_coeffs = np.zeros((self.num_states, self.num_det))  # state vector for each state in SA
+        self.ref_coeffs = np.zeros((self.num_states, self.num_det))  # state vector for each state in SA
         # Loop over all states in SA procedure
         for i, (coeffs, on_vecs) in enumerate(zip(states[0], states[1])):
             if len(coeffs) != len(on_vecs):
@@ -232,8 +232,8 @@ class WaveFunctionSAUPS:
                         f"Length of determinant, {len(on_vec)}, does not match number of active spin orbitals, {self.num_active_spin_orbs}. For determinant, {on_vec}"
                     )
                 idx = self.ci_info.det2idx[int(on_vec, 2)]
-                self.csf_coeffs[i, idx] = coeff
-        self._ci_coeffs = np.copy(self.csf_coeffs)
+                self.ref_coeffs[i, idx] = coeff
+        self._ci_coeffs = np.copy(self.ref_coeffs)
         for i, coeff_i in enumerate(self.ci_coeffs):
             for j, coeff_j in enumerate(self.ci_coeffs):
                 if i == j:
@@ -319,7 +319,7 @@ class WaveFunctionSAUPS:
         """
         if self._ci_coeffs is None:
             self._ci_coeffs = construct_ups_state_SA(
-                self.csf_coeffs,
+                self.ref_coeffs,
                 self.ci_info,
                 self.thetas,
                 self.ups_layout,
@@ -968,8 +968,8 @@ class WaveFunctionSAUPS:
                 dagger=True,
             )
             # CSF reference state on ket
-            ket_vec = np.copy(self.csf_coeffs)
-            ket_vec_tmp = np.copy(self.csf_coeffs)
+            ket_vec = np.copy(self.ref_coeffs)
+            ket_vec_tmp = np.copy(self.ref_coeffs)
             # Calculate analytical derivative w.r.t. each theta using gradient_action function
             for i in range(len(self.thetas)):
                 # Loop over each state in SA
@@ -1022,7 +1022,7 @@ class WaveFunctionSAUPS:
         thetas_local = np.asarray(parameters)
 
         # Prepare reference state up to theta_idx
-        state_vec = np.copy(self.csf_coeffs)
+        state_vec = np.copy(self.ref_coeffs)
         for i in range(0, theta_idx):
             state_vec = propagate_unitary_SA(
                 state_vec,
@@ -1074,7 +1074,7 @@ class WaveFunctionSAUPS:
         energies = np.zeros(len(theta_diffs))
         idx = -1
         for i, (bra, ket) in enumerate(zip(bra_vec, state_vecs)):
-            if i % len(self.csf_coeffs) == 0:
+            if i % len(self.ref_coeffs) == 0:
                 idx += 1
             energies[idx] += bra @ ket
         self.num_energy_evals += self.num_states  # count one measurement per state

@@ -359,7 +359,7 @@ def _single_excitation_trotter(
     for pauli, fac in zip(ops, factors):
         qc.append(
             PauliEvolutionGate(Pauli(pauli), fac * theta),
-            np.linspace(0, num_qubits - 1, num_qubits, dtype=np.int64).tolist(),
+            np.linspace(0, num_qubits - 1, num_qubits, dtype=int).tolist(),
         )
     return qc
 
@@ -407,7 +407,7 @@ def _double_excitation_trotter(
     for pauli, fac in zip(ops, factors):
         qc.append(
             PauliEvolutionGate(Pauli(pauli), fac * theta),
-            np.linspace(0, num_qubits - 1, num_qubits, dtype=np.int64).tolist(),
+            np.linspace(0, num_qubits - 1, num_qubits, dtype=int).tolist(),
         )
     return qc
 

@@ -135,8 +135,6 @@ class WaveFunctionUCC:
         self._g_mo = None
         self._energy_elec: float | None = None
         self._c_mo = mo_coeffs
-        # Used when converting to circuit wavefunction.
-        self._include_active_kappa = self.wavefunction_options["include_active_kappa"]
         # Reference wave function
         if "reference_determinant" in self.wavefunction_options.keys():
             ref_det = self.wavefunction_options["reference_determinant"]
@@ -226,7 +224,7 @@ class WaveFunctionUCC:
                     continue
                 if p in self.virtual_idx and q in self.virtual_idx:
                     continue
-                if not self._include_active_kappa:
+                if not self.wavefunction_options["include_active_kappa"]:
                     if p in self.active_idx and q in self.active_idx:
                         continue
                 if not (p in self.active_idx and q in self.active_idx):
@@ -246,10 +244,10 @@ class WaveFunctionUCC:
                     kappa_hf_like_idx.append((p, q))
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     kappa_hf_like_idx.append((p, q))
-        self.kappa_idx = np.array(kappa_idx, dtype=np.int64)
-        self.kappa_no_activeactive_idx = np.array(kappa_no_activeactive_idx, dtype=np.int64)
-        self.kappa_no_activeactive_idx_dagger = np.array(kappa_no_activeactive_idx_dagger, dtype=np.int64)
-        self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=np.int64)
+        self.kappa_idx = np.array(kappa_idx, dtype=int)
+        self.kappa_no_activeactive_idx = np.array(kappa_no_activeactive_idx, dtype=int)
+        self.kappa_no_activeactive_idx_dagger = np.array(kappa_no_activeactive_idx_dagger, dtype=int)
+        self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
         # Construct determinant basis
         self.ci_info = get_indexing(
             self.num_inactive_orbs,
@@ -259,7 +257,7 @@ class WaveFunctionUCC:
             self.num_active_elec_beta,
         )
         self.num_det = len(self.ci_info.idx2det)
-        self.ref_coeffs = np.zeros(self.num_det, dtype=np.float64)
+        self.ref_coeffs = np.zeros(self.num_det, dtype=float)
         print("Reference (active) determinant:", ref_det)
         self.ref_coeffs[self.ci_info.det2idx[int(ref_det, 2)]] = 1
         self.ci_coeffs = np.copy(self.ref_coeffs)
@@ -274,6 +272,8 @@ class WaveFunctionUCC:
             self.num_active_orbs,
         )
         self._thetas = np.zeros(self.ucc_layout.n_params).tolist()
+        # Needed
+        self._ref_det = ref_det
 
     @property
     def kappa(self) -> list[float]:
@@ -318,13 +318,13 @@ class WaveFunctionUCC:
         self._rdm3 = None
         self._rdm4 = None
         self._energy_elec = None
+        self._thetas = theta.copy()
         self.ci_coeffs = construct_ucc_state(
             self.ref_coeffs,
             self.ci_info,
             self.thetas,
             self.ucc_layout,
         )
-        self._thetas = theta.copy()
 
     @property
     def c_mo(self) -> np.ndarray:
@@ -354,9 +354,7 @@ class WaveFunctionUCC:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._h_mo is None:
-            self._h_mo = one_electron_integral_transform(
-                self.c_mo, self.int_gen.kinetic_energy + self.int_gen.nuclear_electron_attraction
-            )
+            self._h_mo = one_electron_integral_transform(self.c_mo, self.int_gen.h_ao)
         return self._h_mo
 
     @property
@@ -378,7 +376,7 @@ class WaveFunctionUCC:
             One-electron reduced density matrix.
         """
         if self._rdm1 is None:
-            self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs), dtype=np.float64)
+            self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs), dtype=float)
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
@@ -408,7 +406,7 @@ class WaveFunctionUCC:
                     self.num_active_orbs,
                     self.num_active_orbs,
                 ),
-                dtype=np.float64,
+                dtype=float,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
@@ -459,7 +457,7 @@ class WaveFunctionUCC:
                     self.num_active_orbs,
                     self.num_active_orbs,
                 ),
-                dtype=np.float64,
+                dtype=float,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
@@ -522,7 +520,7 @@ class WaveFunctionUCC:
                     self.num_active_orbs,
                     self.num_active_orbs,
                 ),
-                dtype=np.float64,
+                dtype=float,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
@@ -730,7 +728,7 @@ class WaveFunctionUCC:
             and "1step_optimizer" not in self._optimization_options.keys()
         ):
             print(
-                "'1step_optimizer' was not specifed using the optimizer specified as 'theta_optimizer': {self._optimization_options['theta_optimizer']}"
+                f"'1step_optimizer' was not specifed using the optimizer specified as 'theta_optimizer': {self._optimization_options['theta_optimizer']}"
             )
             self._optimization_options["1step_optimizer"] = self._optimization_options["theta_optimizer"]
         print("### Parameters information:")
@@ -744,7 +742,7 @@ class WaveFunctionUCC:
             num_theta5 = 0
             num_theta6 = 0
             for exc_type in self.ucc_layout.excitation_operator_type:
-                if exc_type == ("sa_single", "single"):
+                if exc_type in ("sa_single", "single"):
                     num_theta1 += 1
                 elif exc_type in (
                     "sa_double_1",
@@ -775,7 +773,7 @@ class WaveFunctionUCC:
         if self._optimization_options["opt_type"].lower() == "1step":
             self._run_wf_optimization_1step()
         elif self._optimization_options["opt_type"].lower() == "2step":
-            self._run_wf_optimization_1step()
+            self._run_wf_optimization_2step()
         else:
             raise ValueError(
                 f"Got unknown 'opt_type', {[self._optimization_options['opt_type']]} excepted '1step' or '2step'."

@@ -28,7 +28,7 @@ def test_ups_naivelr() -> None:
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(True)
     LR = naivelr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.129476) < 10**-4
@@ -77,9 +77,10 @@ def test_LiH_sto3g_allST():
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
-        "SD",
+        excitations=["SAS", "SAD"],
+        wavefunction_options={"include_active_kappa": False},
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(True)
     WF2 = WaveFunctionUPS(
         (2, 2),
         WF.c_mo,
@@ -87,7 +88,7 @@ def test_LiH_sto3g_allST():
         "tUPS",
         ansatz_options={"n_layers": 1},
     )
-    WF2.run_wf_optimization_1step("BFGS", False)
+    WF2.run_wf_optimization(False)
     # Linear Response
     LR = allstlr.LinearResponse(
         WF2,
@@ -145,7 +146,7 @@ def test_ups_water_44() -> None:
         SQobj,
         "fUCCSD",
     )
-    WF.run_wf_optimization_1step("bfgs", True)
+    WF.run_wf_optimization(True)
     # Changed threshold from 10-8 to 10-6, due to loss of precision in optimizer.
     # Change back again when optimization code has been made more stable.
     assert abs(WF.energy_elec - -84.00619955119978) < 10**-6
@@ -186,7 +187,7 @@ def test_saups_h2_3states() -> None:
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
     )
 
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(True)
 
     assert abs(WF.excitation_energies[0] - 0.974553) < 10**-6
     assert abs(WF.excitation_energies[1] - 1.632364) < 10**-6
@@ -229,7 +230,7 @@ def test_saups_h3_3states() -> None:
         ansatz_options={"n_layers": 2, "skip_last_singles": True},
     )
 
-    WF.run_wf_optimization_2step("BFGS", True)
+    WF.run_wf_optimization_2step(True, orbital_optimization={"opt_type": "2step"})
 
     assert abs(WF.excitation_energies[0] - 0.838466) < 10**-6
     assert abs(WF.excitation_energies[1] - 0.838466) < 10**-6
@@ -254,9 +255,9 @@ def test_sa_doubles() -> None:
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         ansatz="fUCC",
-        ansatz_options={"n_layers": 1, "SAS": True, "SAD": True},
+        ansatz_options={"n_layers": 1, "excitations": ["SAS", "SAD"]},
     )
-    WF.run_wf_optimization_1step("BFGS")
+    WF.run_wf_optimization(False)
     assert abs(WF.energy_elec - -8.874521029611891) < 10**-8
 
 
@@ -277,9 +278,9 @@ def test_SA_sa_doubles() -> None:
         SQobj,
         ([[1]], [["111100000000"]]),
         ansatz="SAfUCCSD",
-        ansatz_options={"n_layers": 1, "SAS": True, "SAD": True},
+        ansatz_options={"n_layers": 1, "excitations": ["SAS", "SAD"]},
     )
-    WF.run_wf_optimization_1step("BFGS")
+    WF.run_wf_optimization(False)
     assert abs(WF.energy_states[0] - -8.874521029611891) < 10**-8
 
 
@@ -303,7 +304,7 @@ def test_ups_water_44_threaded() -> None:
         "fUCCSD",
         ansatz_options={},
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization(True, optimization_options={"1step_optimizer": "SLSQP"})
     assert abs(WF.energy_elec - -83.97256228053688) < 10**-8
     nb.set_num_threads(1)
 
@@ -342,8 +343,7 @@ def test_saups_h3_3states_threaded() -> None:
         "tUPS",
         ansatz_options={"n_layers": 2, "skip_last_singles": True},
     )
-
-    WF.run_wf_optimization_2step("BFGS", True)
+    WF.run_wf_optimization(True, optimization_options={"opt_type": "2step"})
 
     assert abs(WF.excitation_energies[0] - 0.838466) < 10**-6
     assert abs(WF.excitation_energies[1] - 0.838466) < 10**-6
@@ -384,7 +384,7 @@ def test_pptUPS_h2o() -> None:
         wavefunction_options={"do_pp": True},
     )
 
-    WF.run_wf_optimization_1step("bfgs", orbital_optimization=False)
+    WF.run_wf_optimization(False)
 
     assert abs(WF.energy_elec + 83.96387402720552) < 10**-6
 
@@ -408,7 +408,7 @@ def test_ups_n2_fuccsdtq56() -> None:
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         "fUCC",
-        ansatz_options={"S": True, "D": True, "T": True, "Q": True, "5": True, "6": True},
+        ansatz_options={"excitations": ["S", "D", "T", "Q", "5", "6"]},
     )
-    WF.run_wf_optimization_1step("bfgs", False)
+    WF.run_wf_optimization(False)
     assert abs(WF.energy_elec - -131.1965135680604533) < 10**-6

@@ -290,10 +290,10 @@ class WaveFunctionUPS:
                     kappa_hf_like_idx.append((p, q))
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     kappa_hf_like_idx.append((p, q))
-        self.kappa_idx = np.array(kappa_idx, dtype=np.int64)
-        self.kappa_no_activeactive_idx = np.array(kappa_no_activeactive_idx, dtype=np.int64)
-        self.kappa_no_activeactive_idx_dagger = np.array(kappa_no_activeactive_idx_dagger, dtype=np.int64)
-        self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=np.int64)
+        self.kappa_idx = np.array(kappa_idx, dtype=int)
+        self.kappa_no_activeactive_idx = np.array(kappa_no_activeactive_idx, dtype=int)
+        self.kappa_no_activeactive_idx_dagger = np.array(kappa_no_activeactive_idx_dagger, dtype=int)
+        self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
         # Construct determinant basis
         self.ci_info = get_indexing(
             self.num_inactive_orbs,
@@ -303,13 +303,12 @@ class WaveFunctionUPS:
             self.num_active_elec_beta,
         )
         self.num_det = len(self.ci_info.idx2det)
-        self.ref_coeffs = np.zeros(self.num_det, dtype=np.float64)
+        self.ref_coeffs = np.zeros(self.num_det, dtype=float)
         print("Reference (active) determinant:", ref_det)
         self.ref_coeffs[self.ci_info.det2idx[int(ref_det, 2)]] = 1
         self.ci_coeffs = np.copy(self.ref_coeffs)
         # Construct UPS Structure
         self.ups_layout = UpsStructure()
-        self.ansatz_options.setdefault("excitations", [])
         if ansatz.lower() in ("tups", "qnp"):
             if ansatz.lower() == "tups":
                 self.ansatz_options["do_tups"] = True
@@ -317,6 +316,7 @@ class WaveFunctionUPS:
                 self.ansatz_options["do_qnp"] = True
             self.ups_layout.create_tiled(self.num_active_orbs, self.ansatz_options)
         elif ansatz.lower() in ("fucc", "fuccsd", "ksafupccgsd", "fuccpd", "safuccsd"):
+            self.ansatz_options.setdefault("excitations", [])
             if ansatz.lower() == "fuccsd":
                 self.ansatz_options["excitations"].append("S")
                 self.ansatz_options["excitations"].append("D")
@@ -339,6 +339,7 @@ class WaveFunctionUPS:
                 self.ansatz_options,
             )
         elif ansatz.lower() in ("sdsfuccsd", "ksasdsfupccgsd"):
+            self.ansatz_options.setdefault("excitations", [])
             if ansatz.lower() == "sdsfuccsd":
                 self.ansatz_options["excitations"].append("D")
             elif ansatz.lower() == "ksasdsfupccgsd":
@@ -461,7 +462,7 @@ class WaveFunctionUPS:
             One-electron reduced density matrix.
         """
         if self._rdm1 is None:
-            self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs), dtype=np.float64)
+            self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs), dtype=float)
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
@@ -491,7 +492,7 @@ class WaveFunctionUPS:
                     self.num_active_orbs,
                     self.num_active_orbs,
                 ),
-                dtype=np.float64,
+                dtype=float,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
@@ -542,7 +543,7 @@ class WaveFunctionUPS:
                     self.num_active_orbs,
                     self.num_active_orbs,
                 ),
-                dtype=np.float64,
+                dtype=float,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
@@ -605,7 +606,7 @@ class WaveFunctionUPS:
                     self.num_active_orbs,
                     self.num_active_orbs,
                 ),
-                dtype=np.float64,
+                dtype=float,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
@@ -819,7 +820,7 @@ class WaveFunctionUPS:
             and "1step_optimizer" not in self._optimization_options.keys()
         ):
             print(
-                "'1step_optimizer' was not specifed using the optimizer specified as 'theta_optimizer': {self._optimization_options['theta_optimizer']}"
+                f"'1step_optimizer' was not specifed using the optimizer specified as 'theta_optimizer': {self._optimization_options['theta_optimizer']}"
             )
             self._optimization_options["1step_optimizer"] = self._optimization_options["theta_optimizer"]
         print("### Parameters information:")
@@ -830,7 +831,7 @@ class WaveFunctionUPS:
         if self._optimization_options["opt_type"].lower() == "1step":
             self._run_wf_optimization_1step()
         elif self._optimization_options["opt_type"].lower() == "2step":
-            self._run_wf_optimization_1step()
+            self._run_wf_optimization_2step()
         else:
             raise ValueError(
                 f"Got unknown 'opt_type', {[self._optimization_options['opt_type']]} excpected '1step' or '2step'."

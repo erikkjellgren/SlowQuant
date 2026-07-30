@@ -30,9 +30,9 @@ def test_h2_sto3g_uccsd_lr() -> None:
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
-        "SD",
+        excitations=["SAS", "SAD"],
     )
-    WF.run_wf_optimization_1step("BFGS", False)
+    WF.run_wf_optimization(False)
     # SC
     LR = allselfconsistent.LinearResponse(
         WF,
@@ -66,9 +66,10 @@ def test_LiH_atmethods_energies() -> None:
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
-        "SD",
+        excitations=["SAS", "SAD"],
+        wavefunction_options={"include_active_kappa": False},
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(True)
 
     threshold = 10 ** (-3)
 
@@ -134,9 +135,10 @@ def test_LiH_naiveq_methods_energies() -> None:
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
-        "SD",
+        excitations=["SAS", "SAD"],
+        wavefunction_options={"include_active_kappa": False},
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(True)
 
     threshold = 10 ** (-5)
 
@@ -257,9 +259,10 @@ def test_LiH_naiveq_methods_matrices() -> None:
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
-        "SD",
+        excitations=["SAS", "SAD"],
+        wavefunction_options={"include_active_kappa": False},
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(True)
 
     threshold = 10 ** (-5)
 
@@ -321,9 +324,10 @@ def test_LiH_allproj_energies() -> None:
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
-        "SD",
+        excitations=["SAS", "SAD"],
+        wavefunction_options={"include_active_kappa": False},
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(True)
 
     threshold = 10 ** (-5)
 
@@ -368,9 +372,10 @@ def test_LiH_STproj_energies() -> None:
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
-        "SD",
+        excitations=["SAS", "SAD"],
+        wavefunction_options={"include_active_kappa": False},
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(True)
 
     threshold = 10 ** (-5)
 

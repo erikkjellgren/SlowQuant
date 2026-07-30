@@ -281,10 +281,10 @@ class WaveFunctionCircuit:
                     kappa_hf_like_idx.append((p, q))
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     kappa_hf_like_idx.append((p, q))
-        self.kappa_idx = np.array(kappa_idx, dtype=np.int64)
-        self.kappa_no_activeactive_idx = np.array(kappa_no_activeactive_idx, dtype=np.int64)
-        self.kappa_no_activeactive_idx_dagger = np.array(kappa_no_activeactive_idx_dagger, dtype=np.int64)
-        self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=np.int64)
+        self.kappa_idx = np.array(kappa_idx, dtype=int)
+        self.kappa_no_activeactive_idx = np.array(kappa_no_activeactive_idx, dtype=int)
+        self.kappa_no_activeactive_idx_dagger = np.array(kappa_no_activeactive_idx_dagger, dtype=int)
+        self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
         hf_det = "1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec)
         if ref_det == hf_det:
             # If the refernce determinant is just Hartree-Fock,
@@ -454,7 +454,7 @@ class WaveFunctionCircuit:
             One-electron reduced density matrix.
         """
         if self._rdm1 is None:
-            self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs), dtype=np.float64)
+            self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs), dtype=float)
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
@@ -487,7 +487,7 @@ class WaveFunctionCircuit:
                     self.num_active_orbs,
                     self.num_active_orbs,
                 ),
-                dtype=np.float64,
+                dtype=float,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
@@ -539,7 +539,7 @@ class WaveFunctionCircuit:
                     self.num_active_orbs,
                     self.num_active_orbs,
                 ),
-                dtype=np.float64,
+                dtype=float,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
@@ -603,7 +603,7 @@ class WaveFunctionCircuit:
                     self.num_active_orbs,
                     self.num_active_orbs,
                 ),
-                dtype=np.float64,
+                dtype=float,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
@@ -920,7 +920,7 @@ class WaveFunctionCircuit:
             and "1step_optimizer" not in self._optimization_options.keys()
         ):
             print(
-                "'1step_optimizer' was not specifed. Using the optimizer specified as 'theta_optimizer': {self._optimization_options['theta_optimizer']}"
+                f"'1step_optimizer' was not specifed. Using the optimizer specified as 'theta_optimizer': {self._optimization_options['theta_optimizer']}"
             )
             self._optimization_options["1step_optimizer"] = self._optimization_options["theta_optimizer"]
         if self._optimization_options["theta_optimization"] and isinstance(self.QI.ansatz, QuantumCircuit):
@@ -940,7 +940,7 @@ class WaveFunctionCircuit:
         if self._optimization_options["opt_type"].lower() == "1step":
             self._run_wf_optimization_1step()
         elif self._optimization_options["opt_type"].lower() == "2step":
-            self._run_wf_optimization_1step()
+            self._run_wf_optimization_2step()
         else:
             raise ValueError(
                 f"Got unknown 'opt_type', {[self._optimization_options['opt_type']]} excepted '1step' or '2step'."
