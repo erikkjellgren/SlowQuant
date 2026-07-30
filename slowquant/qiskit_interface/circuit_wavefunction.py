@@ -42,6 +42,20 @@ class WaveFunctionCircuit:
     ) -> None:
         """Initialize circuit based UPS wave function.
 
+        Wavefunction Options:
+            * do_pp [bool]: Make perfect-pairing reference determinant.
+                            Will also reorder the orbitalers to match the determinant.
+                            (default: False)
+            * include_active_kappa [bool]: Include active-active orbital rotations.
+                                           (default: True)
+            * resolve_unpaired_idx [str]: Specify how to resolve spatial index with respect to occupation of reference determinant.
+                                          'both', include spatial index in both occ and unocc idx list.
+                                          'occ', include spatial index only in occ idx list.
+                                          'unocc', include spatial index only in unocc idx list.
+                                          (default: 'both')
+            * reference_determinant [str]: Specify a reference determinant for the active space part.
+                                          1 specifying occupied orbital and 0 specifying unoccupied orbital.
+
         Args:
             active_space: (num_active_elec, num_active_orbs) or ((num_active_elec_alpha, num_active_elec_beta), num_active_orbs),
                  orbitals are counted in spatial basis.
