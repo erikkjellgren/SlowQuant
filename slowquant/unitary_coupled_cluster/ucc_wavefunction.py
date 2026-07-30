@@ -97,7 +97,7 @@ class WaveFunctionUCC:
             if active_space[0] % 2 == 0:
                 cas = ((active_space[0] // 2, active_space[0] // 2), active_space[1])
             else:
-                # Uneven number of electrons mean one electron must be unpaired.
+                # Odd number of electrons mean one electron must be unpaired.
                 cas = ((active_space[0] // 2 + 1, active_space[0] // 2), active_space[1])
         else:
             cas = ((active_space[0][0], active_space[0][1]), active_space[1])
@@ -219,10 +219,9 @@ class WaveFunctionUCC:
         kappa_no_activeactive_idx_dagger = []
         self._kappa_old = []
         # kappa can be optimized in spatial basis
-        # Loop over all q>p orb combinations and find redundant kappas
+        # Loop over all q>p orb combinations
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
-                # find redundant kappas
                 if p in self.inactive_idx and q in self.inactive_idx:
                     continue
                 if p in self.virtual_idx and q in self.virtual_idx:
