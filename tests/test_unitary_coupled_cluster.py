@@ -21,10 +21,8 @@ def test_heh_sto3g_hf() -> None:
     A.set_basis_set("sto-3g")
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
-    WF = WaveFunctionUCC(
-        (2, 1), S_sqrt, A, excitations=["SAS"], wavefunction_options={"include_active_kappa": False}
-    )
-    WF.run_wf_optimization(True)
+    WF = WaveFunctionUCC((2, 1), S_sqrt, A, excitations=["SAS"], include_active_kappa=False)
+    WF.run_wf_optimization(orbital_optimization=True)
     assert abs(WF.energy_elec - (-4.262632309847)) < 10**-8
 
 
@@ -39,10 +37,8 @@ def test_lih_sto3g_hf() -> None:
     A.set_basis_set("sto-3g")
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
-    WF = WaveFunctionUCC(
-        (2, 1), S_sqrt, A, excitations=["SAS"], wavefunction_options={"include_active_kappa": False}
-    )
-    WF.run_wf_optimization(True)
+    WF = WaveFunctionUCC((2, 1), S_sqrt, A, excitations=["SAS"], include_active_kappa=False)
+    WF.run_wf_optimization(orbital_optimization=True)
     assert abs(WF.energy_elec - (-8.862246324082243)) < 10**-8
 
 
@@ -59,7 +55,7 @@ def test_heh_sto3g_uccs() -> None:
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
     WF = WaveFunctionUCC((2, 2), S_sqrt, A, excitations=["SAS"])
-    WF.run_wf_optimization(False)
+    WF.run_wf_optimization(orbital_optimization=False)
     assert abs(WF.energy_elec - (-4.262632309847)) < 10**-8
 
 
@@ -91,7 +87,7 @@ def test_h10_sto3g_uccsd() -> None:
         A,
         excitations=["SAS", "SAD"],
     )
-    WF.run_wf_optimization(False)
+    WF.run_wf_optimization(orbital_optimization=False)
     assert abs(WF.energy_elec - (-18.839645894737956)) < 10**-8
 
 
@@ -112,7 +108,7 @@ def test_h2_431g_oouccd() -> None:
         A,
         excitations=["SAD"],
     )
-    WF.run_wf_optimization(True)
+    WF.run_wf_optimization(orbital_optimization=True)
     assert abs(WF.energy_elec - (-1.860533598715)) < 10**-8
 
 
@@ -134,9 +130,9 @@ def test_h4_sto3g_oouccsd() -> None:
         A.hartree_fock.mo_coeff,
         A,
         excitations=["SAS", "SAD"],
-        wavefunction_options={"include_active_kappa": False},
+        include_active_kappa=False,
     )
-    WF.run_wf_optimization(True)
+    WF.run_wf_optimization(orbital_optimization=True)
     assert abs(WF.energy_elec - (-5.211066791547)) < 10**-8
 
 
@@ -159,7 +155,7 @@ def test_h4_sto3g_oouccd() -> None:
         A,
         excitations=["SAD"],
     )
-    WF.run_wf_optimization(True)
+    WF.run_wf_optimization(orbital_optimization=True)
     assert abs(WF.energy_elec - (-5.211066791547)) < 10**-8
 
 
@@ -180,7 +176,7 @@ def test_h2_sto3g_uccsd_lr() -> None:
         SQobj,
         excitations=["SAS", "SAD"],
     )
-    WF.run_wf_optimization(False)
+    WF.run_wf_optimization(orbital_optimization=False)
     LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 1.015738) < 10**-4
@@ -213,7 +209,7 @@ def test_h4_sto3g_uccdq() -> None:
         A,
         excitations=["SAD", "Q"],
     )
-    WF.run_wf_optimization(False)
+    WF.run_wf_optimization(orbital_optimization=False)
     assert abs(WF.energy_elec + A.molecule.nuclear_repulsion - (-1.968914822185857)) < 10**-7
 
 
@@ -233,9 +229,9 @@ def test_h2_631g_hf_lr() -> None:
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         excitations=["SAS", "SAD"],
-        wavefunction_options={"include_active_kappa": False},
+        include_active_kappa=False,
     )
-    WF.run_wf_optimization(True)
+    WF.run_wf_optimization(orbital_optimization=True)
     LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.551961) < 10**-5
@@ -263,9 +259,9 @@ def test_h2_631g_oouccsd_lr() -> None:
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         excitations=["SAS", "SAD"],
-        wavefunction_options={"include_active_kappa": False},
+        include_active_kappa=False,
     )
-    WF.run_wf_optimization(True, tol=10**-11)
+    WF.run_wf_optimization(orbital_optimization=True, tol=10**-11)
     LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.574413) < 10**-5
@@ -302,7 +298,7 @@ def test_h4_sto3g_uccsd_lr_naive() -> None:
         SQobj,
         excitations=["SAS", "SAD"],
     )
-    WF.run_wf_optimization("BFGS")
+    WF.run_wf_optimization(orbital_optimization=False)
     LR = naivelr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.162961) < 10**-5
@@ -382,9 +378,9 @@ def test_be_sto3g_uccsd_lr_naive() -> None:
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         excitations=["SAS", "SAD"],
-        wavefunction_options={"include_active_kappa": False},
+        include_active_kappa=False,
     )
-    WF.run_wf_optimization(True)
+    WF.run_wf_optimization(orbital_optimization=True)
     LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.000001) < 10**-5
@@ -452,9 +448,9 @@ def test_lih_sto3g_uccsd_lr_naive() -> None:
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         excitations=["SAS", "SAD"],
-        wavefunction_options={"include_active_kappa": False},
+        include_active_kappa=False,
     )
-    WF.run_wf_optimization(True)
+    WF.run_wf_optimization(orbital_optimization=True)
     LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.129476) < 10**-4
@@ -531,9 +527,9 @@ def test_LiH_sto3g_uccsd_lr() -> None:
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         excitations=["SAS", "SAD"],
-        wavefunction_options={"include_active_kappa": False},
+        include_active_kappa=False,
     )
-    WF.run_wf_optimization(True)
+    WF.run_wf_optimization(orbital_optimization=True)
     LR = naivelr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.129476) < 10**-4
@@ -613,5 +609,5 @@ def test_H4_sto3g_uccsdtq() -> None:
         SQobj,
         excitations=["SAS", "SAD", "T", "Q"],
     )
-    WF.run_wf_optimization(False)
+    WF.run_wf_optimization(orbital_optimization=False)
     assert abs(WF.energy_elec - (-3.714153922167)) < 10**-8

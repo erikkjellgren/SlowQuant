@@ -29,9 +29,9 @@ def test_H2_631g_naive():
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         excitations=["SAS", "SAD"],
-        wavefunction_options={"include_active_kappa": False},
+        include_active_kappa=False,
     )
-    WF.run_wf_optimization(True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     # Linear Response
     LR = naive.LinearResponse(WF, excitations="SD")
@@ -82,9 +82,9 @@ def test_LiH_sto3g_naive():
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         excitations=["SAS", "SAD"],
-        wavefunction_options={"include_active_kappa": False},
+        include_active_kappa=False,
     )
-    WF.run_wf_optimization(True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     # Linear Response
     LR = naive.LinearResponse(WF, excitations="SD")
@@ -149,9 +149,9 @@ def test_H2_631g_projLR():
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         excitations=["SAS", "SAD"],
-        wavefunction_options={"include_active_kappa": False},
+        include_active_kappa=False,
     )
-    WF.run_wf_optimization(True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     # Linear Response
     LR = projected.LinearResponse(WF, excitations="SD")
@@ -197,9 +197,9 @@ def test_LiH_sto3g_proj():
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         excitations=["SAS", "SAD"],
-        wavefunction_options={"include_active_kappa": False},
+        include_active_kappa=False,
     )
-    WF.run_wf_optimization(True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     LR = projected.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
@@ -257,9 +257,9 @@ def test_H2_631g_STLR():
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         excitations=["SAS", "SAD"],
-        wavefunction_options={"include_active_kappa": False},
+        include_active_kappa=False,
     )
-    WF.run_wf_optimization(True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     # Linear Response
     LR = statetransfer.LinearResponse(
@@ -307,9 +307,9 @@ def test_LiH_sto3g_st():
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         excitations=["SAS", "SAD"],
-        wavefunction_options={"include_active_kappa": False},
+        include_active_kappa=False,
     )
-    WF.run_wf_optimization(True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     # Linear Response
     LR = statetransfer.LinearResponse(
@@ -371,9 +371,9 @@ def test_H2_631g_allST():
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         excitations=["SAS", "SAD"],
-        wavefunction_options={"include_active_kappa": False},
+        include_active_kappa=False,
     )
-    WF.run_wf_optimization(True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     # Linear Response
     LR = allstatetransfer.LinearResponse(
@@ -417,9 +417,9 @@ def test_LiH_sto3g_allST():
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         excitations=["SAS", "SAD"],
-        wavefunction_options={"include_active_kappa": False},
+        include_active_kappa=False,
     )
-    WF.run_wf_optimization(True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     # Linear Response
     LR = allstatetransfer.LinearResponse(

@@ -64,10 +64,9 @@ def circuit_wavefunction_from_ups(
             ups_wf.c_mo,
             ups_wf.int_gen.int_obj,
             QI,
-            wavefunction_options={
-                "include_active_kappa": ups_wf._include_active_kappa,
-                "reference_determinant": ups_wf._ref_det,
-            },
+            reference_determinant=ups_wf._ref_det,
+            include_active_kappa=ups_wf._include_active_kappa,
+            resolve_unpaired_idx=ups_wf._resolve_unpaired_idx,
         )
         wf.thetas = ups_wf.thetas
         return wf
@@ -78,7 +77,8 @@ def circuit_wavefunction_from_ups(
             ups_wf.int_gen.int_obj,
             ups_wf._states,
             QI,
-            wavefunction_options={"include_active_kappa": ups_wf._include_active_kappa},
+            include_active_kappa=ups_wf._include_active_kappa,
+            resolve_unpaired_idx=ups_wf._resolve_unpaired_idx,
         )
         sawf.thetas = ups_wf.thetas
         return sawf

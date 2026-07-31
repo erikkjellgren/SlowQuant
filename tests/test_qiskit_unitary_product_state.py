@@ -35,7 +35,7 @@ def test_tups() -> None:
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     assert abs(WF.energy_elec - -8.82891657651419) < 10**-8
 
@@ -75,16 +75,15 @@ def test_fucc() -> None:
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         "fUCCSD",
-        ansatz_options={},
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     assert abs(WF.energy_elec - -8.828916576513892) < 10**-8
 
     # Circuit based UPS wave function
     mapper = JordanWignerMapper()
     primitive = Sampler(run_options={"shots": None})
-    QI = QuantumInterface(primitive, "fUCCSD", mapper, ansatz_options={})
+    QI = QuantumInterface(primitive, "fUCCSD", mapper)
     qWF = WaveFunctionCircuit(
         (2, 2),
         WF.c_mo,
@@ -117,7 +116,7 @@ def test_ksafupccgsd() -> None:
         "kSAfUpCCGSD",
         ansatz_options={"n_layers": 1},
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     assert abs(WF.energy_elec - -8.828916576543133) < 10**-8
 
@@ -155,16 +154,15 @@ def test_sdsfuccsd() -> None:
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         "SDSfUCCSD",
-        ansatz_options={},
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     assert abs(WF.energy_elec - -8.82891657653415) < 10**-8
 
     # Circuit based UPS wave function
     mapper = JordanWignerMapper()
     primitive = Sampler(run_options={"shots": None})
-    QI = QuantumInterface(primitive, "SDSfUCCSD", mapper, ansatz_options={})
+    QI = QuantumInterface(primitive, "SDSfUCCSD", mapper)
     qWF = WaveFunctionCircuit(
         (2, 2),
         WF.c_mo,
@@ -197,7 +195,7 @@ def test_ksasdsfupccgsd() -> None:
         "kSASDSfUpCCGSD",
         ansatz_options={"n_layers": 1},
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     assert abs(WF.energy_elec - -8.828916576542285) < 10**-8
 
@@ -270,7 +268,7 @@ def test_lih_fucc_mappings() -> None:
         mol,
         "fUCCSD",
     )
-    WF.run_wf_optimization_1step("BFGS", False)
+    WF.run_wf_optimization(orbital_optimization=False)
     assert abs(WF.energy_elec - -8.82972563114591) < 10**-10
 
     sampler = Sampler()
@@ -314,7 +312,7 @@ def test_lih_sdsfucc_mappings() -> None:
         mol,
         "SDSfUCCSD",
     )
-    WF.run_wf_optimization_1step("BFGS", False)
+    WF.run_wf_optimization(orbital_optimization=False)
     assert abs(WF.energy_elec - -8.829725631105443) < 10**-10
 
     sampler = Sampler()
@@ -359,7 +357,7 @@ def test_lih_tups_mappings() -> None:
         "tUPS",
         ansatz_options={"n_layers": 4},
     )
-    WF.run_wf_optimization_1step("BFGS", False)
+    WF.run_wf_optimization(orbital_optimization=False)
     assert abs(WF.energy_elec - -8.825023029148799) < 10**-10
 
     sampler = Sampler()
@@ -406,7 +404,7 @@ def test_h2_selfconsistent_lr() -> None:
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
     )
 
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     mapper = JordanWignerMapper()
     primitive = Sampler(run_options={"shots": None})
@@ -451,7 +449,7 @@ def test_h2_statetransfer_lr() -> None:
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
     )
 
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     mapper = JordanWignerMapper()
     primitive = Sampler(run_options={"shots": None})
@@ -494,7 +492,7 @@ def test_convert_ups_to_circuit() -> None:
         SQobj,
         "fUCCSD",
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True)
     mapper = JordanWignerMapper()
     primitive = Sampler(run_options={"shots": None})
     qWF = circuit_wavefunction_from_ups(WF, primitive, mapper)
@@ -533,7 +531,7 @@ def test_convert_saups_to_circuit() -> None:
         "tUPS",
         ansatz_options={"n_layers": 2, "skip_last_singles": True},
     )
-    WF.run_wf_optimization_2step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True)
     mapper = JordanWignerMapper()
     primitive = Sampler(run_options={"shots": None})
     qWF = circuit_wavefunction_from_ups(WF, primitive, mapper)
@@ -567,10 +565,10 @@ def test_pp_ups_to_circuit() -> None:
         integral_generator,
         "tUPS",  # our circuit Ansatz
         ansatz_options={"n_layers": 1, "skip_last_singles": True},  # we use 1 layer
-        wavefunction_options={"do_pp": True},
+        do_pp=True,
     )
 
-    WF.run_wf_optimization_1step("bfgs", orbital_optimization=True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     assert abs(WF.energy_elec + 83.98433373390003) < 10**-10
 
