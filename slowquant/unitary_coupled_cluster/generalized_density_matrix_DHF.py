@@ -968,6 +968,7 @@ def get_orbital_gradient_response_real_imag(
 @nb.jit(nopython=True)
 def get_orbital_response_metric_sigma(
     kappa_spin_idx: list[tuple[int, int]],
+    kappa_spin_idx2: list[tuple[int, int]],
     num_NES: int, 
     num_inactive_spin_orbs: int,
     num_active_spin_orbs: int,
@@ -989,7 +990,7 @@ def get_orbital_response_metric_sigma(
     """
     sigma = np.zeros((len(kappa_spin_idx), len(kappa_spin_idx)), dtype=np.complex128)
     for idx1, (M, N) in enumerate(kappa_spin_idx):
-        for idx2, (P, Q) in enumerate(kappa_spin_idx):
+        for idx2, (P, Q) in enumerate(kappa_spin_idx2):
             if Q == N:
                 sigma[idx1, idx2] += RDM1(M, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             if P == M:
@@ -1368,17 +1369,17 @@ def get_orbital_response_hessian_block(
             A1e_eq1[idx1, idx2] += h[N, T] * RDM1(M, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             A1e_eq2[idx1, idx2] += h[U, M] * RDM1(T, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
 
-            if RDM1(M, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1).real != 0:
-                print("idx1, idx2")
-                print(idx1, idx2)
-                print("M, U")
-                print(M, U)
-                print("RDM1(M,U)")
-                print(RDM1(M, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1))
-                print("H(N,T)")
-                print(h[N, T])
-                print("H(T,N)")
-                print(h[T, N])
+            # if RDM1(M, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1).real != 0:
+            #     print("idx1, idx2")
+            #     print(idx1, idx2)
+            #     print("M, U")
+            #     print(M, U)
+            #     print("RDM1(M,U)")
+            #     print(RDM1(M, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1))
+            #     print("H(N,T)")
+            #     print(h[N, T])
+            #     print("H(T,N)")
+            #     print(h[T, N])
 
             for P in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
                 if M == U:
@@ -1467,11 +1468,11 @@ def get_orbital_response_hessian_block(
                         #     )
 
     
-    with np.printoptions(precision=4):
-        print("1e eq")
-        print(np.round(A1e_eq, 4))
-        print("1e eq1")
-        print(np.round(A1e_eq1, 4))
+    # with np.printoptions(precision=4):
+        # print("1e eq")
+        # print(np.round(A1e_eq, 4))
+        # print("1e eq1")
+        # print(np.round(A1e_eq1, 4))
         #print("1e eq2")
         #print(np.round(A1e_eq2, 4))
         # print("1 electron")

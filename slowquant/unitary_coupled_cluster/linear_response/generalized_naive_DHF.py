@@ -167,7 +167,20 @@ class LinearResponse(LinearResponseBaseClass):
                 # raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad))) #AE udkommenteret
         if len(self.q_ops) != 0:
             # Do orbital-orbital blocks
-            self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
+
+            # self.A[: len(self.q_ops_resp), : len(self.q_ops_resp)] = get_orbital_response_hessian_block(
+            #     self.wf.h_mo,
+            #     self.wf.g_mo,
+            #     self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
+            #     self.wf.kappa_no_activeactive_spin_idx_resp,
+            #     self.wf.num_spin_orbs_NES, 
+            #     self.wf.num_inactive_spin_orbs,
+            #     self.wf.num_active_spin_orbs,
+            #     self.wf.rdm1,
+            #     self.wf.rdm2,
+            # )
+
+            self.A_EE[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
                 self.wf.h_mo,
                 self.wf.g_mo,
                 self.wf.kappa_no_activeactive_spin_idx_dagger,
@@ -179,7 +192,57 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.rdm2,
             )
 
-            self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
+            self.A_EP = get_orbital_response_hessian_block(
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.kappa_no_activeactive_spin_idx_dagger,
+                self.wf.kappa_no_activeactive_spin_idx_ep,
+                self.wf.num_spin_orbs_NES, 
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.rdm1,
+                self.wf.rdm2,
+            )
+
+            self.A_PE = get_orbital_response_hessian_block(
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+                self.wf.kappa_no_activeactive_spin_idx,
+                self.wf.num_spin_orbs_NES, 
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.rdm1,
+                self.wf.rdm2,
+            )
+
+            self.A_PP = get_orbital_response_hessian_block(
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+                self.wf.kappa_no_activeactive_spin_idx_ep,
+                self.wf.num_spin_orbs_NES, 
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.rdm1,
+                self.wf.rdm2,
+            )
+        
+
+            # self.B = get_orbital_response_hessian_block(
+            #     self.wf.h_mo,
+            #     self.wf.g_mo,
+            #     self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
+            #     self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
+            #     self.wf.num_spin_orbs_NES, 
+            #     self.wf.num_inactive_spin_orbs,
+            #     self.wf.num_active_spin_orbs,
+            #     self.wf.rdm1,
+            #     self.wf.rdm2,
+            # )
+
+
+            self.B_EE = get_orbital_response_hessian_block(
                 self.wf.h_mo,
                 self.wf.g_mo,
                 self.wf.kappa_no_activeactive_spin_idx_dagger,
@@ -190,14 +253,74 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.rdm1,
                 self.wf.rdm2,
             )
+
+
+            self.B_EP = get_orbital_response_hessian_block(
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.kappa_no_activeactive_spin_idx_dagger,
+                self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+                self.wf.num_spin_orbs_NES, 
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.rdm1,
+                self.wf.rdm2,
+            )
+
+            self.B_PE = get_orbital_response_hessian_block(
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+                self.wf.kappa_no_activeactive_spin_idx_dagger,
+                self.wf.num_spin_orbs_NES, 
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.rdm1,
+                self.wf.rdm2,
+            )            
+
+            self.B_PP = get_orbital_response_hessian_block(
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+                self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+                self.wf.num_spin_orbs_NES, 
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.rdm1,
+                self.wf.rdm2,
+            )
+
+
+            # self.Sigma_tot[: len(self.q_ops_resp), : len(self.q_ops_resp)] = get_orbital_response_metric_sigma(
+            #     self.wf.kappa_no_activeactive_spin_idx_resp,
+            #     self.wf.kappa_no_activeactive_spin_idx_resp,
+            #     self.wf.num_spin_orbs_NES, 
+            #     self.wf.num_inactive_spin_orbs,
+            #     self.wf.num_active_spin_orbs,
+            #     self.wf.rdm1,
+            # )
 
             self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
                 self.wf.kappa_no_activeactive_spin_idx,
+                self.wf.kappa_no_activeactive_spin_idx,
                 self.wf.num_spin_orbs_NES, 
                 self.wf.num_inactive_spin_orbs,
                 self.wf.num_active_spin_orbs,
                 self.wf.rdm1,
             )
+
+            # self.Sigma_EP = get_orbital_response_metric_sigma(
+            #     self.wf.kappa_no_activeactive_spin_idx,
+            #     self.wf.kappa_no_activeactive_spin_idx_ep,
+            #     self.wf.num_spin_orbs_NES, 
+            #     self.wf.num_inactive_spin_orbs,
+            #     self.wf.num_active_spin_orbs,
+            #     self.wf.rdm1,
+            # )
+
+
+
             """
         # qq block manual
             # for j, qJ in enumerate(self.q_ops):
@@ -1246,18 +1369,20 @@ class LinearResponse(LinearResponseBaseClass):
         test = True
 
         if test == True:
-            size = len(self.A)
-            E2 = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
-            E2[:size, :size] = self.A
-            E2[:size, size:] = self.B
-            E2[size:, :size] = self.B.conjugate() #AE added conjugtate 
-            E2[size:, size:] = self.A.conjugate() #AE added conjugtate 
+            # size = len(self.A)
+            # E2 = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
+            # E2[:size, :size] = self.A
+            # E2[:size, size:] = self.B
+            # E2[size:, :size] = self.B.conjugate() #AE added conjugtate 
+            # E2[size:, size:] = self.A.conjugate() #AE added conjugtate 
 
-            S = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
-            S[:size, :size] = self.Sigma
-            S[:size, size:] = self.Delta
-            S[size:, :size] = -self.Delta.conjugate()
-            S[size:, size:] = -self.Sigma.conjugate()
+            # S = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
+            # S[:size, :size] = self.Sigma
+            # S[:size, size:] = self.Delta
+            # S[size:, :size] = -self.Delta.conjugate()
+            # S[size:, size:] = -self.Sigma.conjugate()
+
+            E2 = self.E2_eff
 
             
             def solve_lr_drop_sigma_null(H, sigma, cut=1e-10):
@@ -1512,14 +1637,35 @@ class LinearResponse(LinearResponseBaseClass):
         #     np.linalg.pinv(E2_mat, rcond=1e-10) @ prop_grads[I]
         #     for I in range(natm)
         # ]
-        
-        prop_grads = [self.get_property_gradient_4comp_no_ep(h1_int[I]) for I in range(natm)]
-        responses = [
-            np.linalg.pinv(E2, rcond=1e-10) @ prop_grads[I]
-            for I in range(natm)
-        ]
 
-        # responses  = [solve(E2, prop_grads[I]) for I in range(natm)]
+
+
+
+        ee = len(self.wf.kappa_no_activeactive_spin_idx)
+
+        ep = len(self.wf.kappa_no_activeactive_spin_idx_ep)
+
+        prop_grads = [self.get_property_gradient_4comp(h1_int[I]) for I in range(natm)]
+
+        prop_grads_eff = []
+
+        for I in range(natm):
+            prop_ee = np.concatenate([prop_grads[I][ep:ee + ep], prop_grads[I][ee + ep*2:]])
+            prop_ep = np.concatenate([prop_grads[I][:ep], prop_grads[I][ee + ep:ee + 2*ep]])
+            #prop_grads_eff.append(prop_ee)
+            prop_grads_eff.append(prop_ee - self.E2_EP @ np.linalg.solve(self.E2_PP, prop_ep))
+            #prop_grads_eff.append(prop_ee- self.E2_PE.conj().T @ np.linalg.solve(self.E2_PP.conj().T, prop_ep))
+
+        responses  = [solve(E2, prop_grads_eff[I]) for I in range(natm)]
+
+
+
+        # responses = [
+        #     np.linalg.pinv(E2, rcond=1e-6) @ prop_grads_eff[I]
+        #     for I in range(natm)
+        # ]
+
+        
         # responses  = [solve(E2_mat, prop_grads[I]) for I in range(natm)]
 
         # prop_grads = [self.get_property_gradient_4comp_no_ep_select(h1_int[I]) for I in range(natm)]
@@ -1591,11 +1737,9 @@ class LinearResponse(LinearResponseBaseClass):
             for k, (I, J) in enumerate(nuc_pair):
                 for alpha in range(3):
                     for beta in range(3):
-                        ssc_para[I, J, alpha, beta] = ssc_para[J, I, alpha, beta] = np.einsum(
-                            'i,i->',
-                            -prop_grads[I][:, alpha].conj(),
-                            responses[J][:, beta]
-                        ).real
+                        ssc_para[I, J, alpha, beta] = ssc_para[J, I, alpha, beta] = np.einsum('i,i->',
+                                    -prop_grads_eff[I][:, alpha].conj(),responses[J][:, beta]).real
+                        
 
             # Factoring:
             ssc_dia *= nist.ALPHA**4
@@ -1605,6 +1749,7 @@ class LinearResponse(LinearResponseBaseClass):
 
             for k, (I, J) in enumerate(nuc_pair):
                 ktensor[I, J] = ktensor[J, I] = au2Hz * nuc_mag ** 2 * np.trace(ssc_para[I, J] + ssc_dia[I, J]).real / 3 
+                #ktensor[I, J] = ktensor[J, I] = au2Hz * nuc_mag ** 2 * np.trace(ssc_para[I, J]).real / 3 
 
                 print("Diamagnetic contribution:")
                 print(np.round(ssc_dia[I,J].real, 10))

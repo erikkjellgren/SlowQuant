@@ -744,7 +744,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     mf = scf.dhf.DHF(mol)
 
 
-    mf.conv_tol = 1e-8        # Energy convergence (Hartree)
+    mf.conv_tol = 1e-10        # Energy convergence (Hartree)
     mf.conv_tol_grad = 1e-8   # Optional: gradient convergence
     mf.max_cycle = 500
     # mf.with_ssss
@@ -812,7 +812,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
     # small random anti-Hermitian
-    eps = 0.01  # controls "step size"
+    eps = 0.005  # controls "step size"
     X_anti = np.random.randn(C_MO.shape[0],C_MO.shape[0]) + 1j*np.random.randn(C_MO.shape[0],C_MO.shape[0])
     A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian
 
@@ -1003,7 +1003,6 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
 
 
-    WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-8, maxiter = 1000)
 
     # print("rdm2 PySCF")
     # with np.printoptions(precision=4):
@@ -1259,7 +1258,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     alpha_occ = WF.c_mo[:, 4]
     beta_occ  = WF.c_mo[:, 5]
 
-    check_kramers_pair(alpha_occ, beta_occ, S_ovlp)
+    # check_kramers_pair(alpha_occ, beta_occ, S_ovlp)
 
 
     LR2 = generalized_naive_DHF.LinearResponse(WF2, excitations="S")
@@ -1279,11 +1278,20 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # print("Shieldings:")
     # print(shieldings)
 
-    SSCC2 = LR2.get_SSCC_4comp_iso(h1, h2)
-    for I in range(SSCC2.shape[0]):
-        for J in range(I+1, SSCC2.shape[1]):
-            print(f"K({mol.atom_symbol(I)}{I} - {mol.atom_symbol(J)}{J}) = {SSCC2[I,J]:.5f} Hz")
 
+
+
+
+    # SSCC2 = LR2.get_SSCC_4comp_iso(h1, h2)
+    # for I in range(SSCC2.shape[0]):
+    #     for J in range(I+1, SSCC2.shape[1]):
+    #         print(f"K({mol.atom_symbol(I)}{I} - {mol.atom_symbol(J)}{J}) = {SSCC2[I,J]:.5f} Hz")
+
+
+
+
+
+    WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-14, maxiter = 1000)
 
     LR = generalized_naive_DHF.LinearResponse(WF, excitations="S")
 
@@ -1347,6 +1355,33 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # print("virt→occ", np.linalg.norm(U[nNES+nocc:, nNES:nNES+nocc]))
     # print("NES→occ ", np.linalg.norm(U[:nNES, nNES:nNES+nocc]))
     # print("occ→NES ", np.linalg.norm(U[nNES:nNES+nocc, :nNES]))
+
+
+    # U = WF2.c_mo.conj().T @ S_ovlp @ WF.c_mo
+    # print("U unitary check:", np.abs(U.conj().T @ U - np.eye(U.shape[0])).max())
+
+    # h_transformed = U.conj().T @ WF2.h_mo @ U
+    # print("h_mo consistency:", np.abs(h_transformed - WF.h_mo).max())
+
+    # h_test = DHF_one_electron_transform(WF.c_mo,h_core)
+
+    # print("h_mo consistency:", np.abs(h_test - WF.h_mo).max())
+
+    # C_test = WF2.c_mo @ U
+    # print(np.linalg.norm(C_test - WF.c_mo))
+
+    # print(np.trace(WF2.h_mo[6:8,6:8]), np.trace(WF.h_mo[6:8,6:8]))
+
+    # D_mine = WF.c_mo[:, 4:6] @ WF.c_mo[:, 4:6].conj().T
+    # D_pyscf = WF2.c_mo[:, 4:6] @ WF2.c_mo[:, 4:6].conj().T
+    # print(np.abs(D_mine - D_pyscf).max())
+
+    # print(np.abs(WF.h_mo - WF.h_mo.conj().T).max())                          # h Hermiticity
+    # print(np.abs(WF.g_mo - WF.g_mo.transpose(2,3,0,1)).max())               # g exchange symmetry
+    # print(np.abs(WF.g_mo - WF.g_mo.transpose(1,0,3,2).conj()).max())
+
+
+
 
 
 def split_general_contraction(basis_dict):
@@ -1449,8 +1484,8 @@ def HF():
     #basis = "cc-pvdz"
     #basis = "631-g"
     basis = "sto-3g"
-    active_space = ((1, 1), 4)
-    #active_space = ((5, 5), 10)
+    #active_space = ((1, 1), 4)
+    active_space = ((5, 5), 10)
     #active_space = (2, 4)
     charge = 0
     spin = 0
@@ -1556,4 +1591,4 @@ def N3():
 
 ###RUN SCRIPT###
 
-H2()
+HF()

@@ -921,8 +921,8 @@ class GeneralizedWaveFunctionUPS:
         Returns:
             One-electron Hamiltonian integrals in MO basis.
         """
-        if self._h_mo is None:
-            self._h_mo = DHF_one_electron_transform(self.c_mo, self._h_ao) #DHF
+        #if self._h_mo is None:
+        self._h_mo = DHF_one_electron_transform(self.c_mo, self._h_ao) #DHF
         return self._h_mo
 
     @property
@@ -932,8 +932,8 @@ class GeneralizedWaveFunctionUPS:
         Returns:
             Two-electron Hamiltonian integrals in MO basis.
         """
-        if self._g_mo is None:
-            self._g_mo = DHF_two_electron_transform(self.c_mo, self._g_ao) #DHF
+        #if self._g_mo is None:
+        self._g_mo = DHF_two_electron_transform(self.c_mo, self._g_ao) #DHF
         return self._g_mo
 
     @property
@@ -943,8 +943,8 @@ class GeneralizedWaveFunctionUPS:
         Returns:
             One-electron Hamiltonian integrals in MO basis.
         """
-        if self._h_mo_ep is None:
-            self._h_mo_ep = DHF_one_electron_transform(self.c_mo_ep, self._h_ao) #DHF
+        #if self._h_mo_ep is None:
+        self._h_mo_ep = DHF_one_electron_transform(self.c_mo_ep, self._h_ao) #DHF
         return self._h_mo_ep
 
     @property
@@ -954,8 +954,8 @@ class GeneralizedWaveFunctionUPS:
         Returns:
             Two-electron Hamiltonian integrals in MO basis.
         """
-        if self._g_mo_ep is None:
-            self._g_mo_ep = DHF_two_electron_transform(self.c_mo_ep, self._g_ao) #DHF
+        #if self._g_mo_ep is None:
+        self._g_mo_ep = DHF_two_electron_transform(self.c_mo_ep, self._g_ao) #DHF
         return self._g_mo_ep
 
     @property
