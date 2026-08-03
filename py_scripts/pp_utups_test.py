@@ -31,14 +31,23 @@ h_core = mol.intor("int1e_kin") + mol.intor("int1e_nuc")
 g_eri = mol.intor("int2e")
 
 #Slowquant
+# WF = UnrestrictedWaveFunctionUPS(
+#     mol.nelectron,
+#     ((2,0),4),
+#     mc.mo_coeff,
+#     h_core,
+#     g_eri,
+#     "utups",
+#     {"n_layers":2},
+#     include_active_kappa=True,
+# )
+
 WF = UnrestrictedWaveFunctionUPS(
-    mol.nelectron,
     ((2,0),4),
     mc.mo_coeff,
-    h_core,
-    g_eri,
-    "utups",
-    {"n_layers":2},
+    mol,
+    ansatz = "utups",
+    ansatz_options= {"n_layers":2},
     include_active_kappa=True,
 )
 

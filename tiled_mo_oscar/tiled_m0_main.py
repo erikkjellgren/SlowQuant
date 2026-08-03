@@ -15,7 +15,9 @@ from slowquant.qiskit_interface.util import add_permutation_gate
 from tiled_m0_helper import (ApplyMitigator,
                              CalculateExpectationValueOfPauliString,
                              GroupPauliStringsByQwc,
-                             CalculateAllPsGroupOneNorms)
+                             CalculateAllPsGroupOneNorms,
+                             )
+# GetConditionNumberForFullSystemConfusionMatrix
 
 class TiledM0:
     def __init__(
@@ -70,7 +72,7 @@ class TiledM0:
         self.backend = backend
         self.expectationValueShots = expectationValueShots
         self.mitigatorShots = mitigatorShots
-        print("OPERATOR", self.operator)
+
         self.totQubitCount = len(list(self.operator.keys())[0])
         if (self.totQubitCount % 4 != 0):
             raise ValueError("The total number of qubits must be a multiple of 4.") # Because the current implementation assumes RE mitigators of size 16x16.
@@ -130,6 +132,8 @@ class TiledM0:
         self.service = service
         self.inputStatePrepQc = None
         self.parameters = None
+        self.mitigatedPsExpectationValues_All = None
+        self.rawPsExpectationValues_All = None
 
         if self.backend.name != 'aer_simulator':
             self.InitializePatches(savedPatches)
@@ -370,11 +374,14 @@ class TiledM0:
         """
         self.mitigatedExpectationValue_All = [0 for i in range(len(self.patches))]
         self.rawExpectationValue_All = [0 for i in range(len(self.patches))]
+        self.mitigatedPsExpectationValues_All = [dict() for i in range(len(self.patches))]
+        self.rawPsExpectationValues_All = [dict() for i in range(len(self.patches))]
+
         # Loop over all Pauli string groups
         for psGroup in range(0, len(self.operatorGroupedByQwc)):
             shotCount = int((self.qwcGroupsOneNorms[psGroup] / self.operatorSumOfWeights) * self.expectationValueShots) + 1
+            
             self.qwcGroups_ShotCounts[psGroup] = shotCount
-            print(shotCount, end = ", ")
             shotCountSaved = shotCount
             maxShotCount = 10000000 # If shotCount > 10 million, we need to split up the job
             while shotCount > 0:
@@ -420,13 +427,24 @@ class TiledM0:
                             self.mitigatedExpectationValue_All[patchIdx] += (shotCountRestricted / shotCountSaved) * self.operator[ps]
                             self.rawExpectationValue_All[patchIdx] += (shotCountRestricted / shotCountSaved) * self.operator[ps]
                             continue
-                        self.mitigatedExpectationValue_All[patchIdx] += (shotCountRestricted / shotCountSaved) * CalculateExpectationValueOfPauliString(ps, p) * self.operator[ps]
-                        self.rawExpectationValue_All[patchIdx] += (shotCountRestricted / shotCountSaved) * CalculateExpectationValueOfPauliString(ps, pNoisy) * self.operator[ps]
+                        
+                        psExpectationValue_Mitigated = CalculateExpectationValueOfPauliString(ps, p)
+                        psExpectationValue_Raw = CalculateExpectationValueOfPauliString(ps, pNoisy)
+
+                        if ps in self.mitigatedPsExpectationValues_All[patchIdx].keys():
+                            self.mitigatedPsExpectationValues_All[patchIdx][ps] += (shotCountRestricted / shotCountSaved) * psExpectationValue_Mitigated
+                            self.rawPsExpectationValues_All[patchIdx][ps] += (shotCountRestricted / shotCountSaved) * psExpectationValue_Raw
+                        else:
+                            self.mitigatedPsExpectationValues_All[patchIdx][ps] = (shotCountRestricted / shotCountSaved) * psExpectationValue_Mitigated
+                            self.rawPsExpectationValues_All[patchIdx][ps] = (shotCountRestricted / shotCountSaved) * psExpectationValue_Raw
+                        
+                        self.mitigatedExpectationValue_All[patchIdx] += (shotCountRestricted / shotCountSaved) * psExpectationValue_Mitigated * self.operator[ps]
+                        self.rawExpectationValue_All[patchIdx] += (shotCountRestricted / shotCountSaved) * psExpectationValue_Raw  * self.operator[ps]
                         
                 shotCount -= maxShotCount
 
         print()
-
+        
         if (self.runOnHardware == False or self.firstPass == False):
             for patchIdx in range(len(self.patches)):
                 print(" --- Patch", patchIdx + 1)
@@ -851,18 +869,21 @@ class TiledM0:
                         self.conditionNumbersOverTime[-1].append(conditionNumber)
     
     def NormalM0_Run(
-        self
+        self,
+        parameters : list[float]
     )   -> np.float64:
         """
         Calculate the expectation value of ``self.operator`` using normal M0.
         The normal M0 version of ``self.Run``.
-            
+        Args:
+            parameters: The parameters to parameterize the circuit with
         Returns:
             The average of the error mitigated expectation values for all patches which satisfy
             that the condition numbers for the normal M0 mitigators are below a certain threshold. This is to
             assure the quality of a given patch. Also outputs a log file with results for all patches
             including raw expectation values.
         """
+        self.ParameterizeAndComposeFullCircuit(parameters)
         self.quantumCircuitsBatch = list()
         self.jobResults = list()
         self.jobResultsIndex = 0
@@ -908,7 +929,7 @@ class TiledM0:
         for i in range(len(self.patches)):
             U, S, Vdag = np.linalg.svd(self.normal_M0_Mitigators_All[i], full_matrices = False)
             conditionNumber = S[0] / S[-1]
-            self.conditionNumbers_All.append(conditionNumber)
+            self.conditionNumbers_All.append([conditionNumber])
 
         return self.LogTiledM0()
     
@@ -1082,7 +1103,7 @@ class TiledM0:
         Logs results from tiled M0. Also returns the average error mitigated expectation value over all good patches (based on condition numbers).
 
         Returns:
-            The average error mitigated expectation value over all good patches.
+            The average error mitigated expectation value over all good patches and the average raw energy over all good patches.
         """
         currentTime = datetime.now().strftime("%H:%M:%S")
         self.logData = "\n\n---- ERROR MITIGATION ----" + '\n' + datetime.now().strftime("%d") + ' ' + datetime.now().strftime("%m") + ' ' + currentTime + '\n'
@@ -1117,17 +1138,26 @@ class TiledM0:
         for i in range(len(self.patches)):
             self.logData += "\n\n--- PATCH " + str(i + 1)
             self.logData += "\nCondition numbers:\n"
-            for j in range(len(self.tileMitigators_All[i])):
-                self.logData += str(self.conditionNumbers_All[i][j]) + "    chosen: " + str(self.chosenTileMitigators_All[i][j]) + "\n"
-            self.logData += "Average: " + str(np.average(self.conditionNumbers_All[i]))
-            self.logData += "\nProduct: " + str(self.conditionNumbersProduct_All[i])
-            self.logData += "\nTiled M0 expectation value: " + str(self.mitigatedExpectationValue_All[i])
-            self.logData += "\nRaw expectation value: " + str(self.rawExpectationValue_All[i])
-            self.logData += "\nDepth complexity: " + str(self.depth_All[i])
-            self.logData += "\nGate complexity: " + str(self.gateCount_All[i])
-            self.logData += "\nNumber of non-local gates: " + str(self.nonLocalGates_All[i])
+            if self.doNormalM0 == False:
+                for j in range(len(self.tileMitigators_All[i])):
+                    self.logData += str(self.conditionNumbers_All[i][j]) + "    chosen: " + str(self.chosenTileMitigators_All[i][j]) + "\n"
+                self.logData += "Average: " + str(np.average(self.conditionNumbers_All[i]))
+                self.logData += "\nProduct: " + str(self.conditionNumbersProduct_All[i])
+                self.logData += "\nTiled M0 expectation value: " + str(self.mitigatedExpectationValue_All[i])
+                self.logData += "\nRaw expectation value: " + str(self.rawExpectationValue_All[i])
+                self.logData += "\nDepth complexity: " + str(self.depth_All[i])
+                self.logData += "\nGate complexity: " + str(self.gateCount_All[i])
+                self.logData += "\nNumber of non-local gates: " + str(self.nonLocalGates_All[i])
 
-            if (np.average(self.conditionNumbers_All[i]) < conditionNumberThreshold):
+                if (np.average(self.conditionNumbers_All[i]) < conditionNumberThreshold):
+                    finalMitigatedEvals.append(self.mitigatedExpectationValue_All[i])
+                    finalRawEvals.append(self.rawExpectationValue_All[i])
+            
+            elif self.doNormalM0 == True:
+                self.logData += str(self.conditionNumbers_All[i][0]) + "    chosen: always for normal m0\n"
+                self.logData += "\nDepth complexity: " + str(self.depth_All[i])
+                self.logData += "\nGate complexity: " + str(self.gateCount_All[i])
+                self.logData += "\nNumber of non-local gates: " + str(self.nonLocalGates_All[i])
                 finalMitigatedEvals.append(self.mitigatedExpectationValue_All[i])
                 finalRawEvals.append(self.rawExpectationValue_All[i])
 
@@ -1147,9 +1177,9 @@ class TiledM0:
         self.logData += "{0: <20}".format("\nAverage: ") + str(avgRaw)
         self.logData += "{0: <20}".format("\nStandard deviation: ") + str(stdRaw)
 
-        f = open("tiledM0.log", 'a')
+        f = open("tiledM0_L" + str(self.layerCount) + ".log", 'a')
         f.write(self.logData)
         f.write("\n###############\n")
         f.close()
 
-        return avgMitigated
+        return avgMitigated, avgRaw
