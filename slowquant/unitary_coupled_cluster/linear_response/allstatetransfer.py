@@ -78,9 +78,7 @@ class LinearResponse(LinearResponseBaseClass):
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters))
-        self.B = np.zeros((num_parameters, num_parameters))
         self.Sigma = np.zeros((num_parameters, num_parameters))
-        self.Delta = np.zeros((num_parameters, num_parameters))
 
         H_2i_2a = hamiltonian_2i_2a(
             self.wf.h_mo,
