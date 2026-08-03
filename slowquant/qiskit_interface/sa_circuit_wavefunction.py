@@ -809,7 +809,7 @@ class WaveFunctionSACircuit:
             transition_property[i] = self._state_ci_coeffs[:, i + 1] @ state_op @ self._state_ci_coeffs[:, 0]
         return transition_property
 
-    def get_oscillator_strenghts(self) -> np.ndarray:
+    def get_oscillator_strengths(self) -> np.ndarray:
         r"""Get oscillator strengths between ground state and excited states.
 
         .. math::

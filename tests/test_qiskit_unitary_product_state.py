@@ -575,3 +575,28 @@ def test_pp_ups_to_circuit() -> None:
     qWF = circuit_wavefunction_from_ups(WF, Sampler(), JordanWignerMapper(), shots=None)
 
     assert abs(qWF.energy_elec + 83.9843337275081) < 10**-10
+
+
+def test_openshell_reference() -> None:
+    """Test circuit wavefunction for openshell reference."""
+    mol = pyscf.M(
+        atom="H   0.0 0.0 0.0; H   1.0 0.0 0.0; H   0.5 0.8660254038  0.0;",
+        basis="sto-3g",
+        unit="angstrom",
+        spin=1,
+    )
+    rohf = pyscf.scf.ROHF(mol).run()
+
+    WF = WaveFunctionUPS(
+        (3, 3),
+        rohf.mo_coeff,
+        mol,
+        "fUCC",
+        ansatz_options={"excitations": ["S", "D"]},
+        reference_determinant="111000",
+    )
+    WF.run_wf_optimization(orbital_optimization=False)
+    mapper = JordanWignerMapper()
+    primitive = Sampler(run_options={"shots": None})
+    qWF = circuit_wavefunction_from_ups(WF, primitive, mapper)
+    assert abs(WF.energy_elec - qWF.energy_elec) < 10**-10

@@ -276,6 +276,8 @@ class WaveFunctionCircuit:
             (self.num_active_elec_alpha, self.num_active_elec_beta),
             ref_det=self.ref_det,
         )
+        # Save for uses outside WF class.
+        self._ref_det = ref_det
 
     @property
     def kappa(self) -> list[float]:

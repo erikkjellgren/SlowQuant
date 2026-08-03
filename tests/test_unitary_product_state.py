@@ -1,6 +1,7 @@
 # type: ignore
 import numba as nb
 import numpy as np
+import pyscf
 
 import slowquant.SlowQuant as sq
 import slowquant.unitary_coupled_cluster.linear_response.allstatetransfer as allstlr
@@ -191,7 +192,7 @@ def test_saups_h2_3states() -> None:
 
     assert abs(WF.excitation_energies[0] - 0.974553) < 10**-6
     assert abs(WF.excitation_energies[1] - 1.632364) < 10**-6
-    osc = WF.get_oscillator_strenghts()
+    osc = WF.get_oscillator_strengths()
     assert abs(osc[0] - 0.8706) < 10**-3
     assert abs(osc[1] - 0.0) < 10**-3
 
@@ -234,7 +235,7 @@ def test_saups_h3_3states() -> None:
 
     assert abs(WF.excitation_energies[0] - 0.838466) < 10**-6
     assert abs(WF.excitation_energies[1] - 0.838466) < 10**-6
-    osc = WF.get_oscillator_strenghts()
+    osc = WF.get_oscillator_strengths()
     assert abs(osc[0] - 0.7569) < 10**-3
     assert abs(osc[1] - 0.7569) < 10**-3
 
@@ -346,7 +347,7 @@ def test_saups_h3_3states_threaded() -> None:
 
     assert abs(WF.excitation_energies[0] - 0.838466) < 10**-6
     assert abs(WF.excitation_energies[1] - 0.838466) < 10**-6
-    osc = WF.get_oscillator_strenghts()
+    osc = WF.get_oscillator_strengths()
     assert abs(osc[0] - 0.7569) < 10**-3
     assert abs(osc[1] - 0.7569) < 10**-3
     nb.set_num_threads(1)
@@ -411,3 +412,74 @@ def test_ups_n2_fuccsdtq56() -> None:
     )
     WF.run_wf_optimization(orbital_optimization=False)
     assert abs(WF.energy_elec - -131.1965135680604533) < 10**-6
+
+
+def test_ups_pp_lr() -> None:
+    """Test that the linear response are independent of reference for fUCCSD.
+
+    When using a fUCCSD wave function, the linear response results should be
+    independent of reference (if it is closed-shell).
+    """
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """O   0.0  0.0           0.1035174918;
+    H   0.0  0.7955612117 -0.4640237459;
+    H   0.0 -0.7955612117 -0.4640237459;""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("STO-3G")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    WF = WaveFunctionUPS(
+        (4, 4),
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
+        "fUCCSD",
+        ansatz_options={"n_layers": 2},
+    )
+    WF.run_wf_optimization(orbital_optimization=False)
+    # Hack to turn off orbital part in response.
+    WF.kappa_no_activeactive_idx = []
+    WF.kappa_no_activeactive_idx_dagger = []
+    LR = naivelr.LinearResponse(WF, excitations="SD")
+    LR.calc_excitation_energies()
+    ppWF = WaveFunctionUPS(
+        (4, 4),
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
+        "fUCCSD",
+        ansatz_options={"n_layers": 2},
+        do_pp=True,
+    )
+    ppWF.run_wf_optimization(orbital_optimization=False)
+    # Hack to turn off orbital part in response.
+    ppWF.kappa_no_activeactive_idx = []
+    ppWF.kappa_no_activeactive_idx_dagger = []
+    ppLR = naivelr.LinearResponse(ppWF, excitations="SD")
+    ppLR.calc_excitation_energies()
+    for exc, ppexc in zip(LR.excitation_energies, ppLR.excitation_energies):
+        assert abs(exc - ppexc) < 10**-6
+    for osc, pposc in zip(LR.get_oscillator_strength(), ppLR.get_oscillator_strength()):
+        assert abs(osc - pposc) < 10**-3
+
+
+def test_H3_fuccsdt_openshell() -> None:
+    """Test UPS wavefunction works with a open-shell reference."""
+    mol = pyscf.M(
+        atom="H   0.0 0.0 0.0; H   1.0 0.0 0.0; H   0.5 0.8660254038  0.0;",
+        basis="sto-3g",
+        unit="angstrom",
+        spin=1,
+    )
+    rohf = pyscf.scf.ROHF(mol).run()
+
+    WF = WaveFunctionUPS(
+        (3, 3),
+        rohf.mo_coeff,
+        mol,
+        "fUCC",
+        ansatz_options={"excitations": ["S", "D", "T"]},
+        reference_determinant="111000",
+    )
+    WF.run_wf_optimization(orbital_optimization=False)
+    assert abs(WF.energy_elec - -2.951920725362) < 10**-7
