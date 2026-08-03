@@ -303,74 +303,36 @@ class LinearResponse(LinearResponseBaseClass):
                 )
                 self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = val
 
-    def get_transition_dipole(self) -> np.ndarray:
+    def _get_transition_property(self, property_integral: np.ndarray) -> np.ndarray:
         """Calculate transition dipole moment.
 
+        Args:
+            property_integral: Property integral.
+
         Returns:
-            Transition dipole moment.
+            Transition property.
         """
         number_excitations = len(self.excitation_energies)
-        dipole_integrals = self.wf.int_gen.electric_dipole
-        mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
-        muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
-        muz = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[2])
-        mux_op = one_elec_op_0i_0a(
-            mux,
+        prop = one_electron_integral_transform(self.wf.c_mo, property_integral)
+        prop_op = one_elec_op_0i_0a(
+            prop,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
         )
-        muy_op = one_elec_op_0i_0a(
-            muy,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        muz_op = one_elec_op_0i_0a(
-            muz,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        mux_ket = propagate_state([mux_op], self.wf.ci_coeffs, *self.index_info)
-        muxd_ket = propagate_state([mux_op.dagger], self.wf.ci_coeffs, *self.index_info)
-        muy_ket = propagate_state([muy_op], self.wf.ci_coeffs, *self.index_info)
-        muyd_ket = propagate_state([muy_op.dagger], self.wf.ci_coeffs, *self.index_info)
-        muz_ket = propagate_state([muz_op], self.wf.ci_coeffs, *self.index_info)
-        muzd_ket = propagate_state([muz_op.dagger], self.wf.ci_coeffs, *self.index_info)
-        transition_dipole_x = 0.0
-        transition_dipole_y = 0.0
-        transition_dipole_z = 0.0
-        transition_dipoles = np.zeros((number_excitations, 3))
+        prop_ket = propagate_state([prop_op], self.wf.ci_coeffs, *self.index_info)
+        propd_ket = propagate_state([prop_op.dagger], self.wf.ci_coeffs, *self.index_info)
+        transition_property = 0.0
+        transition_properties = np.zeros(number_excitations, dtype=float)
         for state_number in range(number_excitations):
             transfer_op = FermionicOperator({})
             for i, G in enumerate(self.G_ops):
                 transfer_op += (
                     self.Z_G_normed[i, state_number] * G.dagger + self.Y_G_normed[i, state_number] * G
                 )
-            q_part_x = 0.0
-            q_part_y = 0.0
-            q_part_z = 0.0
+            q_part = 0.0
             if len(self.q_ops) != 0:
-                q_part_x = get_orbital_response_property_gradient(
-                    mux,
-                    self.wf.kappa_no_activeactive_idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.rdm1,
-                    self.normed_response_vectors,
-                    state_number,
-                    number_excitations,
-                )
-                q_part_y = get_orbital_response_property_gradient(
-                    muy,
-                    self.wf.kappa_no_activeactive_idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.rdm1,
-                    self.normed_response_vectors,
-                    state_number,
-                    number_excitations,
-                )
-                q_part_z = get_orbital_response_property_gradient(
-                    muz,
+                q_part = get_orbital_response_property_gradient(
+                    prop,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
                     self.wf.num_active_orbs,
@@ -381,49 +343,19 @@ class LinearResponse(LinearResponseBaseClass):
                 )
             transfer_ket = propagate_state([transfer_op], self.wf.ci_coeffs, *self.index_info)
             transferd_ket = propagate_state([transfer_op.dagger], self.wf.ci_coeffs, *self.index_info)
-            # <0| mux T |0>
-            transition_dipole_x = expectation_value(
-                muxd_ket,
+            # <0| prop T |0>
+            transition_property = expectation_value(
+                propd_ket,
                 [],
                 transfer_ket,
                 *self.index_info,
             )
-            # - <0| T mux |0>
-            transition_dipole_x -= expectation_value(
+            # - <0| T prop |0>
+            transition_property -= expectation_value(
                 transferd_ket,
                 [],
-                mux_ket,
+                prop_ket,
                 *self.index_info,
             )
-            # <0| muy T |0>
-            transition_dipole_y = expectation_value(
-                muyd_ket,
-                [],
-                transfer_ket,
-                *self.index_info,
-            )
-            # - <0| T muy |0>
-            transition_dipole_y -= expectation_value(
-                transferd_ket,
-                [],
-                muy_ket,
-                *self.index_info,
-            )
-            # <0| muz T |0>
-            transition_dipole_z = expectation_value(
-                muzd_ket,
-                [],
-                transfer_ket,
-                *self.index_info,
-            )
-            # - <0| T muz |0>
-            transition_dipole_z -= expectation_value(
-                transferd_ket,
-                [],
-                muz_ket,
-                *self.index_info,
-            )
-            transition_dipoles[state_number, 0] = q_part_x + transition_dipole_x
-            transition_dipoles[state_number, 1] = q_part_y + transition_dipole_y
-            transition_dipoles[state_number, 2] = q_part_z + transition_dipole_z
-        return transition_dipoles
+            transition_properties[state_number] = q_part + transition_property
+        return transition_properties
