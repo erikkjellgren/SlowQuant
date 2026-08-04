@@ -61,7 +61,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     max_iter = 10000
 
 
-    data = np.load("data_H5_6-31g_01.npz")
+    data = np.load("data_H3_def2svp_00.npz")
 
     c_mo = data["c_mo"]
 
@@ -185,4 +185,4 @@ def h8():
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
 
-h5()
+h3()
