@@ -57,16 +57,25 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     mf = scf.GHF(mol)
     mf.conv_tol = tole        # Energy convergence (Hartree)
     mf.conv_tol_grad = tolg   # Optional: gradient convergence
-    mf.max_cycle = 1000
+    mf.max_cycle = 10000
 
     mf.kernel()
 
     print("GHF electronic energy:", mf.energy_elec()[0])
     print("GHF nuclear energy:", mf.energy_nuc())
 
-    ovlp_int = mol.intor("int1e_ovlp")
-
     c_mo = np.array(mf.mo_coeff,dtype=complex)
+
+    # Small step
+    eps = 0.1  # controls "step size"
+    X_anti = np.random.randn(c_mo.shape[0],c_mo.shape[0]) + 1j*np.random.randn(c_mo.shape[0],c_mo.shape[0])
+    A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian
+
+    U_step = expm(A_mat)
+
+    c_u = c_mo @ U_step
+
+    #print(np.max(np.abs(c_u.imag)))
 
     method = "fUCCSD"
     spin_consv = False
@@ -76,7 +85,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     rd_seed = 42
     bounds = [-0.5,0.5]
     tolerance = 1e-10
-    nl = 1
+    nl = 0
     max_iter = 10000
 
     directory = os.getcwd() 
@@ -113,34 +122,31 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     WF = GeneralizedWaveFunctionUPS(
         active_space,
-        c_mo,
+        c_u,
         mol,
         method,
         ansatz_options = {"n_layers": nl, "is_spin_conserving" : spin_consv},
         include_active_kappa=active_k,
     )
 
-    print(WF.c_mo.shape)
+    # np.random.seed(rd_seed)
+    # new_thetas_real = np.random.uniform(bounds[0], bounds[1], len(WF.thetas_real)).tolist()
+    # new_thetas_imag = np.zeros_like(WF.thetas_imag)
 
-    np.random.seed(rd_seed)
-    new_thetas_real = np.random.uniform(bounds[0], bounds[1], len(WF.thetas_real)).tolist()
-    new_thetas_imag = np.zeros_like(WF.thetas_imag)
+    # WF.set_thetas(new_thetas_real, new_thetas_imag)
 
-    WF.set_thetas(new_thetas_real, new_thetas_imag)
-
-    WF.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter=max_iter)
+    WF.run_wf_optimization_1step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter=max_iter)
 
     print("Final electronic energy:", WF.energy_elec)
-    print("Approximate value for S^2:", WF.calc_S2(ovlp_int))
-    print("Approximate value for S_z:", WF.calc_Sz(ovlp_int))
-    print("2s+1:", WF.calc_multiplicity(ovlp_int))
+    print(np.max(np.abs(WF.c_mo.imag)))
+    WF.spin_analysis()
 
-    np.savez(
-        data_file,
-        c_mo=WF.c_mo,
-        thetas_real=WF.thetas_real,
-        thetas_imag=WF.thetas_imag
-        )
+    # np.savez(
+    #     data_file,
+    #     c_mo=WF.c_mo,
+    #     thetas_real=WF.thetas_real,
+    #     thetas_imag=WF.thetas_imag
+    #     )
 
 
 def h8():
@@ -152,7 +158,7 @@ def h8():
                     H  -0.984056   0.984056   0.984056
                     H   0.984056  -0.984056   0.984056
                     H   0.984056   0.984056  -0.984056"""
-    basis = "6-31g"
+    basis = "cc-pvdz"
     active_space = ((3, 3), 16) # maks 8-9 i 20 siger Pernille, gtUPS og tiled-M0 for 
     charge = 2
     spin = 0
@@ -180,7 +186,7 @@ def h5():
                     H  -0.688191   0.500000   0.000000
                     H  -0.688191  -0.500000   0.000000
                     H   0.262866  -0.809017   0.000000  """
-    basis = "def-2-svp"
+    basis = "6-31g"
     active_space = ((3, 2), 10)
     charge = 0
     spin = 1

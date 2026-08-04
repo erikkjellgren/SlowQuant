@@ -33,6 +33,9 @@ from slowquant.qiskit_interface.generalized_interface import QuantumInterface
 from qiskit_nature.second_q.operators import FermionicOp
 from qiskit.quantum_info import SparsePauliOp
 
+from functools import reduce
+
+
 
 
 def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
@@ -45,29 +48,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # PySCF
     mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
     mol.build()
-
-    # GHF
-    tole = 1e-10
-    tolg = 1e-8
-
-    print("GHF")
-    print("Convergence tolerance energy:", tole)
-    print("Convergence tolerance gradient:", tolg)
-
-    mf = scf.GHF(mol)
-    mf.conv_tol = tole        # Energy convergence (Hartree)
-    mf.conv_tol_grad = tolg   # Optional: gradient convergence
-    mf.max_cycle = 1000
-
-    mf.kernel()
-
-    print("GHF electronic energy:", mf.energy_elec()[0])
-    print("GHF nuclear energy:", mf.energy_nuc())
-
-    ovlp_int = mol.intor("int1e_ovlp")
-
-    c_mo = np.array(mf.mo_coeff,dtype=complex)
-
+   
     method = "fUCCSD"
     spin_consv = False
     active_k = True
@@ -79,37 +60,16 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     nl = 1
     max_iter = 10000
 
-    directory = os.getcwd() 
-    name = "data_H8_6_31g"
 
-    j,k = 0,0
-    while j < 30:
-        if j < 10:
-            if os.path.exists("%s/%s_0%s.npz" % (directory, name, j)):
-                k = j + 1
-        else:
-            if os.path.exists("%s/%s_%s.npz" % (directory, name, j)):
-                k = j +1
-        j += 1
+    data = np.load("data_H5_6-31g_01.npz")
 
-    if k < 10:
-        k = f"0{k}"
+    c_mo = data["c_mo"]
 
-    data_file = Path("%s_%s.npz" % (name,k))
+    print(np.max(np.abs(c_mo.imag)))
 
-    print("WF optimization:")
-    print("Method:", method)
-    print("Is spin conserving:", spin_consv)
-    print("Include Active kappa:", active_k)
-    print("Orbital optimization:", orb_opt)
-    print("Optimizer:",optimizer)
-    print("Random seed:", rd_seed)
-    print("Bounds for initiation of thetas:", bounds)
-    print("Convergence tolerance:", tolerance)
-    print("Number of layers:", nl)
-    print("Max iterations:",max_iter)
-    print("Name of data file:",data_file)
+    thetas_real = data["thetas_real"]
 
+    thetas_imag = data["thetas_imag"]
 
     WF = GeneralizedWaveFunctionUPS(
         active_space,
@@ -120,52 +80,21 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         include_active_kappa=active_k,
     )
 
-    print(WF.c_mo.shape)
+    print("Largest imaginary component of orbital coefficient:")
+    print(np.max(WF.c_mo.imag))
 
-    np.random.seed(rd_seed)
-    new_thetas_real = np.random.uniform(bounds[0], bounds[1], len(WF.thetas_real)).tolist()
-    new_thetas_imag = np.zeros_like(WF.thetas_imag)
-
-    WF.set_thetas(new_thetas_real, new_thetas_imag)
-
-    WF.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter=max_iter)
+    WF.set_thetas(thetas_real, thetas_imag)
 
     print("Final electronic energy:", WF.energy_elec)
-    print("Approximate value for S^2:", WF.calc_S2(ovlp_int))
-    print("Approximate value for S_z:", WF.calc_Sz(ovlp_int))
-    print("2s+1:", WF.calc_multiplicity(ovlp_int))
-
-    np.savez(
-        data_file,
-        c_mo=WF.c_mo,
-        thetas_real=WF.thetas_real,
-        thetas_imag=WF.thetas_imag
-        )
+    WF.spin_analysis()
 
 
-def h8():
-    geometry =   """H   0.590434   0.590434   0.590434
-                    H   0.590434  -0.590434  -0.590434
-                    H  -0.590434   0.590434  -0.590434
-                    H  -0.590434  -0.590434   0.590434
-                    H  -0.984056  -0.984056  -0.984056
-                    H  -0.984056   0.984056   0.984056
-                    H   0.984056  -0.984056   0.984056
-                    H   0.984056   0.984056  -0.984056"""
-    basis = "6-31g"
-    active_space = ((3, 3), 16) # maks 8-9 i 20 siger Pernille, gtUPS og tiled-M0 for 
-    charge = 2
-    spin = 0
-
-    NR(
-        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
-    )
 
 def h3():
     geometry = """H  0.000000   0.000000       0.000000;
                   H  1.000000   0.000000       0.000000;
                   H  0.500000   0.8660254038   0.000000"""
-    basis = "def-2-svp"
+    basis = "def2svp"
     active_space = ((2, 1), 6)
     charge = 0
     spin = 1
@@ -180,7 +109,7 @@ def h5():
                     H  -0.688191   0.500000   0.000000
                     H  -0.688191  -0.500000   0.000000
                     H   0.262866  -0.809017   0.000000  """
-    basis = "def-2-svp"
+    basis = "6-31g"
     active_space = ((3, 2), 10)
     charge = 0
     spin = 1
@@ -197,7 +126,7 @@ def h7():
                     H  -1.038362  -0.500000   0.000000
                     H  -0.256328  -1.123490   0.000000
                     H   0.718499  -0.900969   0.000000  """
-    basis = "def-2-svp"
+    basis = "6-31g"
     active_space = ((4, 3), 14)
     charge = 0
     spin = 1
@@ -232,10 +161,28 @@ def Cu3():
 
 def OH():
     geometry = "O 0.0 0.0 0.0; H  0.0 0.0 0.9697"
-    basis = "sto-3g"
-    active_space = ((3, 2), 8)
+    basis = "6-31g"
+    active_space = ((2, 1), 6)
     spin = 1
     charge = 0
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+
+def h8():
+    geometry =   """H   0.590434   0.590434   0.590434
+                    H   0.590434  -0.590434  -0.590434
+                    H  -0.590434   0.590434  -0.590434
+                    H  -0.590434  -0.590434   0.590434
+                    H  -0.984056  -0.984056  -0.984056
+                    H  -0.984056   0.984056   0.984056
+                    H   0.984056  -0.984056   0.984056
+                    H   0.984056   0.984056  -0.984056"""
+    basis = "6-31g"
+    active_space = ((3, 3), 16) # maks 8-9 i 20 siger Pernille, gtUPS og tiled-M0 for 
+    charge = 2
+    spin = 0
+
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
