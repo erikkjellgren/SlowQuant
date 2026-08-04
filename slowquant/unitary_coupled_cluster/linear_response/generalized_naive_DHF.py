@@ -1347,6 +1347,8 @@ class LinearResponse(LinearResponseBaseClass):
             ktensor[i, j] = ktensor[j, i] = iso_ssc[k]
 
         return ktensor  # reduced K (Hz), (natm, natm)
+
+
     
     def get_SSCC_4comp_iso(self, h1: np.ndarray, h2: np.ndarray) -> np.ndarray:
         """
