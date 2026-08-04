@@ -86,3 +86,37 @@ def test_convert_fermionic2hcb() -> None:
     Hfb = Hf.get_hardcoreboson_form()
 
     assert (Hb - Hfb).operators == {}
+
+
+def test_h2o_44_ooUCCpD() -> None:
+    """Test H2O oo-fUCCpD(4,4)."""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """O   0.0  0.0           0.1035174918;
+    H   0.0  0.7955612117 -0.4640237459;
+    H   0.0 -0.7955612117 -0.4640237459;""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("STO-3G")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    WFref = WaveFunctionUPS(
+        (4, 4),
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
+        "fucc",
+        ansatz_options={"pD": True},
+        include_active_kappa=True,
+    )
+    WFref.run_wf_optimization_1step("BFGS", True)
+
+    WF = WaveFunctionHCBUPS(
+        (4, 4),
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
+        "fuccpd",
+    )
+    WF.run_wf_optimization_1step("BFGS", True)
+
+    assert abs(WF.energy_elec - WFref.energy_elec) < 10**-8
+    assert abs(WF.energy_elec - -83.97256228148073) < 10**-8
