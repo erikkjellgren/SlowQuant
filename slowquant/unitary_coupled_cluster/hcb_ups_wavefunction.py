@@ -23,9 +23,10 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     propagate_state,
     propagate_unitary,
 )
-from slowquant.unitary_coupled_cluster.operators import hamiltonian_hcb_0i_0a
+from slowquant.unitary_coupled_cluster.operators import hamiltonian_hcb_0i_0a, b_op
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UpsStructure
+from slowquant.unitary_coupled_cluster.hcb_density_matrix import get_electronic_energy_hcb, get_orbital_gradient_hcb
 
 
 class WaveFunctionHCBUPS:
@@ -71,6 +72,8 @@ class WaveFunctionHCBUPS:
         self._rdm2 = None
         self._hr1 = None
         self._hr2 = None
+        self._h_mo = None
+        self._g_mo = None
         self._energy_elec: float | None = None
         self.ansatz_options = ansatz_options
         self.num_energy_evals = 0
@@ -192,6 +195,8 @@ class WaveFunctionHCBUPS:
         """
         self._hr1 = None
         self._hr2 = None
+        self._h_mo = None
+        self._g_mo = None
         self._energy_elec = None
         self._kappa = k.copy()
         # Move current expansion point.
@@ -251,53 +256,68 @@ class WaveFunctionHCBUPS:
     def hr1(self) -> np.ndarray:
         if self._hr1 is None:
             self._hr1 = np.zeros_like(self.int_gen.h_ao)
-            h_mo = one_electron_integral_transform(self.c_mo, self.int_gen.h_ao)
-            g_mo = two_electron_integral_transform(self.c_mo, self.int_gen.electron_electron_repulsion)
             for p in range(self.num_orbs):
                 for q in range(self.num_orbs):
                     if p == q:
-                        self._hr1[p, q] = 2 * h_mo[p, p] + g_mo[p, p, p, p]
+                        self._hr1[p, q] = 2 * self.h_mo[p, p] + self.g_mo[p, p, p, p]
                     else:
-                        self._hr1[p, q] = g_mo[p, q, p, q]
+                        self._hr1[p, q] = self.g_mo[p, q, p, q]
         return self._hr1
 
     @property
     def hr2(self) -> np.ndarray:
         if self._hr2 is None:
             self._hr2 = np.zeros_like(self.int_gen.h_ao)
-            g_mo = two_electron_integral_transform(self.c_mo, self.int_gen.electron_electron_repulsion)
             for p in range(self.num_orbs):
                 for q in range(self.num_orbs):
                     if p != q:
-                        self._hr2[p, q] = 2 * g_mo[p, p, q, q] - g_mo[p, q, p, q]
+                        self._hr2[p, q] = 2 * self.g_mo[p, p, q, q] - self.g_mo[p, q, p, q]
         return self._hr2
 
     @property
+    def h_mo(self) -> np.ndarray:
+        if self._h_mo is None:
+            self._h_mo = one_electron_integral_transform(self.c_mo, self.int_gen.h_ao)
+        return self._h_mo
+        
+    @property
+    def g_mo(self) -> np.ndarray:
+        if self._g_mo is None:
+            self._g_mo = two_electron_integral_transform(self.c_mo, self.int_gen.electron_electron_repulsion)
+        return self._g_mo
+
+    @property
     def rdm1(self) -> np.ndarray:
-        """Calculate one-electron reduced density matrix in the active space.
+        """Calculate the symmetrized one-electron reduced density matrix in the active space.
+
+        This is the 1-RDM in hard-core boson operators,
+        it is not equal to the 1-RDM for fermionic operators.
 
         Returns:
             One-electron reduced density matrix.
         """
         if self._rdm1 is None:
-            self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs))
+            self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs), dtype=float)
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_idx = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
                     q_idx = q - self.num_inactive_orbs
                     val = expectation_value(
                         self.ci_coeffs,
-                        [Epq(p, q)],
+                        [b_op(p, True) * b_op(q, False) + b_op(q, True) * b_op(p, False)],
                         self.ci_coeffs,
                         self.ci_info,
                     )
-                    self._rdm1[p_idx, q_idx] = val  # type: ignore
-                    self._rdm1[q_idx, p_idx] = val  # type: ignore
+                    self._rdm1[p_idx, q_idx] = 1/2*val  # type: ignore
+                    self._rdm1[q_idx, p_idx] = 1/2*val  # type: ignore
         return self._rdm1
 
     @property
     def rdm2(self) -> np.ndarray:
         """Calculate two-electron reduced density matrix in the active space.
+
+        This is the 2-RDM in hard-core boson operators,
+        it is not equal to the 2-RDM for fermionic operators.
 
         Returns:
             Two-electron reduced density matrix.
@@ -307,38 +327,20 @@ class WaveFunctionHCBUPS:
                 (
                     self.num_active_orbs,
                     self.num_active_orbs,
-                    self.num_active_orbs,
-                    self.num_active_orbs,
-                )
+                ), dtype=float
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_idx = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
                     q_idx = q - self.num_inactive_orbs
-                    for r in range(self.num_inactive_orbs, p + 1):
-                        r_idx = r - self.num_inactive_orbs
-                        if p == q:
-                            s_lim = r + 1
-                        elif p == r:
-                            s_lim = q + 1
-                        elif q < r:
-                            s_lim = p
-                        else:
-                            s_lim = p + 1
-                        for s in range(self.num_inactive_orbs, s_lim):
-                            s_idx = s - self.num_inactive_orbs
-                            val = expectation_value(
-                                self.ci_coeffs,
-                                [Epq(p, q) * Epq(r, s)],
-                                self.ci_coeffs,
-                                self.ci_info,
-                            )
-                            if q == r:
-                                val -= self.rdm1[p_idx, s_idx]
-                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
-                            self._rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore
-                            self._rdm2[q_idx, p_idx, s_idx, r_idx] = val  # type: ignore
-                            self._rdm2[s_idx, r_idx, q_idx, p_idx] = val  # type: ignore
+                    val = expectation_value(
+                        self.ci_coeffs,
+                        [b_op(p, True) * b_op(p, False) * b_op(q, True) * b_op(q, False)],
+                        self.ci_coeffs,
+                        self.ci_info,
+                    )
+                    self._rdm2[p_idx, q_idx] = val  # type: ignore
+                    self._rdm2[q_idx, p_idx] = val  # type: ignore
         return self._rdm2
 
     def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
@@ -614,15 +616,12 @@ class WaveFunctionHCBUPS:
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
-            assert False
-            """
             # RDM is more expensive than evaluation of the Hamiltonian.
             # Thus only construct these if orbital-optimization is turned on,
             # since the RDMs will be reused in the oo gradient calculation.
-            E = get_electronic_energy(
-                self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.rdm1, self.rdm2
+            E = get_electronic_energy_hcb(
+                self.hr1, self.hr2, self.num_inactive_orbs, self.num_active_orbs, self.rdm1, self.rdm2
             )
-            """
         else:
             E = expectation_value(
                 self.ci_coeffs,
@@ -656,8 +655,6 @@ class WaveFunctionHCBUPS:
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
-            assert False
-            """
             gradient[:num_kappa] = get_orbital_gradient_hcb(
                 self.h_mo,
                 self.g_mo,
@@ -667,7 +664,6 @@ class WaveFunctionHCBUPS:
                 self.rdm1,
                 self.rdm2,
             )
-            """
         if theta_optimization:
             Hamiltonian = hamiltonian_hcb_0i_0a(
                 self.hr1, self.hr2, self.num_inactive_orbs, self.num_active_orbs
