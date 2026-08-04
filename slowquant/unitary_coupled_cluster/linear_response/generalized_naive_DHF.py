@@ -887,7 +887,6 @@ class LinearResponse(LinearResponseBaseClass):
         # Oscillator strengths:
         return np.round((2/3*np.multiply(self.excitation_energies,(np.square(tdm[:,0])+np.square(tdm[:,1])+np.square(tdm[:,2])))).real,8)
 
-
     def get_property_gradient(self, property_integrals: np.ndarray) -> np.ndarray:
         """Calculate property gradient.
 
@@ -944,7 +943,6 @@ class LinearResponse(LinearResponseBaseClass):
             return np.vstack((V, -1 * V)).reshape(-1, *in_shape)
         return np.vstack((V, V)).reshape(-1, *in_shape)
     
-
     def get_property_gradient_4comp_old(self, property_integrals: np.ndarray) -> np.ndarray:
         """Calculate property gradient.
 
@@ -1003,7 +1001,6 @@ class LinearResponse(LinearResponseBaseClass):
             return np.vstack((V, -1 * V.conjugate())).reshape(-1, *in_shape)
         return np.vstack((V, V.conjugate())).reshape(-1, *in_shape)
         #return np.vstack((V, V.conjugate())).reshape(-1, *in_shape)
-
 
     def get_property_gradient_4comp(self, property_integrals: np.ndarray) -> np.ndarray:
         in_shape = property_integrals.shape[:-2]
@@ -1118,7 +1115,6 @@ class LinearResponse(LinearResponseBaseClass):
         #     V_stacked =  np.vstack((V, V.conj())).reshape(-1, *in_shape)
         #     V_stacked=V_stacked[full_mask, :]
         #     return V_stacked
-
 
     def get_SSCC_4comp_old(self, h1_int, h2_int: np.ndarray) -> np.ndarray:
         prop_grad = self.get_property_gradient_4comp(h1_int)
@@ -1740,7 +1736,7 @@ class LinearResponse(LinearResponseBaseClass):
                 for alpha in range(3):
                     for beta in range(3):
                         ssc_para[I, J, alpha, beta] = ssc_para[J, I, alpha, beta] = np.einsum('i,i->',
-                                    -prop_grads_eff[I][:, alpha].conj(),responses[J][:, beta]).real
+                                    -prop_grads_eff[I][:, alpha].conj(), responses[J][:, beta]).real
                         
 
             # Factoring:
