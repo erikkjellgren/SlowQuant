@@ -65,8 +65,6 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     c_mo = data["c_mo"]
 
-    print(np.max(np.abs(c_mo.imag)))
-
     thetas_real = data["thetas_real"]
 
     thetas_imag = data["thetas_imag"]
@@ -81,7 +79,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     )
 
     print("Largest imaginary component of orbital coefficient:")
-    print(np.max(WF.c_mo.imag))
+    print("Largest complex element of c_mo:",np.max(WF.c_mo.imag))
 
     WF.set_thetas(thetas_real, thetas_imag)
 
@@ -187,4 +185,4 @@ def h8():
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
 
-h8()
+h5()

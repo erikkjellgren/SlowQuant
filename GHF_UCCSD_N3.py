@@ -5,9 +5,10 @@ from scipy.stats import unitary_group
 from pyscf.lib import chkfile
 from scipy.linalg import expm
 import matplotlib
+import basis_set_exchange as bse
+from pyscf.gto import basis as bs
 from pathlib import Path
 import os
-
 
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
@@ -43,21 +44,23 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Spin", {spin})
     print("Charge",{charge})
     # PySCF
-    mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
+    # ECP for Cu3
+    # ecp="lanl2dz"
+    mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin) # ecp = ecp for CU3
     mol.build()
 
     # GHF
     tole = 1e-10
     tolg = 1e-8
 
-    print("GHF")
+    print("GHF in PySCF:")
     print("Convergence tolerance energy:", tole)
     print("Convergence tolerance gradient:", tolg)
 
     mf = scf.GHF(mol)
     mf.conv_tol = tole        # Energy convergence (Hartree)
     mf.conv_tol_grad = tolg   # Optional: gradient convergence
-    mf.max_cycle = 1000
+    mf.max_cycle = 100000
 
     mf.kernel()
 
@@ -72,47 +75,83 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     orb_opt = True
     optimizer = "l-bfgs-b"
     rd_seed = 42
-    bounds = [-0.5,0.5]
-    tolerance = 1e-10
+    bounds = [-0.05,0.05]
+    tolerance = 1e-8
     nl = 1
-    max_iter = 10000
-
-    
-    directory = os.getcwd()
-    name = "data_H5_6-31g"
-
-    j,k = 0,0
-    while j < 30:
-        if j < 10:
-            if os.path.exists("%s/%s_0%s.npz" % (directory, name, j)):
-                k = j + 1
-        else:
-            if os.path.exists("%s/%s_%s.npz" % (directory, name, j)):
-                k = j +1
-        j += 1
-
-    if k < 10:
-        k = f"0{k}"
-
-    data_file = Path("%s_%s.npz" % (name,k))
+    max_iter = 100000
 
     print("WF optimization:")
     print("Method:", method)
     print("Is spin conserving:", spin_consv)
-    print("Include Active kappa:", active_k)
+    print("Include active kappa:", active_k)
     print("Orbital optimization:", orb_opt)
     print("Optimizer:",optimizer)
     print("Random seed:", rd_seed)
     print("Bounds for initiation of thetas:", bounds)
     print("Convergence tolerance:", tolerance)
     print("Number of layers:", nl)
-    print("Max iterations:", max_iter)
-    print("Name of data file:", data_file)
+    print("Max iterations:",max_iter)
 
+
+    # Small step
+    eps = 0.07  # controls "step size"
+    X_anti = np.random.randn(c_mo.shape[0],c_mo.shape[0]) + 1j*np.random.randn(c_mo.shape[0],c_mo.shape[0])
+    A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian
+
+    step = expm(A_mat)
+
+    c_u = c_mo @ step
+
+    # GHF
+    print("\n\nStarting GHF reoptimization:")
+
+    GHF = GeneralizedWaveFunctionUPS(
+        active_space,
+        c_u,
+        mol,
+        method,
+        ansatz_options = {"n_layers": 0, "is_spin_conserving" : spin_consv},
+        include_active_kappa=active_k,
+    )
+
+    GHF.run_wf_optimization_1step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter = max_iter)
+
+    print("\nGHF electronic energy after reoptimization:", GHF.energy_elec)
+    GHF.spin_analysis()
+
+    # Saving the data:
+    directory = os.getcwd()
+    name = "data_N3"
+
+    j,k = 0,0
+    while j < 100:
+        if j < 10:
+            if os.path.exists("%s/%s_GHF_0%s.npz" % (directory, name, j)):
+                k = j + 1
+        else:
+            if os.path.exists("%s/%s_GHF_%s.npz" % (directory, name, j)):
+                k = j +1
+        j += 1
+
+    if k < 10:
+        k = f"0{k}"
+
+    data_file_GHF = Path("%s_GHF_%s.npz" % (name, k))
+
+    print("\nName of the GHF data file:", data_file_GHF)
+
+    np.savez(
+        data_file_GHF,
+        c_mo=GHF.c_mo
+        )
+
+
+    # UCCSD
+    print("\nStarting UCCSD WF optimization:")
 
     WF = GeneralizedWaveFunctionUPS(
         active_space,
-        c_mo,
+        GHF.c_mo,
         mol,
         method,
         ansatz_options = {"n_layers": nl, "is_spin_conserving" : spin_consv},
@@ -125,12 +164,32 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     WF.set_thetas(new_thetas_real, new_thetas_imag)
 
-    WF.run_wf_optimization_2step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter=max_iter)
+    WF.run_wf_optimization_1step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter = max_iter)
 
-    print("Final electronic energy:", WF.energy_elec)
+    print("\nFinal electronic GHF-UCCSD energy:", WF.energy_elec)
+    WF.spin_analysis()
+
+
+    # Saving the data:
+    j,k = 0,0
+    while j < 100:
+        if j < 10:
+            if os.path.exists("%s/%s_UCCSD_0%s.npz" % (directory, name, j)):
+                k = j + 1
+        else:
+            if os.path.exists("%s/%s_UCCSD_%s.npz" % (directory, name, j)):
+                k = j +1
+        j += 1
+
+    if k < 10:
+        k = f"0{k}"
+
+    data_file_UCCSD = Path("%s_UCCSD_%s.npz" % (name, k))
+
+    print("\nName of the UCCSD data file:", data_file_UCCSD)
 
     np.savez(
-        data_file,
+        data_file_UCCSD,
         c_mo=WF.c_mo,
         thetas_real=WF.thetas_real,
         thetas_imag=WF.thetas_imag
@@ -175,7 +234,7 @@ def h7():
                     H  -1.038362  -0.500000   0.000000
                     H  -0.256328  -1.123490   0.000000
                     H   0.718499  -0.900969   0.000000  """
-    basis = "def-2-svp"
+    basis = "6-31g"
     active_space = ((4, 3), 14)
     charge = 0
     spin = 1
@@ -200,7 +259,7 @@ def Cu3():
     geometry = """Cu   0.000000   0.000000   0.000000;
                   Cu   0.000000   0.000000   2.260000;
                   Cu   0.000000   1.883000   1.250000"""
-    basis = "def-2-svp"
+    basis = "lanl2dz"
     active_space = ((2, 1), 6)
     charge = 0
     spin = 1
@@ -208,4 +267,22 @@ def Cu3():
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
 
-h5()
+def h8():
+    geometry =   """H   0.590434   0.590434   0.590434
+                    H   0.590434  -0.590434  -0.590434
+                    H  -0.590434   0.590434  -0.590434
+                    H  -0.590434  -0.590434   0.590434
+                    H  -0.984056  -0.984056  -0.984056
+                    H  -0.984056   0.984056   0.984056
+                    H   0.984056  -0.984056   0.984056
+                    H   0.984056   0.984056  -0.984056"""
+    basis = "6-31g"
+    active_space = ((3, 3), 16) # maks 8-9 i 20 siger Pernille, gtUPS og tiled-M0 for 
+    charge = 2
+    spin = 0
+
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+
+N3()
