@@ -687,7 +687,7 @@ class GeneralizedWaveFunctionCircuit:
             thetas = self.thetas_real + self.thetas_imag
             res = optimizer.minimize(
                 thetas,
-                extra_options={"R": self.QI.grad_param_R, "param_names": self.QI.param_names},
+                extra_options={"R": self.QI.grad_param_R_r, "param_names": self.QI.param_names},
             )
             thetas_r = []
             thetas_i = []

@@ -7,12 +7,14 @@ import pyscf
 
 import numpy as np
 import scipy
+from scipy.optimize import root_scalar
 
 from slowquant.SlowQuant import SlowQuant
 from slowquant.molecularintegrals.integralfunctions import (
     generalized_one_electron_transform,
     generalized_two_electron_transform,
     DHF_one_electron_transform,
+    generalized_1e_transform_spin_separated,
 )
 from slowquant.unitary_coupled_cluster.generalized_integral_manager import IntegralManager
 
@@ -21,6 +23,13 @@ from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_electronic_energy_generalized,
     get_orbital_gradient_expvalue_real_imag,
     get_orbital_gradient_generalized_real_imag,
+    get_S2,
+    get_Sz,
+    get_nr_elec,
+    get_S2_old,
+    get_mu0,
+    get_e0,
+
 )
 from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import (
     generalized_construct_ups_state_test_erik,
@@ -553,8 +562,8 @@ class GeneralizedWaveFunctionUPS:
                             self._rdm2[R_idx, S_idx, P_idx, Q_idx] = val  # type: ignore
                             self._rdm2[S_idx, R_idx, Q_idx, P_idx] = val.conjugate()  # type: ignore
 
-                            # self._rdm2[R_idx, Q_idx, P_idx, S_idx] = -val  # type: ignore
-                            # self._rdm2[P_idx, S_idx, R_idx, Q_idx] = -val  # type: ignore
+                            #self._rdm2[R_idx, Q_idx, P_idx, S_idx] = -val  # type: ignore
+                            #self._rdm2[P_idx, S_idx, R_idx, Q_idx] = -val  # type: ignore
 
         return self._rdm2
 
@@ -1282,3 +1291,111 @@ class GeneralizedWaveFunctionUPS:
         return get_orbital_gradient_expvalue_real_imag(
             self.ci_coeffs, self.ci_info, self.h_mo, self.g_mo, self.num_spin_orbs, self.kappa_spin_idx
         )
+    
+    def calc_Sz(self, S_int):
+        S_int_MO = generalized_1e_transform_spin_separated(self.c_mo, S_int)
+        return get_Sz(self.rdm1, self.num_inactive_spin_orbs, self.num_active_spin_orbs, S_int_MO)
+    
+    def calc_S2_old(self, S_int):
+        S_int_MO = generalized_1e_transform_spin_separated(self.c_mo, S_int)
+        return get_S2_old(self.rdm1, self.rdm2, self.num_inactive_spin_orbs, self.num_active_spin_orbs, self.num_virtual_spin_orbs, S_int_MO) 
+    
+    def calc_S2(self, S_int):
+        S_int_MO = generalized_1e_transform_spin_separated(self.c_mo, S_int)
+        return get_S2(self.rdm1, self.rdm2, self.num_inactive_spin_orbs, self.num_active_spin_orbs, S_int_MO) 
+    
+    def calc_multiplicity(self, S_int):
+        S2 = self.calc_S2(S_int)
+
+        # Protect against tiny negative values due to numerical noise
+        if S2 < 0 and abs(S2) < 1e-10:
+            S2 = 0.0
+        elif S2 < 0:
+            raise ValueError(f"Invalid <S^2> = {S2}")
+
+        S = (-1 + np.sqrt(1 + 4*S2)) / 2
+
+        return 2*S + 1
+    
+    def calc_S(self, S_int):
+        S2 = self.calc_S2(S_int)
+
+        # Protect against tiny negative values due to numerical noise
+        if S2 < 0 and abs(S2) < 1e-10:
+            S2 = 0.0
+        elif S2 < 0:
+            raise ValueError(f"Invalid <S^2> = {S2}")
+
+        S = (-1 + np.sqrt(1 + 4*S2)) / 2
+
+        return S
+    
+    def calc_nr_elec(self):
+        N = get_nr_elec(self.num_inactive_spin_orbs, self.num_active_spin_orbs, self.rdm1)
+        if np.abs(N.imag) > 1e-10:
+            print("Warning! Complex Nr of electrons!!")
+            return N
+        else:
+            return N.real
+
+
+    def calc_mu0(self, S_int):
+        S_int_MO = generalized_1e_transform_spin_separated(self.c_mo, S_int)
+        return get_mu0(self.rdm1, self.rdm2, self.num_inactive_spin_orbs, self.num_active_spin_orbs, S_int_MO) 
+    
+    def calc_e0(self, S_int):
+        S_int_MO = generalized_1e_transform_spin_separated(self.c_mo, S_int)
+        return get_e0(self.rdm1, self.rdm2, self.num_inactive_spin_orbs, self.num_active_spin_orbs, S_int_MO) 
+
+
+    def spin_analysis(self):
+        S_int = self.int_gen.overlap
+        S2 = self.calc_S2(S_int)
+        # Protect against tiny negative values due to numerical noise
+        if S2 < 0 and abs(S2) < 1e-10:
+            S2 = 0.0
+        elif S2 < 0:
+            raise ValueError(f"Invalid <S^2> = {S2}")
+        S = (-1 + np.sqrt(1 + 4*S2)) / 2
+
+        Sz = self.calc_Sz(S_int)
+        mu0 = self.calc_mu0(S_int)
+        e0 = self.calc_e0(S_int)
+
+        print()
+        print("Full characterization of spin for a generalized wavefunction:")
+        print("─" * 60)
+        print("WARNING: A generalized WF breaks S\u00B2 and Sz symmetry!")
+        print("The wavefunction should therefore be characterized by \u03F5\u2080 and \u03bc\u2080")
+        print()
+
+        # --- Results table ---
+        labels = [
+            ("Expectation value of S\u00B2", S2),
+            ("Multiplicity (2S + 1)",       2*S + 1),
+            ("Value of S",                  S),
+            ("Expectation value of Sz",     Sz),
+            ("\u03F5\u2080",                e0),
+            ("\u03bc\u2080",                mu0),
+        ]
+
+        label_width = max(len(lbl) for lbl, _ in labels)
+
+        print("┌" + "─"*(label_width+2) + "┬" + "─"*14 + "┐")
+        for lbl, val in labels:
+            print(f"│ {lbl:<{label_width}} │ {np.round(val,5):>12} │")
+        print("└" + "─"*(label_width+2) + "┴" + "─"*14 + "┘")
+
+        print()
+        print("\u03F5\u2080 is the Euclidean norm of the vector (<Sx>, <Sy>, <Sz>)\u1d40,")
+        print("and it determines unpaired spin in the direction of maximum unpaired spin.")
+        print("If \u03F5\u2080 is an allowed value of Sz for the system and \u03bc\u2080 = 0, the solution is collinear.")
+        print("If \u03bc\u2080 \u2260 0, the solution is non-collinear!")
+        print()
+
+
+
+
+
+
+        

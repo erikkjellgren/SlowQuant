@@ -217,7 +217,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     mf.scf()
     mf.kernel()
-    c=np.array(mf.mo_coeff,dtype=complex)
+    c_mo=np.array(mf.mo_coeff,dtype=complex)
 
 
 
@@ -232,13 +232,13 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # # Slowquant
 
     # small random anti-Hermitian
-    eps = 0.005  # controls "step size"
-    X_anti = np.random.randn(c.shape[0],c.shape[0]) + 1j*np.random.randn(c.shape[0],c.shape[0])
+    eps = 0.7  # controls "step size"
+    X_anti = np.random.randn(c_mo.shape[0],c_mo.shape[0]) + 1j*np.random.randn(c_mo.shape[0],c_mo.shape[0])
     A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian
 
     U_step = expm(A_mat)
 
-    c_u = c @ U_step
+    c_u = c_mo @ U_step
 
 
     #print(np.round(c.real,3))
@@ -247,12 +247,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF = GeneralizedWaveFunctionUPS(
         #mol.nelectron,
         active_space,
-        c,
+        c_u,
         # h_core,
         # g_eri,
         mol,
         "fuccsd",
-        {"n_layers": 1, "is_spin_conserving" : False},
+        {"n_layers": 0, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
@@ -260,7 +260,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print(mf.energy_elec()[0])
 
 
-    # H = generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo, WF.num_spin_orbs)
+    '''# H = generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo, WF.num_spin_orbs)
 
     # threshold = 1e-15
 
@@ -291,7 +291,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #             WF.rdm2,
     #         )
     
-    # print(E_tester)
+    # print(E_tester)'''
 
 
     print("Nr. of kappas:", len(WF.kappa_spin_idx))
@@ -301,7 +301,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Nr. of virtual spin orbitals:", WF.num_virtual_spin_orbs)
 
 
-    #print("Nr. of occ active spind idx shifted orbitals:", WF.active_occ_spin_idx_shifted)
+    '''#print("Nr. of occ active spind idx shifted orbitals:", WF.active_occ_spin_idx_shifted)
     #print("Nr. of unocc active spind idx shifted orbitals:", WF.active_unocc_spin_idx_shifted)
 
 
@@ -316,7 +316,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     #print("wf variable", WF._c_mo, "\n\n")
 
-    #print("wf function", WF.c_mo, "\n\n")
+    #print("wf function", WF.c_mo, "\n\n")'''
 
 
     '''H=generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo, WF.num_spin_orbs)
@@ -390,22 +390,22 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
                             print("imaginary part")
                             print(WF.kappa_spin_idx[i-len(WF.kappa_spin_idx)],WF.kappa_spin_idx[j-len(WF.kappa_spin_idx)])'''
 
-    np.random.seed(20)
+    '''np.random.seed(20)
 
     arr1 = np.random.uniform(-0.05, 0.05, len(WF.thetas_real)).tolist()
     arr2 = np.zeros_like(WF.thetas_imag)
 
-    WF.set_thetas(arr1, arr2)
+    WF.set_thetas(arr1, arr2)'''
 
-    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
-    #WF.do_adapt(["S","D"])
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
+    '''#WF.do_adapt(["S","D"])
 
     #print(WF.ups_layout.excitation_indices)
     #print(WF.c_mo)
 
     #print("efter optimering")
 
-    #print(WF.thetas)
+    #print(WF.thetas)'''
 
     ''' my_gradient_after = get_orbital_gradient_generalized_real_imag(WF.h_mo,
         WF.g_mo,
@@ -460,24 +460,25 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
     WF2 = GeneralizedWaveFunctionUPS(
-        mol.nelectron,
         active_space,
-        WF.c_mo,
-        h_core,
-        g_eri,
-        #mol,
+        c_mo,
+        mol,
         "fuccsd",
-        {"n_layers": 1, "is_spin_conserving" : False},
+        {"n_layers": 0, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
-    WF2.set_thetas(WF.thetas_real,WF.thetas_imag)
+    #WF2.set_thetas(WF.thetas_real,WF.thetas_imag)
 
-    LR = generalized_naive.LinearResponse(WF, excitations="SD")
+    LR = generalized_naive.LinearResponse(WF2, excitations="S")
     LR.calc_excitation_energies()
     print(np.array2string(LR.excitation_energies, precision=4, suppress_small=True))
 
-    # LR = generalized_naive.LinearResponse(WF2, excitations="SD")
+    LR = generalized_naive.LinearResponse(WF, excitations="S")
+    LR.calc_excitation_energies()
+    print(np.array2string(LR.excitation_energies, precision=4, suppress_small=True))
+
+    '''# LR = generalized_naive.LinearResponse(WF2, excitations="SD")
     # LR.calc_excitation_energies()
     # print(np.array2string(LR.excitation_energies, precision=4, suppress_small=True))
 
@@ -492,7 +493,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     #print(LR.excitation_energies)
     #print(np.round(LR.get_transition_dipole(dip_int).real,5))
-    #print(LR.get_oscillator_strengths(dip_int))
+    #print(LR.get_oscillator_strengths(dip_int))'''
 
 
 
@@ -503,7 +504,7 @@ def h2():
     #basis = "631-g"
     basis = "sto-3g"
     #basis = "sto-6g"
-    active_space = ((1, 1), 4)
+    active_space = ((1, 1), 2)
     #active_space = (2, 4)
     charge = 0
     spin = 0
@@ -622,7 +623,7 @@ def HBr():
     
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-h3()
+h2()
 
 
 # h2o()
