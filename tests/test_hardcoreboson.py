@@ -2,6 +2,7 @@ import slowquant.SlowQuant as sq
 from slowquant.unitary_coupled_cluster.hcb_ups_wavefunction import WaveFunctionHCBUPS
 from slowquant.unitary_coupled_cluster.operators import hamiltonian_0i_0a, hamiltonian_hcb_0i_0a
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
+import numpy as np
 
 
 def test_h2o_fullspace() -> None:
@@ -108,6 +109,7 @@ def test_h2o_44_ooUCCpD() -> None:
         ansatz_options={"pD": True},
         include_active_kappa=True,
     )
+    WFref.thetas = (np.ones(len(WFref.thetas))*0.1).tolist()
     WFref.run_wf_optimization_1step("BFGS", True)
 
     WF = WaveFunctionHCBUPS(
@@ -116,6 +118,7 @@ def test_h2o_44_ooUCCpD() -> None:
         SQobj,
         "fuccpd",
     )
+    WF.thetas = (np.ones(len(WF.thetas))*0.1).tolist()
     WF.run_wf_optimization_1step("BFGS", True)
 
     assert abs(WF.energy_elec - WFref.energy_elec) < 10**-8

@@ -11,12 +11,14 @@ import scipy
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
+    two_electron_integral_transform_split
 )
 from slowquant.SlowQuant import SlowQuant
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_hcb
 from slowquant.unitary_coupled_cluster.hcb_density_matrix import (
     get_electronic_energy_hcb,
     get_orbital_gradient_hcb,
+    get_unrestricted_orbital_gradient_hcb,
 )
 from slowquant.unitary_coupled_cluster.integral_manager import IntegralManager
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
@@ -88,7 +90,7 @@ class WaveFunctionHCBUPS:
             self.wf_type = "generalized"
         else:
             raise ValueError("Could not identify wavefunction type.")
-        print(f"Wavefunction to be {self.wf_type}")
+        print(f"Wavefunction identified to be {self.wf_type}")
         self._c_mo = mo_coeffs
         ref_det = "1" * (self.num_active_elec // 2) + "0" * (self.num_active_orbs - self.num_active_elec // 2)
         # Construct spatial idx
@@ -109,9 +111,9 @@ class WaveFunctionHCBUPS:
         self.active_unocc_idx_shifted = [x - self.num_inactive_orbs for x in self.active_unocc_idx]
         # Find non-redundant kappas
         kappa_idx = []
-        if self.wf_type == "restricted":
-            self._kappa = []
-            self._kappa_old = []
+        self._kappa = []
+        self._kappa_old = []
+        if self.wf_type in ("restricted", "unrestricted"):
             for p in range(0, self.num_orbs):
                 for q in range(p + 1, self.num_orbs):
                     if p in self.inactive_idx and q in self.inactive_idx:
@@ -121,25 +123,12 @@ class WaveFunctionHCBUPS:
                     # the rest is non-redundant
                     self._kappa.append(0.0)
                     self._kappa_old.append(0.0)
-                    kappa_idx.append((p, q))
-        elif self.wf_type == "unrestricted":
-            self._kappa = [[], []]
-            self._kappa_old = [[], []]
-            for p in range(0, self.num_orbs):
-                for q in range(p + 1, self.num_orbs):
-                    if p in self.inactive_idx and q in self.inactive_idx:
-                        continue
-                    if p in self.virtual_idx and q in self.virtual_idx:
-                        continue
-                    # the rest is non-redundant
-                    self._kappa[0].append(0.0)
-                    self._kappa_old[0].append(0.0)
-                    self._kappa[1].append(0.0)
-                    self._kappa_old[1].append(0.0)
+                    if self.wf_type == "unrestricted":
+                        # Need twice as many parameters
+                        self._kappa.append(0.0)
+                        self._kappa_old.append(0.0)
                     kappa_idx.append((p, q))
         elif self.wf_type == "generalized":
-            self._kappa = []
-            self._kappa_old = []
             for p in range(0, self.num_spin_orbs):
                 for q in range(p + 1, self.num_spin_orbs):
                     if p in self.inactive_spin_idx and q in self.inactive_spin_idx:
@@ -187,12 +176,12 @@ class WaveFunctionHCBUPS:
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
 
     @property
-    def kappa(self) -> list[float] | list[list[float]]:
+    def kappa(self) -> list[float]:
         """Get orbital rotation parameters."""
         return self._kappa.copy()
 
     @kappa.setter
-    def kappa(self, k: list[float] | list[list[float]]) -> None:
+    def kappa(self, k: list[float]) -> None:
         """Set orbital rotation parameters, and move current expansion point.
 
         Args:
@@ -253,16 +242,23 @@ class WaveFunctionHCBUPS:
             if len(self.kappa) != 0:
                 if np.max(np.abs(np.array(self.kappa) - np.array(self._kappa_old))) > 0.0:
                     for kappa_val, kappa_old, (p, q) in zip(self.kappa, self._kappa_old, self.kappa_idx):
-                        kappa_mat[p, q] = kappa_val - kappa_old  # type: ignore
-                        kappa_mat[q, p] = -(kappa_val - kappa_old)  # type: ignore
+                        kappa_mat[p, q] = kappa_val - kappa_old
+                        kappa_mat[q, p] = -(kappa_val - kappa_old)
             # Apply orbital rotation unitary to MO coefficients
             mo_coeffs = np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
         elif self.wf_type == "unrestricted":
             mo_coeffs = np.zeros((2, self.num_orbs, self.num_orbs), dtype=float)
             kappa_mat_a = np.zeros_like(self._c_mo[0])
-            kappa_mat_b = np.zeros_like(self._c_mo[0])
-            if len(self.kappa[0]) != 0:  # type: ignore
-                None
+            kappa_mat_b = np.zeros_like(self._c_mo[1])
+            if len(self.kappa) != 0:
+                shift = len(self.kappa_idx)
+                if np.max(np.abs(np.array(self.kappa) - np.array(self._kappa_old))) > 0.0:
+                    for kappa_val, kappa_old, (p, q) in zip(self.kappa[:shift], self._kappa_old[:shift], self.kappa_idx):
+                        kappa_mat_a[p, q] = kappa_val - kappa_old
+                        kappa_mat_a[q, p] = -(kappa_val - kappa_old)
+                    for kappa_val, kappa_old, (p, q) in zip(self.kappa[shift:], self._kappa_old[shift:], self.kappa_idx):
+                        kappa_mat_b[p, q] = kappa_val - kappa_old
+                        kappa_mat_b[q, p] = -(kappa_val - kappa_old)
             mo_coeffs[0] = np.matmul(self._c_mo[0], scipy.linalg.expm(-kappa_mat_a))
             mo_coeffs[1] = np.matmul(self._c_mo[1], scipy.linalg.expm(-kappa_mat_b))
         else:
@@ -334,6 +330,8 @@ class WaveFunctionHCBUPS:
             elif self.wf_type == "unrestricted":
                 # Sorted as [h_aa, h_bb]
                 self._h_mo = np.zeros((2, self.num_orbs, self.num_orbs), dtype=float)
+                self._h_mo[0] = one_electron_integral_transform(self.c_mo[0], self.int_gen.h_ao)
+                self._h_mo[1] = one_electron_integral_transform(self.c_mo[1], self.int_gen.h_ao)
             else:
                 raise ValueError(f"Got unknown wavefunction type, {self.wf_type}")
         return self._h_mo
@@ -347,7 +345,10 @@ class WaveFunctionHCBUPS:
                 )
             elif self.wf_type == "unrestricted":
                 # Sorted as [g_aaaa, g_bbbb, g_aabb]
-                self._g_mo = np.zeros((3, self.num_orbs, self.num_orbs), dtype=float)
+                self._g_mo = np.zeros((3, self.num_orbs, self.num_orbs, self.num_orbs, self.num_orbs), dtype=float)
+                self._g_mo[0] = two_electron_integral_transform(self.c_mo[0], self.int_gen.electron_electron_repulsion)
+                self._g_mo[1] = two_electron_integral_transform(self.c_mo[1], self.int_gen.electron_electron_repulsion)
+                self._g_mo[2] = two_electron_integral_transform_split(self.c_mo[0], self.c_mo[1], self.int_gen.electron_electron_repulsion)
             else:
                 raise ValueError(f"Got unknown wavefunction type, {self.wf_type}")
         return self._g_mo
@@ -509,7 +510,7 @@ class WaveFunctionHCBUPS:
                 )
             self.thetas = res.x.tolist()
 
-            if orbital_optimization and len(self.kappa) != 0:
+            if orbital_optimization and len(self.kappa) > 0:
                 if not is_silent_subiterations:
                     print("--------Orbital optimization")
                     print(
@@ -535,9 +536,9 @@ class WaveFunctionHCBUPS:
                     is_silent=is_silent_subiterations,
                     energy_eval_callback=lambda: self.num_energy_evals,
                 )
-                self._old_opt_parameters = np.zeros(len(self.kappa_idx)) + 10**20
                 self._E_opt_old = 0.0
-                res = optimizer.minimize([0.0] * len(self.kappa_idx))
+                self._old_opt_parameters = np.zeros(len(self.kappa)) + 10**20
+                res = optimizer.minimize([0.0] * len(self.kappa))
                 for i in range(len(self.kappa)):
                     self._kappa[i] = 0.0
                     self._kappa_old[i] = 0.0
@@ -657,7 +658,7 @@ class WaveFunctionHCBUPS:
             return self._E_opt_old
         num_kappa = 0
         if kappa_optimization:
-            num_kappa = len(self.kappa_idx)
+            num_kappa = len(self.kappa)
             self.kappa = parameters[:num_kappa]
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
@@ -698,7 +699,7 @@ class WaveFunctionHCBUPS:
         gradient = np.zeros(len(parameters))
         num_kappa = 0
         if kappa_optimization:
-            num_kappa = len(self.kappa_idx)
+            num_kappa = len(self.kappa)
             self.kappa = parameters[:num_kappa]
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
