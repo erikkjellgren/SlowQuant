@@ -68,6 +68,7 @@ class WaveFunctionHCBUPS:
                 "Number of inactive + number of active orbitals is larger than total number of orbitals."
             )
         self.num_orbs = self.num_inactive_orbs + self.num_active_orbs + self.num_virtual_orbs
+        self.num_spin_orbs = 2 * self.num_orbs
         self.num_active_elec = active_space[0]
         self._rdm1 = None
         self._rdm2 = None
@@ -79,7 +80,15 @@ class WaveFunctionHCBUPS:
         self.ansatz_options = ansatz_options
         self.num_energy_evals = 0
         # Reference wave function
-        self.wf_type = "restricted"
+        if len(np.shape(mo_coeffs)) == 3:
+            self.wf_type = "unrestricted"
+        elif len(mo_coeffs) == self.num_orbs:
+            self.wf_type = "restricted"
+        elif len(mo_coeffs) == self.num_spin_orbs:
+            self.wf_type = "generalized"
+        else:
+            raise ValueError("Could not identify wavefunction type.")
+        print(f"Wavefunction to be {self.wf_type}")
         self._c_mo = mo_coeffs
         ref_det = "1" * (self.num_active_elec // 2) + "0" * (self.num_active_orbs - self.num_active_elec // 2)
         # Construct spatial idx
@@ -99,21 +108,50 @@ class WaveFunctionHCBUPS:
         self.active_occ_idx_shifted = [x - self.num_inactive_orbs for x in self.active_occ_idx]
         self.active_unocc_idx_shifted = [x - self.num_inactive_orbs for x in self.active_unocc_idx]
         # Find non-redundant kappas
-        self._kappa = []
         kappa_idx = []
-        self._kappa_old = []
-        # kappa can be optimized in spatial basis
-        # Loop over all q>p orb combinations.
-        for p in range(0, self.num_orbs):
-            for q in range(p + 1, self.num_orbs):
-                if p in self.inactive_idx and q in self.inactive_idx:
-                    continue
-                if p in self.virtual_idx and q in self.virtual_idx:
-                    continue
-                # the rest is non-redundant
-                self._kappa.append(0.0)
-                self._kappa_old.append(0.0)
-                kappa_idx.append((p, q))
+        if self.wf_type == "restricted":
+            self._kappa = []
+            self._kappa_old = []
+            for p in range(0, self.num_orbs):
+                for q in range(p + 1, self.num_orbs):
+                    if p in self.inactive_idx and q in self.inactive_idx:
+                        continue
+                    if p in self.virtual_idx and q in self.virtual_idx:
+                        continue
+                    # the rest is non-redundant
+                    self._kappa.append(0.0)
+                    self._kappa_old.append(0.0)
+                    kappa_idx.append((p, q))
+        elif self.wf_type == "unrestricted":
+            self._kappa = [[], []]
+            self._kappa_old = [[], []]
+            for p in range(0, self.num_orbs):
+                for q in range(p + 1, self.num_orbs):
+                    if p in self.inactive_idx and q in self.inactive_idx:
+                        continue
+                    if p in self.virtual_idx and q in self.virtual_idx:
+                        continue
+                    # the rest is non-redundant
+                    self._kappa[0].append(0.0)
+                    self._kappa_old[0].append(0.0)
+                    self._kappa[1].append(0.0)
+                    self._kappa_old[1].append(0.0)
+                    kappa_idx.append((p, q))
+        elif self.wf_type == "generalized":
+            self._kappa = []
+            self._kappa_old = []
+            for p in range(0, self.num_spin_orbs):
+                for q in range(p + 1, self.num_spin_orbs):
+                    if p in self.inactive_spin_idx and q in self.inactive_spin_idx:
+                        continue
+                    if p in self.virtual_spin_idx and q in self.virtual_spin_idx:
+                        continue
+                    # the rest is non-redundant
+                    self._kappa.append(0.0)
+                    self._kappa_old.append(0.0)
+                    kappa_idx.append((p, q))
+        else:
+            raise ValueError(f"Got unknown wavefunction type, {self.wf_type}")
         self.kappa_idx = np.array(kappa_idx, dtype=int)
         # Construct determinant basis
         self.ci_info = get_indexing_hcb(
@@ -149,12 +187,12 @@ class WaveFunctionHCBUPS:
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
 
     @property
-    def kappa(self) -> list[float]:
+    def kappa(self) -> list[float] | list[list[float]]:
         """Get orbital rotation parameters."""
         return self._kappa.copy()
 
     @kappa.setter
-    def kappa(self, k: list[float]) -> None:
+    def kappa(self, k: list[float] | list[list[float]]) -> None:
         """Set orbital rotation parameters, and move current expansion point.
 
         Args:
@@ -206,65 +244,112 @@ class WaveFunctionHCBUPS:
         Returns:
             Molecular orbital coefficients.
         """
-        # Construct anti-hermitian kappa matrix
-        kappa_mat = np.zeros_like(self._c_mo)
-        if len(self.kappa) != 0:
-            # The MO transformation is calculated as a difference between current kappa and kappa old.
-            # This is to make the moving of the expansion point to work with SciPy optimization algorithms.
-            # Resetting kappa to zero would mess with any algorithm that has any memory f.x. BFGS.
-            if np.max(np.abs(np.array(self.kappa) - np.array(self._kappa_old))) > 0.0:
-                for kappa_val, kappa_old, (p, q) in zip(self.kappa, self._kappa_old, self.kappa_idx):
-                    kappa_mat[p, q] = kappa_val - kappa_old
-                    kappa_mat[q, p] = -(kappa_val - kappa_old)
-        # Apply orbital rotation unitary to MO coefficients
-        return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
+        # The MO transformation is calculated as a difference between current kappa and kappa old.
+        # This is to make the moving of the expansion point to work with SciPy optimization algorithms.
+        # Resetting kappa to zero would mess with any algorithm that has any memory f.x. BFGS.
+        if self.wf_type == "restricted":
+            # Construct anti-hermitian kappa matrix
+            kappa_mat = np.zeros_like(self._c_mo)
+            if len(self.kappa) != 0:
+                if np.max(np.abs(np.array(self.kappa) - np.array(self._kappa_old))) > 0.0:
+                    for kappa_val, kappa_old, (p, q) in zip(self.kappa, self._kappa_old, self.kappa_idx):
+                        kappa_mat[p, q] = kappa_val - kappa_old  # type: ignore
+                        kappa_mat[q, p] = -(kappa_val - kappa_old)  # type: ignore
+            # Apply orbital rotation unitary to MO coefficients
+            mo_coeffs = np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
+        elif self.wf_type == "unrestricted":
+            mo_coeffs = np.zeros((2, self.num_orbs, self.num_orbs), dtype=float)
+            kappa_mat_a = np.zeros_like(self._c_mo[0])
+            kappa_mat_b = np.zeros_like(self._c_mo[0])
+            if len(self.kappa[0]) != 0:  # type: ignore
+                None
+            mo_coeffs[0] = np.matmul(self._c_mo[0], scipy.linalg.expm(-kappa_mat_a))
+            mo_coeffs[1] = np.matmul(self._c_mo[1], scipy.linalg.expm(-kappa_mat_b))
+        else:
+            raise ValueError(f"Got unknown wavefunction type, {self.wf_type}")
+        return mo_coeffs
 
     @property
     def hr1(self) -> np.ndarray:
         if self._hr1 is None:
             self._hr1 = np.zeros_like(self.int_gen.h_ao)
-            for p in range(self.num_orbs):
-                for q in range(self.num_orbs):
-                    if self.wf_type == "restricted":
+            if self.wf_type == "restricted":
+                for p in range(self.num_orbs):
+                    for q in range(self.num_orbs):
                         if p == q:
                             self._hr1[p, q] = 2 * self.h_mo[p, p] + self.g_mo[p, p, p, p]
                         else:
                             self._hr1[p, q] = self.g_mo[p, q, p, q]
-                    elif self.wf_type == "unrestricted":
-                        None
-                    elif self.wf_type == "generalized":
-                        None
-                    else:
-                        raise ValueError(f"Got unknown wf_type, {self.wf_type}")
+            elif self.wf_type == "unrestricted":
+                for p in range(self.num_orbs):
+                    for q in range(self.num_orbs):
+                        if p == q:
+                            self._hr1[p, q] = (
+                                self.h_mo[0, p, p] + self.h_mo[1, p, p] + self.g_mo[2, p, p, p, p]
+                            )
+                        else:
+                            self._hr1[p, q] = self.g_mo[2, p, q, p, q]
+            elif self.wf_type == "generalized":
+                None
+            else:
+                raise ValueError(f"Got unknown wf_type, {self.wf_type}")
         return self._hr1
 
     @property
     def hr2(self) -> np.ndarray:
         if self._hr2 is None:
             self._hr2 = np.zeros_like(self.int_gen.h_ao)
-            for p in range(self.num_orbs):
-                for q in range(self.num_orbs):
-                    if self.wf_type == "restricted":
+            if self.wf_type == "restricted":
+                for p in range(self.num_orbs):
+                    for q in range(self.num_orbs):
                         if p != q:
                             self._hr2[p, q] = 2 * self.g_mo[p, p, q, q] - self.g_mo[p, q, p, q]
-                    elif self.wf_type == "unrestricted":
-                        None
-                    elif self.wf_type == "generalized":
-                        None
-                    else:
-                        raise ValueError(f"Got unknown wf_type, {self.wf_type}")
+            elif self.wf_type == "unrestricted":
+                for p in range(self.num_orbs):
+                    for q in range(self.num_orbs):
+                        if p != q:
+                            self._hr2[p, q] = (
+                                1
+                                / 2
+                                * (
+                                    self.g_mo[0, p, p, q, q]
+                                    + self.g_mo[2, p, p, q, q]
+                                    + self.g_mo[2, q, q, p, p]
+                                    + self.g_mo[1, p, p, q, q]
+                                    - self.g_mo[0, p, q, p, q]
+                                    - self.g_mo[1, p, q, p, q]
+                                )
+                            )
+            elif self.wf_type == "generalized":
+                None
+            else:
+                raise ValueError(f"Got unknown wf_type, {self.wf_type}")
         return self._hr2
 
     @property
     def h_mo(self) -> np.ndarray:
         if self._h_mo is None:
-            self._h_mo = one_electron_integral_transform(self.c_mo, self.int_gen.h_ao)
+            if self.wf_type == "restricted":
+                self._h_mo = one_electron_integral_transform(self.c_mo, self.int_gen.h_ao)
+            elif self.wf_type == "unrestricted":
+                # Sorted as [h_aa, h_bb]
+                self._h_mo = np.zeros((2, self.num_orbs, self.num_orbs), dtype=float)
+            else:
+                raise ValueError(f"Got unknown wavefunction type, {self.wf_type}")
         return self._h_mo
 
     @property
     def g_mo(self) -> np.ndarray:
         if self._g_mo is None:
-            self._g_mo = two_electron_integral_transform(self.c_mo, self.int_gen.electron_electron_repulsion)
+            if self.wf_type == "restricted":
+                self._g_mo = two_electron_integral_transform(
+                    self.c_mo, self.int_gen.electron_electron_repulsion
+                )
+            elif self.wf_type == "unrestricted":
+                # Sorted as [g_aaaa, g_bbbb, g_aabb]
+                self._g_mo = np.zeros((3, self.num_orbs, self.num_orbs), dtype=float)
+            else:
+                raise ValueError(f"Got unknown wavefunction type, {self.wf_type}")
         return self._g_mo
 
     @property
@@ -580,7 +665,7 @@ class WaveFunctionHCBUPS:
             # RDM is more expensive than evaluation of the Hamiltonian.
             # Thus only construct these if orbital-optimization is turned on,
             # since the RDMs will be reused in the oo gradient calculation.
-            # The information about restricted, unrestricted and genralized is encoded in hr1 and hr2,
+            # The information about restricted, unrestricted and generalized is encoded in hr1 and hr2,
             # hence only one type of energy call is needed.
             E = get_electronic_energy_hcb(
                 self.hr1, self.hr2, self.num_inactive_orbs, self.num_active_orbs, self.rdm1, self.rdm2
@@ -629,7 +714,18 @@ class WaveFunctionHCBUPS:
                     self.rdm2,
                 )
             elif self.wf_type == "unrestricted":
-                None
+                gradient[:num_kappa] = get_unrestricted_orbital_gradient_hcb(
+                    self.h_mo[0],
+                    self.h_mo[1],
+                    self.g_mo[0],
+                    self.g_mo[1],
+                    self.g_mo[2],
+                    self.kappa_idx,
+                    self.num_inactive_orbs,
+                    self.num_active_orbs,
+                    self.rdm1,
+                    self.rdm2,
+                )
             elif self.wf_type == "generalized":
                 None
             else:
