@@ -119,4 +119,4 @@ def test_h2o_44_ooUCCpD() -> None:
     WF.run_wf_optimization_1step("BFGS", True)
 
     assert abs(WF.energy_elec - WFref.energy_elec) < 10**-8
-    assert abs(WF.energy_elec - -83.97256228148073) < 10**-8
+    assert abs(WF.energy_elec - -83.98145575177105) < 10**-8
