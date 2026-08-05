@@ -136,6 +136,9 @@ class LinearResponseBaseClass:
 
         self.hessian = E2
         self.metric = S
+        
+        print('E2 cond',np.linalg.cond(E2))
+        print('S cond',np.linalg.cond(S))
 
         eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)
         sorting = np.argsort(eigval)

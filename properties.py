@@ -14,7 +14,7 @@ from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.linear_response import generalized_naive, naive
 from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import generalized_expectation_value, generalized_propagate_state
-from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a, generalized_hamiltonian_1i_1a, generalized_one_elec_op_0i_0a, test_generalized_one_elec_op_0i_0a
+from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a, generalized_hamiltonian_1i_1a, generalized_one_elec_op_0i_0a
 from slowquant.unitary_coupled_cluster.operators import a_op_spin
 from slowquant.molecularintegrals.integralfunctions import generalized_one_electron_transform
 
@@ -69,7 +69,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # WF.set_thetas(ny_theta_real, ny_theta_imag)
 
-    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=False, tol=1e-10, maxiter = 2000)
+    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
 
     print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
     # print(np.diag(WF.rdm1))
@@ -356,5 +356,5 @@ def h2():
     # )
 
 # h2()
-HCl()
-# HF()
+# HCl()
+HF()

@@ -290,10 +290,16 @@ class quantumLR(quantumLRBaseClass):
         E2[size:, :size] = self.B.conjugate() #AE added conjugtate 
         E2[size:, size:] = self.A.conjugate() #AE added conjugtate 
 
-        print('Circuit', self.A)
+        #test anna
+        self.A = 1/2*(self.A+self.A.conj().T)
+        self.Sigma = 1/2*(self.Sigma+self.Sigma.conj().T)
 
-        print(f"Hermiticity check of the Hessian: max|E2 - E2†| = "
-            f"{np.max(np.abs(E2 - E2.conj().T)):.2e}")  
+
+        
+        # print('Circuit', self.A)
+
+        # print(f"Hermiticity check of the Hessian: max|E2 - E2†| = "
+        #     f"{np.max(np.abs(E2 - E2.conj().T)):.2e}")  
 
         print(f"Hermiticity check of A: max|A - A†| = "
             f"{np.max(np.abs(self.A - self.A.conj().T)):.2e}")  
@@ -341,6 +347,8 @@ class quantumLR(quantumLRBaseClass):
         Returns:
             Qubit map of operators.
         """
+
+        print('Renato is spiderman')
         idx_shift = self.num_q
         print("Gs", self.num_G)
         print("qs", self.num_q)
@@ -494,6 +502,8 @@ class quantumLR(quantumLRBaseClass):
         Returns:
             Array of standard deviations for A, B and Sigma
         """
+
+        print('Renarto is batsman')
         idx_shift = self.num_q
         print("Gs", self.num_G)
         print("qs", self.num_q)
