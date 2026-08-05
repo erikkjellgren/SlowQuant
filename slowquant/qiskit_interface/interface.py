@@ -54,7 +54,7 @@ class QuantumInterface:
         ISA: bool = False,
         pass_manager_options: dict[str, Any] | None = None,
         ansatz_options: dict[str, Any] | None = None,
-        shots: None | int = None,
+        shots: int | None = None,
         max_shots_per_run: int = 100000,
         do_M_mitigation: bool = False,
         do_M_ansatz0: bool = False,
@@ -166,26 +166,36 @@ class QuantumInterface:
             self.state_circuit: QuantumCircuit = QuantumCircuit(
                 self.ansatz.num_qubits
             )  # empty state as custom circuit is passed
-            self.circuit = self.ansatz
-        elif isinstance(self.ansatz, str):
-            if (
-                self.ansatz.lower() == "tups"
-                and "do_pp" in self.ansatz_options.keys()
-                and self.ansatz_options["do_pp"]
+        elif "do_pp" in self.ansatz_options.keys() and self.ansatz_options["do_pp"]:
+            # HF in pp-tUPS ordering
+            if not isinstance(self.mapper, JordanWignerMapper):
+                raise ValueError(f"pp-tUPS only implemented for JW mapper, got: {type(self.mapper)}")
+            # Obtain pp determinant
+            pp_det = ""
+            spin_orb = 0
+            elec_count = self.num_elec[0] + self.num_elec[1]
+            while spin_orb < self.num_spin_orbs:
+                if (
+                    elec_count >= 2
+                    and (self.num_spin_orbs - spin_orb) >= 4
+                    and elec_count <= (self.num_spin_orbs - spin_orb - 2)
+                ):
+                    pp_det += "1100"
+                    elec_count -= 2
+                    spin_orb += 4
+                elif elec_count == 0:
+                    pp_det += "0"
+                    spin_orb += 1
+                elif elec_count != 0:
+                    pp_det += "1"
+                    spin_orb += 1
+                    elec_count -= 1
+            print("State preparation: perfect-pairing determinant found as:", pp_det)
+            if len(pp_det) != self.num_spin_orbs or pp_det.count("1") != (
+                self.num_elec[0] + self.num_elec[1]
             ):
-                # HF in pp-tUPS ordering
-                if not isinstance(self.mapper, JordanWignerMapper):
-                    raise ValueError(f"pp-tUPS only implemented for JW mapper, got: {type(self.mapper)}")
-                if np.sum(num_elec) != num_orbs:
-                    raise ValueError(
-                        f"pp-tUPS only implemented for number of electrons and number of orbitals being the same, got: ({np.sum(num_elec)}, {num_orbs}), (elec, orbs)"
-                    )
-                self.state_circuit = QuantumCircuit(2 * num_orbs)
-                for p in range(0, 2 * num_orbs):
-                    if p % 2 == 0:
-                        self.state_circuit.x(p)
-            else:
-                self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
+                raise ValueError("Perfect pairing determinant violates orbital or electron numbers")
+            self.state_circuit = get_determinant_reference(pp_det, self.num_orbs, self.mapper)
         else:
             self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
         self.num_qubits = self.state_circuit.num_qubits
@@ -835,41 +845,38 @@ class QuantumInterface:
                 state = get_determinant_superposition_reference(bra_det, ket_det, self.num_orbs, self.mapper)
                 # Superposition state contains non-native gates for ISA -> transpilation needed.
                 if self.ISA:
-                    if ISA_csfs_option == 1:  # Option 1: flexible layout
-                        # Use untranspiled ansatz and compose with superposition state
-                        circuit = self._ansatz_circuit_raw.compose(state, front=True)
-                        # Transpile freely
-                        circuit = self._pass_manager.run(circuit)  # type: ignore
-                    elif ISA_csfs_option == 2:  # Option 2: fixed layout - flexible order (needed with M)
-                        # Use untranspiled ansatz and compose with superposition state
-                        circuit = self._ansatz_circuit_raw.compose(state, front=True)
-                        # Transpile the composed circuit together using the correct layout
-                        # This will however still introduce routing swaps (flexible order)
-                        circuit = self._initialfixedlayout_pm.run(circuit)
-                    elif (
-                        ISA_csfs_option == 3
-                    ):  # Option 3: fixed layout - fixed order without optimization (needed with M_Ansatz0)
-                        circuit = layout_conserving_compose(
-                            self.ansatz_circuit,
-                            state,
-                            self._initialfixedlayout_pm,
-                            coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
-                            optimization=False,
-                        )
-                    elif (
-                        ISA_csfs_option == 4
-                    ):  # Option 4: fixed layout - fixed order with optimization (needed with M_Ansatz0)
-                        circuit = layout_conserving_compose(
-                            self.ansatz_circuit,
-                            state,
-                            self._initialfixedlayout_pm,
-                            coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
-                            optimization=True,
-                        )
-                    else:
-                        raise ValueError(
-                            f"Wrong ISA_csfs_option specified, {ISA_csfs_option}. Needs to be 1,2,3,4."
-                        )
+                    match ISA_csfs_option:
+                        case 1:  # Option 1: flexible layout
+                            # Use untranspiled ansatz and compose with superposition state
+                            circuit = self._ansatz_circuit_raw.compose(state, front=True)
+                            # Transpile freely
+                            circuit = self._pass_manager.run(circuit)  # type: ignore
+                        case 2:  # Option 2: fixed layout - flexible order (needed with M)
+                            # Use untranspiled ansatz and compose with superposition state
+                            circuit = self._ansatz_circuit_raw.compose(state, front=True)
+                            # Transpile the composed circuit together using the correct layout
+                            # This will however still introduce routing swaps (flexible order)
+                            circuit = self._initialfixedlayout_pm.run(circuit)
+                        case 3:  # Option 3: fixed layout - fixed order without optimization (needed with M_Ansatz0)
+                            circuit = layout_conserving_compose(
+                                self.ansatz_circuit,
+                                state,
+                                self._initialfixedlayout_pm,
+                                coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
+                                optimization=False,
+                            )
+                        case (
+                            4
+                        ):  # Option 4: fixed layout - fixed order with optimization (needed with M_Ansatz0)
+                            circuit = layout_conserving_compose(
+                                self.ansatz_circuit,
+                                state,
+                                self._initialfixedlayout_pm,
+                                coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
+                                optimization=True,
+                            )
+                        case _:
+                            raise ValueError("Wrong ISA_csfs_option specified. Needs to be 1,2,3,4.")
                 else:
                     circuit = self.ansatz_circuit.compose(state, front=True)
                 # Check if M per superposition circuit is requested
@@ -973,7 +980,7 @@ class QuantumInterface:
         op: FermionicOperator | SparsePauliOp,
         run_circuit: QuantumCircuit | None = None,
         det: str | None = None,
-        circuit_M: None | QuantumCircuit = None,
+        circuit_M: QuantumCircuit | None = None,
         csfs_option: int = 1,
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
@@ -1078,7 +1085,7 @@ class QuantumInterface:
         run_parameters: list[float],
         run_circuit: QuantumCircuit,
         do_cliques: bool = True,
-        circuit_M: None | QuantumCircuit = None,
+        circuit_M: QuantumCircuit | None = None,
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
@@ -1451,7 +1458,7 @@ class QuantumInterface:
         return dist_combined
 
     def _sampler_distributions(
-        self, pauli: str, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
+        self, pauli: str, run_parameters: list[float], custom_circ: QuantumCircuit | None = None
     ) -> dict[int, float]:
         r"""Get results from a sampler distribution for one given Pauli string.
 
@@ -1502,7 +1509,7 @@ class QuantumInterface:
         return distr
 
     def _sampler_distribution_p1(
-        self, pauli: str, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
+        self, pauli: str, run_parameters: list[float], custom_circ: QuantumCircuit | None = None
     ) -> float:
         """Sample the probability of measuring one for a given Pauli string.
 
@@ -1522,7 +1529,7 @@ class QuantumInterface:
                 p1 += value
         return p1
 
-    def _make_Minv(self, shots: None | int = None, custom_ansatz: None | QuantumCircuit = None) -> np.ndarray:
+    def _make_Minv(self, shots: int | None = None, custom_ansatz: QuantumCircuit | None = None) -> np.ndarray:
         r"""Make inverse of read-out correlation matrix with one device call.
 
         The read-out correlation matrix is of the form (for two qubits):
