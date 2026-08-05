@@ -79,7 +79,6 @@ class WaveFunctionSACircuit:
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
         self.num_active_orbs = cas[1]
         self.num_active_spin_orbs = 2 * self.num_active_orbs
-        self.num_active_orbs = self.num_active_spin_orbs // 2
         self.num_virtual_orbs = (
             len(self.int_gen.kinetic_energy) - self.num_inactive_orbs - self.num_active_orbs
         )
