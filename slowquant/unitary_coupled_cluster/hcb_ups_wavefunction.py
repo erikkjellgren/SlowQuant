@@ -42,10 +42,10 @@ class WaveFunctionHCBUPS:
         ansatz: str,
         ansatz_options: dict[str, Any] | None = None,
     ) -> None:
-        """Initialize for HCB UPS wave function.
+        """Initialize HCB UPS wave function.
 
         Args:
-            active_space: CAS(num_active_elec, num_active_orbs),
+            active_space: (num_active_elec, num_active_orbs),
                  orbitals are counted in spatial basis.
             mo_coeffs: Initial orbital coefficients.
             integral_generator: Integral generator object.
@@ -72,6 +72,7 @@ class WaveFunctionHCBUPS:
         self.num_orbs = self.num_inactive_orbs + self.num_active_orbs + self.num_virtual_orbs
         self.num_spin_orbs = 2 * self.num_orbs
         self.num_active_elec = active_space[0]
+        self.num_active_elec_pair = self.num_active_elec // 2
         self._rdm1 = None
         self._rdm2 = None
         self._hr1 = None

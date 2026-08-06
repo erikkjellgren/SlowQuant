@@ -6,7 +6,7 @@ from slowquant.qiskit_interface.hcb_interface import HCBQuantumInterface
 from slowquant.unitary_coupled_cluster.hcb_ups_wavefunction import WaveFunctionHCBUPS
 
 
-def test_h2o_fullspace() -> None:
+def test_lih_fullspace() -> None:
     """Test LiH fUCCpD(4,6)."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(

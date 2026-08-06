@@ -1,5 +1,4 @@
 import time
-from collections.abc import Sequence
 from functools import partial
 
 import numpy as np
@@ -29,111 +28,115 @@ from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 class WaveFunctionHCBCircuit:
     def __init__(
         self,
-        cas: Sequence[int],
+        active_space: tuple[int, int],
         mo_coeffs: np.ndarray,
         integral_generator: SlowQuant | pyscf.gto.mole.Mole,
         quantum_interface: HCBQuantumInterface,
     ) -> None:
-        """Initialize circuit based UPS wave function.
+        """Initialize circuit based HCB UPS wave function.
 
         Args:
-            cas: CAS(num_active_elec, num_active_orbs),
+            active_space: (num_active_elec, num_active_orbs),
                  orbitals are counted in spatial basis.
             mo_coeffs: Initial orbital coefficients.
             integral_generator: Integral generator object.
             quantum_interface: QuantumInterface.
         """
-        if len(cas) != 2:
-            raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
+        if len(active_space) != 2:
+            raise ValueError(f"cas must have two elements, got {len(active_space)} elements.")
+        if active_space[0] % 2 != 0:
+            raise ValueError(f"Number of electrons must be even, got {active_space[0]}")
+        if not isinstance(quantum_interface, HCBQuantumInterface):
+            raise TypeError(f"Expected quantum_interface to be 'HCBQuantumInterface' got, {type(quantum_interface)}.")
         if isinstance(quantum_interface.ansatz, QuantumCircuit):
             print(
                 "WARNING: A QI with a custom Ansatz was passed. VQE will only work with COBYLA and COBYQA optimizer."
             )
+        # Init stuff
         self.int_gen = IntegralManager(integral_generator)
-        self._c_mo = mo_coeffs
-        self.inactive_idx = []
-        self.virtual_idx = []
-        self.active_idx = []
-        self.active_occ_idx = []
-        self.active_unocc_idx = []
-        self.active_idx_shifted = []
-        self.active_occ_idx_shifted = []
-        self.active_unocc_idx_shifted = []
-        self.num_orbs = len(self.int_gen.kinetic_energy)
-        self.num_active_elec_pair = 0
-        self.num_active_orbs = 0
-        self.num_inactive_orbs = 0
-        self.num_virtual_orbs = 0
+        self.num_inactive_orbs = (self.int_gen.num_elec - active_space[0]) // 2
+        self.num_active_orbs = active_space[1]
+        self.num_virtual_orbs = (
+            len(self.int_gen.kinetic_energy) - self.num_inactive_orbs - self.num_active_orbs
+        )
+        if self.num_virtual_orbs < 0:
+            raise ValueError(
+                "Number of inactive + number of active orbitals is larger than total number of orbitals."
+            )
+        self.num_orbs = self.num_inactive_orbs + self.num_active_orbs + self.num_virtual_orbs
+        self.num_spin_orbs = 2 * self.num_orbs
+        self.num_active_elec = active_space[0]
+        self.num_active_elec_pair = self.num_active_elec // 2
         self._rdm1 = None
         self._rdm2 = None
         self._hr1 = None
         self._hr2 = None
+        self._h_mo = None
+        self._g_mo = None
         self._energy_elec: float | None = None
-        self.num_energy_evals = 0  # number of energy measurements on quanutm
-        active_space = []
-        orbital_counter = 0
-        num_elec_pair = self.int_gen.num_elec // 2
-        for i in range(num_elec_pair - cas[0] // 2, num_elec_pair):
-            active_space.append(i)
-            orbital_counter += 1
-        for i in range(num_elec_pair, num_elec_pair + cas[1] - orbital_counter):
-            active_space.append(i)
-        for i in range(num_elec_pair):
-            if i in active_space:
-                self.active_idx.append(i)
-                self.active_occ_idx.append(i)
-                self.num_active_orbs += 1
-                self.num_active_elec_pair += 1
-            else:
-                self.inactive_idx.append(i)
-                self.num_inactive_orbs += 1
-        for i in range(num_elec_pair, self.num_orbs):
-            if i in active_space:
-                self.active_idx.append(i)
-                self.active_unocc_idx.append(i)
-                self.num_active_orbs += 1
-            else:
-                self.virtual_idx.append(i)
-                self.num_virtual_orbs += 1
-        # Make shifted indices
-        if len(self.active_idx) != 0:
-            active_shift = np.min(self.active_idx)
-            for active_idx in self.active_idx:
-                self.active_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_occ_idx:
-                self.active_occ_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_unocc_idx:
-                self.active_unocc_idx_shifted.append(active_idx - active_shift)
+        self.num_energy_evals = 0
+        # Reference wave function
+        if len(np.shape(mo_coeffs)) == 3:
+            self.wf_type = "unrestricted"
+        elif len(mo_coeffs) == self.num_orbs:
+            self.wf_type = "restricted"
+        elif len(mo_coeffs) == self.num_spin_orbs:
+            self.wf_type = "generalized"
+        else:
+            raise ValueError("Could not identify wavefunction type.")
+        print(f"Wavefunction identified to be {self.wf_type}")
+        self._c_mo = mo_coeffs
+        ref_det = "1" * (self.num_active_elec // 2) + "0" * (self.num_active_orbs - self.num_active_elec // 2)
+        # Construct spatial idx
+        self.inactive_idx = [x for x in range(self.num_inactive_orbs)]
+        self.active_idx = [x + self.num_inactive_orbs for x in range(self.num_active_orbs)]
+        self.virtual_idx = [
+            x + self.num_inactive_orbs + self.num_active_orbs for x in range(self.num_virtual_orbs)
+        ]
+        self.active_occ_idx = []
+        self.active_unocc_idx = []
+        for i, orb_idx in enumerate(self.active_idx):
+            if ref_det[i] == "1":
+                self.active_occ_idx.append(orb_idx)
+            elif ref_det[i] == "0":
+                self.active_unocc_idx.append(orb_idx)
+        self.active_idx_shifted = [x - self.num_inactive_orbs for x in self.active_idx]
+        self.active_occ_idx_shifted = [x - self.num_inactive_orbs for x in self.active_occ_idx]
+        self.active_unocc_idx_shifted = [x - self.num_inactive_orbs for x in self.active_unocc_idx]
         # Find non-redundant kappas
-        self._kappa = []
         kappa_idx = []
-        kappa_redundant_idx = []
+        self._kappa = []
         self._kappa_old = []
-        # kappa can be optimized in spatial basis
-        for p in range(0, self.num_orbs):
-            for q in range(p + 1, self.num_orbs):
-                if p in self.inactive_idx and q in self.inactive_idx:
-                    kappa_redundant_idx.append((p, q))
-                    continue
-                if p in self.virtual_idx and q in self.virtual_idx:
-                    kappa_redundant_idx.append((p, q))
-                    continue
-                self._kappa.append(0.0)
-                self._kappa_old.append(0.0)
-                kappa_idx.append((p, q))
-        # HF like orbital rotation indices
-        kappa_hf_like_idx = []
-        for p in range(0, self.num_orbs):
-            for q in range(p + 1, self.num_orbs):
-                if p in self.inactive_idx and q in self.virtual_idx:
-                    kappa_hf_like_idx.append((p, q))
-                elif p in self.inactive_idx and q in self.active_unocc_idx:
-                    kappa_hf_like_idx.append((p, q))
-                elif p in self.active_occ_idx and q in self.virtual_idx:
-                    kappa_hf_like_idx.append((p, q))
+        if self.wf_type in ("restricted", "unrestricted"):
+            for p in range(0, self.num_orbs):
+                for q in range(p + 1, self.num_orbs):
+                    if p in self.inactive_idx and q in self.inactive_idx:
+                        continue
+                    if p in self.virtual_idx and q in self.virtual_idx:
+                        continue
+                    # the rest is non-redundant
+                    self._kappa.append(0.0)
+                    self._kappa_old.append(0.0)
+                    if self.wf_type == "unrestricted":
+                        # Need twice as many parameters
+                        self._kappa.append(0.0)
+                        self._kappa_old.append(0.0)
+                    kappa_idx.append((p, q))
+        elif self.wf_type == "generalized":
+            for p in range(0, self.num_spin_orbs):
+                for q in range(p + 1, self.num_spin_orbs):
+                    if p in self.inactive_spin_idx and q in self.inactive_spin_idx:
+                        continue
+                    if p in self.virtual_spin_idx and q in self.virtual_spin_idx:
+                        continue
+                    # the rest is non-redundant
+                    self._kappa.append(0.0)
+                    self._kappa_old.append(0.0)
+                    kappa_idx.append((p, q))
+        else:
+            raise ValueError(f"Got unknown wavefunction type, {self.wf_type}")
         self.kappa_idx = np.array(kappa_idx, dtype=int)
-        self.kappa_redundant_idx = np.array(kappa_redundant_idx, dtype=int)
-        self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
+
         # Setup Qiskit stuff
         self.QI = quantum_interface
         self.QI.construct_circuit(
@@ -623,42 +626,21 @@ class WaveFunctionHCBCircuit:
         if print_std:
             header += " | Std(H)"
         print(header)
+        do_theta_optimization = True
+        if len(self.thetas) == 0:
+            do_theta_optimization = False
+        energy = partial(
+            self._calc_energy_optimization,
+            theta_optimization=do_theta_optimization,
+            kappa_optimization=orbital_optimization,
+        )
+        gradient = partial(
+            self._calc_gradient_optimization,
+            theta_optimization=do_theta_optimization,
+            kappa_optimization=orbital_optimization,
+        )
         if orbital_optimization:
-            if len(self.thetas) > 0:
-                energy = partial(
-                    self._calc_energy_optimization,
-                    theta_optimization=True,
-                    kappa_optimization=True,
-                )
-                gradient = partial(
-                    self._calc_gradient_optimization,
-                    theta_optimization=True,
-                    kappa_optimization=True,
-                )
-            else:
-                energy = partial(
-                    self._calc_energy_optimization,
-                    theta_optimization=False,
-                    kappa_optimization=True,
-                )
-                gradient = partial(
-                    self._calc_gradient_optimization,
-                    theta_optimization=False,
-                    kappa_optimization=True,
-                )
-        else:
-            energy = partial(
-                self._calc_energy_optimization,
-                theta_optimization=True,
-                kappa_optimization=False,
-            )
-            gradient = partial(
-                self._calc_gradient_optimization,
-                theta_optimization=True,
-                kappa_optimization=False,
-            )
-        if orbital_optimization:
-            if len(self.thetas) > 0:
+            if do_theta_optimization:
                 parameters = self.kappa + self.thetas
             else:
                 parameters = self.kappa
