@@ -48,7 +48,7 @@ class WaveFunctionUPS:
         resolve_unpaired_idx: str = "both",
         do_pp: bool = False,
     ) -> None:
-        """Initialize for UPS wave function.
+        """Initialize UPS wave function.
 
         Args:
             active_space: (num_active_elec, num_active_orbs) or ((num_active_elec_alpha, num_active_elec_beta), num_active_orbs),
@@ -116,7 +116,7 @@ class WaveFunctionUPS:
         # Reference wave function
         if do_pp:
             if reference_determinant is not None:
-                raise ValueError("Both 'do_pp' and 'reference_determinant'.")
+                raise ValueError("Both 'do_pp' and 'reference_determinant' are requested.")
             if self.num_active_elec_alpha != self.num_active_elec_beta:
                 raise ValueError(
                     "perfect-pairing is only defined for equal number of alpha and beta electrons."
@@ -225,7 +225,7 @@ class WaveFunctionUPS:
                 self.active_unocc_idx.append(orb_idx)
             else:
                 raise ValueError(
-                    f"Got unknown option for resolve_unpaired_idx, {resolve_unpaired_idx}, excepted 'both', 'occ' or 'unocc'."
+                    f"Got unknown option for resolve_unpaired_idx, {resolve_unpaired_idx}, expected 'both', 'occ' or 'unocc'."
                 )
         self.active_idx_shifted = [x - self.num_inactive_orbs for x in self.active_idx]
         self.active_occ_idx_shifted = [x - self.num_inactive_orbs for x in self.active_occ_idx]
@@ -352,6 +352,8 @@ class WaveFunctionUPS:
         self._g_mo = None
         self._energy_elec = None
         self._kappa = k.copy()
+        if isinstance(self._kappa, np.ndarray):
+            self._kappa = self._kappa.tolist()
         # Move current expansion point.
         self._c_mo = self.c_mo
         self._kappa_old = self.kappa
@@ -397,6 +399,8 @@ class WaveFunctionUPS:
         self._energy_elec = None
         self._ci_coeffs = None
         self._thetas = theta_vals.copy()
+        if isinstance(self._thetas, np.ndarray):
+            self._thetas = self._thetas.tolist()
 
     @property
     def c_mo(self) -> np.ndarray:
@@ -707,7 +711,7 @@ class WaveFunctionUPS:
 
     @property
     def energy_elec(self) -> float:
-        """Get the electronic energy.
+        """Get electronic energy.
 
         Returns:
             Electronic energy.
@@ -786,7 +790,7 @@ class WaveFunctionUPS:
                 tol, maxiter, theta_optimizer, orbital_optimizer, is_silent_subiterations
             )
         else:
-            raise ValueError(f"Got unknown 'opt_type', {opt_type} excpected '1step' or '2step'.")
+            raise ValueError(f"Got unknown 'opt_type', {opt_type} expected '1step' or '2step'.")
 
     def _run_wf_optimization_2step(
         self,
@@ -964,9 +968,9 @@ class WaveFunctionUPS:
         """Calculate electronic energy.
 
         Args:
-            parameters: Ansatz and orbital rotation parameters.
-            theta_optimization: If used in theta optimization.
-            kappa_optimization: If used in kappa optimization.
+            parameters: Orbital rotation and ansatz parameters.
+            theta_optimization: Doing theta optimization.
+            kappa_optimization: Doing kappa optimization.
 
         Returns:
             Electronic energy.
@@ -1006,8 +1010,8 @@ class WaveFunctionUPS:
 
         Args:
             parameters: Ansatz and orbital rotation parameters.
-            theta_optimization: If used in theta optimization.
-            kappa_optimization: If used in kappa optimization.
+            theta_optimization: Doing theta optimization.
+            kappa_optimization: Doing kappa optimization.
 
         Returns:
             Electronic gradient.

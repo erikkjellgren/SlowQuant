@@ -234,6 +234,8 @@ class WaveFunctionSACircuit:
         self._sa_energy = None
         self._state_energies = None
         self._kappa = k.copy()
+        if isinstance(self._kappa, np.ndarray):
+            self._kappa = self._kappa.tolist()
         # Move current expansion point.
         self._c_mo = self.c_mo
         self._kappa_old = self.kappa
@@ -245,6 +247,7 @@ class WaveFunctionSACircuit:
         Returns:
             Molecular orbital coefficients.
         """
+        # Construct anti-hermitian kappa matrix
         kappa_mat = np.zeros_like(self._c_mo)
         if len(self.kappa) != 0:
             # The MO transformation is calculated as a difference between current kappa and kappa old.
@@ -254,6 +257,7 @@ class WaveFunctionSACircuit:
                 for kappa_val, kappa_old, (p, q) in zip(self.kappa, self._kappa_old, self.kappa_idx):
                     kappa_mat[p, q] = kappa_val - kappa_old
                     kappa_mat[q, p] = -(kappa_val - kappa_old)
+        # Apply orbital rotation unitary to MO coefficients
         return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
 
     @property
@@ -299,7 +303,6 @@ class WaveFunctionSACircuit:
         self._sa_energy = None
         self._state_energies = None
         self._state_ci_coeffs = None
-        self._ci_coeffs = None
         self.QI.parameters = parameters
 
     def change_primitive(self, primitive: BaseSamplerV1 | BaseSamplerV2, verbose: bool = True) -> None:
@@ -356,12 +359,7 @@ class WaveFunctionSACircuit:
 
     @property
     def rdm1(self) -> np.ndarray:
-        r"""Calculate one-electron reduced density matrix.
-
-        The trace condition is enforced:
-
-        .. math::
-            \sum_i\Gamma^{[1]}_{ii} = N_e
+        """Calculate one-electron reduced density matrix in the active space.
 
         Returns:
             One-electron reduced density matrix.
@@ -369,9 +367,9 @@ class WaveFunctionSACircuit:
         if self._rdm1 is None:
             self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs), dtype=float)
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                p_idx = p - self.num_inactive_orbs
+                p_ = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
-                    q_idx = q - self.num_inactive_orbs
+                    q_ = q - self.num_inactive_orbs
                     rdm1_op = Epq(p, q).get_folded_operator(
                         self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                     )
@@ -379,18 +377,13 @@ class WaveFunctionSACircuit:
                     for coeffs, csf in zip(self.states[0], self.states[1]):
                         val += self.QI.quantum_expectation_value_csfs((coeffs, csf), rdm1_op, (coeffs, csf))
                     val = val / self.num_states
-                    self._rdm1[p_idx, q_idx] = val  # type: ignore [index]
-                    self._rdm1[q_idx, p_idx] = val  # type: ignore [index]
+                    self._rdm1[p_, q_] = val  # type: ignore [index]
+                    self._rdm1[q_, p_] = val  # type: ignore [index]
         return self._rdm1
 
     @property
     def rdm2(self) -> np.ndarray:
-        r"""Calculate two-electron reduced density matrix.
-
-        The trace condition is enforced:
-
-        .. math::
-            \sum_{ij}\Gamma^{[2]}_{iijj} = N_e(N_e-1)
+        """Calculate two-electron reduced density matrix in the active space.
 
         Returns:
             Two-electron reduced density matrix.
@@ -406,11 +399,11 @@ class WaveFunctionSACircuit:
                 dtype=float,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                p_idx = p - self.num_inactive_orbs
+                p_ = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
-                    q_idx = q - self.num_inactive_orbs
+                    q_ = q - self.num_inactive_orbs
                     for r in range(self.num_inactive_orbs, p + 1):
-                        r_idx = r - self.num_inactive_orbs
+                        r_ = r - self.num_inactive_orbs
                         if p == q:
                             s_lim = r + 1
                         elif p == r:
@@ -420,7 +413,7 @@ class WaveFunctionSACircuit:
                         else:
                             s_lim = p + 1
                         for s in range(self.num_inactive_orbs, s_lim):
-                            s_idx = s - self.num_inactive_orbs
+                            s_ = s - self.num_inactive_orbs
                             pdm2_op = (Epq(p, q) * Epq(r, s)).get_folded_operator(
                                 self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                             )
@@ -431,11 +424,11 @@ class WaveFunctionSACircuit:
                                 )
                             val = val / self.num_states
                             if q == r:
-                                val -= self.rdm1[p_idx, s_idx]
-                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore [index]
-                            self._rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore [index]
-                            self._rdm2[q_idx, p_idx, s_idx, r_idx] = val  # type: ignore [index]
-                            self._rdm2[s_idx, r_idx, q_idx, p_idx] = val  # type: ignore [index]
+                                val -= self.rdm1[p_, s_]
+                            self._rdm2[p_, q_, r_, s_] = val  # type: ignore
+                            self._rdm2[r_, s_, p_, q_] = val  # type: ignore
+                            self._rdm2[q_, p_, s_, r_] = val  # type: ignore
+                            self._rdm2[s_, r_, q_, p_] = val  # type: ignore
         return self._rdm2
 
     def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
@@ -548,7 +541,7 @@ class WaveFunctionSACircuit:
                 tol, maxiter, theta_optimizer, orbital_optimizer, is_silent_subiterations
             )
         else:
-            raise ValueError(f"Got unknown 'opt_type', {opt_type} excpected '1step' or '2step'.")
+            raise ValueError(f"Got unknown 'opt_type', {opt_type} expected '1step' or '2step'.")
 
     def _run_wf_optimization_2step(
         self,
@@ -882,8 +875,8 @@ class WaveFunctionSACircuit:
 
         Args:
             parameters: Ansatz and orbital rotation parameters.
-            theta_optimization: If used in theta optimization.
-            kappa_optimization: If used in kappa optimization.
+            theta_optimization: Doing theta optimization.
+            kappa_optimization: Doing kappa optimization.
 
         Returns:
             State-averaged electronic gradient.

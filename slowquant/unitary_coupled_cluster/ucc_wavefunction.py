@@ -42,7 +42,7 @@ class WaveFunctionUCC:
         include_active_kappa: bool = True,
         resolve_unpaired_idx: str = "both",
     ) -> None:
-        """Initialize for UCC wave function.
+        """Initialize UCC wave function.
 
         Possible excitations:
             * S: Add single excitations.
@@ -183,7 +183,7 @@ class WaveFunctionUCC:
                 self.active_unocc_idx.append(orb_idx)
             else:
                 raise ValueError(
-                    f"Got unknown option for resolve_unpaired_idx, {resolve_unpaired_idx}, excepted 'both', 'occ' or 'unocc'."
+                    f"Got unknown option for resolve_unpaired_idx, {resolve_unpaired_idx}, expected 'both', 'occ' or 'unocc'."
                 )
         self.active_idx_shifted = [x - self.num_inactive_orbs for x in self.active_idx]
         self.active_occ_idx_shifted = [x - self.num_inactive_orbs for x in self.active_occ_idx]
@@ -195,7 +195,7 @@ class WaveFunctionUCC:
         kappa_no_activeactive_idx_dagger = []
         self._kappa_old = []
         # kappa can be optimized in spatial basis
-        # Loop over all q>p orb combinations
+        # Loop over all q>p orb combinations.
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
                 if p in self.inactive_idx and q in self.inactive_idx:
@@ -269,6 +269,8 @@ class WaveFunctionUCC:
         self._g_mo = None
         self._energy_elec = None
         self._kappa = k.copy()
+        if isinstance(self._kappa, np.ndarray):
+            self._kappa = self._kappa.tolist()
         # Move current expansion point.
         self._c_mo = self.c_mo
         self._kappa_old = self.kappa
@@ -299,21 +301,23 @@ class WaveFunctionUCC:
         return self._thetas.copy()
 
     @thetas.setter
-    def thetas(self, theta: list[float]) -> None:
-        """Set theta1 values.
+    def thetas(self, theta_vals: list[float]) -> None:
+        """Set theta values.
 
         Args:
-            theta: theta1 values.
+            theta_vals: theta values.
         """
-        if len(theta) != len(self._thetas):
-            raise ValueError(f"Expected {len(self._thetas)} theta1 values got {len(theta)}")
+        if len(theta_vals) != len(self._thetas):
+            raise ValueError(f"Expected {len(self._thetas)} theta1 values got {len(theta_vals)}")
         self._rdm1 = None
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
         self._energy_elec = None
         self._ci_coeffs = None
-        self._thetas = theta.copy()
+        self._thetas = theta_vals.copy()
+        if isinstance(self._thetas, np.ndarray):
+            self._thetas = self._thetas.tolist()
 
     @property
     def c_mo(self) -> np.ndarray:
@@ -624,7 +628,7 @@ class WaveFunctionUCC:
 
     @property
     def energy_elec(self) -> float:
-        """Get the electronic energy.
+        """Get electronic energy.
 
         Returns:
             Electronic energy.
@@ -731,7 +735,7 @@ class WaveFunctionUCC:
                 tol, maxiter, theta_optimizer, orbital_optimizer, is_silent_subiterations
             )
         else:
-            raise ValueError(f"Got unknown 'opt_type', {opt_type} excpected '1step' or '2step'.")
+            raise ValueError(f"Got unknown 'opt_type', {opt_type} expected '1step' or '2step'.")
 
     def _run_wf_optimization_2step(
         self,
@@ -867,10 +871,7 @@ class WaveFunctionUCC:
         self._energy_elec = res.fun
 
     def _calc_energy_optimization(
-        self,
-        parameters: list[float],
-        theta_optimization: bool,
-        kappa_optimization: bool,
+        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
     ) -> float:
         r"""Calculate electronic energy of UCC wave function.
 
@@ -878,10 +879,9 @@ class WaveFunctionUCC:
             E = \left<0\left|\hat{H}\right|0\right>
 
         Args:
-            parameters: Sequence of all parameters.
-                        Ordered as orbital rotations, active-space singles, active-space doubles, ...
-            theta_optimization: If used in theta optimization.
-            kappa_optimization: If used in kappa optimization.
+            parameters: Orbital rotations and cluster amplitude parameters.
+            theta_optimization: Doing theta optimization.
+            kappa_optimization: Doing kappa optimization.
 
         Returns:
             Electronic energy.
@@ -939,8 +939,8 @@ class WaveFunctionUCC:
 
         Args:
             parameters: Ansatz and orbital rotation parameters.
-            theta_optimization: If used in theta optimization.
-            kappa_optimization: If used in kappa optimization.
+            theta_optimization: Doing theta optimization.
+            kappa_optimization: Doing kappa optimization.
 
         Returns:
             Electronic gradient.

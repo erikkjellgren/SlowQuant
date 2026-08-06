@@ -145,7 +145,7 @@ class WaveFunctionSAUPS:
                 self.active_unocc_spin_idx.append(orb_idx)
             else:
                 raise ValueError(
-                    f"Got unknown option for resolve_unpaired_idx, {resolve_unpaired_idx}, excepted 'both', 'occ' or 'unocc'."
+                    f"Got unknown option for resolve_unpaired_idx, {resolve_unpaired_idx}, expected 'both', 'occ' or 'unocc'."
                 )
         self.active_spin_idx_shifted = [x - self.num_inactive_spin_orbs for x in self.active_spin_idx]
         self.active_occ_spin_idx_shifted = [x - self.num_inactive_spin_orbs for x in self.active_occ_spin_idx]
@@ -187,7 +187,7 @@ class WaveFunctionSAUPS:
                 self.active_unocc_idx.append(orb_idx)
             else:
                 raise ValueError(
-                    f"Got unknown option for resolve_unpaired_idx, {resolve_unpaired_idx}, excepted 'both', 'occ' or 'unocc'."
+                    f"Got unknown option for resolve_unpaired_idx, {resolve_unpaired_idx}, expected 'both', 'occ' or 'unocc'."
                 )
         self.active_idx_shifted = [x - self.num_inactive_orbs for x in self.active_idx]
         self.active_occ_idx_shifted = [x - self.num_inactive_orbs for x in self.active_occ_idx]
@@ -201,7 +201,6 @@ class WaveFunctionSAUPS:
         # Loop over all q>p orb combinations.
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
-                # find redundant kappas
                 if p in self.inactive_idx and q in self.inactive_idx:
                     continue
                 if p in self.virtual_idx and q in self.virtual_idx:
@@ -260,6 +259,8 @@ class WaveFunctionSAUPS:
                 self.ansatz_options["do_qnp"] = True
             self.ups_layout.create_tiled(self.num_active_orbs, self.ansatz_options)
         elif ansatz.lower() in ("fucc", "ksafupccgsd", "safuccsd"):
+            # Default options
+            self.ansatz_options.setdefault("n_layers", 1)
             self.ansatz_options.setdefault("excitations", [])
             if ansatz.lower() == "ksafupccgsd":
                 self.ansatz_options["excitations"].append("SAGS")
@@ -267,8 +268,6 @@ class WaveFunctionSAUPS:
             elif ansatz.lower() == "safuccsd":
                 self.ansatz_options["excitations"].append("SAS")
                 self.ansatz_options["excitations"].append("SAD")
-            # Default options
-            self.ansatz_options.setdefault("n_layers", 1)
             self.ups_layout.create_fUCC(
                 self.active_occ_idx_shifted,
                 self.active_unocc_idx_shifted,
@@ -278,10 +277,10 @@ class WaveFunctionSAUPS:
                 self.ansatz_options,
             )
         elif ansatz.lower() == "ksasdsfupccgsd":
-            self.ansatz_options.setdefault("excitations", [])
-            self.ansatz_options["excitations"].append("GpD")
             # Default options
             self.ansatz_options.setdefault("n_layers", 1)
+            self.ansatz_options.setdefault("excitations", [])
+            self.ansatz_options["excitations"].append("GpD")
             self.ups_layout.create_SDSfUCC(
                 self.active_occ_idx_shifted,
                 self.active_unocc_idx_shifted,
@@ -315,10 +314,11 @@ class WaveFunctionSAUPS:
         self._sa_energy = None
         self._state_energies = None
         self._kappa = k.copy()
+        if isinstance(self._kappa, np.ndarray):
+            self._kappa = self._kappa.tolist()
         # Move current expansion point.
         self._c_mo = self.c_mo
         self._kappa_old = self.kappa
-        self._state_ci_coeffs = None
 
     @property
     def ci_coeffs(self) -> list[np.ndarray]:
@@ -361,13 +361,15 @@ class WaveFunctionSAUPS:
         self._state_ci_coeffs = None
         self._ci_coeffs = None
         self._thetas = theta_vals.copy()
+        if isinstance(self._thetas, np.ndarray):
+            self._thetas = self._thetas.tolist()
 
     @property
     def c_mo(self) -> np.ndarray:
-        """Get orbital coefficients.
+        """Get molecular orbital coefficients.
 
         Returns:
-            Orbital coefficients.
+            Molecular orbital coefficients.
         """
         # Construct anti-hermitian kappa matrix
         kappa_mat = np.zeros_like(self._c_mo)
@@ -414,23 +416,17 @@ class WaveFunctionSAUPS:
         if self._rdm1 is None:
             self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs), dtype=float)
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                p_idx = p - self.num_inactive_orbs
+                p_ = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
-                    q_idx = q - self.num_inactive_orbs
-                    val = 0.0
-                    Epq_op = Epq(
-                        p_idx,
-                        q_idx,
-                    )
+                    q_ = q - self.num_inactive_orbs
                     val = expectation_value_SA(
                         self.ci_coeffs,
-                        [Epq_op],
+                        [Epq(p, q)],
                         self.ci_coeffs,
                         self.ci_info,
-                        do_folding=False,
                     )
-                    self._rdm1[p_idx, q_idx] = val  # type: ignore
-                    self._rdm1[q_idx, p_idx] = val  # type: ignore
+                    self._rdm1[p_, q_] = val  # type: ignore
+                    self._rdm1[q_, p_] = val  # type: ignore
         return self._rdm1
 
     @property
@@ -451,15 +447,11 @@ class WaveFunctionSAUPS:
                 dtype=float,
             )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                p_idx = p - self.num_inactive_orbs
+                p_ = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
-                    q_idx = q - self.num_inactive_orbs
-                    Epq_op = Epq(
-                        p_idx,
-                        q_idx,
-                    )
+                    q_ = q - self.num_inactive_orbs
                     for r in range(self.num_inactive_orbs, p + 1):
-                        r_idx = r - self.num_inactive_orbs
+                        r_ = r - self.num_inactive_orbs
                         if p == q:
                             s_lim = r + 1
                         elif p == r:
@@ -469,24 +461,19 @@ class WaveFunctionSAUPS:
                         else:
                             s_lim = p + 1
                         for s in range(self.num_inactive_orbs, s_lim):
-                            s_idx = s - self.num_inactive_orbs
-                            Ers_op = Epq(
-                                r_idx,
-                                s_idx,
-                            )
+                            s_ = s - self.num_inactive_orbs
                             val = expectation_value_SA(
                                 self.ci_coeffs,
-                                [Epq_op, Ers_op],
+                                [Epq(p, q) * Epq(r, s)],
                                 self.ci_coeffs,
                                 self.ci_info,
-                                do_folding=False,
                             )
                             if q == r:
-                                val -= self.rdm1[p_idx, s_idx]
-                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
-                            self._rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore
-                            self._rdm2[q_idx, p_idx, s_idx, r_idx] = val  # type: ignore
-                            self._rdm2[s_idx, r_idx, q_idx, p_idx] = val  # type: ignore
+                                val -= self.rdm1[p_, s_]
+                            self._rdm2[p_, q_, r_, s_] = val  # type: ignore
+                            self._rdm2[r_, s_, p_, q_] = val  # type: ignore
+                            self._rdm2[q_, p_, s_, r_] = val  # type: ignore
+                            self._rdm2[s_, r_, q_, p_] = val  # type: ignore
         return self._rdm2
 
     def check_orthonormality(self) -> None:
@@ -574,7 +561,7 @@ class WaveFunctionSAUPS:
                 tol, maxiter, theta_optimizer, orbital_optimizer, is_silent_subiterations
             )
         else:
-            raise ValueError(f"Got unknown 'opt_type', {opt_type} excpected '1step' or '2step'.")
+            raise ValueError(f"Got unknown 'opt_type', {opt_type} expected '1step' or '2step'.")
 
     def _run_wf_optimization_2step(
         self,
@@ -877,9 +864,9 @@ class WaveFunctionSAUPS:
             E = \left<0\left|\hat{H}\right|0\right>
 
         Args:
-            parameters: Ansatz and orbital rotation parameters.
-            theta_optimization: If used in theta optimization.
-            kappa_optimization: If used in kappa optimization.
+            parameters: Orbital rotation and ansatz parameters.
+            theta_optimization: Doing theta optimization.
+            kappa_optimization: Doing kappa optimization.
             return_all_states: Return the energy for all states instead of only the averaged energy.
 
         Returns:
@@ -936,8 +923,8 @@ class WaveFunctionSAUPS:
 
         Args:
             parameters: Ansatz and orbital rotation parameters.
-            theta_optimization: If used in theta optimization.
-            kappa_optimization: If used in kappa optimization.
+            theta_optimization: Doing theta optimization.
+            kappa_optimization: Doing kappa optimization.
 
         Returns:
             State-averaged electronic gradient.

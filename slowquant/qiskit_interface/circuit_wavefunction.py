@@ -214,7 +214,7 @@ class WaveFunctionCircuit:
                 self.active_unocc_idx.append(orb_idx)
             else:
                 raise ValueError(
-                    f"Got unknown option for resolve_unpaired_idx, {resolve_unpaired_idx}, excpected 'both', 'occ' or 'unocc'."
+                    f"Got unknown option for resolve_unpaired_idx, {resolve_unpaired_idx}, expected 'both', 'occ' or 'unocc'."
                 )
         self.active_idx_shifted = [x - self.num_inactive_orbs for x in self.active_idx]
         self.active_occ_idx_shifted = [x - self.num_inactive_orbs for x in self.active_occ_idx]
@@ -226,7 +226,7 @@ class WaveFunctionCircuit:
         kappa_no_activeactive_idx_dagger = []
         self._kappa_old = []
         # kappa can be optimized in spatial basis
-        # Loop over all q>p orb combinations
+        # Loop over all q>p orb combinations.
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
                 if p in self.inactive_idx and q in self.inactive_idx:
@@ -294,6 +294,8 @@ class WaveFunctionCircuit:
         self._g_mo = None
         self._energy_elec = None
         self._kappa = k.copy()
+        if isinstance(self._kappa, np.ndarray):
+            self._kappa = self._kappa.tolist()
         # Move current expansion point.
         self._c_mo = self.c_mo
         self._kappa_old = self.kappa
@@ -305,6 +307,7 @@ class WaveFunctionCircuit:
         Returns:
             Molecular orbital coefficients.
         """
+        # Construct anti-hermitian kappa matrix
         kappa_mat = np.zeros_like(self._c_mo)
         if len(self.kappa) != 0:
             # The MO transformation is calculated as a difference between current kappa and kappa old.
@@ -314,6 +317,7 @@ class WaveFunctionCircuit:
                 for kappa_val, kappa_old, (p, q) in zip(self.kappa, self._kappa_old, self.kappa_idx):
                     kappa_mat[p, q] = kappa_val - kappa_old
                     kappa_mat[q, p] = -(kappa_val - kappa_old)
+        # Apply orbital rotation unitary to MO coefficients
         return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
 
     @property
@@ -417,12 +421,7 @@ class WaveFunctionCircuit:
 
     @property
     def rdm1(self) -> np.ndarray:
-        r"""Calculate one-electron reduced density matrix.
-
-        The trace condition is enforced:
-
-        .. math::
-            \sum_i\Gamma^{[1]}_{ii} = N_e
+        """Calculate one-electron reduced density matrix in the active space.
 
         Returns:
             One-electron reduced density matrix.
@@ -443,12 +442,7 @@ class WaveFunctionCircuit:
 
     @property
     def rdm2(self) -> np.ndarray:
-        r"""Calculate two-electron reduced density matrix.
-
-        The trace condition is enforced:
-
-        .. math::
-            \sum_{ij}\Gamma^{[2]}_{iijj} = N_e(N_e-1)
+        """Calculate two-electron reduced density matrix in the active space.
 
         Returns:
             Two-electron reduced density matrix.
@@ -493,12 +487,9 @@ class WaveFunctionCircuit:
 
     @property
     def rdm3(self) -> np.ndarray:
-        r"""Calculate three-electron reduced density matrix.
+        """Calculate three-electron reduced density matrix in the active space.
 
-        The trace condition is enforced:
-
-        .. math::
-            \sum_{ijk}\Gamma^{[3]}_{iijjkk} = N_e(N_e-1)(N_e-2)
+        Currently not utilizing the full symmetry.
 
         Returns:
             Three-electron reduced density matrix.
@@ -555,12 +546,9 @@ class WaveFunctionCircuit:
 
     @property
     def rdm4(self) -> np.ndarray:
-        r"""Calculate four-electron reduced density matrix.
+        """Calculate four-electron reduced density matrix in the active space.
 
-        The trace condition is enforced:
-
-        .. math::
-            \sum_{ijkl}\Gamma^{[4]}_{iijjkkll} = N_e(N_e-1)(N_e-2)(N_e-3)
+        Currently not utilizing the full symmetry.
 
         Returns:
             Four-electron reduced density matrix.
@@ -877,7 +865,7 @@ class WaveFunctionCircuit:
                 tol, maxiter, theta_optimizer, orbital_optimizer, is_silent_subiterations, print_std
             )
         else:
-            raise ValueError(f"Got unknown 'opt_type', {opt_type} excpected '1step' or '2step'.")
+            raise ValueError(f"Got unknown 'opt_type', {opt_type} expected '1step' or '2step'.")
 
     def _run_wf_optimization_2step(
         self,
@@ -1117,7 +1105,6 @@ class WaveFunctionCircuit:
         Returns:
             Electronic gradient.
         """
-        num_kappa = 0
         gradient = np.zeros(len(parameters))
         num_kappa = 0
         if kappa_optimization:
