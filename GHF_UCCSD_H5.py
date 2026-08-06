@@ -102,6 +102,17 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     c_u = c_mo @ step
 
+    # Small real step
+    # eps = 0.07
+
+    # X = np.random.randn(c_mo.shape[0], c_mo.shape[0])
+    # A_mat = eps * (X - X.T) / 2   # real antisymmetric
+
+    # step = expm(A_mat)            # orthogonal (= unitary for real matrices)
+
+    # c_u = c_mo @ step
+
+
     # GHF
     print("\n\nStarting GHF reoptimization:")
 

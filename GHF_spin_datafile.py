@@ -46,7 +46,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Spin", {spin})
     print("Charge",{charge})
     # PySCF
-    mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
+    mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin,)# ecp = "lanl2dz")
     mol.build()
    
     method = "fUCCSD"
@@ -61,13 +61,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     max_iter = 10000
 
 
-    data = np.load("data_H3_def2svp_00.npz")
+    data = np.load("data_N3_UCCSD_04.npz")
 
-    c_mo = data["c_mo"]
-
-    thetas_real = data["thetas_real"]
-
-    thetas_imag = data["thetas_imag"]
+    c_mo, thetas_real, thetas_imag = data["c_mo"], data["thetas_real"], data["thetas_imag"]
 
     WF = GeneralizedWaveFunctionUPS(
         active_space,
@@ -78,13 +74,14 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         include_active_kappa=active_k,
     )
 
-    print("Largest imaginary component of orbital coefficient:")
-    print("Largest complex element of c_mo:",np.max(WF.c_mo.imag))
-
     WF.set_thetas(thetas_real, thetas_imag)
 
-    print("Final electronic energy:", WF.energy_elec)
-    WF.spin_analysis()
+    print("Largest imaginary element of c_mo:",np.max(np.abs(WF.c_mo.imag)))
+    print("Largest imaginary element of thetas:",np.max(np.abs(WF.thetas_imag)))
+
+
+    # print("Final electronic energy:", WF.energy_elec)
+    # WF.spin_analysis()
 
 
 
@@ -149,7 +146,7 @@ def Cu3():
     geometry = """Cu   0.000000   0.000000   0.000000;
                   Cu   0.000000   0.000000   2.260000;
                   Cu   0.000000   1.883000   1.250000"""
-    basis = "def-2-svp"
+    basis = "lanl2dz"
     active_space = ((2, 1), 6)
     charge = 0
     spin = 1
@@ -185,4 +182,4 @@ def h8():
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
 
-h3()
+N3()
