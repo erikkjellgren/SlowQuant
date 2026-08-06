@@ -11,7 +11,7 @@ import scipy
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
-    two_electron_integral_transform_split
+    two_electron_integral_transform_split,
 )
 from slowquant.SlowQuant import SlowQuant
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_hcb
@@ -253,10 +253,14 @@ class WaveFunctionHCBUPS:
             if len(self.kappa) != 0:
                 shift = len(self.kappa_idx)
                 if np.max(np.abs(np.array(self.kappa) - np.array(self._kappa_old))) > 0.0:
-                    for kappa_val, kappa_old, (p, q) in zip(self.kappa[:shift], self._kappa_old[:shift], self.kappa_idx):
+                    for kappa_val, kappa_old, (p, q) in zip(
+                        self.kappa[:shift], self._kappa_old[:shift], self.kappa_idx
+                    ):
                         kappa_mat_a[p, q] = kappa_val - kappa_old
                         kappa_mat_a[q, p] = -(kappa_val - kappa_old)
-                    for kappa_val, kappa_old, (p, q) in zip(self.kappa[shift:], self._kappa_old[shift:], self.kappa_idx):
+                    for kappa_val, kappa_old, (p, q) in zip(
+                        self.kappa[shift:], self._kappa_old[shift:], self.kappa_idx
+                    ):
                         kappa_mat_b[p, q] = kappa_val - kappa_old
                         kappa_mat_b[q, p] = -(kappa_val - kappa_old)
             mo_coeffs[0] = np.matmul(self._c_mo[0], scipy.linalg.expm(-kappa_mat_a))
@@ -345,10 +349,18 @@ class WaveFunctionHCBUPS:
                 )
             elif self.wf_type == "unrestricted":
                 # Sorted as [g_aaaa, g_bbbb, g_aabb]
-                self._g_mo = np.zeros((3, self.num_orbs, self.num_orbs, self.num_orbs, self.num_orbs), dtype=float)
-                self._g_mo[0] = two_electron_integral_transform(self.c_mo[0], self.int_gen.electron_electron_repulsion)
-                self._g_mo[1] = two_electron_integral_transform(self.c_mo[1], self.int_gen.electron_electron_repulsion)
-                self._g_mo[2] = two_electron_integral_transform_split(self.c_mo[0], self.c_mo[1], self.int_gen.electron_electron_repulsion)
+                self._g_mo = np.zeros(
+                    (3, self.num_orbs, self.num_orbs, self.num_orbs, self.num_orbs), dtype=float
+                )
+                self._g_mo[0] = two_electron_integral_transform(
+                    self.c_mo[0], self.int_gen.electron_electron_repulsion
+                )
+                self._g_mo[1] = two_electron_integral_transform(
+                    self.c_mo[1], self.int_gen.electron_electron_repulsion
+                )
+                self._g_mo[2] = two_electron_integral_transform_split(
+                    self.c_mo[0], self.c_mo[1], self.int_gen.electron_electron_repulsion
+                )
             else:
                 raise ValueError(f"Got unknown wavefunction type, {self.wf_type}")
         return self._g_mo
