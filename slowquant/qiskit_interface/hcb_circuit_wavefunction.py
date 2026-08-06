@@ -47,7 +47,9 @@ class WaveFunctionHCBCircuit:
         if active_space[0] % 2 != 0:
             raise ValueError(f"Number of electrons must be even, got {active_space[0]}")
         if not isinstance(quantum_interface, HCBQuantumInterface):
-            raise TypeError(f"Expected quantum_interface to be 'HCBQuantumInterface' got, {type(quantum_interface)}.")
+            raise TypeError(
+                f"Expected quantum_interface to be 'HCBQuantumInterface' got, {type(quantum_interface)}."
+            )
         if isinstance(quantum_interface.ansatz, QuantumCircuit):
             print(
                 "WARNING: A QI with a custom Ansatz was passed. VQE will only work with COBYLA and COBYQA optimizer."
