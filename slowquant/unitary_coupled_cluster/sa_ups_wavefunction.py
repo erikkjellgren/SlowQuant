@@ -138,6 +138,8 @@ class WaveFunctionSAUPS:
             else:
                 self.virtual_spin_idx.append(i)
                 self.num_virtual_spin_orbs += 1
+        if self.num_active_elec % 2 != 0:
+            raise ValueError("Number of active electrons has to be even")
         self.num_active_elec_alpha = self.num_active_elec // 2
         self.num_active_elec_beta = self.num_active_elec // 2
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
@@ -260,6 +262,8 @@ class WaveFunctionSAUPS:
         # Construct UPS Structure
         self.ups_layout = UpsStructure()
         if ansatz.lower() in ("tups", "qnp"):
+            if self.ansatz_options.get("do_pp"):
+                raise ValueError("perfect pairing is not supported for Ansatz in SA UPS wave functions.")
             if ansatz.lower() == "tups":
                 self.ansatz_options["do_tups"] = True
             elif ansatz.lower() == "qnp":

@@ -230,7 +230,7 @@ class RotoSolve:
         self,
         f: Callable[[list[float]], float | np.ndarray],
         x0: Sequence[float],
-        f_rotosolve_optimized: None | Callable[[list[float], list[float], int], list[float]] = None,
+        f_rotosolve_optimized: Callable[[list[float], list[float], int], list[float]] | None = None,
     ) -> Result:
         """Run minimization.
 

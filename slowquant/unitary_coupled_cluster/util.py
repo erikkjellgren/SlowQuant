@@ -671,7 +671,7 @@ class UpsStructure:
             tUPS ansatz.
         """
         # Options
-        valid_options = ("n_layers", "do_qnp", "skip_last_singles", "do_tups")
+        valid_options = ("n_layers", "do_qnp", "skip_last_singles", "do_tups", "do_pp")
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(f"Got unknown option for tUPS, {option}. Valid options are: {valid_options}")
