@@ -518,12 +518,12 @@ class FermionicOperator:
         r"""Complex conjugation of fermionic operator.
 
         After dagger'ing, the operator blocks need to be reversed.
-        This give a number phase change that follows a shifted triangular number sequence,
+        This give a number of phase changes that follows a shifted triangular number sequence,
 
         .. math::
             \Gamma = (-1)^{(k(k-1)/2 + l(l-1)/2}
 
-        with :math:`k` being the number of creation and l the number of annihilation operators.
+        with :math:`k` being the number of creation operators and l the number of annihilation operators.
 
         Returns:
             New fermionic operator.
@@ -534,7 +534,7 @@ class FermionicOperator:
             l = len(op_key[0])
             phase_changes = (k * k - k + l * l - l) // 2
             sign = 1 - 2 * (phase_changes & 1)
-            operators[(op_key[1][::-1], op_key[0][::-1])] = fac * sign
+            operators[(op_key[1], op_key[0])] = fac * sign
         return FermionicOperator(operators)
 
     @property
