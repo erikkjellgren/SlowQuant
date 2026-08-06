@@ -185,7 +185,7 @@ def do_product_extended_normal_ordering_rankreduction(
     nondagger1_set: set[int],
     nondagger2_set: set[int],
 ) -> Generator[tuple[tuple[tuple[int, ...], tuple[int, ...]], int], None, None]:
-    """Generate all fermistrings from the product of two fermistrings with the assumption of rank reduction.
+    """Generate all fermistrings from the product of two fermistrings with the assumption of rank reduction, e.g. a fermistring product from a commutator.
 
     Takes as input two fermistrings that are already assumed to be sorted.
     If a1 has no index overlap with c2, then rank reduction cannot happen and the term is skipped
