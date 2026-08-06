@@ -160,7 +160,42 @@ class LinearResponseBaseClass:
         print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}")
         self.hessian = E2
         self.metric = S
+        
+        print('cond E', np.linalg.cond(E2))
+        print('cond E', np.linalg.cond(S))
 
+        
+        print('Vi er her ideal')
+
+        hessian_for = self.hessian
+        print('Hessian før', hessian_for)
+        metric_for = self.metric
+        print('Metric før', metric_for)
+        self.metric = 1/2*(self.metric+self.metric.conj().T) 
+        self.hessian = 1/2*(self.hessian+self.hessian.conj().T)
+
+        hessian_efter = self.hessian
+        print('Hessian efter', hessian_efter)
+        metric_efter = self.metric
+        print('Metric efter', metric_efter)
+
+        print("Metric is real?", np.allclose(self.metric.imag, 0))
+
+        print(f"Hermiticity check of the Hessian: max|E2 - E2†| = "
+        f"{np.max(np.abs(self.hessian - self.hessian.conj().T)):.2e}")  
+
+        print(f"Hermiticity check of the Metric: max|S2 - S2†| = "
+        f"{np.max(np.abs(self.metric - self.metric.T)):.2e}")  
+
+
+        print(f"Metric ENS = "
+        f"{np.max(np.abs(metric_for- metric_efter)):.2e}")  
+
+
+        print(f"Hessian ENS = "
+        f"{np.max(np.abs(hessian_for - hessian_efter)):.2e}")  
+
+        
         # for i in range(len(self.hessian)):
         #     print(self.hessian[i][i], i)
                 

@@ -351,7 +351,7 @@ def _single_excitation_efficient_generalized(
 
     # Complex correction:
     qc.rz(-phi/2, k_o) 
-    qc.rz(phi/2, i_o) 
+    qc.rz(phi/2, i_o)   
 
 
     # Correcting for switching of idx using anti-commutator relations:

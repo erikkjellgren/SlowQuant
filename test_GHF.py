@@ -452,7 +452,7 @@ def h3():
     geometry = """H  0.000000   0.000000       0.000000;
                   H  1.000000   0.000000       0.000000;
                   H  0.500000   0.8660254038   0.000000"""
-    basis = "sto-3g"
+    basis = "def2SVP"
     # basis = "631-g"
     #active_space = ((2, 1), 6)
     active_space = ((2,1), 6)
@@ -543,8 +543,8 @@ def O2():
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
 
-O2() 
-# h3()
+# O2() 
+h3()
 # h2()
 # h4_rektangle()
 # HI()
