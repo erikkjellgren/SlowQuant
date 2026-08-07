@@ -185,6 +185,7 @@ class WaveFunctionUPS:
                 self.active_unocc_idx_shifted.append(active_idx - active_shift)
         # Find non-redundant kappas
         self._kappa = []
+        kappa_with_activeactive_idx = []
         kappa_idx = []
         kappa_no_activeactive_idx = []
         kappa_no_activeactive_idx_dagger = []
@@ -201,6 +202,7 @@ class WaveFunctionUPS:
                 if p in self.virtual_idx and q in self.virtual_idx:
                     kappa_redundant_idx.append((p, q))
                     continue
+                kappa_with_activeactive_idx.append((p,q))
                 if not include_active_kappa:
                     if p in self.active_idx and q in self.active_idx:
                         kappa_redundant_idx.append((p, q))
@@ -223,6 +225,7 @@ class WaveFunctionUPS:
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     kappa_hf_like_idx.append((p, q))
         self.kappa_idx = np.array(kappa_idx, dtype=int)
+        self._kappa_with_activeactive_idx = np.array(kappa_with_activeactive_idx, dtype=int)
         self.kappa_no_activeactive_idx = np.array(kappa_no_activeactive_idx, dtype=int)
         self.kappa_no_activeactive_idx_dagger = np.array(kappa_no_activeactive_idx_dagger, dtype=int)
         self.kappa_redundant_idx = np.array(kappa_redundant_idx, dtype=int)
@@ -1392,17 +1395,14 @@ class WaveFunctionUPS:
         theta_optimization: bool,
         kappa_optimization: bool,
     ) -> np.ndarray:
-        h = 10**-4
+        h = 10**-2
+        num_kappa = len(self.kappa_idx)
         parameters_plus = (np.array(parameters) + h * np.array(trial_vec)).tolist()
         g_plus = self._calc_gradient_optimization(parameters_plus, theta_optimization, kappa_optimization)
         parameters_minus = (np.array(parameters) - h * np.array(trial_vec)).tolist()
         g_minus = self._calc_gradient_optimization(parameters_minus, theta_optimization, kappa_optimization)
-        num_kappa = 0
-        if kappa_optimization:
-            num_kappa = len(self.kappa_idx)
-            self.kappa = parameters[:num_kappa]
-        if theta_optimization:
-            self.thetas = parameters[num_kappa:]
+        self.kappa = parameters[:num_kappa]
+        self.thetas = parameters[num_kappa:]
         return (g_plus - g_minus) / (2 * h)
 
     def _calc_hessian_vector_product_optimization(
@@ -1442,9 +1442,9 @@ class WaveFunctionUPS:
             g_k += np.einsum("qo,pors->pqrs", kappa_mat, self.g_mo)
             g_k += np.einsum("ro,pqos->pqrs", kappa_mat, self.g_mo)
             g_k += np.einsum("so,pqro->pqrs", kappa_mat, self.g_mo)
-            grad_kappa = get_orbital_gradient(self.kappa_idx, self.fock_mat)
+            grad_kappa_all = get_orbital_gradient(self._kappa_with_activeactive_idx, self.fock_mat)
             grad_kappa_mat = np.zeros_like(self._c_mo)
-            for grad, (p, q) in zip(grad_kappa, self.kappa_idx):
+            for grad, (p, q) in zip(grad_kappa_all, self._kappa_with_activeactive_idx):
                 grad_kappa_mat[p, q] = grad
                 grad_kappa_mat[q, p] = -grad
             Ek_mat = np.matmul(grad_kappa_mat, kappa_mat) - np.matmul(kappa_mat, grad_kappa_mat)
