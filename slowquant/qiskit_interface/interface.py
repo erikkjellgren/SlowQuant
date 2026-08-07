@@ -1180,9 +1180,7 @@ class QuantumInterface:
                 if no_coeffs:
                     coeff = 1
                 p1 = self._sampler_distribution_p1(pauli, run_parameters)
-                var_p = (
-                    4 * coeff.real ** 2 * (p1 - p1**2)
-                )  # variance formula expressed in p1 probability
+                var_p = 4 * coeff.real**2 * (p1 - p1**2)  # variance formula expressed in p1 probability
                 result += var_p
         elif not do_no_corr:
             # Pauli strings in a group are not independent.
@@ -1224,7 +1222,7 @@ class QuantumInterface:
                 for key, value in dist.items():
                     if get_bitstring_sign(pauli, key) == 1:
                         p1 += value
-                var_p = 4 * coeff.real ** 2 * (p1 - p1**2)
+                var_p = 4 * coeff.real**2 * (p1 - p1**2)
                 result += var_p
 
         if self.shots is not None:

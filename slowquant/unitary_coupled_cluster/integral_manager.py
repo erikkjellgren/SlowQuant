@@ -127,4 +127,4 @@ class IntegralManager:
     @property
     def g_ao(self) -> np.ndarray:
         """Electron-electron repulsion integrals."""
-        return self.electron_electron_repulsion 
+        return self.electron_electron_repulsion

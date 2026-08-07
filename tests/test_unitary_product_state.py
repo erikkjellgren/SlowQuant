@@ -357,3 +357,61 @@ def test_saups_h3_3states_threaded() -> None:
     assert abs(osc[0] - 0.7569) < 10**-3
     assert abs(osc[1] - 0.7569) < 10**-3
     nb.set_num_threads(1)
+
+
+def test_h2o_symmetric_hessian() -> None:
+    """Test that the wavefunction Hessian is symmetric."""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """O   0.0  0.0           0.1035174918;
+    H   0.0  0.7955612117 -0.4640237459;
+    H   0.0 -0.7955612117 -0.4640237459;""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("STO-3G")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    WF = WaveFunctionUPS(
+        (4, 4),
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
+        "fUCCSD",
+        include_active_kappa=False,
+    )
+    WF.thetas = (np.ones(len(WF.thetas))).tolist()
+    n = len(WF.kappa) + len(WF.thetas)
+    hess = np.zeros((n, n))
+    for i in range(0, n):
+        vec = np.zeros(n)
+        vec[i] = 1
+        hess[:, i] = WF._calc_hessian_vector_product_optimization(WF.kappa + WF.thetas, vec, True, True)
+    assert np.max(np.abs(hess - hess.T)) < 10**-12
+
+
+def test_h2o_activekappa_symmetric_hessian() -> None:
+    """Test that the wavefunction Hessian is symmetric including active-active orbital rotations."""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """O   0.0  0.0           0.1035174918;
+    H   0.0  0.7955612117 -0.4640237459;
+    H   0.0 -0.7955612117 -0.4640237459;""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("STO-3G")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    WF = WaveFunctionUPS(
+        (4, 4),
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
+        "fUCCSD",
+        include_active_kappa=True,
+    )
+    WF.thetas = (np.ones(len(WF.thetas))).tolist()
+    n = len(WF.kappa) + len(WF.thetas)
+    hess = np.zeros((n, n))
+    for i in range(0, n):
+        vec = np.zeros(n)
+        vec[i] = 1
+        hess[:, i] = WF._calc_hessian_vector_product_optimization(WF.kappa + WF.thetas, vec, True, True)
+    assert np.max(np.abs(hess - hess.T)) < 10**-12

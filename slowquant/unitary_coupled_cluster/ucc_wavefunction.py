@@ -1078,7 +1078,7 @@ class WaveFunctionUCC:
         self._old_opt_parameters = np.copy(parameters)
         return E
 
-    def _theta_gradient(self, operator: FermionicOperator, set_step_size: None | float = None) -> np.ndarray:
+    def _theta_gradient(self, operator: FermionicOperator, set_step_size: float | None = None) -> np.ndarray:
         gradient = np.zeros(len(self.thetas))
         # Numerical finite difference gradient
         eps = np.finfo(np.float64).eps ** (1 / 2)  # half-precision of double-precision floating-point numbers
@@ -1118,7 +1118,7 @@ class WaveFunctionUCC:
         parameters: list[float],
         theta_optimization: bool,
         kappa_optimization: bool,
-        set_step_size: None | float = None,
+        set_step_size: float | None = None,
     ) -> np.ndarray:
         r"""Calculate electronic gradient.
 
