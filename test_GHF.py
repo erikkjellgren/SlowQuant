@@ -74,19 +74,19 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         coeff,
         #C_u,
         mol,
-        "fUCCSD",
+        "fUCCSDTQ",
         False, #Do x2c
         {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
-    ny_theta_real = np.random.uniform(-0.05, 0.05, len(WF.thetas))
-    # print(ny_theta_real)
-    ny_theta_imag = np.random.uniform(-0.05,0.05,len(WF.thetas)) 
-    # ny_theta_imag = [0.0] * len(WF.thetas)
-    # print(ny_theta_imag)
-    WF.set_thetas(ny_theta_real, ny_theta_imag)
-    # print('Theats noisy',WF.thetas)
+    # ny_theta_real = np.random.uniform(-0.05, 0.05, len(WF.thetas))
+    # # print(ny_theta_real)
+    # ny_theta_imag = np.random.uniform(-0.05,0.05,len(WF.thetas)) 
+    # # ny_theta_imag = [0.0] * len(WF.thetas)
+    # # print(ny_theta_imag)
+    # WF.set_thetas(ny_theta_real, ny_theta_imag)
+    # # print('Theats noisy',WF.thetas)
 
     # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
 
@@ -106,11 +106,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # dip_ao = build_x2c_pc_operator(mf, mol, "int1e_r", 'int1e_sprsp', c, x2c=False, picture_change=True)
 
 
-    "Calculate Excitation energies"
-    LR = generalized_naive.LinearResponse(WF, excitations="sd")
-    LR.calc_excitation_energies()
-    print(LR.excitation_energies)
-    print(LR.get_oscillator_strength(mol.intor("int1e_r")))
+    # "Calculate Excitation energies"
+    # LR = generalized_naive.LinearResponse(WF, excitations="sd")
+    # LR.calc_excitation_energies()
+    # print(LR.excitation_energies)
+    # print(LR.get_oscillator_strength(mol.intor("int1e_r")))
 
 
     # print(dip_ao.shape)
@@ -223,19 +223,19 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # thetas = np.array([0, 0, 0, 0, -0.11284015184], dtype=float).tolist()
     
      
-    'Test of Hamiltonians'
-    H=generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo, coeff.shape[0])
-    H_test=generalized_hamiltonian_0i_0a(WF.h_mo, WF.g_mo, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs)
-    test=generalized_expectation_value(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
-    print(test, test+e_nuc)
-    test2=generalized_expectation_value(WF.ci_coeffs, [H_test], WF.ci_coeffs, WF.ci_info)
-    print(test2, test2+e_nuc)
-    H_1iai=generalized_hamiltonian_1i_1a(WF.h_mo, WF.g_mo,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs, WF.num_virtual_spin_orbs)
-    test3=generalized_expectation_value(WF.ci_coeffs, [H_1iai], WF.ci_coeffs, WF.ci_info)
-    print(test3, test3+e_nuc)
-    H_2i2a=generalized_hamiltonian_2i_2a(WF.h_mo, WF.g_mo,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs, WF.num_virtual_spin_orbs)
-    test4=generalized_expectation_value(WF.ci_coeffs, [H_2i2a], WF.ci_coeffs, WF.ci_info)
-    print(test4, test4+e_nuc)
+    # 'Test of Hamiltonians'
+    # H=generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo, coeff.shape[0])
+    # H_test=generalized_hamiltonian_0i_0a(WF.h_mo, WF.g_mo, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs)
+    # test=generalized_expectation_value(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
+    # print(test, test+e_nuc)
+    # test2=generalized_expectation_value(WF.ci_coeffs, [H_test], WF.ci_coeffs, WF.ci_info)
+    # print(test2, test2+e_nuc)
+    # H_1iai=generalized_hamiltonian_1i_1a(WF.h_mo, WF.g_mo,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs, WF.num_virtual_spin_orbs)
+    # test3=generalized_expectation_value(WF.ci_coeffs, [H_1iai], WF.ci_coeffs, WF.ci_info)
+    # print(test3, test3+e_nuc)
+    # H_2i2a=generalized_hamiltonian_2i_2a(WF.h_mo, WF.g_mo,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs, WF.num_virtual_spin_orbs)
+    # test4=generalized_expectation_value(WF.ci_coeffs, [H_2i2a], WF.ci_coeffs, WF.ci_info)
+    # print(test4, test4+e_nuc)
 
     
     # # 'Test of gradients'
@@ -509,7 +509,7 @@ def HF():
     # basis = {'H':'sto-3g','Cl': 'x2c-SVPall.nw'}
     basis = {'H': gto.uncontract(load('x2c-SVPall.nw', 'H')),
                 'F': gto.uncontract(load('x2c-SVPall.nw', 'F'))}
-    active_space = ((1,1), 2) #spin orbitaler or spinor basis
+    active_space = ((4,4), 12) #spin orbitaler or spinor basis
     # active_space = ((2,2), 6) #spin orbitaler or spinor basis
     # active_space = (2, 4)
     charge = 0
@@ -544,7 +544,7 @@ def O2():
     )
 
 # O2() 
-h3()
+# h3()
 # h2()
 # h4_rektangle()
 # HI()
@@ -554,7 +554,7 @@ h3()
 # h2o()
 # LiH()
 # HCl()
-# HF()
+HF()
 # h5()
 
 
