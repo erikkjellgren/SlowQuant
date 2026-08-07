@@ -30,6 +30,7 @@ class Optimizers:
         method: str,
         grad: Callable[[list[float]], np.ndarray] | None = None,
         hessp: Callable[[list[float], list[float]], np.ndarray] | None = None,
+        hess: Callable[[list[float]], np.ndarray] | None = None,
         maxiter: int = 1000,
         tol: float = 10e-8,
         is_silent: bool = False,
@@ -54,6 +55,7 @@ class Optimizers:
         self.fun = fun
         self.grad = grad
         self.hessp = hessp
+        self.hess = hess
         self.method = method.lower()
         self.maxiter = maxiter
         self.tol = tol
@@ -126,6 +128,17 @@ class Optimizers:
                 x0,
                 jac=self.grad,
                 hessp=self.hessp,
+                method=self.method,
+                tol=self.tol,
+                callback=print_progress,
+                options={"maxiter": self.maxiter},  # , "disp": True},
+            )
+        elif self.method in ("trust-exact",):
+            res = scipy.optimize.minimize(
+                self.fun,
+                x0,
+                jac=self.grad,
+                hess=self.hess,
                 method=self.method,
                 tol=self.tol,
                 callback=print_progress,

@@ -1112,7 +1112,7 @@ class WaveFunctionUPS:
                 )
                 optimizer = Optimizers(
                     energy_oo,
-                    "l-bfgs-b",
+                    "newton-cg",
                     grad=gradient_oo,
                     hessp=hessp_oo,
                     maxiter=maxiter,
@@ -1174,58 +1174,31 @@ class WaveFunctionUPS:
                 )
 
         print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #")
-        if orbital_optimization:
-            if len(self.thetas) > 0:
-                energy = partial(
-                    self._calc_energy_optimization,
-                    theta_optimization=True,
-                    kappa_optimization=True,
-                )
-                gradient = partial(
-                    self._calc_gradient_optimization,
-                    theta_optimization=True,
-                    kappa_optimization=True,
-                )
-                hessp = partial(
-                    self._calc_hessian_vector_product_optimization,
-                    theta_optimization=True,
-                    kappa_optimization=True,
-                )
-            else:
-                energy = partial(
-                    self._calc_energy_optimization,
-                    theta_optimization=False,
-                    kappa_optimization=True,
-                )
-                gradient = partial(
-                    self._calc_gradient_optimization,
-                    theta_optimization=False,
-                    kappa_optimization=True,
-                )
-                hessp = partial(
-                    self._calc_hessian_vector_product_optimization,
-                    theta_optimization=False,
-                    kappa_optimization=True,
-                )
-        else:
-            energy = partial(
-                self._calc_energy_optimization,
-                theta_optimization=True,
-                kappa_optimization=False,
-            )
-            gradient = partial(
-                self._calc_gradient_optimization,
-                theta_optimization=True,
-                kappa_optimization=False,
-            )
-            hessp = partial(
-                self._calc_hessian_vector_product_optimization,
-                theta_optimization=True,
-                kappa_optimization=False,
-            )
+        theta_optimization = True
+        if len(self.thetas) == 0:
+            theta_optimization = False
+        energy = partial(
+            self._calc_energy_optimization,
+            theta_optimization=theta_optimization,
+            kappa_optimization=orbital_optimization,
+        )
+        gradient = partial(
+            self._calc_gradient_optimization,
+            theta_optimization=theta_optimization,
+            kappa_optimization=orbital_optimization,
+        )
+        hessp = partial(
+            self._calc_hessian_vector_product_optimization,
+            theta_optimization=theta_optimization,
+            kappa_optimization=orbital_optimization,
+        )
+        hess = partial(self._calc_full_hessian_optimization,
+            theta_optimization=theta_optimization,
+            kappa_optimization=orbital_optimization,
+                       )
         if orbital_optimization:
             cep_move_fun = self._move_cep
-            if len(self.thetas) > 0:
+            if theta_optimization:
                 parameters = self.kappa + self.thetas
             else:
                 parameters = self.kappa
@@ -1237,6 +1210,7 @@ class WaveFunctionUPS:
             optimizer_name,
             grad=gradient,
             hessp=hessp,
+            hess=hess,
             maxiter=maxiter,
             tol=tol,
             energy_eval_callback=lambda: self.num_energy_evals,
@@ -1395,15 +1369,44 @@ class WaveFunctionUPS:
         theta_optimization: bool,
         kappa_optimization: bool,
     ) -> np.ndarray:
-        h = 10**-2
+# Increased h slightly: dividing by h^2 later magnifies precision loss.
+        # 10**-3 is usually the sweet spot for 2nd derivatives via energy.
+        h = 10**-3 
+        
+        p = np.array(parameters)
+        v = np.array(trial_vec)
+        num_params = len(p)
+        
+        # Array to store the resulting Hessian-vector product
+        hv_product = np.zeros(num_params)
+       
+        self._old_opt_parameters = np.zeros(len(p))
+        # Calculate the product for each dimension i
+        for i in range(num_params):
+            e_i = np.zeros(num_params)
+            e_i[i] = 1.0
+            
+            # 4 points for the mixed partial derivative stencil
+            p_pp = (p + h * v + h * e_i).tolist()
+            p_pm = (p + h * v - h * e_i).tolist()
+            p_mp = (p - h * v + h * e_i).tolist()
+            p_mm = (p - h * v - h * e_i).tolist()
+            
+            # Evaluate energies (update method name if yours differs)
+            e_pp = self._calc_energy_optimization(p_pp, theta_optimization, kappa_optimization)
+            e_pm = self._calc_energy_optimization(p_pm, theta_optimization, kappa_optimization)
+            e_mp = self._calc_energy_optimization(p_mp, theta_optimization, kappa_optimization)
+            e_mm = self._calc_energy_optimization(p_mm, theta_optimization, kappa_optimization)
+            
+            # 4-point central difference for the off-diagonal (mixed) second derivative
+            hv_product[i] = (e_pp - e_pm - e_mp + e_mm) / (4 * h**2)
+            
+        # Restore state variables exactly as in your original code
         num_kappa = len(self.kappa_idx)
-        parameters_plus = (np.array(parameters) + h * np.array(trial_vec)).tolist()
-        g_plus = self._calc_gradient_optimization(parameters_plus, theta_optimization, kappa_optimization)
-        parameters_minus = (np.array(parameters) - h * np.array(trial_vec)).tolist()
-        g_minus = self._calc_gradient_optimization(parameters_minus, theta_optimization, kappa_optimization)
         self.kappa = parameters[:num_kappa]
         self.thetas = parameters[num_kappa:]
-        return (g_plus - g_minus) / (2 * h)
+        
+        return hv_product
 
     def _calc_hessian_vector_product_optimization(
         self,
@@ -1575,6 +1578,192 @@ class WaveFunctionUPS:
                 2 * np.sum(list(self.ups_layout.grad_param_R.values()))
             ) ** 2  # Count energy measurements for theta theta Hessian
         return hvp
+
+    def _calc_full_hessian_optimization(
+        self,
+        parameters: list[float],
+        theta_optimization: bool,
+        kappa_optimization: bool,
+    ) -> np.ndarray:
+        """Construct the full Hessian directly, without looping the
+        Hessian-vector product over the standard basis.
+
+        Shares every piece of work that does not depend on the trial
+        direction instead of recomputing it per column:
+          1. psi_vec's forward trajectory and lambda_vec's backward
+             trajectory (H|psi>) are built once, not once per column.
+          2. The M "companion" states that make up phi_vec for each theta
+             direction are built in one shared forward sweep.
+          3. The kappa-theta / theta-kappa block is filled once (via the
+             cheaper H_k/theta_gradient path, looped over kappa indices)
+             and mirrored into its symmetric partner, instead of also being
+             computed via the O(num_active^4)-per-theta-index tdm1/tdm2
+             path. Set use_tdm_for_kappa_theta=True to use that path
+             instead (e.g. to cross-check numerically).
+
+        Args:
+            parameters: Ansatz and orbital rotation parameters.
+            theta_optimization: If used in theta optimization.
+            kappa_optimization: If used in kappa optimization.
+
+        Returns:
+            Full Hessian, shape (len(parameters), len(parameters)).
+        """
+        use_tdm_for_kappa_theta = False
+
+        num_params = len(parameters)
+        hessian = np.zeros((num_params, num_params))
+
+        num_kappa = 0
+        if kappa_optimization:
+            num_kappa = len(self.kappa_idx)
+            self.kappa = parameters[:num_kappa]
+        if theta_optimization:
+            self.thetas = parameters[num_kappa:]
+        num_theta = len(self.thetas) if theta_optimization else 0
+
+        # -----------------------------------------------------------------
+        # Kappa-kappa block (+ theta-kappa via the cheap path), one pass per
+        # kappa index -- no theta sweep attached anymore.
+        # -----------------------------------------------------------------
+        if kappa_optimization:
+            grad_kappa_all = get_orbital_gradient(self._kappa_with_activeactive_idx, self.fock_mat)
+            grad_kappa_mat = np.zeros_like(self._c_mo)
+            for grad, (p, q) in zip(grad_kappa_all, self._kappa_with_activeactive_idx):
+                grad_kappa_mat[p, q] = grad
+                grad_kappa_mat[q, p] = -grad
+
+            for col, (p_c, q_c) in enumerate(self.kappa_idx):
+                kappa_mat = np.zeros_like(self._c_mo)
+                kappa_mat[p_c, q_c] = 1.0
+                kappa_mat[q_c, p_c] = -1.0
+
+                h_k = np.einsum("po,oq->pq", kappa_mat, self.h_mo)
+                h_k += np.einsum("qo,po->pq", kappa_mat, self.h_mo)
+                g_k = np.einsum("po,oqrs->pqrs", kappa_mat, self.g_mo)
+                g_k += np.einsum("qo,pors->pqrs", kappa_mat, self.g_mo)
+                g_k += np.einsum("ro,pqos->pqrs", kappa_mat, self.g_mo)
+                g_k += np.einsum("so,pqro->pqrs", kappa_mat, self.g_mo)
+
+                Ek_mat = np.matmul(grad_kappa_mat, kappa_mat) - np.matmul(kappa_mat, grad_kappa_mat)
+                grad_k = get_orbital_gradient_den(
+                    h_k, g_k, self.kappa_idx, self.num_inactive_orbs, self.num_active_orbs, self.rdm1, self.rdm2,
+                )
+                for row, (p, q) in enumerate(self.kappa_idx):
+                    hessian[row, col] = grad_k[row] + 0.5 * Ek_mat[p, q]
+
+                if theta_optimization and not use_tdm_for_kappa_theta:
+                    H_k = hamiltonian_0i_0a(h_k, g_k, self.num_inactive_orbs, self.num_active_orbs)
+                    hessian[num_kappa:, col] = self._theta_gradient(H_k)
+
+        if not theta_optimization:
+            return 0.5 * (hessian + hessian.T)
+
+        # -----------------------------------------------------------------
+        # Shared forward pass: psi trajectory + all M companion states,
+        # built once instead of once per column (linearity of
+        # propagate_unitary in the state argument is what licenses this).
+        # -----------------------------------------------------------------
+        psi_vec = np.copy(self.csf_coeffs)
+        companions: list[np.ndarray] = []
+        for i in range(num_theta):
+            psi_vec = propagate_unitary(psi_vec, i, self.ci_info, self.thetas, self.ups_layout)
+            for j in range(len(companions)):
+                companions[j] = propagate_unitary(companions[j], i, self.ci_info, self.thetas, self.ups_layout)
+            companions.append(get_grad_action(psi_vec, i, self.ci_info, self.ups_layout))
+        psi_vec_final = psi_vec
+
+        # -----------------------------------------------------------------
+        # Kappa-theta block via tdm1/tdm2, only if explicitly requested
+        # (this is the expensive O(num_active^4)-per-column path).
+        # -----------------------------------------------------------------
+        if kappa_optimization and use_tdm_for_kappa_theta:
+            for col_j in range(num_theta):
+                phi_vec = companions[col_j]
+                tdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs))
+                for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                    p_idx = p - self.num_inactive_orbs
+                    for q in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                        q_idx = q - self.num_inactive_orbs
+                        op = Epq(p, q)
+                        Ephi_vec = propagate_state([op], phi_vec, self.ci_info, wf_struct=self.ups_layout)
+                        Epsi_vec = propagate_state([op], psi_vec_final, self.ci_info, wf_struct=self.ups_layout)
+                        tdm1[p_idx, q_idx] = psi_vec_final @ Ephi_vec + phi_vec @ Epsi_vec
+
+                tdm2 = np.zeros((self.num_active_orbs,) * 4)
+                pairs = [
+                    (p, q)
+                    for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs)
+                    for q in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs)
+                ]
+                for i in range(len(pairs)):
+                    p, q = pairs[i]
+                    p_idx, q_idx = p - self.num_inactive_orbs, q - self.num_inactive_orbs
+                    for j in range(i, len(pairs)):
+                        r, s = pairs[j]
+                        r_idx, s_idx = r - self.num_inactive_orbs, s - self.num_inactive_orbs
+                        op = epqrs(p, q, r, s)
+                        ephi_vec = propagate_state([op], phi_vec, self.ci_info, self.thetas, self.ups_layout)
+                        epsi_vec = propagate_state([op], psi_vec_final, self.ci_info, self.thetas, self.ups_layout)
+                        val = psi_vec_final @ ephi_vec + phi_vec @ epsi_vec
+                        tdm2[p_idx, q_idx, r_idx, s_idx] = val
+                        tdm2[r_idx, s_idx, p_idx, q_idx] = val
+
+                DA_ao_trans = np.einsum(
+                    "vw,Pv,Qw->PQ",
+                    tdm1,
+                    self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs],
+                    self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs],
+                )
+                fock_mat_active_trans, _ = build_fock_active(self.int_gen.g_ao, self.c_mo, DA_ao_trans)
+                fock_trans = build_fock_matrix(
+                    self.g_Pvwx, self.c_mo, self.fock_mat_inactive, fock_mat_active_trans,
+                    tdm1, tdm2, self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs, do_resp=True,
+                )
+                hessian[:num_kappa, num_kappa + col_j] = get_orbital_gradient(self.kappa_idx, fock_trans)
+        elif kappa_optimization:
+            hessian[:num_kappa, num_kappa:] = hessian[num_kappa:, :num_kappa].T
+
+        # -----------------------------------------------------------------
+        # Shared backward pass for psi_vec / lambda_vec (independent of the
+        # trial direction) -- built once instead of once per column.
+        # -----------------------------------------------------------------
+        lambda_vec = propagate_state([self.H_wf_opt], psi_vec_final, self.ci_info, self.thetas, self.ups_layout)
+        psi_b = psi_vec_final
+        dpsi_at = [None] * num_theta
+        dlambda_at = [None] * num_theta
+        lambda_b_at = [None] * num_theta
+        for i in range(num_theta - 1, -1, -1):
+            dpsi_at[i] = get_grad_action(psi_b, i, self.ci_info, self.ups_layout)
+            dlambda_at[i] = get_grad_action(lambda_vec, i, self.ci_info, self.ups_layout)
+            lambda_b_at[i] = lambda_vec
+            lambda_vec = propagate_unitary(lambda_vec, i, self.ci_info, self.thetas, self.ups_layout, dagger=True)
+            psi_b = propagate_unitary(psi_b, i, self.ci_info, self.thetas, self.ups_layout, dagger=True)
+
+        # -----------------------------------------------------------------
+        # Theta-theta block: one backward sweep per column, reusing the
+        # shared dpsi_at / dlambda_at / lambda_b_at from above.
+        # -----------------------------------------------------------------
+        for col_j in range(num_theta):
+            phi_vec = companions[col_j]
+            mu_vec = propagate_state([self.H_wf_opt], phi_vec, self.ci_info, self.thetas, self.ups_layout)
+            for i in range(num_theta - 1, -1, -1):
+                dphi_vec = get_grad_action(phi_vec, i, self.ci_info, self.ups_layout)
+                term_overlap_and_future = np.vdot(mu_vec, dpsi_at[i])
+                term_past_and_diag = np.vdot(lambda_b_at[i], dphi_vec)
+                hessian[num_kappa + i, num_kappa + col_j] = 2 * np.real(
+                    term_overlap_and_future + term_past_and_diag
+                )
+                if i == col_j:
+                    phi_vec = phi_vec - dpsi_at[i]
+                    mu_vec = mu_vec - dlambda_at[i]
+                mu_vec = propagate_unitary(mu_vec, i, self.ci_info, self.thetas, self.ups_layout, dagger=True)
+                phi_vec = propagate_unitary(phi_vec, i, self.ci_info, self.thetas, self.ups_layout, dagger=True)
+
+            self.num_energy_evals += (2 * np.sum(list(self.ups_layout.grad_param_R.values()))) ** 2
+
+        return 0.5 * (hessian + hessian.T)
+
 
     def _calc_energy_rotosolve_optimization(
         self,
