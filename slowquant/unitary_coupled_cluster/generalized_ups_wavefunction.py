@@ -65,6 +65,7 @@ class GeneralizedWaveFunctionUPS:
         integral_generator: SlowQuant | pyscf.gto.mole.Mole,
         ansatz: str,
         do_x2c: bool = False,
+        ecp : bool = False,
         ansatz_options: dict[str, Any] | None = None,
         include_active_kappa: bool = False,
     ) -> None:
@@ -99,7 +100,8 @@ class GeneralizedWaveFunctionUPS:
         #     )
         # Init stuff
         self.x2c=do_x2c #AE added this
-        self.int_gen: IntegralManager = IntegralManager(integral_generator, x2c=do_x2c)
+        self.ecp = ecp
+        self.int_gen: IntegralManager = IntegralManager(integral_generator, x2c=do_x2c, ecp = ecp)
         self._c_mo = np.copy(mo_coeffs).astype(np.complex128)
         # self._h_ao = h_ao
         # self._g_ao = g_ao
