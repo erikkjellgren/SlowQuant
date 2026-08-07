@@ -705,6 +705,58 @@ def make_h_B_ao_old(mol):
     return hB
 
 
+def pauli_ao_int(mol):
+    """
+    Return the spin-AO integrals of the Pauli operators.
+
+    Returns
+    -------
+    sigma : ndarray, shape (3, 2*nao, 2*nao)
+        sigma[0] = σx
+        sigma[1] = σy
+        sigma[2] = σz
+    """
+    S = mol.intor("int1e_ovlp_sph")
+    paulis = lib.PauliMatrices
+
+    return np.array([np.kron(p, S) for p in paulis])
+
+def ang_mom_ao_int(mol, origin=(0.0, 0.0, 0.0)):
+    """
+    Two-spinor AO integrals of L = (r-origin) x p.
+    """
+
+    with mol.with_common_origin(origin):
+        L_spatial = mol.intor("int1e_cg_irxp_sph", comp=3)
+
+    nao = L_spatial.shape[-1]
+
+    L_spinor = np.zeros((3, 2*nao, 2*nao), dtype=L_spatial.dtype)
+
+    for k in range(3):
+        L_spinor[k, :nao, :nao] = L_spatial[k]
+        L_spinor[k, nao:, nao:] = L_spatial[k]
+
+    return L_spinor
+
+
+def RMB_corr_int(mol, origin=(0.0, 0.0, 0.0)):
+    """
+    Spin-AO integrals of L + σ.
+
+    Returns
+    -------
+    op : (3, 2*nao, 2*nao) ndarray
+        op[0] = Lx + σx
+        op[1] = Ly + σy
+        op[2] = Lz + σz
+    """
+    return (
+        ang_mom_ao_int(mol, origin)
+        + pauli_ao_int(mol)
+    )
+
+
 
 
 def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):

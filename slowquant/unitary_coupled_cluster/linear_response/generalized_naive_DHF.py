@@ -4,6 +4,9 @@ import numpy as np
 from scipy.linalg import solve
 import scipy.linalg as la
 from pyscf.data import nist
+pyscf import lib
+
+c = lib.param.LIGHT_SPEED
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform, generalized_one_electron_transform, DHF_one_electron_transform,
@@ -2149,4 +2152,44 @@ class LinearResponse(LinearResponseBaseClass):
         return np.trace(sigma_total, axis1=1, axis2=2) / 3
     
 
+
+    def get_occ_beta(self, RMB_int):
+        # Should only be indexed with occupied-occupied idx !!!
+
+        nao = RMB_int.shape[0] // 2
+
+        RMB_int_full = np.zeros((3, 4*nao, 4*nao), dtype=np.complex128)
+
+        for k in range(3):
+            RMB_int_full[k, 2*nao:, 2*nao:] = RMB_int[k]
+
+        RMB_int_occ_MO = DHF_one_electron_transform(self.wf.c_mo, RMB_int_full)
+
+        return - .25 * c**3 * RMB_int_occ_MO
+
+
+    def get_shielding_P0(self, RMB_int, P0_int):
+        # OBS! on integral prefactors for P0_int!! (Maybe 1/c or 1/2 too much!)
+        # Use h1_AO integrals for P0_int
+
+        occ_beta = self.get_occ_beta(RMB_int)
+
+        P0_int_MO = DHF_one_electron_transform(self.wf.c_mo, P0_int)
+
+        P0 = 0
+
+        for i in range(self.wf.inactive_spin_idx + self.wf.active_occ_spin_idx):
+            for j in range(self.wf.inactive_spin_idx + self.wf.active_occ_spin_idx):
+                P0 += .5 * 1/c * occ_beta[j, i] * P0_int_MO[i, j]
+
+        return P0
+
+
+    def prop_grad_RMB_corr(self, h_B):
+        # Use the h_B_AO or h2_AO integrals 
+        return 0
+
+
+
+    
 
