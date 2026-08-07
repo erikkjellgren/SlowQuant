@@ -1,4 +1,5 @@
 import numpy as np
+import pyscf
 
 import slowquant.SlowQuant as sq
 from slowquant.unitary_coupled_cluster.hcb_ups_wavefunction import WaveFunctionHCBUPS
@@ -124,3 +125,27 @@ def test_h2o_44_ooUCCpD() -> None:
 
     assert abs(WF.energy_elec - WFref.energy_elec) < 10**-8
     assert abs(WF.energy_elec - -83.98145575177105) < 10**-8
+
+
+def test_unrestricted_oo_H4() -> None:
+    """Test unrestricted orbital optimization for H4.
+
+    Square H4 should give a unrestricted solution for DOCI.
+    """
+    mol = pyscf.gto.M(
+        atom="H 0 0 0; H 1.5 0 0; H 1.5 1.5 0; H 0 1.5 0;",
+        basis="STO-3G",
+    )
+
+    uhf = pyscf.scf.UHF(mol)
+    uhf = uhf.newton()
+    _ = uhf.kernel()
+
+    UWF = WaveFunctionHCBUPS(
+        (4, 4),
+        uhf.mo_coeff,
+        mol,
+        "fuccpd",
+    )
+    UWF.run_wf_optimization_1step("BFGS", True)
+    assert abs(UWF.energy_elec - -3.8304665729480392) < 10**-8

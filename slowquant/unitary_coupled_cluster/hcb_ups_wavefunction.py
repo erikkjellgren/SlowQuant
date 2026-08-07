@@ -9,6 +9,8 @@ import pyscf
 import scipy
 
 from slowquant.molecularintegrals.integralfunctions import (
+    generalized_one_electron_transform,
+    generalized_two_electron_transform,
     one_electron_integral_transform,
     two_electron_integral_transform,
     two_electron_integral_transform_split,
@@ -110,6 +112,9 @@ class WaveFunctionHCBUPS:
         self.active_idx_shifted = [x - self.num_inactive_orbs for x in self.active_idx]
         self.active_occ_idx_shifted = [x - self.num_inactive_orbs for x in self.active_occ_idx]
         self.active_unocc_idx_shifted = [x - self.num_inactive_orbs for x in self.active_unocc_idx]
+        # Construct spin idx
+        self.inactive_spin_idx = [so for i in self.inactive_idx for so in (2 * i, 2 * i + 1)]
+        self.virtual_spin_idx = [so for i in self.virtual_idx for so in (2 * i, 2 * i + 1)]
         # Find non-redundant kappas
         kappa_idx = []
         self._kappa = []
@@ -237,7 +242,7 @@ class WaveFunctionHCBUPS:
         # The MO transformation is calculated as a difference between current kappa and kappa old.
         # This is to make the moving of the expansion point to work with SciPy optimization algorithms.
         # Resetting kappa to zero would mess with any algorithm that has any memory f.x. BFGS.
-        if self.wf_type == "restricted":
+        if self.wf_type in ("restricted", "generalized"):
             # Construct anti-hermitian kappa matrix
             kappa_mat = np.zeros_like(self._c_mo)
             if len(self.kappa) != 0:
@@ -291,7 +296,21 @@ class WaveFunctionHCBUPS:
                         else:
                             self._hr1[p, q] = self.g_mo[2, p, q, p, q]
             elif self.wf_type == "generalized":
-                None
+                for p in range(self.num_orbs):
+                    pa = 2 * p
+                    pb = 2 * p + 1
+                    for q in range(self.num_orbs):
+                        qa = 2 * q
+                        qb = 2 * q + 1
+                        if p == q:
+                            self._hr1[p, p] = (
+                                self.h_mo[pa, pa]
+                                + self.h_mo[pb, pb]
+                                + self.g_mo[pa, pa, pb, pb]
+                                - self.g_mo[pa, pb, pb, pa]
+                            )
+                        else:
+                            self._hr1[p, q] = self.g_mo[pa, qa, pb, qb] - self.g_mo[pa, qb, pb, qa]
             else:
                 raise ValueError(f"Got unknown wf_type, {self.wf_type}")
         return self._hr1
@@ -322,7 +341,26 @@ class WaveFunctionHCBUPS:
                                 )
                             )
             elif self.wf_type == "generalized":
-                None
+                for p in range(self.num_orbs):
+                    pa = 2 * p
+                    pb = 2 * p + 1
+                    for q in range(self.num_orbs):
+                        qa = 2 * q
+                        qb = 2 * q + 1
+                        self._hr2[p, q] = (
+                            1
+                            / 2
+                            * (
+                                self.g_mo[pa, pa, qa, qa]
+                                + self.g_mo[pa, pa, qb, qb]
+                                + self.g_mo[pb, pb, qa, qa]
+                                + self.g_mo[pb, pb, qb, qb]
+                                - self.g_mo[pa, qa, pa, qa]
+                                - self.g_mo[pa, qb, pa, qb]
+                                - self.g_mo[pb, qa, pb, qa]
+                                - self.g_mo[pb, qb, pb, qb]
+                            )
+                        )
             else:
                 raise ValueError(f"Got unknown wf_type, {self.wf_type}")
         return self._hr2
@@ -337,6 +375,8 @@ class WaveFunctionHCBUPS:
                 self._h_mo = np.zeros((2, self.num_orbs, self.num_orbs), dtype=float)
                 self._h_mo[0] = one_electron_integral_transform(self.c_mo[0], self.int_gen.h_ao)
                 self._h_mo[1] = one_electron_integral_transform(self.c_mo[1], self.int_gen.h_ao)
+            elif self.wf_type == "generalized":
+                self._h_mo = generalized_one_electron_transform(self.c_mo, self.int_gen.h_ao)
             else:
                 raise ValueError(f"Got unknown wavefunction type, {self.wf_type}")
         return self._h_mo
@@ -361,6 +401,10 @@ class WaveFunctionHCBUPS:
                 )
                 self._g_mo[2] = two_electron_integral_transform_split(
                     self.c_mo[0], self.c_mo[1], self.int_gen.electron_electron_repulsion
+                )
+            elif self.wf_type == "generalized":
+                self._g_mo = generalized_two_electron_transform(
+                    self.c_mo, self.int_gen.electron_electron_repulsion
                 )
             else:
                 raise ValueError(f"Got unknown wavefunction type, {self.wf_type}")
