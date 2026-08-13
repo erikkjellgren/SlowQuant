@@ -321,9 +321,9 @@ class quantumLRBaseClass:
         """Solve LR eigenvalue problem."""
         # Build Hessian and Metric
 
-        self.Sigma = 1/2*(self.Sigma+self.Sigma.conj().T)
-        self.A = 1/2*(self.A+self.A.conj().T)
-        self.B = 1/2*(self.B+self.B.T)
+        # self.Sigma = 1/2*(self.Sigma+self.Sigma.conj().T)
+        # self.A = 1/2*(self.A+self.A.conj().T)
+        # self.B = 1/2*(self.B+self.B.T)
 
 
         size = len(self.A)
@@ -340,8 +340,8 @@ class quantumLRBaseClass:
         self.metric[size:, size:] = -self.Sigma.conjugate()
 
 
-        self.hessian = 1/2*(self.hessian+self.hessian.conj().T)
-        self.metric = 1/2*(self.metric+self.metric.conj().T) 
+        # self.hessian = 1/2*(self.hessian+self.hessian.conj().T)
+        # self.metric = 1/2*(self.metric+self.metric.conj().T) 
 
         
         # print('Vi er her noisy')
