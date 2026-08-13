@@ -112,6 +112,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         method,
         ansatz_options = {"n_layers": 0, "is_spin_conserving" : spin_consv},
         include_active_kappa=active_k,
+        ecp = True,
     )
 
     GHF.run_wf_optimization_1step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter = max_iter)
@@ -156,6 +157,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         method,
         ansatz_options = {"n_layers": nl, "is_spin_conserving" : spin_consv},
         include_active_kappa=active_k,
+        ecp = True,
     )
 
     np.random.seed(rd_seed)

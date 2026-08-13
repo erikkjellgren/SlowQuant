@@ -16,9 +16,10 @@ class IntegralManager:
         "_overlap",
         "int_obj",
         "x2c",
+        "ecp",
     )
 
-    def __init__(self, integral_obj: SlowQuant | pyscf.gto.mole.Mole, x2c: bool = False) -> None:
+    def __init__(self, integral_obj: SlowQuant | pyscf.gto.mole.Mole, x2c: bool = False, ecp = False) -> None:
         """Initilize the integral manager.
 
         Args:
@@ -32,6 +33,7 @@ class IntegralManager:
         self._electric_dipole: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
         self._h_ao: np.ndarray | None = None
         self.x2c = x2c
+        self.ecp = ecp
 
     @property
     def num_elec(self) -> int:
@@ -125,6 +127,8 @@ class IntegralManager:
             if self.x2c:
                 mf = pyscf.scf.GHF(self.int_obj).x2c()
                 h_core = mf.get_hcore()
+            elif self.ecp:
+                h_core = self.nuclear_electron_attraction + self.kinetic_energy + self.int_obj.intor("ECPscalar")
             else:
                 h_core = self.nuclear_electron_attraction + self.kinetic_energy
         else:
