@@ -574,6 +574,10 @@ class LinearResponse(LinearResponseBaseClass):
         print(f"Symmetry check of B: max|B - B.T| = "
             f"{np.max(np.abs(self.B - self.B.T)):.2e}")  
         
+        
+        print(f"Symmetry check of Sigma: max|Sigma - Sigma†| = "
+            f"{np.max(np.abs(self.Sigma - self.Sigma.conj().T)):.2e}")  
+
         print("Hessian is real?", np.allclose(E2.imag, 0))
         print("Largest imaginary value in Hessian",np.max(np.imag(E2)))
                         

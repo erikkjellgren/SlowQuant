@@ -320,6 +320,12 @@ class quantumLRBaseClass:
     def get_excitation_energies(self) -> np.ndarray:
         """Solve LR eigenvalue problem."""
         # Build Hessian and Metric
+
+        self.Sigma = 1/2*(self.Sigma+self.Sigma.conj().T)
+        self.A = 1/2*(self.A+self.A.conj().T)
+        self.B = 1/2*(self.B+self.B.T)
+
+
         size = len(self.A)
         self.Delta = np.zeros_like(self.Sigma, dtype=complex)
         self.hessian = np.zeros((size * 2, size * 2), dtype=complex)
@@ -334,6 +340,9 @@ class quantumLRBaseClass:
         self.metric[size:, size:] = -self.Sigma.conjugate()
 
 
+        self.hessian = 1/2*(self.hessian+self.hessian.conj().T)
+        self.metric = 1/2*(self.metric+self.metric.conj().T) 
+
         
         # print('Vi er her noisy')
 
@@ -341,8 +350,7 @@ class quantumLRBaseClass:
         # print('Hessian før', hessian_for)
         # metric_for = self.metric
         # print('Metric før', metric_for)
-        # self.metric = 1/2*(self.metric+self.metric.conj().T) 
-        # self.hessian = 1/2*(self.hessian+self.hessian.conj().T)
+        # self.metric = 1/2*(self.metric+self.metric.T) 
 
         # hessian_efter = self.hessian
         # print('Hessian efter', hessian_efter)
@@ -354,8 +362,13 @@ class quantumLRBaseClass:
         print(f"Hermiticity check of the Hessian: max|E2 - E2†| = "
         f"{np.max(np.abs(self.hessian - self.hessian.conj().T)):.2e}")  
 
-        print(f"Hermiticity check of the Metric: max|S2 - S2†| = "
+        print(f"Symmetry check of the Metric: max|S2 - S2^T| = "
         f"{np.max(np.abs(self.metric - self.metric.conj().T)):.2e}")  
+
+
+
+        # print(f"Hermiticity check of the Metric: max|S2 - S2†| = "
+        # f"{np.max(np.abs(self.metric - self.metric.conj().T)):.2e}")  
 
 
         # print(f"Metric ENS = "
