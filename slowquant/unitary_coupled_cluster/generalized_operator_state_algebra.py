@@ -675,7 +675,7 @@ def generalized_construct_ups_state_test_erik(
                 T = G3(i, j, k, a, b, c, False)
             elif exc_type == "quadruple":
                 (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
-                T = G4(i, j, k, a, b, c, d, False)
+                T = G4(i, j, k, l, a, b, c, d, False)
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
             if dagger:

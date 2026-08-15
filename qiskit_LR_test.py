@@ -127,6 +127,7 @@ def noisy(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03
         mol,
         "fUCCSD",
         False, #Do x2c
+        False, #Do ecp
         {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
@@ -161,7 +162,7 @@ def noisy(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.03
     # primitive = Sampler(run_options={"shots": 0})
     primitive = SamplerV2()
     QI = QuantumInterface(primitive, "fUCCSD", mapper, ansatz_options=({"n_layers": 1, "is_spin_conserving" : False}),  shots=15000, 
-        do_M_ansatz0=True
+        do_M_ansatz0=True, do_postselection=True
 )
 #     QI = QuantumInterface(primitive, "fUCCSD", mapper, ansatz_options=({"n_layers": 1, "is_spin_conserving" : False}))
 
@@ -197,26 +198,48 @@ def h3():
     geometry = """H  0.000000   0.000000       0.000000;
                   H  1.000000   0.000000       0.000000;
                   H  0.500000   0.8660254038   0.000000"""
-    basis = "def2SVP"
+    # basis = "def2SVP"
     # basis = "sto-3g"
-    active_space = ((2, 1), 6)
+    basis = "631-g"
+    active_space = ((2, 1), 12)
     charge = 0
     spin = 1
     noisy(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
 
-h3()
+# h3()
 
+def h2():
+    geometry = """H  0.0   0.0  0.0;
+        H  0.0  0.0  0.74"""
+    basis = "sto-3g"
+    # active_space = ((1, 1), 8) #spin orbitaler or spinor basis
+    active_space = ((1, 1), 4) #spin orbitaler or spinor basis
+    # active_space = (2, 4)
+    charge = 0
+    spin = 0
+
+    # restricted(
+    #     geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    # )
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+    # unrestricted(
+    #     geometry=geometry, basis=basis, active_space=active_space_u, charge=charge, spin=spin, unit="angstrom"
+    # )
+
+h2()
 
 
 
 
 #Do post selection from Erik: 
 # if isinstance(mapper, JordanWignerMapper) and do_generalized:
-#         for bitint, val in dist.items():
-#             bitstr = format(bitint, f"0{num_qubits}b")
-#             if bitstr.count("1") == num_elec:
-#                 new_dist[int(bitstr, 2)] = val
-#                 prob_sum += val
+        # for bitint, val in dist.items():
+        #     bitstr = format(bitint, f"0{num_qubits}b")
+        #     if bitstr.count("1") == num_elec:
+        #         new_dist[int(bitstr, 2)] = val
+        #         prob_sum += val
 # in https://github.com/erikkjellgren/SlowQuant/blob/generalized_orbitals/slowquant/qiskit_interface/util.py#L803
