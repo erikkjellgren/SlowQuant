@@ -67,12 +67,12 @@ class LinearResponse(LinearResponseBaseClass):
         else:
             raise ValueError(f"Got incompatible wave function type, {type(self.wf)}")
         num_det = len(ci_info.idx2det)
-        self.csf_coeffs = np.zeros(num_det)
-        hf_det = int(
-            "1" * self.wf.int_gen.num_elec + "0" * (self.wf.num_spin_orbs - self.wf.int_gen.num_elec), 2
+        self.ref_coeffs = np.zeros(num_det)
+        ref_det = (
+            "1" * self.wf.num_inactive_spin_orbs + self.wf._ref_det + "0" * self.wf.num_virtual_spin_orbs
         )
-        self.csf_coeffs[ci_info.det2idx[hf_det]] = 1
-        self.ci_coeffs = propagate_state(["U"], self.csf_coeffs, *self.index_info_extended)
+        self.ref_coeffs[ci_info.det2idx[int(ref_det, 2)]] = 1
+        self.ci_coeffs = propagate_state(["U"], self.ref_coeffs, *self.index_info_extended)
         idx_shift = len(self.q_ops)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
@@ -94,7 +94,7 @@ class LinearResponse(LinearResponseBaseClass):
         for i, op in enumerate(self.G_ops):
             G_ket = propagate_state(
                 [op],
-                self.csf_coeffs,
+                self.ref_coeffs,
                 *self.index_info_extended,
             )
             # <0| H U G |CSF>
@@ -159,7 +159,7 @@ class LinearResponse(LinearResponseBaseClass):
             for i, GI in enumerate(self.G_ops):
                 G_ket = propagate_state(
                     [GI],
-                    self.csf_coeffs,
+                    self.ref_coeffs,
                     *self.index_info_extended,
                 )
                 # Make A
@@ -211,7 +211,7 @@ class LinearResponse(LinearResponseBaseClass):
         for j, GJ in enumerate(self.G_ops):
             UdHUGJ_ket = propagate_state(
                 ["Ud", self.H_0i_0a, "U", GJ],
-                self.csf_coeffs,
+                self.ref_coeffs,
                 *self.index_info_extended,
             )
             GJUdH_ket = propagate_state(
@@ -227,7 +227,7 @@ class LinearResponse(LinearResponseBaseClass):
             for i, GI in enumerate(self.G_ops[j:], j):
                 GI_ket = propagate_state(
                     [GI],
-                    self.csf_coeffs,
+                    self.ref_coeffs,
                     *self.index_info_extended,
                 )
                 # Make A
@@ -256,7 +256,7 @@ class LinearResponse(LinearResponseBaseClass):
                     * expectation_value(
                         UdH00_ket,
                         [GI.dagger, GJ],
-                        self.csf_coeffs,
+                        self.ref_coeffs,
                         *self.index_info_extended,
                     )
                 )
@@ -348,7 +348,7 @@ class LinearResponse(LinearResponseBaseClass):
             for i, G in enumerate(self.G_ops):
                 G_ket = propagate_state(
                     [G],
-                    self.csf_coeffs,
+                    self.ref_coeffs,
                     *self.index_info_extended,
                 )
                 # -Z * <0| mux U G | CSF>

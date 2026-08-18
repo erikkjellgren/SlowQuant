@@ -53,11 +53,12 @@ def test_LiH_naive() -> None:
         (2, 2),
         rhf.mo_coeff,
         mol,
-        "SD",
+        excitations=["SAS", "SAD"],
+        include_active_kappa=False,
     )
 
     # Optimize WF
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     # Optimize WF with QSQ
     sampler = SamplerAer()
@@ -70,9 +71,10 @@ def test_LiH_naive() -> None:
         WF.c_mo,
         mol,
         QI,
+        include_active_kappa=False,
     )
 
-    qWF.run_wf_optimization_2step("rotosolve", True)
+    qWF.run_wf_optimization(orbital_optimization=True, opt_type="2step", theta_optimizer="rotosolve")
 
     # LR with SQ
     LR = naive.LinearResponse(WF, excitations="SD")
@@ -120,9 +122,10 @@ def test_LiH_projected() -> None:
         (2, 2),
         rhf.mo_coeff,
         mol,
-        "SD",
+        excitations=["SAS", "SAD"],
+        include_active_kappa=False,
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     # CircuitWF with QSQ
     sampler = SamplerAer()
@@ -136,8 +139,9 @@ def test_LiH_projected() -> None:
         WF.c_mo,
         mol,
         QI,
+        include_active_kappa=False,
     )
-    qWF.run_wf_optimization_2step("rotosolve", True)
+    qWF.run_wf_optimization(orbital_optimization=True, opt_type="2step", theta_optimizer="rotosolve")
 
     # LR with QSQ
     qLR = q_projected.quantumLR(qWF, "SD")
@@ -179,11 +183,12 @@ def test_LiH_allprojected() -> None:
         (2, 2),
         rhf.mo_coeff,
         mol,
-        "SD",
+        excitations=["SAS", "SAD"],
+        include_active_kappa=False,
     )
 
     # Optimize WF
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     # Optimize WF with QSQ
     sampler = SamplerAer()
@@ -197,9 +202,10 @@ def test_LiH_allprojected() -> None:
         WF.c_mo,
         mol,
         QI,
+        include_active_kappa=False,
     )
 
-    qWF.run_wf_optimization_2step("rotosolve", True)
+    qWF.run_wf_optimization(orbital_optimization=True, opt_type="2step", theta_optimizer="rotosolve")
 
     # LR with SQ
     LR = allprojected.LinearResponse(WF, excitations="SD")
@@ -247,11 +253,12 @@ def test_LiH_naive_sampler_ISA() -> None:
         (2, 2),
         rhf.mo_coeff,
         mol,
-        "SD",
+        excitations=["SAS", "SAD"],
+        include_active_kappa=False,
     )
 
     # Optimize WF
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     # Optimize WF with QSQ
     sampler = SamplerAer()
@@ -264,9 +271,10 @@ def test_LiH_naive_sampler_ISA() -> None:
         WF.c_mo,
         mol,
         QI,
+        include_active_kappa=False,
     )
 
-    qWF.run_wf_optimization_2step("rotosolve", True)
+    qWF.run_wf_optimization(orbital_optimization=True, opt_type="2step", theta_optimizer="rotosolve")
 
     # LR with QSQ
     qLR = q_naive.quantumLR(qWF, "SD")
@@ -308,11 +316,12 @@ def test_LiH_oscillator_strength() -> None:
         (2, 2),
         rhf.mo_coeff,
         mol,
-        "SD",
+        excitations=["SAS", "SAD"],
+        include_active_kappa=False,
     )
 
     # Optimize WF
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     # Optimize WF with QSQ
     sampler = SamplerAer()
@@ -325,9 +334,10 @@ def test_LiH_oscillator_strength() -> None:
         WF.c_mo,
         mol,
         QI,
+        include_active_kappa=False,
     )
 
-    qWF.run_wf_optimization_2step("rotosolve", True)
+    qWF.run_wf_optimization(orbital_optimization=True, opt_type="2step", theta_optimizer="rotosolve")
 
     # naive LR with QSQ
     qLR_naive = q_naive.quantumLR(qWF, "SD")
@@ -426,7 +436,7 @@ def test_gradient_optimizer_H2() -> None:
         QI,
     )
 
-    WF.run_wf_optimization_2step("BFGS", False)
+    WF.run_wf_optimization(orbital_optimization=False, one_step_optimizer="rotosolve")
     assert abs(WF.energy_elec - -1.8572750819575072) < 10**-6
 
 
@@ -536,7 +546,7 @@ def test_fUCC_h2o() -> None:
         QI,
     )
 
-    WF.run_wf_optimization_2step("RotoSolve", False)
+    WF.run_wf_optimization(orbital_optimization=False, one_step_optimizer="rotosolve")
     assert abs(WF.energy_elec - -83.96650295692562) < 10**-6
 
 
@@ -622,8 +632,11 @@ def test_custom() -> None:
         rhf.mo_coeff,
         mol,
         QI,
+        include_active_kappa=False,
     )
-    qWF.run_wf_optimization_2step("rotosolve", True, is_silent_subiterations=True)
+    qWF.run_wf_optimization(
+        orbital_optimization=True, theta_optimizer="rotosolve", opt_type="2step", is_silent_subiterations=True
+    )
     energy = qWF._calc_energy_elec()
 
     qc = qWF.QI.circuit.copy()
@@ -674,9 +687,10 @@ def test_H2_sampler_layout() -> None:
         rhf.mo_coeff,
         mol,
         QI,
+        include_active_kappa=False,
     )
 
-    qWF.run_wf_optimization_2step("rotosolve", True)
+    qWF.run_wf_optimization(orbital_optimization=True, theta_optimizer="rotosolve", opt_type="2step")
 
     QI.update_pass_manager({"backend": FakeTorino()})
 
@@ -705,9 +719,8 @@ def test_mitigation_nocm() -> None:
         SQobj,
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
-        include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     sampler = SamplerAer(backend_options={"noise_model": noise_model})
     mapper = JordanWignerMapper()
@@ -770,9 +783,8 @@ def test_mitigation() -> None:
         SQobj,
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
-        include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     sampler = SamplerAer(backend_options={"noise_model": noise_model})
     mapper = JordanWignerMapper()
@@ -847,7 +859,7 @@ def test_state_average_layout() -> None:
         "tUPS",
         ansatz_options={"n_layers": 1},
     )
-    WF.run_wf_optimization_1step("BFGS")
+    WF.run_wf_optimization(orbital_optimization=False)
 
     sampler = SamplerAer()
     mapper = JordanWignerMapper()
@@ -912,7 +924,7 @@ def test_state_average_M() -> None:
         "tUPS",
         ansatz_options={"n_layers": 1},
     )
-    WF.run_wf_optimization_1step("BFGS")
+    WF.run_wf_optimization(orbital_optimization=False)
 
     sampler = SamplerAer(backend_options={"noise_model": noise_model})
     mapper = JordanWignerMapper()
@@ -980,7 +992,7 @@ def test_state_average_Mplus() -> None:
         "tUPS",
         ansatz_options={"n_layers": 1},
     )
-    WF.run_wf_optimization_1step("BFGS")
+    WF.run_wf_optimization(orbital_optimization=False)
 
     sampler = SamplerAer()
     mapper = JordanWignerMapper()
@@ -1062,7 +1074,7 @@ def test_no_saving() -> None:
         "tUPS",
         ansatz_options={"n_layers": 1},
     )
-    WF.run_wf_optimization_1step("BFGS")
+    WF.run_wf_optimization(orbital_optimization=False)
 
     sampler = SamplerAer()
     mapper = JordanWignerMapper()
@@ -1123,9 +1135,8 @@ def test_variance_nocm() -> None:
         SQobj,
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
-        include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     sampler = SamplerAer(backend_options={"noise_model": noise_model})
     mapper = JordanWignerMapper()
@@ -1176,9 +1187,8 @@ def test_variance() -> None:
         SQobj,
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
-        include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     sampler = SamplerAer(backend_options={"noise_model": noise_model})
     mapper = JordanWignerMapper()
@@ -1224,7 +1234,7 @@ def test_upslayout_input() -> None:
         mol,
         "fUCCSD",
     )
-    WF.run_wf_optimization_1step("BFGS", False)
+    WF.run_wf_optimization(orbital_optimization=False)
     sampler = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
     QI = QuantumInterface(sampler, WF.ups_layout, mapper)
