@@ -1,9 +1,9 @@
+import itertools
 from collections.abc import Generator
 
 import numba as nb
 import numba.typed as nbt
 import numpy as np
-from sympy.utilities.iterables import multiset_permutations
 
 
 class CI_Info:
@@ -53,6 +53,26 @@ class CI_Info:
         self.space_extension_offset = 0
 
 
+def generate_spin_strings(num_orbs: int, num_elec: int) -> Generator[list[int], None, None]:
+    """Generate all unique length-n lists of 0s and 1s with exactly k 1s.
+
+    Args:
+        num_orbs: Number of spatial orbitals.
+        num_elec: Number of electrons.
+
+    Returns:
+        Determinants with k electrons in n orbitals.
+    """
+    if num_elec < 0:
+        # Nothing to iterate
+        return
+    for indices in itertools.combinations(range(num_orbs), num_elec):
+        string = [0] * num_orbs
+        for idx in indices:
+            string[idx] = 1
+        yield string
+
+
 def get_indexing(
     num_inactive_orbs: int,
     num_active_orbs: int,
@@ -76,12 +96,8 @@ def get_indexing(
     idx2det = []
     det2idx = {}
     # Loop over all possible particle and spin conserving determinant combinations
-    for alpha_string in multiset_permutations(
-        [1] * num_active_elec_alpha + [0] * (num_active_orbs - num_active_elec_alpha)
-    ):
-        for beta_string in multiset_permutations(
-            [1] * num_active_elec_beta + [0] * (num_active_orbs - num_active_elec_beta)
-        ):
+    for alpha_string in generate_spin_strings(num_active_orbs, num_active_elec_alpha):
+        for beta_string in generate_spin_strings(num_active_orbs, num_active_elec_beta):
             det_str = ""
             for a, b in zip(alpha_string, beta_string):
                 det_str += str(a) + str(b)
@@ -145,12 +161,8 @@ def get_indexing_extended(
     det2idx = {}
     # Generate 0th space
     # Particle and spin conserving determinants in active space. No excitation in occ and virtual orbs.
-    for alpha_string in multiset_permutations(
-        [1] * num_active_elec_alpha + [0] * (num_active_orbs - num_active_elec_alpha)
-    ):  # active space permutations in alpha
-        for beta_string in multiset_permutations(
-            [1] * num_active_elec_beta + [0] * (num_active_orbs - num_active_elec_beta)
-        ):  # active space permutations in beta
+    for alpha_string in generate_spin_strings(num_active_orbs, num_active_elec_alpha):
+        for beta_string in generate_spin_strings(num_active_orbs, num_active_elec_beta):
             det_str = ""
             for a, b in zip(
                 [1] * num_inactive_orbs + alpha_string + [0] * num_virtual_orbs,
@@ -172,12 +184,8 @@ def get_indexing_extended(
         active_alpha_elec = int(
             num_active_elec_alpha - np.sum(alpha_virtual) + num_inactive_orbs - np.sum(alpha_inactive)
         )
-        for alpha_string in multiset_permutations(
-            [1] * active_alpha_elec + [0] * (num_active_orbs - active_alpha_elec)
-        ):  # active space permutations in alpha
-            for beta_string in multiset_permutations(
-                [1] * num_active_elec_beta + [0] * (num_active_orbs - num_active_elec_beta)
-            ):  # active space permutations in alpha
+        for alpha_string in generate_spin_strings(num_active_orbs, active_alpha_elec):
+            for beta_string in generate_spin_strings(num_active_orbs, num_active_elec_beta):
                 det_str = ""
                 for a, b in zip(
                     alpha_inactive + alpha_string + alpha_virtual,
@@ -199,12 +207,8 @@ def get_indexing_extended(
         active_beta_elec = int(
             num_active_elec_beta - np.sum(beta_virtual) + num_inactive_orbs - np.sum(beta_inactive)
         )
-        for alpha_string in multiset_permutations(
-            [1] * num_active_elec_alpha + [0] * (num_active_orbs - num_active_elec_alpha)
-        ):  # active space permutations in alpha
-            for beta_string in multiset_permutations(
-                [1] * active_beta_elec + [0] * (num_active_orbs - active_beta_elec)
-            ):  # active space permutations in beta
+        for alpha_string in generate_spin_strings(num_active_orbs, num_active_elec_alpha):
+            for beta_string in generate_spin_strings(num_active_orbs, active_beta_elec):
                 det_str = ""
                 for a, b in zip(
                     [1] * num_inactive_orbs + alpha_string + [0] * num_virtual_orbs,
@@ -228,12 +232,8 @@ def get_indexing_extended(
                 active_beta_elec = int(
                     num_active_elec_beta - np.sum(beta_virtual) + num_inactive_orbs - np.sum(beta_inactive)
                 )  # singles inactive and virtual determinants in beta
-                for alpha_string in multiset_permutations(
-                    [1] * active_alpha_elec + [0] * (num_active_orbs - active_alpha_elec)
-                ):  # active space permutations in alpha
-                    for beta_string in multiset_permutations(
-                        [1] * active_beta_elec + [0] * (num_active_orbs - active_beta_elec)
-                    ):  # active space permutations in beta
+                for alpha_string in generate_spin_strings(num_active_orbs, active_alpha_elec):
+                    for beta_string in generate_spin_strings(num_active_orbs, active_beta_elec):
                         det_str = ""
                         for a, b in zip(
                             alpha_inactive + alpha_string + alpha_virtual,
