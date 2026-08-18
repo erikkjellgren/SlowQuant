@@ -14,12 +14,10 @@ RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir build pytest
 # Force minimum versions
 RUN pip install --no-cache-dir \
-    networkx==2.7 \
     numba==0.60 \
     numpy==2.0 \
     pyscf==2.4 \
-    scipy==1.13 \
-    sympy==1.9
+    scipy==1.13
 RUN pip install --no-cache-dir \
     qiskit==2.0 \
     qiskit-ibm-runtime==0.37 \

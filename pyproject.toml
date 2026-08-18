@@ -76,12 +76,10 @@ authors = [
 ]
 
 dependencies = [
-    "networkx>=2.7", # Python 3.10 support
     "numba>=0.60", # NumPy 2.0 support
     "numpy>=2.0", # NumPy 2 API required
     "pyscf>=2.4", # Older versions have Mole deepcopy issues
     "scipy>=1.13", # NumPy 2.0 support
-    "sympy>=1.9", # Python 3.10 support
     "qiskit>=2.0,<=2.1", # Qiskit 2 API required
     "qiskit-aer>=0.17", # Qiskit 2.0 support
     "qiskit-ibm-runtime>=0.37,<=0.41", # Qiskit 2.0 to Qiskit 2.1 support
