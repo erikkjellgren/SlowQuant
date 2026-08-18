@@ -2,7 +2,7 @@
 #    docker build --build-arg CACHE_BUST=$(date +%s) -f Dockerfile -t slowquant-docker .
 #    docker run --rm slowquant-docker:latest
 
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 # Install git and build tools
 RUN apt-get update && \
@@ -17,8 +17,7 @@ RUN pip install --no-cache-dir \
     numba==0.60 \
     numpy==2.0 \
     pyscf==2.4 \
-    scipy==1.13
-RUN pip install --no-cache-dir \
+    scipy==1.13 \
     qiskit==2.0 \
     qiskit-ibm-runtime==0.37 \
     qiskit-aer==0.17 \

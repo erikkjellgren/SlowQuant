@@ -67,7 +67,7 @@ name = "SlowQuant"
 version = "0.1.0"
 description = "A quantum chemistry package"
 readme = "README.md"
-requires-python = ">=3.10" # Oldest not EOL version.
+requires-python = ">=3.11" # Oldest not EOL version.
 license = {text = "BSD 3"}
 
 authors = [
