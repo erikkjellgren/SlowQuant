@@ -680,8 +680,6 @@ def test_H2_sampler_layout() -> None:
 
     QI.update_pass_manager({"backend": FakeTorino()})
 
-    QI._reset_cliques()
-
     assert np.allclose(qWF._calc_energy_elec(), -1.6303275411526188, atol=10**-6)
 
 

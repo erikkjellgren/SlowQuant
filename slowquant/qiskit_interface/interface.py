@@ -410,6 +410,8 @@ class QuantumInterface:
                 self.num_orbs,
                 self.num_elec,
             )
+            # Reset saver
+            self._reset_cliques()
 
     def redo_M_mitigation(self, shots: int | None = None) -> None:
         """Redo M_mitigation.
@@ -1361,6 +1363,8 @@ class QuantumInterface:
             shots = self.shots
         if overwrite_shots is not None:
             print("Warning: Overwriting QI shots has been used.")
+            if self._circuit_multipl > 1:
+                print("Warning: Circuit multiplier is switched on to ", self._circuit_multipl)
             shots = overwrite_shots
 
         if isinstance(paulis, str):
@@ -1432,8 +1436,8 @@ class QuantumInterface:
             # Run sampler
             job = self._primitive.run(circuits, parameter_values=parameter_values, shots=shots)
 
-        if self.shots is not None:  # check if ideal simulator
-            self.total_shots_used += self.shots * num_paulis * num_circuits
+        if shots is not None:  # check if ideal simulator
+            self.total_shots_used += shots * self._circuit_multipl * num_paulis * num_circuits
         self.total_device_calls += 1
         self.total_paulis_evaluated += num_paulis * num_circuits
 
