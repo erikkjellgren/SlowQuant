@@ -14,7 +14,8 @@ from qiskit.primitives import (
     BaseSamplerV2,
 )
 from qiskit.quantum_info import SparsePauliOp
-from qiskit.transpiler import PassManager
+from qiskit.transpiler import PassManager, StagedPassManager
+from qiskit.transpiler.passes import Optimize1qGatesDecomposition
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_nature.second_q.circuit.library import HartreeFock
 from qiskit_nature.second_q.mappers import JordanWignerMapper
@@ -534,10 +535,14 @@ class QuantumInterface:
             )
 
         # Transpile X and Y measurement gates: only translation to basis gates and optimization.
-        self._transp_xy = [
-            self._pass_manager.optimization.run(self._pass_manager.translation.run(to_CBS_measurement("X"))),
-            self._pass_manager.optimization.run(self._pass_manager.translation.run(to_CBS_measurement("Y"))),
-        ]
+        backend = self.pass_manager_options.get("backend")
+        basis_gates = backend.operation_names if backend is not None else None
+        light_pass_manager = StagedPassManager(
+            stages=("translation", "optimization"),
+            translation=self._pass_manager.translation,
+            optimization=PassManager([Optimize1qGatesDecomposition(basis=basis_gates)]),
+        )
+        self._transp_xy = light_pass_manager.run([to_CBS_measurement("X"), to_CBS_measurement("Y")])
 
         return circuit_return
 
