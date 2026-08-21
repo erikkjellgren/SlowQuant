@@ -1627,6 +1627,8 @@ class QuantumInterface:
         """
         with open(filename, "wb") as file:
             pickle.dump(self.saver, file)
+        with open(filename + "_info.txt", "w") as f:
+            f.write(self._info_string())
 
     def load_paulis_from_file(self, filename: str) -> None:
         """Load Pauli strings and their distributions from a file.
@@ -1638,8 +1640,8 @@ class QuantumInterface:
             self.saver = pickle.load(file)
         print(f"Loaded Pauli strings from {filename}.")
 
-    def get_info(self) -> None:
-        """Get infos about settings."""
+    def _info_string(self) -> str:
+        """Get infos about settings as string."""
         if isinstance(self.ansatz, QuantumCircuit):
             data = f"Your settings are:\n {'Ansatz:':<20} {'custom circuit'}\n {'Number of shots:':<20} {self.shots}\n"
         else:
@@ -1664,5 +1666,9 @@ class QuantumInterface:
                     self._primitive.options, "twirling"
                 ):
                     data += f"\n {'Pauli twirling:':<20} {self._primitive.options.twirling.enable_gates}\n {'Dynamic decoupling:':<20} {self._primitive.options.dynamical_decoupling.enable}"
+        data += f"\nMitigation flags:\n{self.mitigation_flags.status_report()}"
+        return data
 
-        print(f"{data}\nMitigation flags:\n{self.mitigation_flags.status_report()}")
+    def get_info(self) -> None:
+        """Print infos about settings."""
+        print(f"{self._info_string()}")
