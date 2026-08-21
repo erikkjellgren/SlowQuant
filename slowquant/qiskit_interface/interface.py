@@ -1629,6 +1629,7 @@ class QuantumInterface:
             pickle.dump(self.saver, file)
         with open(filename + "_info.txt", "w") as f:
             f.write(self._info_string())
+            f.write(f"\nAnsatz parameters:\n{self.parameters}")
 
     def load_paulis_from_file(self, filename: str) -> None:
         """Load Pauli strings and their distributions from a file.
@@ -1645,7 +1646,7 @@ class QuantumInterface:
         if isinstance(self.ansatz, QuantumCircuit):
             data = f"Your settings are:\n {'Ansatz:':<20} {'custom circuit'}\n {'Number of shots:':<20} {self.shots}\n"
         else:
-            data = f"Your settings are:\n {'Ansatz:':<20} {self.ansatz}\n {'Number of shots:':<20} {self.shots}\n"
+            data = f"Your settings are:\n {'Ansatz:':<20} {self.ansatz}\n {'Ansatz options:':<20} {self.ansatz_options}\n {'Number of shots:':<20} {self.shots}\n"
         data += f" {'ISA':<20} {self.ISA}\n {'Primitive:':<20} {self._primitive.__class__.__name__}"
         if self.ISA:
             if self._transpiled:
