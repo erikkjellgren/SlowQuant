@@ -18,7 +18,7 @@ RUN pip install --no-cache-dir \
     numpy==2.0 \
     pyscf==2.4 \
     scipy==1.13 \
-    qiskit==2.0 \
+    qiskit==2.2 \
     qiskit-ibm-runtime==0.37 \
     qiskit-aer==0.17 \
     qiskit-nature==0.7
