@@ -41,4 +41,4 @@ RUN python -m build
 RUN pip install dist/*.whl
 
 # Run tests
-CMD ["pytest", "tests/test_qiskit_interface.py"]
+CMD ["pytest", "tests/"]
