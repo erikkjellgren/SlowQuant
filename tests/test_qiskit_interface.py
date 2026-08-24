@@ -31,10 +31,10 @@ from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
 noise_model = NoiseModel()
-noise_model.add_all_qubit_quantum_error(depolarizing_error(0.005, 1), ["u1", "u2", "u3"])
-noise_model.add_all_qubit_quantum_error(depolarizing_error(0.02, 2), ["cx"])
-noise_model.add_all_qubit_quantum_error(amplitude_damping_error(0.02), ["u1", "u2", "u3"], warnings=False)
-noise_model.add_all_qubit_quantum_error(phase_damping_error(0.03), ["u1", "u2", "u3"], warnings=False)
+noise_model.add_all_qubit_quantum_error(depolarizing_error(0.005, 1), ["rz", "sx", "x"])
+noise_model.add_all_qubit_quantum_error(depolarizing_error(0.02, 2), ["cz"])
+noise_model.add_all_qubit_quantum_error(amplitude_damping_error(0.02), ["rz", "sx", "x"], warnings=False)
+noise_model.add_all_qubit_quantum_error(phase_damping_error(0.03), ["rz", "sx", "x"], warnings=False)
 noise_model.add_all_qubit_readout_error(ReadoutError([[0.95, 0.05], [0.1, 0.9]]))
 
 
@@ -694,8 +694,6 @@ def test_H2_sampler_layout() -> None:
 
     QI.update_pass_manager({"backend": FakeTorino()})
 
-    QI._reset_cliques()
-
     assert np.allclose(qWF._calc_energy_elec(), -1.6303275411526188, atol=10**-6)
 
 
@@ -722,7 +720,10 @@ def test_mitigation_nocm() -> None:
     )
     WF.run_wf_optimization(orbital_optimization=True)
 
-    sampler = SamplerAer(backend_options={"noise_model": noise_model})
+    sampler = SamplerAer(
+        backend_options={"noise_model": noise_model},
+        skip_transpilation=True,
+    )
     mapper = JordanWignerMapper()
     QI = QuantumInterface(
         sampler,
@@ -743,23 +744,23 @@ def test_mitigation_nocm() -> None:
     )
     qWF.thetas = WF.thetas
 
-    assert abs(qWF._calc_energy_elec() - -9.418383329562078) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.631094873717291) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0]
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() - -9.602601639646656) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.695213772925092) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8]
 
     QI.update_mitigation_flags(do_postselection=False, do_M_ansatz0=True)
-    assert abs(qWF._calc_energy_elec() - -9.683988916881479) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.689807552229608) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3]
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() - -9.70319667962837) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.712408682894697) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11]
 
     QI.update_mitigation_flags(do_M_ansatz0_plus=True)
-    assert abs(qWF._calc_energy_elec() - -9.70319667962837) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.712408682894697) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11, 15]
 
 
@@ -786,7 +787,10 @@ def test_mitigation() -> None:
     )
     WF.run_wf_optimization(orbital_optimization=True)
 
-    sampler = SamplerAer(backend_options={"noise_model": noise_model})
+    sampler = SamplerAer(
+        backend_options={"noise_model": noise_model},
+        skip_transpilation=True,
+    )
     mapper = JordanWignerMapper()
     QI = QuantumInterface(
         sampler,
@@ -797,7 +801,13 @@ def test_mitigation() -> None:
         do_M_mitigation=False,
         do_M_ansatz0=False,
         do_postselection=False,
-        pass_manager_options={"backend": FakeTorino(), "seed_transpiler": 1234},
+        pass_manager_options={
+            "backend": FakeTorino(),
+            "initial_layout": [99, 98, 80, 92],
+            "optimization_level": 1,
+            "routing_method": "basic",
+            "seed_transpiler": 1234,
+        },
     )
 
     qWF = WaveFunctionCircuit(
@@ -808,23 +818,23 @@ def test_mitigation() -> None:
     )
     qWF.thetas = WF.thetas
 
-    assert abs(qWF._calc_energy_elec() - -9.233747228500063) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.09907097331813) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0]
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() - -9.530550958752345) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.289142691443796) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8]
 
     QI.update_mitigation_flags(do_postselection=False, do_M_ansatz0=True)
-    assert abs(qWF._calc_energy_elec() - -9.66182116795791) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.499753131080157) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3]
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() - -9.712021766284208) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.55460043872056) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11]
 
     QI.update_mitigation_flags(do_M_ansatz0_plus=True)
-    assert abs(qWF._calc_energy_elec() - -9.712021766284208) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.55460043872056) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11, 15]
 
 
@@ -926,7 +936,10 @@ def test_state_average_M() -> None:
     )
     WF.run_wf_optimization(orbital_optimization=False)
 
-    sampler = SamplerAer(backend_options={"noise_model": noise_model})
+    sampler = SamplerAer(
+        backend_options={"noise_model": noise_model},
+        skip_transpilation=True,
+    )
     mapper = JordanWignerMapper()
     QI = QuantumInterface(
         sampler,
@@ -937,7 +950,13 @@ def test_state_average_M() -> None:
         do_M_mitigation=True,
         do_M_ansatz0=True,
         do_postselection=True,
-        pass_manager_options={"backend": FakeTorino(), "seed_transpiler": 1234},
+        pass_manager_options={
+            "backend": FakeTorino(),
+            "initial_layout": [99, 98, 80, 92],
+            "optimization_level": 1,
+            "routing_method": "basic",
+            "seed_transpiler": 1234,
+        },
     )
 
     QWF = WaveFunctionSACircuit(
@@ -958,7 +977,7 @@ def test_state_average_M() -> None:
     )
     QWF.thetas = WF.thetas
 
-    assert abs(QWF._calc_energy_elec() + 1.4240939758312483) < 10**-6  # type: ignore
+    assert abs(QWF._calc_energy_elec() + 1.3749928877432358) < 10**-6  # type: ignore
 
 
 def test_state_average_Mplus() -> None:
@@ -1018,29 +1037,40 @@ def test_state_average_Mplus() -> None:
 
     assert abs(WF._sa_energy - QWF._calc_energy_elec()) < 10**-6  # type: ignore
 
-    sampler = SamplerAer(backend_options={"noise_model": noise_model})
+    sampler = SamplerAer(
+        backend_options={"noise_model": noise_model},
+        skip_transpilation=True,
+    )
     QWF.change_primitive(sampler)
 
     QI.shots = None
     QI.ISA = True
-    QI.update_pass_manager({"backend": FakeTorino(), "seed_transpiler": 1234})
+    QI.update_pass_manager(
+        {
+            "backend": FakeTorino(),
+            "initial_layout": [99, 98, 80, 92],
+            "optimization_level": 1,
+            "routing_method": "basic",
+            "seed_transpiler": 1234,
+        }
+    )
 
     # No EM
     QI._reset_cliques()
-    assert abs(QWF._calc_energy_elec() + 9.436258997213987) < 10**-6  # type: ignore  # CSFs option 1
+    assert abs(QWF._calc_energy_elec() + 9.374249021996663) < 10**-6  # type: ignore  # CSFs option 1
 
     # EM with M_Ansatz0
     QI.update_mitigation_flags(do_M_mitigation=True, do_M_ansatz0=True)
 
-    assert abs(QWF._calc_energy_elec() + 9.596224644030176) < 10**-6  # type: ignore  # CSFs option 4
+    assert abs(QWF._calc_energy_elec() + 9.398404469079898) < 10**-6  # type: ignore  # CSFs option 4
 
     # EM with M_Ansatz0+
     QI.update_mitigation_flags(do_M_ansatz0_plus=True)
-    assert abs(QWF._calc_energy_elec() + 9.608563673328995) < 10**-6  # type: ignore  # CSFs option 1
+    assert abs(QWF._calc_energy_elec() + 9.426250418342013) < 10**-6  # type: ignore  # CSFs option 1
 
     # EM with M_Ansatz0 and postselection
     QI.update_mitigation_flags(do_postselection=True, do_M_ansatz0_plus=False)
-    assert abs(QWF._calc_energy_elec() + 9.638637411200133) < 10**-6  # type: ignore  # CSFs option 4
+    assert abs(QWF._calc_energy_elec() + 9.637857456768002) < 10**-6  # type: ignore  # CSFs option 4
 
 
 def test_no_saving() -> None:
@@ -1104,15 +1134,26 @@ def test_no_saving() -> None:
     QI._do_cliques = False
     assert abs(WF._sa_energy - QWF._calc_energy_elec()) < 10**-6  # type: ignore
 
-    sampler = SamplerAer(backend_options={"noise_model": noise_model})
+    sampler = SamplerAer(
+        backend_options={"noise_model": noise_model},
+        skip_transpilation=True,
+    )
     QWF.change_primitive(sampler)
 
     QI.shots = None
     QI.ISA = True
-    QI.update_pass_manager({"backend": FakeTorino(), "seed_transpiler": 1234})
+    QI.update_pass_manager(
+        {
+            "backend": FakeTorino(),
+            "initial_layout": [99, 98, 80, 92],
+            "optimization_level": 1,
+            "routing_method": "basic",
+            "seed_transpiler": 1234,
+        }
+    )
 
     QI.update_mitigation_flags(do_postselection=False, do_M_ansatz0=True)
-    assert abs(QWF._calc_energy_elec() + 9.596224644030176) < 10**-6  # type: ignore
+    assert abs(QWF._calc_energy_elec() + 9.398404469079898) < 10**-6  # type: ignore
 
 
 def test_variance_nocm() -> None:
@@ -1138,7 +1179,10 @@ def test_variance_nocm() -> None:
     )
     WF.run_wf_optimization(orbital_optimization=True)
 
-    sampler = SamplerAer(backend_options={"noise_model": noise_model})
+    sampler = SamplerAer(
+        backend_options={"noise_model": noise_model},
+        skip_transpilation=True,
+    )
     mapper = JordanWignerMapper()
     QI = QuantumInterface(
         sampler,
@@ -1159,12 +1203,12 @@ def test_variance_nocm() -> None:
     )
     qWF.thetas = WF.thetas
 
-    assert abs(qWF._calc_energy_elec() - -9.418383329562078) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian(), do_no_corr=True) - 0.10213270381462243) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.631094873717291) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian(), do_no_corr=True) - 0.0567009117091328) < 10**-6  # type: ignore
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() - -9.602601639646656) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian(), do_no_corr=True) - 0.052830412154174874) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.695213772925092) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian(), do_no_corr=True) - 0.028179912484011638) < 10**-6  # type: ignore
 
 
 def test_variance() -> None:
@@ -1190,7 +1234,10 @@ def test_variance() -> None:
     )
     WF.run_wf_optimization(orbital_optimization=True)
 
-    sampler = SamplerAer(backend_options={"noise_model": noise_model})
+    sampler = SamplerAer(
+        backend_options={"noise_model": noise_model},
+        skip_transpilation=True,
+    )
     mapper = JordanWignerMapper()
     QI = QuantumInterface(
         sampler,
@@ -1201,7 +1248,13 @@ def test_variance() -> None:
         do_M_mitigation=False,
         do_M_ansatz0=False,
         do_postselection=False,
-        pass_manager_options={"backend": FakeTorino(), "seed_transpiler": 1234},
+        pass_manager_options={
+            "backend": FakeTorino(),
+            "initial_layout": [99, 98, 80, 92],
+            "optimization_level": 1,
+            "routing_method": "basic",
+            "seed_transpiler": 1234,
+        },
     )
 
     qWF = WaveFunctionCircuit(
@@ -1212,14 +1265,14 @@ def test_variance() -> None:
     )
     qWF.thetas = WF.thetas
 
-    assert abs(qWF._calc_energy_elec() - -9.233747228500063) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian(), do_no_corr=True) - 0.13667860748213662) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.2176947578575442) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.09907097331813) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian(), do_no_corr=True) - 0.1531370657002356) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.16583651217084236) < 10**-6  # type: ignore
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() - -9.530550958752345) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian(), do_no_corr=True) - 0.08149072047975339) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.12548161863195212) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.289142691443796) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian(), do_no_corr=True) - 0.13591141770369639) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.16411873796330764) < 10**-6  # type: ignore
 
 
 def test_upslayout_input() -> None:

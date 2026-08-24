@@ -14,7 +14,8 @@ from qiskit.primitives import (
     BaseSamplerV2,
 )
 from qiskit.quantum_info import SparsePauliOp
-from qiskit.transpiler import PassManager
+from qiskit.transpiler import PassManager, StagedPassManager
+from qiskit.transpiler.passes import Optimize1qGatesDecomposition
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_nature.second_q.circuit.library import HartreeFock
 from qiskit_nature.second_q.mappers import JordanWignerMapper
@@ -383,6 +384,8 @@ class QuantumInterface:
                 self.num_orbs,
                 self.num_elec,
             )
+            # Reset saver
+            self._reset_cliques()
 
     def redo_M_mitigation(self, shots: int | None = None) -> None:
         """Redo M_mitigation.
@@ -508,10 +511,14 @@ class QuantumInterface:
             )
 
         # Transpile X and Y measurement gates: only translation to basis gates and optimization.
-        self._transp_xy = [
-            self._pass_manager.optimization.run(self._pass_manager.translation.run(to_CBS_measurement("X"))),
-            self._pass_manager.optimization.run(self._pass_manager.translation.run(to_CBS_measurement("Y"))),
-        ]
+        backend = self.pass_manager_options.get("backend")
+        basis_gates = backend.operation_names if backend is not None else None
+        light_pass_manager = StagedPassManager(
+            stages=("translation", "optimization"),
+            translation=self._pass_manager.translation,
+            optimization=PassManager([Optimize1qGatesDecomposition(basis=basis_gates)]),
+        )
+        self._transp_xy = light_pass_manager.run([to_CBS_measurement("X"), to_CBS_measurement("Y")])
 
         return circuit_return
 
@@ -1330,6 +1337,8 @@ class QuantumInterface:
             shots = self.shots
         if overwrite_shots is not None:
             print("Warning: Overwriting QI shots has been used.")
+            if self._circuit_multipl > 1:
+                print("Warning: Circuit multiplier is switched on to ", self._circuit_multipl)
             shots = overwrite_shots
 
         if isinstance(paulis, str):
@@ -1401,8 +1410,8 @@ class QuantumInterface:
             # Run sampler
             job = self._primitive.run(circuits, parameter_values=parameter_values, shots=shots)
 
-        if self.shots is not None:  # check if ideal simulator
-            self.total_shots_used += self.shots * num_paulis * num_circuits
+        if shots is not None:  # check if ideal simulator
+            self.total_shots_used += shots * self._circuit_multipl * num_paulis * num_circuits
         self.total_device_calls += 1
         self.total_paulis_evaluated += num_paulis * num_circuits
 
@@ -1592,6 +1601,9 @@ class QuantumInterface:
         """
         with open(filename, "wb") as file:
             pickle.dump(self.saver, file)
+        with open(filename + "_info.txt", "w") as f:
+            f.write(self._info_string())
+            f.write(f"\nAnsatz parameters:\n{self.parameters}")
 
     def load_paulis_from_file(self, filename: str) -> None:
         """Load Pauli strings and their distributions from a file.
@@ -1603,12 +1615,12 @@ class QuantumInterface:
             self.saver = pickle.load(file)
         print(f"Loaded Pauli strings from {filename}.")
 
-    def get_info(self) -> None:
-        """Get infos about settings."""
+    def _info_string(self) -> str:
+        """Get infos about settings as string."""
         if isinstance(self.ansatz, QuantumCircuit):
             data = f"Your settings are:\n {'Ansatz:':<20} {'custom circuit'}\n {'Number of shots:':<20} {self.shots}\n"
         else:
-            data = f"Your settings are:\n {'Ansatz:':<20} {self.ansatz}\n {'Number of shots:':<20} {self.shots}\n"
+            data = f"Your settings are:\n {'Ansatz:':<20} {self.ansatz}\n {'Ansatz options:':<20} {self.ansatz_options}\n {'Number of shots:':<20} {self.shots}\n"
         data += f" {'ISA':<20} {self.ISA}\n {'Primitive:':<20} {self._primitive.__class__.__name__}"
         if self.ISA:
             if self._transpiled:
@@ -1629,5 +1641,9 @@ class QuantumInterface:
                     self._primitive.options, "twirling"
                 ):
                     data += f"\n {'Pauli twirling:':<20} {self._primitive.options.twirling.enable_gates}\n {'Dynamic decoupling:':<20} {self._primitive.options.dynamical_decoupling.enable}"
+        data += f"\nMitigation flags:\n{self.mitigation_flags.status_report()}"
+        return data
 
-        print(f"{data}\nMitigation flags:\n{self.mitigation_flags.status_report()}")
+    def get_info(self) -> None:
+        """Print infos about settings."""
+        print(f"{self._info_string()}")
