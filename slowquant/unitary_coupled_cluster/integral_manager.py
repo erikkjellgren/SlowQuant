@@ -29,7 +29,7 @@ class IntegralManager:
         self._kinetic_energy: np.ndarray | None = None
         self._nuclear_electron_attraction: np.ndarray | None = None
         self._electron_electron_repulsion: np.ndarray | None = None
-        self._electric_dipole: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
+        self._electric_dipole: np.ndarray | None = None
         self._h_ao: np.ndarray | None = None
         self._atom_coordinates: np.ndarray | None = None
         self._atom_charges: np.ndarray | None = None
@@ -97,19 +97,18 @@ class IntegralManager:
             raise ValueError("Got unknown integral object, {type(self.int_obj)}")
 
     @property
-    def electric_dipole(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def electric_dipole(self) -> np.ndarray:
         """Electric dipole integrals."""
-        if isinstance(self._electric_dipole, tuple):
+        if isinstance(self._electric_dipole, np.ndarray):
             return self._electric_dipole
         if isinstance(self.int_obj, SlowQuant):
-            dipole_integrals = (
+            dipole_integrals = np.stack((
                 self.int_obj.integral.get_multipole_matrix(np.array([1, 0, 0])),
                 self.int_obj.integral.get_multipole_matrix(np.array([0, 1, 0])),
                 self.int_obj.integral.get_multipole_matrix(np.array([0, 0, 1])),
-            )
+            ))
         elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
-            x, y, z = self.int_obj.intor("int1e_r", comp=3)
-            dipole_integrals = (x, y, z)
+            dipole_integrals = self.int_obj.intor("int1e_r", comp=3)
         else:
             raise ValueError("Got unknown integral object, {type(self.int_obj)}")
         self._electric_dipole = dipole_integrals
@@ -129,39 +128,36 @@ class IntegralManager:
         self._h_ao = h_core
         return h_core
 
-    def diamagnetic_shielding(self, atom_coord, common_orig = (0,0,0)) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def diamagnetic_shielding(self, atom_coord, common_orig = (0,0,0)) -> np.ndarray:
         """Diamagnetic shielding integrals."""
         if isinstance(self.int_obj, SlowQuant):
             raise ValueError("Diamagnetic shielding integrals not implemented for integral object, {type(self.int_obj)}. Use integral object, {pyscf.gto.mole.Mole}")
         elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
             self.int_obj.set_common_orig(common_orig)
             self.int_obj.set_rinv_origin(atom_coord)
-            xx, xy, xz, yx, yy, yz, zx, zy, zz = self.int_obj.intor('int1e_cg_a11part', comp=9)
-            dia_shield = (xx, xy, xz, yx, yy, yz, zx, zy, zz)
+            dia_shield = self.int_obj.intor('int1e_cg_a11part', comp=9)
         else:
             raise ValueError("Got unknown integral object, {type(self.int_obj)}")
         return dia_shield
     
-    def orbital_paramagnetic(self, atom_coord) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def orbital_paramagnetic(self, atom_coord) -> np.ndarray:
         """Paramagnetic spin orbit integrals."""
         if isinstance(self.int_obj, SlowQuant):
             raise ValueError("Paramagnetic spin orbit integrals not implemented for integral object, {type(self.int_obj)}. Use integral object, {pyscf.gto.mole.Mole}")
         elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
             self.int_obj.set_rinv_orig(atom_coord)
-            x, y, z = self.int_obj.intor('int1e_prinvxp', 3)
-            orbital_paramagnetic = (x, y, z)
+            orbital_paramagnetic = self.int_obj.intor('int1e_prinvxp', 3)
         else:
             raise ValueError("Got unknown integral object, {type(self.int_obj)}")
         return orbital_paramagnetic
     
-    def angular_momentum(self, common_orig = (0,0,0)) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def angular_momentum(self, common_orig = (0,0,0)) -> np.ndarray:
         """Angular moment integrals."""
         if isinstance(self.int_obj, SlowQuant):
             raise ValueError("Angular momentum integrals not implemented for integral object, {type(self.int_obj)}. Use integral object, {pyscf.gto.mole.Mole}")
         elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
             self.int_obj.set_common_origin(common_orig)
-            x, y, z = self.int_obj.intor('int1e_cg_irxp', 3) / 2
-            angular_momentum = (x, y, z)
+            angular_momentum = self.int_obj.intor('int1e_cg_irxp', 3) / 2
         else:
             raise ValueError("Got unknown integral object, {type(self.int_obj)}")
         return angular_momentum
@@ -194,7 +190,7 @@ class IntegralManager:
         self._atom_charges = atom_charges
         return atom_charges
     
-    def orbital_diamagnetic(self, atom1_coord, atom2_coord) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def orbital_diamagnetic(self, atom1_coord, atom2_coord) -> np.ndarray:
         """Diamagnetic spin orbit integrals.
         vec{r}vec{r}/(|r-orig1|^3 |r-orig2|^3)
         Ref. JCP, 73, 5718"""
@@ -222,8 +218,7 @@ class IntegralManager:
             mat  = pmol.intor(self.int_obj._add_suffix('int3c1e_iprinv'), comp=3,
                             shls_slice=(self.int_obj.nbas, pmol.nbas, 0, self.int_obj.nbas, 0, self.int_obj.nbas))
             mat += mat1.transpose(0,3,1,2) + mat1.transpose(0,3,2,1)
-            xx, xy, xz, yx, yy, yz, zx, zy, zz = mat.reshape(9, *mat.shape[-2:])
-            orbital_diamagnetic = (xx, xy, xz, yx, yy, yz, zx, zy, zz)
+            orbital_diamagnetic = mat.reshape(9, *mat.shape[-2:])
         else:
             raise ValueError("Got unknown integral object, {type(self.int_obj)}")
         return orbital_diamagnetic
@@ -238,14 +233,13 @@ class IntegralManager:
             raise ValueError("Got unknown integral object, {type(self.int_obj)}")
         return fermi_contact
     
-    def spin_dipolar_fermi_contact(self, atom_coord) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def spin_dipolar_fermi_contact(self, atom_coord) -> np.ndarray:
         if isinstance(self.int_obj, SlowQuant):
             raise ValueError("Angular momentum integrals not implemented for integral object, {type(self.int_obj)}. Use integral object, {pyscf.gto.mole.Mole}")
         elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
             self.int_obj.set_rinv_origin(atom_coord)
             a01p = self.int_obj.intor('int1e_sa01sp', 12).reshape(3, 4, self.int_obj.nao, self.int_obj.nao) * nist.G_ELECTRON / 4
-            xx, xy, xz, yx, yy, yz, zx, zy, zz = -(a01p[:,:3] + a01p[:,:3].transpose(0,1,3,2)).reshape(9, self.int_obj.nao, self.int_obj.nao)
-            spin_dip_fermi_cont = (xx, xy, xz, yx, yy, yz, zx, zy, zz)
+            spin_dip_fermi_cont = -(a01p[:,:3] + a01p[:,:3].transpose(0,1,3,2)).reshape(9, self.int_obj.nao, self.int_obj.nao)
         else:
             raise ValueError("Got unknown integral object, {type(self.int_obj)}")
         return spin_dip_fermi_cont
