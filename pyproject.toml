@@ -57,3 +57,42 @@ indent-style = "space"
 line-ending = "lf"
 docstring-code-format = true
 skip-magic-trailing-comma = false
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "SlowQuant"
+version = "0.1.0"
+description = "A quantum chemistry package"
+readme = "README.md"
+requires-python = ">=3.11" # Oldest not EOL version.
+license = {text = "BSD 3"}
+
+authors = [
+    {name = "Erik Kjellgren"},
+    {name = "Karl Michael Ziems"}
+]
+
+dependencies = [
+    "numba>=0.60", # NumPy 2.0 support
+    "numpy>=2.0", # NumPy 2 API required
+    "pyscf>=2.4", # Older versions have Mole deepcopy issues
+    "scipy>=1.13", # NumPy 2.0 support
+    "qiskit>=2.2", # Qiskit 2.2 API required
+    "qiskit-aer>=0.17", # Qiskit 2.2 support
+    "qiskit-ibm-runtime>=0.37", # Qiskit 2.2 support
+    "qiskit-nature>=0.7", # Qiskit 2.2 support
+]
+
+[project.urls]
+Homepage = "https://github.com/erikkjellgren/SlowQuant"
+
+[tool.setuptools.packages.find]
+include = ["slowquant*"]
+
+[tool.setuptools.package-data]
+slowquant = [
+    "molecule/basisset/*.basis"
+]
