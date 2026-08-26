@@ -249,7 +249,6 @@ def iterate_t2(
                     if (num_alpha != 0 or num_beta != 0) and is_spin_conserving: #Skal væk AE
                          continue
                     yield a, i, b, j
-                    #yield a, j, b, i
 
 
 def iterate_t2_generalized(
@@ -339,8 +338,8 @@ def iterate_t3(
                                 num_alpha -= 1
                             else:
                                 num_beta -= 1
-                            # if (num_alpha != 0 or num_beta != 0) and is_spin_conserving: #AE 
-                            #     continue
+                            if (num_alpha != 0 or num_beta != 0) and is_spin_conserving: #AE 
+                                continue
                             yield a, i, b, j, c, k
 
 
@@ -609,14 +608,15 @@ class UccStructure:
         self.excitation_operator_type: list[str] = []
         self.n_params = 0
 
-    def add_sa_singles(self, active_occ_idx: Sequence[int], active_unocc_idx: Sequence[int]) -> None:
+
+    def add_singles(self, active_occ_idx: Sequence[int], active_unocc_idx: Sequence[int], is_spin_conserving) -> None:
         """Add spin-adapted singles.
 
         Args:
             active_occ_idx: Active strongly occupied spatial orbital indices.
             active_unocc_idx: Active weakly occupied spatial orbital indices.
         """
-        for a, i, _ in iterate_t1_sa(active_occ_idx, active_unocc_idx):
+        for a, i, _ in iterate_t1(active_occ_idx, active_unocc_idx):
             self.excitation_indices.append((i, a))
             self.excitation_operator_type.append("sa_single")
             self.n_params += 1
@@ -642,20 +642,42 @@ class UccStructure:
                 self.excitation_operator_type.append("sa_double_5")
             self.n_params += 1
 
-    def add_triples(self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int]) -> None:
+    def add_doubles(self, active_occ_idx: Sequence[int], active_unocc_idx: Sequence[int], is_spin_conserving) -> None:
+        """Add spin-adapted doubles.
+
+        Args:
+            active_occ_idx: Active strongly occupied spatial orbital indices.
+            active_unocc_idx: Active weakly occupied spatial orbital indices.
+        """
+        for a, i, b, j, _, op_type in iterate_t2(active_occ_idx, active_unocc_idx, is_spin_conserving):
+            self.excitation_indices.append((i, j, a, b))
+            if op_type == 1:
+                self.excitation_operator_type.append("double_1")
+            elif op_type == 2:
+                self.excitation_operator_type.append("double_2")
+            elif op_type == 3:
+                self.excitation_operator_type.append("double_3")
+            elif op_type == 4:
+                self.excitation_operator_type.append("double_4")
+            elif op_type == 5:
+                self.excitation_operator_type.append("double_5")
+            self.n_params += 1
+
+
+    def add_triples(self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int], is_spin_conserving) -> None:
         """Add alpha-number and beta-number conserving triples.
 
         Args:
             active_occ_spin_idx: Active strongly occupied spin orbital indices.
             active_unocc_spin_idx: Active weakly occupied spin orbital indices.
         """
-        for a, i, b, j, c, k in iterate_t3(active_occ_spin_idx, active_unocc_spin_idx):
+        for a, i, b, j, c, k in iterate_t3(active_occ_spin_idx, active_unocc_spin_idx, is_spin_conserving):
             self.excitation_indices.append((i, j, k, a, b, c))
             self.excitation_operator_type.append("triple")
             self.n_params += 1
 
     def add_quadruples(
-        self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int]
+        self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int], is_spin_conserving
     ) -> None:
         """Add alpha-number and beta-number conserving quadruples.
 
@@ -663,13 +685,13 @@ class UccStructure:
             active_occ_spin_idx: Active strongly occupied spin orbital indices.
             active_unocc_spin_idx: Active weakly occupied spin orbital indices.
         """
-        for a, i, b, j, c, k, d, l in iterate_t4(active_occ_spin_idx, active_unocc_spin_idx):
+        for a, i, b, j, c, k, d, l in iterate_t4(active_occ_spin_idx, active_unocc_spin_idx,is_spin_conserving):
             self.excitation_indices.append((i, j, k, l, a, b, c, d))
             self.excitation_operator_type.append("quadruple")
             self.n_params += 1
 
     def add_quintuples(
-        self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int]
+        self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int],is_spin_conserving
     ) -> None:
         """Add alpha-number and beta-number conserving quintuples.
 
@@ -677,19 +699,19 @@ class UccStructure:
             active_occ_spin_idx: Active strongly occupied spin orbital indices.
             active_unocc_spin_idx: Active weakly occupied spin orbital indices.
         """
-        for a, i, b, j, c, k, d, l, e, m in iterate_t5(active_occ_spin_idx, active_unocc_spin_idx):
+        for a, i, b, j, c, k, d, l, e, m in iterate_t5(active_occ_spin_idx, active_unocc_spin_idx,is_spin_conserving):
             self.excitation_indices.append((i, j, k, l, m, a, b, c, d, e))
             self.excitation_operator_type.append("quintuple")
             self.n_params += 1
 
-    def add_sextuples(self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int]) -> None:
+    def add_sextuples(self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int],is_spin_conserving) -> None:
         """Add alpha-number and beta-number conserving sextuples.
 
         Args:
             active_occ_spin_idx: Active strongly occupied spin orbital indices.
             active_unocc_spin_idx: Active weakly occupied spin orbital indices.
         """
-        for a, i, b, j, c, k, d, l, e, m, f, n in iterate_t6(active_occ_spin_idx, active_unocc_spin_idx):
+        for a, i, b, j, c, k, d, l, e, m, f, n in iterate_t6(active_occ_spin_idx, active_unocc_spin_idx,is_spin_conserving):
             self.excitation_indices.append((i, j, k, l, m, n, a, b, c, d, e, f))
             self.excitation_operator_type.append("sextuple")
             self.n_params += 1
@@ -1137,6 +1159,7 @@ class UpsStructure:
                 ):
                     self.excitation_operator_type.append("triple")
                     self.excitation_indices.append((i, j, k, a, b, c))
+                    # print(i,j,k,a,b,c)
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1

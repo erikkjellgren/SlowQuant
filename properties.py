@@ -55,8 +55,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         coeff,
         #C_u,
         mol,
-        "fUCCSD",
+        "UCCSD",
         True, #Do x2c
+        False, #Do ecp
         {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
@@ -69,7 +70,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # WF.set_thetas(ny_theta_real, ny_theta_imag)
 
-    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
+    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=False, tol=1e-10, maxiter = 2000)
 
     print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
     # print(np.diag(WF.rdm1))
@@ -325,7 +326,7 @@ def HF():
     # basis = {'H':'sto-3g','Cl': 'x2c-SVPall.nw'}
     basis = {'H': gto.uncontract(load('x2c-SVPall.nw', 'H')),
                 'F': gto.uncontract(load('x2c-SVPall.nw', 'F'))}
-    active_space = ((1,1), 2) #spin orbitaler or spinor basis
+    active_space = ((4,4), 12) #spin orbitaler or spinor basis
     # active_space = ((2,2), 6) #spin orbitaler or spinor basis
     # active_space = (2, 4)
     charge = 0

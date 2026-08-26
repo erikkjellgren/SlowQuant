@@ -436,6 +436,7 @@ def generalized_construct_ups_state(
     out = state.copy()
     order = 1
     offset = ci_info.space_extension_offset
+    print('inde i den her')
     if dagger:
         order = -1
     # Loop over all excitation in UPSStructure
@@ -454,6 +455,9 @@ def generalized_construct_ups_state(
             elif exc_type == "double":
                 (i, j, a, b) = np.array(exc_indices) + 2 * offset
                 T = G2(i, j, a, b, True)
+            elif exc_type == "triple": #AE ?
+                (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
+                T = G3(i, j, k, a, b, c, True)
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
             # Analytical application on state vector

@@ -399,9 +399,12 @@ class Clique:
         # Check that all heads have a distr
         for clique_head in self.cliques:
             if clique_head.distr.is_empty(mitigation_flags):
-                raise ValueError(
-                    f"Head, {clique_head.head}, has not been allocated for mitigation; {mitigation_flags}"
-                )
+                # raise ValueError(
+                #     f"Head, {clique_head.head}, has not been allocated for mitigation; {mitigation_flags}"
+                # ) #AE
+                clique_head.distr.add_distr({}, mitigation_flags)
+                # print(f"Warning: Skipping unallocated head {clique_head.head}")
+                # continue
 
     def get_distr(self, pauli: str, mitigation_flags: MitigationFlags | None = None) -> dict[int, float]:
         """Get sample state distribution for a Pauli string.
@@ -421,9 +424,10 @@ class Clique:
                         f"Found matching clique, but head will be mutated. Head; {clique_head.head}, Pauli; {pauli}"
                     )
                 if clique_head.distr.is_empty(mitigation_flags):
-                    raise ValueError(
-                        f"Head, {clique_head.head}, has no distribution for mitigation; {mitigation_flags}"
-                    )
+                    return {}
+                    # raise ValueError(
+                    #     f"Head, {clique_head.head}, has no distribution for mitigation; {mitigation_flags}"
+                    # )
                 return clique_head.distr.get_distr(mitigation_flags)
         raise ValueError(f"Could not find matching clique for Pauli, {pauli}")
 
@@ -805,6 +809,7 @@ def postselection(
     mapper: FermionicMapper,
     num_elec: tuple[int, int],
     num_qubits: int,
+    do_generalized: bool = False
 ) -> dict[int, float]:
     r"""Perform post-selection on distribution in computational basis.
 
@@ -839,7 +844,14 @@ def postselection(
     """
     new_dist = {}
     prob_sum = 0.0
-    if isinstance(mapper, JordanWignerMapper):
+    if isinstance(mapper, JordanWignerMapper) and do_generalized:
+        for bitint, val in dist.items():
+            bitstr = format(bitint, f"0{num_qubits}b")
+            if bitstr.count("1") == np.sum(num_elec):
+                new_dist[int(bitstr,2)] = val
+                prob_sum += val
+
+    elif isinstance(mapper, JordanWignerMapper):
         for bitint, val in dist.items():
             bitstr = format(bitint, f"0{num_qubits}b")
             num_a = len(bitstr) // 2
@@ -849,6 +861,7 @@ def postselection(
             if bitstr_a.count("1") == num_elec[0] and bitstr_b.count("1") == num_elec[1]:
                 new_dist[int(bitstr, 2)] = val
                 prob_sum += val
+
     elif isinstance(mapper, ParityMapper):
         for bitint, val in dist.items():
             bitstr = format(bitint, f"0{num_qubits}b")
