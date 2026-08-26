@@ -739,8 +739,8 @@ def get_triplet_orbital_response_hessian_block(
 
 
 @nb.jit(nopython=True)
-def get_orbital_response_property_gradient(
-    mo: np.ndarray,
+def get_orbital_response_property_gradient_1e(
+    prop_int_1e: np.ndarray,
     kappa_idx: list[tuple[int, int]],
     num_inactive_orbs: int,
     num_active_orbs: int,
@@ -752,7 +752,7 @@ def get_orbital_response_property_gradient(
         P^{\hat{q}} = \frac{1}{\sqrt{2}}\sum_{p}\left(x_{np}\Gamma^{[1]}_{mp} - x_{pm}\Gamma^{[1]}_{pn}\right)
 
     Args:
-       mo: Property integral in MO basis.
+       prop_int_1e: Property integral in MO basis.
        kappa_idx: Orbital parameter indicies in spatial basis.
        num_inactive_orbs: Number of inactive orbitals in spatial basis.
        num_active_orbs: Number of active orbitals in spatial basis.
@@ -761,10 +761,45 @@ def get_orbital_response_property_gradient(
     Returns:
         Orbital part of property gradient.
     """
-    prop_grad = np.zeros((len(kappa_idx), len(mo)))
+    prop_grad = np.zeros((len(kappa_idx), len(prop_int_1e)))
     for idx, (n, m) in enumerate(kappa_idx):
         for p in range(num_inactive_orbs + num_active_orbs):
-            prop_grad[idx, :] += mo[:, n, p] * RDM1(m, p, num_inactive_orbs, num_active_orbs, rdm1)
-            prop_grad[idx, :] -= mo[:, p, m] * RDM1(p, n, num_inactive_orbs, num_active_orbs, rdm1)
+            prop_grad[idx, :] += prop_int_1e[:, n, p] * RDM1(m, p, num_inactive_orbs, num_active_orbs, rdm1)
+            prop_grad[idx, :] -= prop_int_1e[:, p, m] * RDM1(p, n, num_inactive_orbs, num_active_orbs, rdm1)
     return 2 ** (-1 / 2) * prop_grad
 
+
+@nb.jit(nopython=True)
+def get_orbital_response_property_gradient_2e(
+    prop_int_2e: np.ndarray,
+    kappa_idx: list[tuple[int, int]],
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    rdm1: np.array,
+    rdm2: np.ndarray,
+) -> np.ndarray:
+    r"""Calculate the orbital part of property gradient.
+
+    .. math::
+        P^{\hat{q}} = \frac{1}{\sqrt{2}}\sum_{p}\left(x_{np}\Gamma^{[1]}_{mp} - x_{pm}\Gamma^{[1]}_{pn}\right)
+
+    Args:
+       prop_int_2e: two-electron property integral in MO basis.
+       kappa_idx: Orbital parameter indicies in spatial basis.
+       num_inactive_orbs: Number of inactive orbitals in spatial basis.
+       num_active_orbs: Number of active orbitals in spatial basis.
+       rdm1: Active part of 1-RDM
+
+    Returns:
+        Orbital part of property gradient.
+    """
+    prop_grad = np.zeros((len(kappa_idx), len(prop_int_2e)))
+    for idx, (n, m) in enumerate(kappa_idx):
+        for p in range(num_inactive_orbs + num_active_orbs):
+            for q in range(num_inactive_orbs + num_active_orbs):
+                for r in range(num_inactive_orbs + num_active_orbs):
+                    prop_grad[idx, :] += prop_int_2e[:, n, p, q, r] * RDM2(m, p, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2)
+                    prop_grad[idx, :] -= prop_int_2e[:, p, m, q, r] * RDM2(p, n, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2)
+                    prop_grad[idx, :] += prop_int_2e[:, p, q, n, r] * RDM2(p, q, m, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2)
+                    prop_grad[idx, :] -= prop_int_2e[:, p, q, r, m] * RDM2(p, q, r, n, num_inactive_orbs, num_active_orbs, rdm1, rdm2)
+    return 1/2 * 2 ** (-1 / 2) * prop_grad
