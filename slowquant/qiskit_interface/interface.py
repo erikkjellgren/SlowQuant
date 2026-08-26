@@ -14,7 +14,8 @@ from qiskit.primitives import (
     BaseSamplerV2,
 )
 from qiskit.quantum_info import SparsePauliOp
-from qiskit.transpiler import PassManager
+from qiskit.transpiler import PassManager, StagedPassManager
+from qiskit.transpiler.passes import Optimize1qGatesDecomposition
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_nature.second_q.circuit.library import HartreeFock
 from qiskit_nature.second_q.mappers import JordanWignerMapper
@@ -54,7 +55,7 @@ class QuantumInterface:
         ISA: bool = False,
         pass_manager_options: dict[str, Any] | None = None,
         ansatz_options: dict[str, Any] | None = None,
-        shots: None | int = None,
+        shots: int | None = None,
         max_shots_per_run: int = 100000,
         do_M_mitigation: bool = False,
         do_M_ansatz0: bool = False,
@@ -166,47 +167,36 @@ class QuantumInterface:
             self.state_circuit: QuantumCircuit = QuantumCircuit(
                 self.ansatz.num_qubits
             )  # empty state as custom circuit is passed
-        elif self.ansatz == "tUPS" and "do_pp" in self.ansatz_options.keys() and self.ansatz_options["do_pp"]:
+        elif "do_pp" in self.ansatz_options.keys() and self.ansatz_options["do_pp"]:
             # HF in pp-tUPS ordering
             if not isinstance(self.mapper, JordanWignerMapper):
                 raise ValueError(f"pp-tUPS only implemented for JW mapper, got: {type(self.mapper)}")
-            if np.sum(num_elec) != num_orbs:
-                raise ValueError(
-                    f"pp-tUPS only implemented for number of electrons and number of orbitals being the same, got: ({np.sum(num_elec)}, {num_orbs}), (elec, orbs)"
-                )
-            self.state_circuit = QuantumCircuit(2 * num_orbs)
-            for p in range(0, 2 * num_orbs):
-                if p % 2 == 0:
-                    self.state_circuit.x(p)
-        else:
-            self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
-        self.num_qubits = self.state_circuit.num_qubits
-
-        # Ansatz Circuit
-        if isinstance(self.ansatz, QuantumCircuit):
-            print(
-                "QI was initialized with a custom QuantumCircuit object. This is assumed to be the Ansatz (without state preparation circuit)"
-            )
-            self.circuit = self.ansatz
-        elif isinstance(self.ansatz, str):
-            if (
-                self.ansatz.lower() == "tups"
-                and "do_pp" in self.ansatz_options.keys()
-                and self.ansatz_options["do_pp"]
+            # Obtain pp determinant
+            pp_det = ""
+            spin_orb = 0
+            elec_count = self.num_elec[0] + self.num_elec[1]
+            while spin_orb < self.num_spin_orbs:
+                if (
+                    elec_count >= 2
+                    and (self.num_spin_orbs - spin_orb) >= 4
+                    and elec_count <= (self.num_spin_orbs - spin_orb - 2)
+                ):
+                    pp_det += "1100"
+                    elec_count -= 2
+                    spin_orb += 4
+                elif elec_count == 0:
+                    pp_det += "0"
+                    spin_orb += 1
+                elif elec_count != 0:
+                    pp_det += "1"
+                    spin_orb += 1
+                    elec_count -= 1
+            print("State preparation: perfect-pairing determinant found as:", pp_det)
+            if len(pp_det) != self.num_spin_orbs or pp_det.count("1") != (
+                self.num_elec[0] + self.num_elec[1]
             ):
-                # HF in pp-tUPS ordering
-                if not isinstance(self.mapper, JordanWignerMapper):
-                    raise ValueError(f"pp-tUPS only implemented for JW mapper, got: {type(self.mapper)}")
-                if np.sum(num_elec) != num_orbs:
-                    raise ValueError(
-                        f"pp-tUPS only implemented for number of electrons and number of orbitals being the same, got: ({np.sum(num_elec)}, {num_orbs}), (elec, orbs)"
-                    )
-                self.state_circuit = QuantumCircuit(2 * num_orbs)
-                for p in range(0, 2 * num_orbs):
-                    if p % 2 == 0:
-                        self.state_circuit.x(p)
-            else:
-                self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
+                raise ValueError("Perfect pairing determinant violates orbital or electron numbers")
+            self.state_circuit = get_determinant_reference(pp_det, self.num_orbs, self.mapper)
         else:
             self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
         self.num_qubits = self.state_circuit.num_qubits
@@ -420,6 +410,8 @@ class QuantumInterface:
                 self.num_orbs,
                 self.num_elec,
             )
+            # Reset saver
+            self._reset_cliques()
 
     def redo_M_mitigation(self, shots: int | None = None) -> None:
         """Redo M_mitigation.
@@ -545,10 +537,14 @@ class QuantumInterface:
             )
 
         # Transpile X and Y measurement gates: only translation to basis gates and optimization.
-        self._transp_xy = [
-            self._pass_manager.optimization.run(self._pass_manager.translation.run(to_CBS_measurement("X"))),
-            self._pass_manager.optimization.run(self._pass_manager.translation.run(to_CBS_measurement("Y"))),
-        ]
+        backend = self.pass_manager_options.get("backend")
+        basis_gates = backend.operation_names if backend is not None else None
+        light_pass_manager = StagedPassManager(
+            stages=("translation", "optimization"),
+            translation=self._pass_manager.translation,
+            optimization=PassManager([Optimize1qGatesDecomposition(basis=basis_gates)]),
+        )
+        self._transp_xy = light_pass_manager.run([to_CBS_measurement("X"), to_CBS_measurement("Y")])
 
         return circuit_return
 
@@ -991,7 +987,7 @@ class QuantumInterface:
         op: FermionicOperator | SparsePauliOp,
         run_circuit: QuantumCircuit | None = None,
         det: str | None = None,
-        circuit_M: None | QuantumCircuit = None,
+        circuit_M: QuantumCircuit | None = None,
         csfs_option: int = 1,
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
@@ -1096,7 +1092,7 @@ class QuantumInterface:
         run_parameters: list[float],
         run_circuit: QuantumCircuit,
         do_cliques: bool = True,
-        circuit_M: None | QuantumCircuit = None,
+        circuit_M: QuantumCircuit | None = None,
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
@@ -1367,6 +1363,8 @@ class QuantumInterface:
             shots = self.shots
         if overwrite_shots is not None:
             print("Warning: Overwriting QI shots has been used.")
+            if self._circuit_multipl > 1:
+                print("Warning: Circuit multiplier is switched on to ", self._circuit_multipl)
             shots = overwrite_shots
 
         if isinstance(paulis, str):
@@ -1438,8 +1436,8 @@ class QuantumInterface:
             # Run sampler
             job = self._primitive.run(circuits, parameter_values=parameter_values, shots=shots)
 
-        if self.shots is not None:  # check if ideal simulator
-            self.total_shots_used += self.shots * num_paulis * num_circuits
+        if shots is not None:  # check if ideal simulator
+            self.total_shots_used += shots * self._circuit_multipl * num_paulis * num_circuits
         self.total_device_calls += 1
         self.total_paulis_evaluated += num_paulis * num_circuits
 
@@ -1469,7 +1467,7 @@ class QuantumInterface:
         return dist_combined
 
     def _sampler_distributions(
-        self, pauli: str, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
+        self, pauli: str, run_parameters: list[float], custom_circ: QuantumCircuit | None = None
     ) -> dict[int, float]:
         r"""Get results from a sampler distribution for one given Pauli string.
 
@@ -1520,7 +1518,7 @@ class QuantumInterface:
         return distr
 
     def _sampler_distribution_p1(
-        self, pauli: str, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
+        self, pauli: str, run_parameters: list[float], custom_circ: QuantumCircuit | None = None
     ) -> float:
         """Sample the probability of measuring one for a given Pauli string.
 
@@ -1540,7 +1538,7 @@ class QuantumInterface:
                 p1 += value
         return p1
 
-    def _make_Minv(self, shots: None | int = None, custom_ansatz: None | QuantumCircuit = None) -> np.ndarray:
+    def _make_Minv(self, shots: int | None = None, custom_ansatz: QuantumCircuit | None = None) -> np.ndarray:
         r"""Make inverse of read-out correlation matrix with one device call.
 
         The read-out correlation matrix is of the form (for two qubits):
@@ -1629,6 +1627,9 @@ class QuantumInterface:
         """
         with open(filename, "wb") as file:
             pickle.dump(self.saver, file)
+        with open(filename + "_info.txt", "w") as f:
+            f.write(self._info_string())
+            f.write(f"\nAnsatz parameters:\n{self.parameters}")
 
     def load_paulis_from_file(self, filename: str) -> None:
         """Load Pauli strings and their distributions from a file.
@@ -1640,12 +1641,12 @@ class QuantumInterface:
             self.saver = pickle.load(file)
         print(f"Loaded Pauli strings from {filename}.")
 
-    def get_info(self) -> None:
-        """Get infos about settings."""
+    def _info_string(self) -> str:
+        """Get infos about settings as string."""
         if isinstance(self.ansatz, QuantumCircuit):
             data = f"Your settings are:\n {'Ansatz:':<20} {'custom circuit'}\n {'Number of shots:':<20} {self.shots}\n"
         else:
-            data = f"Your settings are:\n {'Ansatz:':<20} {self.ansatz}\n {'Number of shots:':<20} {self.shots}\n"
+            data = f"Your settings are:\n {'Ansatz:':<20} {self.ansatz}\n {'Ansatz options:':<20} {self.ansatz_options}\n {'Number of shots:':<20} {self.shots}\n"
         data += f" {'ISA':<20} {self.ISA}\n {'Primitive:':<20} {self._primitive.__class__.__name__}"
         if self.ISA:
             if self._transpiled:
@@ -1666,5 +1667,9 @@ class QuantumInterface:
                     self._primitive.options, "twirling"
                 ):
                     data += f"\n {'Pauli twirling:':<20} {self._primitive.options.twirling.enable_gates}\n {'Dynamic decoupling:':<20} {self._primitive.options.dynamical_decoupling.enable}"
+        data += f"\nMitigation flags:\n{self.mitigation_flags.status_report()}"
+        return data
 
-        print(f"{data}\nMitigation flags:\n{self.mitigation_flags.status_report()}")
+    def get_info(self) -> None:
+        """Print infos about settings."""
+        print(f"{self._info_string()}")
