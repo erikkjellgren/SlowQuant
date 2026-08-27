@@ -609,16 +609,17 @@ class UccStructure:
         self.n_params = 0
 
 
-    def add_singles(self, active_occ_idx: Sequence[int], active_unocc_idx: Sequence[int], is_spin_conserving) -> None:
+    def add_singles(self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int], is_spin_conserving) -> None:
         """Add spin-adapted singles.
 
         Args:
             active_occ_idx: Active strongly occupied spatial orbital indices.
             active_unocc_idx: Active weakly occupied spatial orbital indices.
         """
-        for a, i, _ in iterate_t1(active_occ_idx, active_unocc_idx):
+        print(active_occ_spin_idx, active_unocc_spin_idx)
+        for a, i in iterate_t1(active_occ_spin_idx, active_unocc_spin_idx, is_spin_conserving=False):
             self.excitation_indices.append((i, a))
-            self.excitation_operator_type.append("sa_single")
+            self.excitation_operator_type.append("single")
             self.n_params += 1
 
     def add_sa_doubles(self, active_occ_idx: Sequence[int], active_unocc_idx: Sequence[int]) -> None:
@@ -642,26 +643,29 @@ class UccStructure:
                 self.excitation_operator_type.append("sa_double_5")
             self.n_params += 1
 
-    def add_doubles(self, active_occ_idx: Sequence[int], active_unocc_idx: Sequence[int], is_spin_conserving) -> None:
+    def add_doubles(self, active_occ_spin_idx: Sequence[int],  active_unocc_spin_idx: Sequence[int], is_spin_conserving) -> None:
         """Add spin-adapted doubles.
 
         Args:
             active_occ_idx: Active strongly occupied spatial orbital indices.
             active_unocc_idx: Active weakly occupied spatial orbital indices.
         """
-        for a, i, b, j, _, op_type in iterate_t2(active_occ_idx, active_unocc_idx, is_spin_conserving):
+        for a, i, b, j in iterate_t2(active_occ_spin_idx, active_unocc_spin_idx, is_spin_conserving=False):
             self.excitation_indices.append((i, j, a, b))
-            if op_type == 1:
-                self.excitation_operator_type.append("double_1")
-            elif op_type == 2:
-                self.excitation_operator_type.append("double_2")
-            elif op_type == 3:
-                self.excitation_operator_type.append("double_3")
-            elif op_type == 4:
-                self.excitation_operator_type.append("double_4")
-            elif op_type == 5:
-                self.excitation_operator_type.append("double_5")
+            self.excitation_operator_type.append("double")
             self.n_params += 1
+
+            # if op_type == 1:
+            #     self.excitation_operator_type.append("double_1")
+            # elif op_type == 2:
+            #     self.excitation_operator_type.append("double_2")
+            # elif op_type == 3:
+            #     self.excitation_operator_type.append("double_3")
+            # elif op_type == 4:
+            #     self.excitation_operator_type.append("double_4")
+            # elif op_type == 5:
+            #     self.excitation_operator_type.append("double_5")
+            # self.n_params += 1
 
 
     def add_triples(self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int], is_spin_conserving) -> None:
