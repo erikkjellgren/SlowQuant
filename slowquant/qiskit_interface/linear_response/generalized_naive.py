@@ -23,7 +23,7 @@ from slowquant.unitary_coupled_cluster.operators import (
     commutator,
     double_commutator,)
 from slowquant.unitary_coupled_cluster.generalized_operators import (
-    # hamiltonian_2i_2a,
+    generalized_hamiltonian_2i_2a,
     generalized_hamiltonian_full_space,
     generalized_one_elec_op_0i_0a,
 )
@@ -75,7 +75,7 @@ class quantumLR(quantumLRBaseClass):
             A = self.wf.QI.quantum_expectation_value_complex(
                 (G.dagger * self.H_1i_1a * G).get_folded_operator(*self.orbs)
             )
-            if abs(A) > 10**-6:  # whatever rimeligt threshold
+            if abs(A) > 10**-6:  # whatever rimeligt threshold 
                 finite_excitations.append(True)
             else:
                 finite_excitations.append(False)
@@ -128,10 +128,11 @@ class quantumLR(quantumLRBaseClass):
                     print("WARNING: Large Gradient detected in G of ", np.max(np.abs(grad)))
 
 
-        self.generalized_hamiltonian_full_space = generalized_hamiltonian_full_space(
-        self.wf.h_mo,
-        self.wf.g_mo,
-        self.wf.num_spin_orbs)
+        # self.generalized_hamiltonian_full_space = generalized_hamiltonian_full_space(
+        # self.wf.h_mo,
+        # self.wf.g_mo,
+        # self.wf.num_spin_orbs)
+
 
         # qq
         if self.num_q != 0:
@@ -146,6 +147,10 @@ class quantumLR(quantumLRBaseClass):
                     self.wf.rdm1,
                     self.wf.rdm2,
                 )
+                print(f"Hermiticity check of A: max|A - A†| efter qq= "
+                f"{np.max(np.abs(self.A - self.A.conj().T)):.2e}")  
+
+
                 self.B[: self.num_q, : self.num_q] = get_orbital_response_hessian_block(
                     self.wf.h_mo,
                     self.wf.g_mo,
@@ -163,37 +168,37 @@ class quantumLR(quantumLRBaseClass):
                     self.wf.rdm1,
                 )
             else: 
-                # self.H_2i_2a = hamiltonian_2i_2a( #AE
-                #     self.wf.h_mo,
-                #     self.wf.g_mo,
-                #     self.wf.num_inactive_orbs,
-                #     self.wf.num_active_orbs,
-                #     self.wf.num_virtual_orbs,
-                # )
-                self.generalized_hamiltonian_full_space = generalized_hamiltonian_full_space(
+                self.H_2i_2a = generalized_hamiltonian_2i_2a( #AE
                     self.wf.h_mo,
                     self.wf.g_mo,
-                    self.wf.num_spin_orbs)
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.num_virtual_orbs,
+                )
+                # self.generalized_hamiltonian_full_space = generalized_hamiltonian_full_space(
+                #     self.wf.h_mo,
+                #     self.wf.g_mo,
+                #     self.wf.num_spin_orbs)
                 
                 for j, qJ in enumerate(self.q_ops):
                     for i, qI in enumerate(self.q_ops[j:], j):
                         # Make A
                         self.A[i, j] = self.wf.QI.quantum_expectation_value_complex(
-                            (qI.dagger * self.generalized_hamiltonian_full_space * qJ).get_folded_operator(*self.orbs)
+                            (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs)
                         ) - self.wf.QI.quantum_expectation_value_complex(
-                            (qI.dagger * qJ * self.generalized_hamiltonian_full_space).get_folded_operator(*self.orbs)
+                            (qI.dagger * qJ * self.H_2i_2a).get_folded_operator(*self.orbs)
                         )
 
                         self.A[j, i] = (self.wf.QI.quantum_expectation_value_complex(
-                            (qI.dagger * self.generalized_hamiltonian_full_space * qJ).get_folded_operator(*self.orbs)
+                            (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs)
                         ) - self.wf.QI.quantum_expectation_value_complex(
-                            (qI.dagger * qJ * self.generalized_hamiltonian_full_space).get_folded_operator(*self.orbs)
+                            (qI.dagger * qJ * self.H_2i_2a).get_folded_operator(*self.orbs)
                         )).conj()
 
                         # Make B
                         self.B[i, j] = self.B[j, i] = -(
                             self.wf.QI.quantum_expectation_value_complex(
-                                (qI.dagger * qJ.dagger *self.generalized_hamiltonian_full_space).get_folded_operator(*self.orbs)
+                                (qI.dagger * qJ.dagger *self.H_2i_2a).get_folded_operator(*self.orbs)
                             )
                         )
                         # Make Sigma
@@ -251,7 +256,7 @@ class quantumLR(quantumLRBaseClass):
                 self.A[i + idx_shift, j + idx_shift] =  (
                     self.wf.QI.quantum_expectation_value_complex(
                         double_commutator(
-                            GI.dagger, self.generalized_hamiltonian_full_space, GJ, do_symmetrized=True
+                            GI.dagger,self.H_0i_0a, GJ, do_symmetrized=True
                         ).get_folded_operator(*self.orbs)
                     )
                 )
@@ -259,7 +264,7 @@ class quantumLR(quantumLRBaseClass):
                 self.A[j + idx_shift, i + idx_shift] = (
                     self.wf.QI.quantum_expectation_value_complex(
                         double_commutator(
-                            GI.dagger, self.generalized_hamiltonian_full_space, GJ, do_symmetrized=True
+                            GI.dagger, self.H_0i_0a, GJ, do_symmetrized=True
                         ).get_folded_operator(*self.orbs)
                     )
                 ).conj()
@@ -291,8 +296,8 @@ class quantumLR(quantumLRBaseClass):
         E2[size:, size:] = self.A.conjugate() #AE added conjugtate 
 
         #test anna
-        self.A = 1/2*(self.A+self.A.conj().T)
-        self.Sigma = 1/2*(self.Sigma+self.Sigma.conj().T)
+        # self.A = 1/2*(self.A+self.A.conj().T)
+        # self.Sigma = 1/2*(self.Sigma+self.Sigma.conj().T)
 
 
         
@@ -304,8 +309,13 @@ class quantumLR(quantumLRBaseClass):
         print(f"Hermiticity check of A: max|A - A†| = "
             f"{np.max(np.abs(self.A - self.A.conj().T)):.2e}")  
 
+
         print(f"Symmetry check of B: max|B - B.T| = "
             f"{np.max(np.abs(self.B - self.B.T)):.2e}")  
+        
+        print(f"Hermiticity check of A: max|Sigma - Sigma†| = "
+            f"{np.max(np.abs(self.Sigma - self.Sigma.conj().T)):.2e}")  
+
         
         print("Hessian is real?", np.allclose(E2.imag, 0))
         print("Largest imaginary value in Hessian",np.max(np.imag(E2)))

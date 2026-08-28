@@ -1,5 +1,6 @@
 import numpy as np
 import numba as nb
+import scipy.sparse as ss
 
 from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
@@ -9,6 +10,7 @@ from slowquant.unitary_coupled_cluster.operators import (
     G3, G4
 )
 from slowquant.unitary_coupled_cluster.util import UpsStructure ##AE
+from slowquant.unitary_coupled_cluster.util import UccStructure ##AE
 from slowquant.unitary_coupled_cluster.operator_state_algebra import bitcount
 import numba as nb
 
@@ -436,6 +438,7 @@ def generalized_construct_ups_state(
     out = state.copy()
     order = 1
     offset = ci_info.space_extension_offset
+    print('inde i den her')
     if dagger:
         order = -1
     # Loop over all excitation in UPSStructure
@@ -454,6 +457,9 @@ def generalized_construct_ups_state(
             elif exc_type == "double":
                 (i, j, a, b) = np.array(exc_indices) + 2 * offset
                 T = G2(i, j, a, b, True)
+            elif exc_type == "triple": #AE ?
+                (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
+                T = G3(i, j, k, a, b, c, True)
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
             # Analytical application on state vector
@@ -675,7 +681,7 @@ def generalized_construct_ups_state_test_erik(
                 T = G3(i, j, k, a, b, c, False)
             elif exc_type == "quadruple":
                 (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
-                T = G4(i, j, k, a, b, c, d, False)
+                T = G4(i, j, k, l, a, b, c, d, False)
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
             if dagger:
@@ -1113,4 +1119,203 @@ def generalized_get_grad_action_test_anna(
 
 
 
+
+
+
+def generalized_get_ucc_T(
+    thetas: list[complex],
+    ucc_struct: UccStructure,
+    offset: int = 0,
+) -> FermionicOperator:
+    """Construct UCC operator.
+
+    Args:
+        thetas: Active-space parameters.
+               Ordered as (S, D, T, ...).
+        ucc_struct: UCCStructure object.
+        offset: Offset needed for extended spaces.
+
+    Returns:
+        UCC operator.
+    """
+    # Build up T matrix based on excitations in ucc_struct and given thetas
+    T = FermionicOperator({})
+    for exc_type, exc_indices, theta in zip(
+        ucc_struct.excitation_operator_type, ucc_struct.excitation_indices, thetas
+    ):
+        if abs(theta) < 10**-28:
+            continue
+        if exc_type == "single":
+            (i, a) = np.array(exc_indices) + 2 * offset
+            t_op =  G1(i, a, False)
+        elif exc_type == "double":
+            (i, j, a, b) = np.array(exc_indices) + 2 * offset
+            t_op = G2(i, j, a, b, False)
+        elif exc_type == "triple":
+            (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
+            T += theta * G3(i, j, k, a, b, c, True)
+        elif exc_type == "quadruple":
+            (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
+            T += theta * G4(i, j, k, l, a, b, c, d, True)
+        # elif exc_type == "quintuple":
+        #     (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + 2 * offset
+        #     T += theta * G5(i, j, k, l, m, a, b, c, d, e, True)
+        # elif exc_type == "sextuple":
+        #     (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + 2 * offset
+        #     T += theta * G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
+        else:
+            raise ValueError(f"Got unknown excitation type, {exc_type}")
+        T += theta * t_op - theta.conjugate()*t_op.dagger
+    return T
+
+
+@nb.jit(nopython=True)
+def generalized_add_operator_matrix(
+    op_mat: np.ndarray,
+    anni_idxs: np.ndarray,
+    create_idxs: np.ndarray,
+    num_active_orbs: int,
+    parity_check: np.ndarray,
+    idx2det: np.ndarray,
+    det2idx: dict[int, int],
+    do_unsafe: bool,
+    factor: complex, #AE ændret fra float til complex.
+) -> np.ndarray:
+    """Add matrix representation of annihilation string.
+
+    This part is outside of propagate_state for performance reasons,
+    i.e., Numba JIT.
+
+    Args:
+        op_mat: Matrix representation of operator.
+        anni_idxs: Indicies for annihilation operators.
+        create_idxs: Indicies for creation operators.
+        num_active_orbs: Number of active spatial orbitals.
+        parity_check: Array used to check the parity when an operator is applied.
+        idx2det: Maps index to determinant.
+        det2idx: Maps determinant to index.
+        do_unsafe: Do unsafe.
+        factor: Factor in front of operator.
+
+    Returns:
+        Operator matrix.
+    """
+    anni_idxs = anni_idxs[::-1]
+    create_idxs = create_idxs[::-1]
+    # loop over all determinants in new_state
+    for i, det in enumerate(idx2det):
+        phase_changes = 0
+        is_killstate = False
+        # evaluate how string of annihilation operator change det
+        for orb_idx in anni_idxs:
+            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 0:
+                # If an annihilation operator works on zero, then we reach kill-state.
+                is_killstate = True
+                break
+            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
+            # take care of phases using parity_check
+            phase_changes += bitcount(det & parity_check[orb_idx])
+        if is_killstate:
+            continue
+        for orb_idx in create_idxs:
+            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 1:
+                # If creation operator works on one, then we reach kill-state.
+                is_killstate = True
+                break
+            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
+            # take care of phases using parity_check
+            phase_changes += bitcount(det & parity_check[orb_idx])
+        if is_killstate:
+            continue
+        if do_unsafe:
+            # For some algorithms it is guaranteed that the application of operators will always
+            # keep the new determinants within a pre-defined space (in det2idx and idx2det).
+            # For these algorithms it is a sign of bug if a keyerror when calling det2idx is found.
+            # These algorithms thus does also not need to check for the exsistence of the new determinant
+            # in det2idx.
+            # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
+            if det not in det2idx:
+                continue
+        op_mat[det2idx[det], i] += factor * (-1) ** phase_changes
+    return op_mat
+
+def generalized_build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bool = False) -> np.ndarray:
+    """Build matrix representation of operator.
+
+    Args:
+        op: Fermionic number and spin conserving operator.
+        ci_info: Information about the CI space.
+        do_unsafe: Ignore elements that are outside the space defined in ci_info. (default: False)
+                If not ignored, getting elements outside the space will stop the calculation.
+
+    Returns:
+        Matrix representation of operator.
+    """
+    idx2det = ci_info.idx2det
+    det2idx = ci_info.det2idx
+    num_active_orbs = ci_info.num_active_orbs
+    num_dets = len(idx2det)  # number of spin and particle conserving determinants
+    op_mat = np.zeros((num_dets, num_dets))  # basis
+    # Create bitstrings for parity check. Contains occupied determinant up to orbital index.
+    parity_check = np.zeros(2 * num_active_orbs + 1, dtype=int)
+    num = 0
+    for i in range(2 * num_active_orbs - 1, -1, -1):
+        num += 2**i
+        parity_check[2 * num_active_orbs - i] = num
+    # loop over all strings of annihilation operators in FermionicOperator sum
+    for fermi_label in op.operators.keys():
+        factor = op.operators[fermi_label]
+        if not isinstance(factor, (float,complex)):
+            raise ValueError(f"Got factor, {factor}, of type {type(factor)}, expected type float.")
+        # Separate each annihilation operator string in creation and annihilation indices
+        anni_idx = []
+        create_idx = []
+        for fermi_op in fermi_label:
+            if fermi_op[1]:
+                create_idx.append(fermi_op[0])
+            else:
+                anni_idx.append(fermi_op[0])
+        anni_idx = np.array(anni_idx, dtype=np.int64)
+        create_idx = np.array(create_idx, dtype=np.int64)
+        op_mat = generalized_add_operator_matrix(
+            op_mat,
+            anni_idx,
+            create_idx,
+            num_active_orbs,
+            parity_check,
+            idx2det,
+            det2idx,
+            do_unsafe,
+            factor,
+        )
+    return op_mat
+
+
+def generalized_construct_ucc_state(
+    state: np.ndarray,
+    ci_info: CI_Info,
+    thetas: list[complex],
+    ucc_struct: UccStructure,
+    dagger: bool = False,
+) -> np.ndarray:
+    """Construct UCC state by applying UCC unitary to reference state.
+
+    Args:
+        state: Reference state vector.
+        ci_info: Information about the CI space.
+        thetas: Active-space parameters.
+               Ordered as (S, D, T, ...).
+        ucc_struct: UCCStructure object.
+        dagger: If true, do dagger unitaries.
+
+    Returns:
+        New state vector with unitaries applied.
+    """
+    # Build up T matrix based on excitations in ucc_struct and given thetas
+    T = generalized_get_ucc_T(thetas, ucc_struct, ci_info.space_extension_offset)
+    # Evil matrix construction
+    Tmat = build_operator_matrix(T, ci_info)
+    if dagger:
+        return ss.linalg.expm_multiply(-Tmat, state, traceA=0.0)
+    return ss.linalg.expm_multiply(Tmat, state, traceA=0.0)
 

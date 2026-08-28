@@ -208,6 +208,16 @@ class GeneralizedWaveFunctionUPS:
                             self._kappa_imag_old.append(0.0)
                             self.kappa_spin_idx.append((P, Q))
                         continue
+
+                # if include_active_kappa: #AE  correction..
+                #     if P in self.active_unocc_spin_idx and Q in self.active_unocc_spin_idx:
+                #         if P != Q:
+                #             self._kappa_real.append(0.0)
+                #             self._kappa_imag.append(0.0)
+                #             self._kappa_real_old.append(0.0)
+                #             self._kappa_imag_old.append(0.0)
+                #             self.kappa_spin_idx.append((P, Q))
+                #         continue
                 
                 if not (P in self.active_spin_idx and Q in self.active_spin_idx):
                     self.kappa_no_activeactive_spin_idx.append((P, Q))
@@ -217,6 +227,7 @@ class GeneralizedWaveFunctionUPS:
                 self._kappa_real_old.append(0.0)
                 self._kappa_imag_old.append(0.0)
                 self.kappa_spin_idx.append((P, Q))
+        print(self.kappa_spin_idx)
 
         # Construct determinant basis
         self.ci_info = get_indexing_generalized(

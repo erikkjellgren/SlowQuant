@@ -59,6 +59,7 @@ class QuantumInterface:
         do_M_ansatz0: bool = False,
         do_M_ansatz0_plus: bool = False,
         do_postselection: bool = False,
+        do_generalized: bool = False
     ) -> None:
         """Interface to Qiskit to use IBM quantum hardware or simulator.
 
@@ -117,6 +118,7 @@ class QuantumInterface:
             do_M_ansatz0_plus=do_M_ansatz0_plus,
             do_postselection=do_postselection,
         )
+        self.do_generalized = do_generalized
         self._Minv = None
         self.total_shots_used = 0
         self.total_device_calls = 0
@@ -128,7 +130,7 @@ class QuantumInterface:
         self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
         self._M_shots = None  # define a separate number of shots for M
 
-    def construct_circuit(self, occ_spin_idx, unocc_spin_idx, num_spin_orbs: int, num_elec: tuple[int, int]) -> None:
+    def construct_circuit(self, occ_spin_idx, unocc_spin_idx, num_spin_orbs: int, num_elec: tuple[int, int], do_generalized: bool=False) -> None:
         """Construct qiskit circuit.
 
         Args:
@@ -1278,7 +1280,7 @@ class QuantumInterface:
         """
         for i, (dist, head) in enumerate(zip(distr, heads)):
             if "X" not in head and "Y" not in head:
-                distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
+                distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits, self.do_generalized)
 
     def _one_call_sampler_distributions(
         self,
