@@ -854,9 +854,9 @@ def gB_RMB_GIAO(mol):
             + np.einsum('abcd->cdab', ss1[i])
 
             + ss2[i]
-            + np.einsum('abcd->bacd', ss2[i].conj())
+            + np.einsum('abcd->badc', ss2[i].conj()) #'abcd->bacd'
             + np.einsum('abcd->cdab', ss2[i])
-            + np.einsum('abcd->dcab', ss2[i].conj())
+            + np.einsum('abcd->dcba', ss2[i].conj()) #'abcd->dcab'
         )
 
     #np.einsum('abcd,cdab,abcd,bacd,cdab,dcab->abcd', ss1[i], ss1[i], ss2[i], ss2[i], ss2[i], ss2[i])
@@ -875,7 +875,7 @@ def gB_RMB_GIAO(mol):
                     + np.einsum('abcd->cdab', ls2[i])
 
                     + ls3[i]
-                    + np.einsum('abcd->bacd', ls3[i].conj())
+                    + np.einsum('abcd->badc', ls3[i].conj())  #'abcd->bacd'
                     )
 
     #SLSL.append(np.einsum("abcd,cdab,abcd,bacd->abcd", ls1[i], ls2[i], ls3[i], ls3[i]))
@@ -1468,7 +1468,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # check_kramers_pair(alpha_occ, beta_occ, S_ovlp)
 
-    #WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-10, maxiter = 1000)
+    WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-12, maxiter = 1000)
 
 
 
@@ -1841,4 +1841,4 @@ def N3():
 
 ###RUN SCRIPT###
 
-HF()
+H2O()

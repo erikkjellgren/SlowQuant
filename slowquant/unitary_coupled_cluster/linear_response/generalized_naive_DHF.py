@@ -2232,9 +2232,9 @@ class LinearResponse(LinearResponseBaseClass):
 
         sigma_total = msc_para + msc_dia
 
-        print("para")
+        print("Response:")
         print(msc_para.real)
-        print("dia")
+        print("Expectation value:")
         print(msc_dia.real)
 
         return np.trace(sigma_total.real, axis1=1, axis2=2) / 3
