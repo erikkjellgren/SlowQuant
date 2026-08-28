@@ -4,12 +4,13 @@ import numpy as np
 from scipy.linalg import solve
 import scipy.linalg as la
 from pyscf.data import nist
-pyscf import lib
+from pyscf import lib
 
 c = lib.param.LIGHT_SPEED
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform, generalized_one_electron_transform, DHF_one_electron_transform,
+    RMB_GIAO_trans_1e, RMB_GIAO_trans_2e, DHF_two_electron_transform
 )
 from slowquant.unitary_coupled_cluster.generalized_density_matrix_DHF import (
     get_orbital_gradient_response, get_orbital_gradient_response_real_imag,
@@ -18,7 +19,8 @@ from slowquant.unitary_coupled_cluster.generalized_density_matrix_DHF import (
     get_orbital_response_property_gradient_annika, get_orbital_response_property_gradient_real_imag, 
     get_orbital_response_metric_sigma_real_imag,  get_orbital_response_static_property_gradient_DHF,
     get_1e_exp_value, 
-    get_orbital_gradient_generalized_real_imag, RDM1
+    get_orbital_gradient_generalized_real_imag, RDM1, get_orbital_response_static_property_gradient_DHF_RMB_GIAO, 
+    get_diamagnetic_RMB_GIAO
 )
 
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
@@ -117,7 +119,7 @@ class LinearResponse(LinearResponseBaseClass):
             grad = get_orbital_gradient_response_real_imag(
                 self.wf.h_mo,
                 self.wf.g_mo,
-                self.wf.kappa_no_activeactive_spin_idx,
+                self.wf.kappa_no_activeactive_spin_idx_resp,
                 self.wf.num_spin_orbs_NES,
                 self.wf.num_inactive_spin_orbs,
                 self.wf.num_active_spin_orbs,
@@ -168,14 +170,26 @@ class LinearResponse(LinearResponseBaseClass):
             if np.max(np.abs(grad)) > 10**-3:
                 print("Large Gradient detected in G of ", np.max(np.abs(grad)))
                 # raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad))) #AE udkommenteret
-        if len(self.q_ops) != 0:
+        if len(self.q_ops_resp) != 0:
             # Do orbital-orbital blocks
 
-            # self.A[: len(self.q_ops_resp), : len(self.q_ops_resp)] = get_orbital_response_hessian_block(
+            self.A[: len(self.q_ops_resp), : len(self.q_ops_resp)] = get_orbital_response_hessian_block(
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
+                self.wf.kappa_no_activeactive_spin_idx_resp,
+                self.wf.num_spin_orbs_NES, 
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.rdm1,
+                self.wf.rdm2,
+            )
+
+            # self.A_EE[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
             #     self.wf.h_mo,
             #     self.wf.g_mo,
-            #     self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
-            #     self.wf.kappa_no_activeactive_spin_idx_resp,
+            #     self.wf.kappa_no_activeactive_spin_idx_dagger,
+            #     self.wf.kappa_no_activeactive_spin_idx,
             #     self.wf.num_spin_orbs_NES, 
             #     self.wf.num_inactive_spin_orbs,
             #     self.wf.num_active_spin_orbs,
@@ -183,60 +197,61 @@ class LinearResponse(LinearResponseBaseClass):
             #     self.wf.rdm2,
             # )
 
-            self.A_EE[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.kappa_no_activeactive_spin_idx_dagger,
-                self.wf.kappa_no_activeactive_spin_idx,
-                self.wf.num_spin_orbs_NES, 
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.rdm1,
-                self.wf.rdm2,
-            )
+            # self.A_EP = get_orbital_response_hessian_block(
+            #     self.wf.h_mo,
+            #     self.wf.g_mo,
+            #     self.wf.kappa_no_activeactive_spin_idx_dagger,
+            #     self.wf.kappa_no_activeactive_spin_idx_ep,
+            #     self.wf.num_spin_orbs_NES, 
+            #     self.wf.num_inactive_spin_orbs,
+            #     self.wf.num_active_spin_orbs,
+            #     self.wf.rdm1,
+            #     self.wf.rdm2,
+            # )
 
-            self.A_EP = get_orbital_response_hessian_block(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.kappa_no_activeactive_spin_idx_dagger,
-                self.wf.kappa_no_activeactive_spin_idx_ep,
-                self.wf.num_spin_orbs_NES, 
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.rdm1,
-                self.wf.rdm2,
-            )
+            # self.A_PE = get_orbital_response_hessian_block(
+            #     self.wf.h_mo,
+            #     self.wf.g_mo,
+            #     self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+            #     self.wf.kappa_no_activeactive_spin_idx,
+            #     self.wf.num_spin_orbs_NES, 
+            #     self.wf.num_inactive_spin_orbs,
+            #     self.wf.num_active_spin_orbs,
+            #     self.wf.rdm1,
+            #     self.wf.rdm2,
+            # )
 
-            self.A_PE = get_orbital_response_hessian_block(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
-                self.wf.kappa_no_activeactive_spin_idx,
-                self.wf.num_spin_orbs_NES, 
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.rdm1,
-                self.wf.rdm2,
-            )
-
-            self.A_PP = get_orbital_response_hessian_block(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
-                self.wf.kappa_no_activeactive_spin_idx_ep,
-                self.wf.num_spin_orbs_NES, 
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.rdm1,
-                self.wf.rdm2,
-            )
+            # self.A_PP = get_orbital_response_hessian_block(
+            #     self.wf.h_mo,
+            #     self.wf.g_mo,
+            #     self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+            #     self.wf.kappa_no_activeactive_spin_idx_ep,
+            #     self.wf.num_spin_orbs_NES, 
+            #     self.wf.num_inactive_spin_orbs,
+            #     self.wf.num_active_spin_orbs,
+            #     self.wf.rdm1,
+            #     self.wf.rdm2,
+            # )
         
 
-            # self.B = get_orbital_response_hessian_block(
+            self.B = get_orbital_response_hessian_block(
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
+                self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
+                self.wf.num_spin_orbs_NES, 
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.rdm1,
+                self.wf.rdm2,
+            )
+
+
+            # self.B_EE = get_orbital_response_hessian_block(
             #     self.wf.h_mo,
             #     self.wf.g_mo,
-            #     self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
-            #     self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
+            #     self.wf.kappa_no_activeactive_spin_idx_dagger,
+            #     self.wf.kappa_no_activeactive_spin_idx_dagger,
             #     self.wf.num_spin_orbs_NES, 
             #     self.wf.num_inactive_spin_orbs,
             #     self.wf.num_active_spin_orbs,
@@ -245,73 +260,60 @@ class LinearResponse(LinearResponseBaseClass):
             # )
 
 
-            self.B_EE = get_orbital_response_hessian_block(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.kappa_no_activeactive_spin_idx_dagger,
-                self.wf.kappa_no_activeactive_spin_idx_dagger,
+            # self.B_EP = get_orbital_response_hessian_block(
+            #     self.wf.h_mo,
+            #     self.wf.g_mo,
+            #     self.wf.kappa_no_activeactive_spin_idx_dagger,
+            #     self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+            #     self.wf.num_spin_orbs_NES, 
+            #     self.wf.num_inactive_spin_orbs,
+            #     self.wf.num_active_spin_orbs,
+            #     self.wf.rdm1,
+            #     self.wf.rdm2,
+            # )
+
+            # self.B_PE = get_orbital_response_hessian_block(
+            #     self.wf.h_mo,
+            #     self.wf.g_mo,
+            #     self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+            #     self.wf.kappa_no_activeactive_spin_idx_dagger,
+            #     self.wf.num_spin_orbs_NES, 
+            #     self.wf.num_inactive_spin_orbs,
+            #     self.wf.num_active_spin_orbs,
+            #     self.wf.rdm1,
+            #     self.wf.rdm2,
+            # )            
+
+            # self.B_PP = get_orbital_response_hessian_block(
+            #     self.wf.h_mo,
+            #     self.wf.g_mo,
+            #     self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+            #     self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+            #     self.wf.num_spin_orbs_NES, 
+            #     self.wf.num_inactive_spin_orbs,
+            #     self.wf.num_active_spin_orbs,
+            #     self.wf.rdm1,
+            #     self.wf.rdm2,
+            # )
+
+
+            self.Sigma_tot[: len(self.q_ops_resp), : len(self.q_ops_resp)] = get_orbital_response_metric_sigma(
+                self.wf.kappa_no_activeactive_spin_idx_resp,
+                self.wf.kappa_no_activeactive_spin_idx_resp,
                 self.wf.num_spin_orbs_NES, 
                 self.wf.num_inactive_spin_orbs,
                 self.wf.num_active_spin_orbs,
                 self.wf.rdm1,
-                self.wf.rdm2,
             )
 
-
-            self.B_EP = get_orbital_response_hessian_block(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.kappa_no_activeactive_spin_idx_dagger,
-                self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
-                self.wf.num_spin_orbs_NES, 
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.rdm1,
-                self.wf.rdm2,
-            )
-
-            self.B_PE = get_orbital_response_hessian_block(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
-                self.wf.kappa_no_activeactive_spin_idx_dagger,
-                self.wf.num_spin_orbs_NES, 
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.rdm1,
-                self.wf.rdm2,
-            )            
-
-            self.B_PP = get_orbital_response_hessian_block(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
-                self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
-                self.wf.num_spin_orbs_NES, 
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.rdm1,
-                self.wf.rdm2,
-            )
-
-
-            # self.Sigma_tot[: len(self.q_ops_resp), : len(self.q_ops_resp)] = get_orbital_response_metric_sigma(
-            #     self.wf.kappa_no_activeactive_spin_idx_resp,
-            #     self.wf.kappa_no_activeactive_spin_idx_resp,
+            # self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
+            #     self.wf.kappa_no_activeactive_spin_idx,
+            #     self.wf.kappa_no_activeactive_spin_idx,
             #     self.wf.num_spin_orbs_NES, 
             #     self.wf.num_inactive_spin_orbs,
             #     self.wf.num_active_spin_orbs,
             #     self.wf.rdm1,
             # )
-
-            self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
-                self.wf.kappa_no_activeactive_spin_idx,
-                self.wf.kappa_no_activeactive_spin_idx,
-                self.wf.num_spin_orbs_NES, 
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.rdm1,
-            )
 
             # self.Sigma_EP = get_orbital_response_metric_sigma(
             #     self.wf.kappa_no_activeactive_spin_idx,
@@ -471,8 +473,8 @@ class LinearResponse(LinearResponseBaseClass):
 
             #manuel slut"""
         
-        if len(self.q_ops) != 0:                          
-            for j, qJ in enumerate(self.q_ops):
+        '''if len(self.q_ops_resp) != 0:                          
+            for j, qJ in enumerate(self.q_ops_resp):
                 Hq_ket = generalized_propagate_state([H * qJ], self.wf.ci_coeffs, *self.index_info) # do_unsafe=True
                 qdH_ket = generalized_propagate_state([qJ.dagger * H], self.wf.ci_coeffs, *self.index_info)
                 for i, GI in enumerate(self.G_ops):
@@ -624,8 +626,8 @@ class LinearResponse(LinearResponseBaseClass):
                 self.A[i + idx_shift, j + idx_shift] = val 
                 self.A[j + idx_shift, i + idx_shift] = val.conj()
 
-                self.A_GG[i, j] = val
-                self.A_GG[j, i] = val.conj()
+                # self.A_GG[i, j] = val
+                # self.A_GG[j, i] = val.conj()
                  
                 # Make B
                 # <0| GId H GJd |0>
@@ -660,8 +662,8 @@ class LinearResponse(LinearResponseBaseClass):
                 self.B[i + idx_shift, j + idx_shift] = val 
                 self.B[j + idx_shift, i + idx_shift] = val
 
-                self.B_GG[i, j] = val
-                self.B_GG[j, i] = val
+                # self.B_GG[i, j] = val
+                # self.B_GG[j, i] = val
                 # Make Sigma
                 # <0| GId GJ |0>
                 val = generalized_expectation_value(
@@ -682,7 +684,7 @@ class LinearResponse(LinearResponseBaseClass):
                 # Where is the Delta matrix? 
 
                 self.Sigma[i + idx_shift, j + idx_shift] =  val   
-                self.Sigma[j + idx_shift, i + idx_shift] =  val.conj()
+                self.Sigma[j + idx_shift, i + idx_shift] =  val.conj()'''
 
 
         # Check hermiticity of the Metric:
@@ -1052,6 +1054,78 @@ class LinearResponse(LinearResponseBaseClass):
                 lower_V[:, i] = V[:, i].conj()
 
         return np.vstack((V, lower_V)).reshape(-1, *in_shape)
+
+    def get_property_gradient_4comp_RMB_GIAO(self, property_integrals: np.ndarray, property_integrals_2: np.ndarray, s_B: np.ndarray) -> np.ndarray:
+        in_shape = property_integrals.shape[:-2]
+        size_mo = self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs + self.wf.num_virtual_spin_orbs
+        num_mo = len(property_integrals)
+
+
+        mo = np.zeros((num_mo, size_mo, size_mo), dtype=complex)
+        for i, ao in enumerate(property_integrals):
+            mo[i, :, :] += DHF_one_electron_transform(self.wf.c_mo, ao)
+
+        mo_s = np.zeros((num_mo, size_mo, size_mo), dtype=complex)
+        for i, ao in enumerate(s_B):
+            mo_s[i, :, :] += DHF_one_electron_transform(self.wf.c_mo, ao)
+
+        mo2 = np.zeros((num_mo, size_mo, size_mo, size_mo, size_mo), dtype=complex)
+        for i, ao in enumerate(property_integrals_2):
+            mo2[i, :, :, :, :] += DHF_two_electron_transform(self.wf.c_mo, ao)
+
+
+        mo_trans = []
+        for i in range(3):
+            mo_trans.append(RMB_GIAO_trans_1e(mo[i], self.wf.h_mo, mo_s[i]))
+
+        mo2_trans = []
+        for i in range(3):
+            mo2_trans.append(RMB_GIAO_trans_2e(mo2[i], self.wf.g_mo, mo_s[i]))
+
+        mo_trans = np.array(mo_trans)
+        mo2_trans = np.array(mo2_trans)
+
+        idx_shift_q = len(self.q_ops_resp)
+        V = np.zeros((len(self.q_ops_resp + self.G_ops), num_mo), dtype=complex)
+
+        if len(self.q_ops_resp) != 0:
+            V[:idx_shift_q, :] = get_orbital_response_static_property_gradient_DHF_RMB_GIAO(
+                mo_trans,
+                mo2_trans,
+                self.wf.kappa_no_activeactive_spin_idx_resp,
+                self.wf.num_spin_orbs_NES,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.rdm1,
+                self.wf.rdm2
+            )
+        for idx, G in enumerate(self.G_ops):
+            G_ket = generalized_propagate_state([G], self.wf.ci_coeffs, *self.index_info)
+            Gd_ket = generalized_propagate_state([G.dagger], self.wf.ci_coeffs, *self.index_info)
+            for i in range(self.wf.num_spin_orbs_NES, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs):
+                E_ket = generalized_propagate_state([a_op_spin(i,True), a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
+                val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
+                val -= generalized_expectation_value(E_ket, [], G_ket, *self.index_info)
+                V[idx + idx_shift_q, :] += mo[:, i, i] * val
+            for p in range(self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
+                for q in range(self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
+                    E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(q,False)], self.wf.ci_coeffs, *self.index_info)
+                    Ed_ket = generalized_propagate_state([a_op_spin(q,True)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
+                    val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
+                    val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+                    V[idx + idx_shift_q, :] += mo[:, p, q] * val
+
+        # Determine hermiticity per component to set correct sign of lower block
+        lower_V = np.zeros_like(V)
+        for i in range(num_mo):
+            if np.allclose(mo_trans[i], mo_trans[i].conj().T, atol=1e-10):
+                # Hermitian operator: lower block is -V*
+                lower_V[:, i] = -V[:, i].conj()
+            else:
+                # Anti-Hermitian operator: lower block is +V*
+                lower_V[:, i] = V[:, i].conj()
+
+        return np.vstack((V, lower_V)).reshape(-1, *in_shape)
     
     def get_property_gradient_4comp_no_ep(self, property_integrals: np.ndarray) -> np.ndarray:
         in_shape = property_integrals.shape[:-2]
@@ -1348,7 +1422,8 @@ class LinearResponse(LinearResponseBaseClass):
         return ktensor  # reduced K (Hz), (natm, natm)
 
 
-    
+
+    # Working functions: 
     def get_SSCC_4comp_iso(self, h1: np.ndarray, h2: np.ndarray) -> np.ndarray:
         """
         Compute isotropic reduced SSC constants K for all atom pairs.
@@ -1836,102 +1911,99 @@ class LinearResponse(LinearResponseBaseClass):
 
         return ktensor  # reduced K (Hz), (natm, natm)
     
-
-
-    
-    def get_shieldings_4comp_iso(self, h1: np.ndarray, h2: np.ndarray, hb: np.ndarray,g_ssss: np.ndarray, g_lsss: np.ndarray) -> np.ndarray:
+    def get_shieldings_4comp_iso(self, h_m: np.ndarray, h_Bm: np.ndarray, h_B: np.ndarray, g_B: np.ndarray, s_B : np.ndarray) -> np.ndarray:
         # Hessian and metric:
-        natm = h1.shape[0]
+        natm = h_m.shape[0]
 
-        size = len(self.A)
+        '''# size = len(self.A)
 
-        E2 = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
-        E2[:size, :size] = self.A
-        E2[:size, size:] = self.B
-        E2[size:, :size] = self.B.conjugate() #AE added conjugtate 
-        E2[size:, size:] = self.A.conjugate() #AE added conjugtate 
+        # E2 = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
+        # E2[:size, :size] = self.A
+        # E2[:size, size:] = self.B
+        # E2[size:, :size] = self.B.conjugate() #AE added conjugtate 
+        # E2[size:, size:] = self.A.conjugate() #AE added conjugtate 
 
         
-        num_parameters = len(self.G_ops) + len(self.q_ops_resp)
-        A_mat     = np.zeros((num_parameters, num_parameters), dtype=complex)
-        B_mat     = np.zeros((num_parameters, num_parameters), dtype=complex)
-        Sigma_mat = np.zeros((num_parameters, num_parameters), dtype=complex)
-        Delta_mat = np.zeros((num_parameters, num_parameters), dtype=complex)
+        # num_parameters = len(self.G_ops) + len(self.q_ops_resp)
+        # A_mat     = np.zeros((num_parameters, num_parameters), dtype=complex)
+        # B_mat     = np.zeros((num_parameters, num_parameters), dtype=complex)
+        # Sigma_mat = np.zeros((num_parameters, num_parameters), dtype=complex)
+        # Delta_mat = np.zeros((num_parameters, num_parameters), dtype=complex)
 
-        if len(self.q_ops_resp) != 0:
-            A_mat[:len(self.wf.kappa_no_activeactive_spin_idx_ep), :len(self.wf.kappa_no_activeactive_spin_idx_ep)] = get_orbital_response_hessian_block(
-                self.wf.h_mo, self.wf.g_mo,
-                #self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
-                #self.wf.kappa_no_activeactive_spin_idx_resp,
-                self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
-                self.wf.kappa_no_activeactive_spin_idx_ep,
-                self.wf.num_spin_orbs_NES,
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.rdm1, self.wf.rdm2,
-            )
-            A_mat[: len(self.wf.kappa_no_activeactive_spin_idx_ep), len(self.wf.kappa_no_activeactive_spin_idx_ep) : len(self.q_ops_resp)] = get_orbital_response_hessian_block(
-                self.wf.h_mo, self.wf.g_mo,
-                self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
-                self.wf.kappa_no_activeactive_spin_idx,
-                self.wf.num_spin_orbs_NES,
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.rdm1, self.wf.rdm2,
-            )
-            A_mat[len(self.wf.kappa_no_activeactive_spin_idx_ep) : len(self.q_ops_resp), : len(self.wf.kappa_no_activeactive_spin_idx_ep)] = get_orbital_response_hessian_block(
-                self.wf.h_mo, self.wf.g_mo,
-                self.wf.kappa_no_activeactive_spin_idx_dagger,
-                self.wf.kappa_no_activeactive_spin_idx_ep,
-                self.wf.num_spin_orbs_NES,
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.rdm1, self.wf.rdm2,
-            )
-            A_mat[len(self.wf.kappa_no_activeactive_spin_idx_ep) : len(self.q_ops_resp), len(self.wf.kappa_no_activeactive_spin_idx_ep) : len(self.q_ops_resp)] = get_orbital_response_hessian_block(
-                self.wf.h_mo, self.wf.g_mo,
-                self.wf.kappa_no_activeactive_spin_idx_dagger,
-                self.wf.kappa_no_activeactive_spin_idx,
-                self.wf.num_spin_orbs_NES,
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.rdm1, self.wf.rdm2,
-            )
+        # if len(self.q_ops_resp) != 0:
+        #     A_mat[:len(self.wf.kappa_no_activeactive_spin_idx_ep), :len(self.wf.kappa_no_activeactive_spin_idx_ep)] = get_orbital_response_hessian_block(
+        #         self.wf.h_mo, self.wf.g_mo,
+        #         #self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
+        #         #self.wf.kappa_no_activeactive_spin_idx_resp,
+        #         self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+        #         self.wf.kappa_no_activeactive_spin_idx_ep,
+        #         self.wf.num_spin_orbs_NES,
+        #         self.wf.num_inactive_spin_orbs,
+        #         self.wf.num_active_spin_orbs,
+        #         self.wf.rdm1, self.wf.rdm2,
+        #     )
+        #     A_mat[: len(self.wf.kappa_no_activeactive_spin_idx_ep), len(self.wf.kappa_no_activeactive_spin_idx_ep) : len(self.q_ops_resp)] = get_orbital_response_hessian_block(
+        #         self.wf.h_mo, self.wf.g_mo,
+        #         self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+        #         self.wf.kappa_no_activeactive_spin_idx,
+        #         self.wf.num_spin_orbs_NES,
+        #         self.wf.num_inactive_spin_orbs,
+        #         self.wf.num_active_spin_orbs,
+        #         self.wf.rdm1, self.wf.rdm2,
+        #     )
+        #     A_mat[len(self.wf.kappa_no_activeactive_spin_idx_ep) : len(self.q_ops_resp), : len(self.wf.kappa_no_activeactive_spin_idx_ep)] = get_orbital_response_hessian_block(
+        #         self.wf.h_mo, self.wf.g_mo,
+        #         self.wf.kappa_no_activeactive_spin_idx_dagger,
+        #         self.wf.kappa_no_activeactive_spin_idx_ep,
+        #         self.wf.num_spin_orbs_NES,
+        #         self.wf.num_inactive_spin_orbs,
+        #         self.wf.num_active_spin_orbs,
+        #         self.wf.rdm1, self.wf.rdm2,
+        #     )
+        #     A_mat[len(self.wf.kappa_no_activeactive_spin_idx_ep) : len(self.q_ops_resp), len(self.wf.kappa_no_activeactive_spin_idx_ep) : len(self.q_ops_resp)] = get_orbital_response_hessian_block(
+        #         self.wf.h_mo, self.wf.g_mo,
+        #         self.wf.kappa_no_activeactive_spin_idx_dagger,
+        #         self.wf.kappa_no_activeactive_spin_idx,
+        #         self.wf.num_spin_orbs_NES,
+        #         self.wf.num_inactive_spin_orbs,
+        #         self.wf.num_active_spin_orbs,
+        #         self.wf.rdm1, self.wf.rdm2,
+        #     )
 
-            B_mat[: len(self.q_ops_resp), : len(self.q_ops_resp)] = get_orbital_response_hessian_block(
-                self.wf.h_mo, self.wf.g_mo,
-                self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
-                self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
-                self.wf.num_spin_orbs_NES,
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.rdm1, self.wf.rdm2,
-            )
+        #     B_mat[: len(self.q_ops_resp), : len(self.q_ops_resp)] = get_orbital_response_hessian_block(
+        #         self.wf.h_mo, self.wf.g_mo,
+        #         self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
+        #         self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
+        #         self.wf.num_spin_orbs_NES,
+        #         self.wf.num_inactive_spin_orbs,
+        #         self.wf.num_active_spin_orbs,
+        #         self.wf.rdm1, self.wf.rdm2,
+        #     )
 
-            Sigma_mat[: len(self.q_ops_resp), : len(self.q_ops_resp)] = get_orbital_response_metric_sigma(
-                self.wf.kappa_no_activeactive_spin_idx_resp,
-                self.wf.num_spin_orbs_NES, 
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.rdm1,
-            )
+        #     Sigma_mat[: len(self.q_ops_resp), : len(self.q_ops_resp)] = get_orbital_response_metric_sigma(
+        #         self.wf.kappa_no_activeactive_spin_idx_resp,
+        #         self.wf.num_spin_orbs_NES, 
+        #         self.wf.num_inactive_spin_orbs,
+        #         self.wf.num_active_spin_orbs,
+        #         self.wf.rdm1,
+        #     )
         
 
-        size = len(A_mat)
-        E2_mat = np.zeros((size * 2, size * 2), dtype=complex)
-        E2_mat[:size, :size] = A_mat
-        E2_mat[:size, size:] = B_mat
-        E2_mat[size:, :size] = B_mat.conjugate()
-        E2_mat[size:, size:] = A_mat.conjugate()
+        # size = len(A_mat)
+        # E2_mat = np.zeros((size * 2, size * 2), dtype=complex)
+        # E2_mat[:size, :size] = A_mat
+        # E2_mat[:size, size:] = B_mat
+        # E2_mat[size:, :size] = B_mat.conjugate()
+        # E2_mat[size:, size:] = A_mat.conjugate()
 
 
-        S_mat = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
-        S_mat[:size, :size] = Sigma_mat
-        S_mat[:size, size:] = Delta_mat
-        S_mat[size:, :size] = -Delta_mat.conjugate()
-        S_mat[size:, size:] = -Sigma_mat.conjugate()
+        # S_mat = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
+        # S_mat[:size, :size] = Sigma_mat
+        # S_mat[:size, size:] = Delta_mat
+        # S_mat[size:, :size] = -Delta_mat.conjugate()
+        # S_mat[size:, size:] = -Sigma_mat.conjugate()
 
-        '''# Transform perturbed 2e integrals to MO basis
+        # Transform perturbed 2e integrals to MO basis
         # g_ssss shape: (3, n2c, n2c, n2c, n2c) — need to embed in n4c first
         n4c = self.wf.c_mo.shape[0]
         n2c = n4c // 2
@@ -1976,23 +2048,25 @@ class LinearResponse(LinearResponseBaseClass):
             eff_ao[:n2c, :n2c] = eff_lsss  # LL block
 
             # Transform to MO basis
-            h_2e_correction[b] = DHF_one_electron_transform(self.wf.c_mo, eff_ao)'''
+            h_2e_correction[b] = DHF_one_electron_transform(self.wf.c_mo, eff_ao)
 
 
         # Paramagnetic:
         # Property gradients: shape (num_parameters, 3)
-        prop_grads_h1 = [self.get_property_gradient_4comp_no_ep(h1[I]) for I in range(natm)]
-        prop_grads_B  = [self.get_property_gradient_4comp_no_ep(hb[I]) for I in range(natm)]
+        # prop_grads_h1 = [self.get_property_gradient_4comp_no_ep(h1[I]) for I in range(natm)]
+        # prop_grads_B  = [self.get_property_gradient_4comp_no_ep(hb[I]) for I in range(natm)]
 
         # prop_grads_h1 = [self.get_property_gradient_4comp(h1[I]) for I in range(natm)]
-        # prop_grads_B  = [self.get_property_gradient_4comp(hb[I]) for I in range(natm)]
+        # prop_grads_B  = [self.get_property_gradient_4comp(hb[I]) for I in range(natm)]'''
+
+        prop_grads_m =  [self.get_property_gradient_4comp(h_m[I]) for I in range(natm)]
+        #prop_grads_B =  self.get_property_gradient_4comp(h_B)
+        prop_grads_B  = self.get_property_gradient_4comp_RMB_GIAO(h_B, g_B, s_B)
 
         # response_B = [
         #     np.linalg.pinv(E2_mat, rcond=1e-10) @ prop_grads_B[I]
         #     for I in range(natm)
         # ]
-
-
 
         def solve_lr_drop_sigma_null(H, sigma, prop_grads1=None, prop_grads2=None, cut=1e-10):
             """
@@ -2067,8 +2141,6 @@ class LinearResponse(LinearResponseBaseClass):
 
 
         #E2_mat_trans, S_mat_trans, prop_grads_h1_trans, prop_grads_B_trans = solve_lr_drop_sigma_null(E2_mat,S_mat,prop_grads_h1,prop_grads_B)
-
-
         
         '''# print(E2)
         (
@@ -2087,8 +2159,7 @@ class LinearResponse(LinearResponseBaseClass):
         print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(S_mat_trans)))}")'''
 
 
-
-        response_B  = [solve(E2, prop_grads_B[I]) for I in range(natm)]
+        response_B  = solve(self.hessian, prop_grads_B)
 
         msc_para = np.zeros((natm, 3, 3))
 
@@ -2097,10 +2168,9 @@ class LinearResponse(LinearResponseBaseClass):
                 for beta in range(3):
                     msc_para[I, alpha, beta] = np.einsum(
                         'i,i->',
-                        -prop_grads_h1[I][:, alpha].conj(),
-                        response_B[I][:, beta]
+                        -prop_grads_m[I][:, alpha].conj(),
+                        response_B[:, beta]
                     ).real
-
 
         # Diamagnetic:
         size_mo = (
@@ -2115,12 +2185,21 @@ class LinearResponse(LinearResponseBaseClass):
         for I in range(natm):
             for a in range(3):
                 for b in range(3):
-                    mo2[I, a, b] = DHF_one_electron_transform(
+                    mo2[I, a, b, :, :] = DHF_one_electron_transform(
                         self.wf.c_mo,
-                        h2[I, a, b]
+                        h_Bm[I, a, b]
                     )
 
-        msc_dia = np.zeros((natm, 3, 3))
+        mo_s = np.zeros((3, size_mo, size_mo), dtype=complex)
+        for i, ao in enumerate(s_B):
+            mo_s[i, :, :] += DHF_one_electron_transform(self.wf.c_mo, ao)
+
+        mo_m = np.zeros((natm, 3, size_mo, size_mo), dtype=complex)
+        for I in range(natm):
+            for i, ao in enumerate(h_m[I]):
+                mo_m[I, i, :, :] += DHF_one_electron_transform(self.wf.c_mo, ao)
+
+        '''msc_dia = np.zeros((natm, 3, 3))
 
         for I in range(natm):
             for a in range(3):
@@ -2134,7 +2213,16 @@ class LinearResponse(LinearResponseBaseClass):
                                 self.wf.num_active_spin_orbs,
                                 self.wf.rdm1,
                             )
-                            msc_dia[I, a, b] += (mo2[I, a, b, i, j] * rdm1_ij).real
+                            msc_dia[I, a, b] += (mo2[I, a, b, i, j] * rdm1_ij).real'''
+
+        mo2_tilde = np.zeros((natm, 3, 3, size_mo, size_mo), dtype=complex)
+        for I in range(natm):
+            for a in range(3):
+                for b in range(3):
+                    mo2_tilde[I, a, b] = RMB_GIAO_trans_1e(mo2[I, a, b], mo_m[I,b], mo_s[a], f=1)
+
+        msc_dia = get_diamagnetic_RMB_GIAO(self.wf.rdm1, self.wf.num_spin_orbs_NES, self.wf.num_inactive_spin_orbs, self.wf.num_active_spin_orbs, mo2_tilde, natm)
+
 
         # Units, returning and printing:
         unit_ppm = nist.ALPHA**2 * 1e6
@@ -2145,14 +2233,17 @@ class LinearResponse(LinearResponseBaseClass):
         sigma_total = msc_para + msc_dia
 
         print("para")
-        print(msc_para)
+        print(msc_para.real)
         print("dia")
-        print(msc_dia)
+        print(msc_dia.real)
 
-        return np.trace(sigma_total, axis1=1, axis2=2) / 3
+        return np.trace(sigma_total.real, axis1=1, axis2=2) / 3
     
 
 
+
+
+    # Old functions:
     def get_occ_beta(self, RMB_int):
         # Should only be indexed with occupied-occupied idx !!!
 
@@ -2186,8 +2277,17 @@ class LinearResponse(LinearResponseBaseClass):
 
 
     def prop_grad_RMB_corr(self, h_B):
-        # Use the h_B_AO or h2_AO integrals 
-        return 0
+        # Use the h_B_AO or h2_AO integrals in the modified version!
+
+        h_b_MO = DHF_one_electron_transform(self.wf.c_mo, h_B)
+
+        corr =  np.zeros((len(self.wf.kappa_no_activeactive_spin_idx_resp), self.wf.c_mo.shape[1]), dtype=np.complex128)
+
+        for idx, (M, N) in enumerate(self.wf.kappa_no_activeactive_spin_idx_resp):
+            corr[idx, :] = 0
+
+
+        return corr
 
 
 

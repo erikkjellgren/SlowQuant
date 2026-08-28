@@ -386,6 +386,72 @@ def generalized_1e_transform_spin_separated(C: np.ndarray, int_1e_inp: np.ndarra
 
 
 
+
+def RMB_GIAO_trans_1e(int1e_alpha, int1e_beta, S_B, f=.5):
+    # Relativistic article
+    # beta = + ( 
+    #     np.einsum('mo,on->mn', int1e_beta, S_B) + 
+    #     np.einsum('om,on->mn', S_B.conj(), int1e_beta) )
+
+    # Chat GPT
+    # beta = -.5 * (
+    #     np.einsum('mo,on->mn', int1e_beta, S_B) +
+    #     np.einsum('om,on->mn', S_B.conj(), int1e_beta)
+    # )
+
+    # 1991
+    beta = - .5 * ( 
+        np.einsum('mo,on->mn', S_B, int1e_beta) + 
+        np.einsum('no,mo->mn', S_B.conj(), int1e_beta) )
+
+    int1e_tilde = int1e_alpha + beta
+
+    return int1e_tilde
+
+
+def RMB_GIAO_trans_2e(int2e_B, int2e_beta, S_B):
+    # Relativistic article
+    # beta =   +  (
+    #     np.einsum('mopq,on->mnpq', int2e_beta, S_B)        +
+    #     np.einsum('om,onpq->mnpq', S_B.conj(), int2e_beta) +
+    #     np.einsum('mnpo,oq->mnpq', int2e_beta, S_B)        +
+    #     np.einsum('op,mnoq->mnpq', S_B.conj(), int2e_beta) )
+
+    # Chat GPT
+    # beta = -.5 * (
+    #     np.einsum('mopq,on->mnpq', int2e_beta, S_B) +
+    #     np.einsum('om,onpq->mnpq', S_B.conj(), int2e_beta) +
+    #     np.einsum('mnpo,oq->mnpq', int2e_beta, S_B) +
+    #     np.einsum('op,mnoq->mnpq', S_B.conj(), int2e_beta)
+    # )
+
+    # 1991
+    beta =  - .5 * (
+        np.einsum('mo,onpq->mnpq', S_B, int2e_beta)        +
+        np.einsum('no,mopq->mnpq', S_B.conj(), int2e_beta) +
+        np.einsum('po,mnoq->mnpq', S_B, int2e_beta)        +
+        np.einsum('qo,mnpo->mnpq', S_B.conj(), int2e_beta) )
+
+    
+    int2e_tilde = int2e_B + beta
+
+    return int2e_tilde
+
+
+
+
+
+
+    # beta =  - .5 * (
+    #     np.einsum('mo,onpq->mnpq', S_B, int2e_beta)        +
+    #     np.einsum('no,mopq->mnpq', S_B.conj(), int2e_beta) +
+    #     np.einsum('po,mnoq->mnpq', S_B, int2e_beta)        +
+    #     np.einsum('qo,mnpo->mnpq', S_B.conj(), int2e_beta) )
+
+
+
+
+
 # def generalized_two_electron_transform(C: np.ndarray, int_2e_inp_spinor: np.ndarray) -> np.ndarray: #change name AE
 #     # C: (nao2c, nmo), eri_ao: (nao2c,nao2c,nao2c,nao2c)
 #     return np.einsum("aP,bQ,cR,dS,abcd->PQRS",

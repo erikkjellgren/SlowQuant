@@ -170,86 +170,86 @@ class LinearResponseBaseClass:
 
     def calc_excitation_energies(self) -> None:
         """Calculate excitation energies."""
-        size = len(self.wf.kappa_no_activeactive_spin_idx)
+        size_ee = len(self.wf.kappa_no_activeactive_spin_idx)
         size_ep = len(self.wf.kappa_no_activeactive_spin_idx_ep)
-        size_total = size + size_ep
+        size = size_ee + size_ep
 
 
-        E2 = np.zeros((size_total * 2, size_total * 2), dtype=complex) #AE complex
-        E2[:size_total, :size_total] = self.A
-        E2[:size_total, size_total:] = self.B
-        E2[size_total:, :size_total] = self.B.conjugate() #AE added conjugtate 
-        E2[size_total:, size_total:] = self.A.conjugate() #AE added conjugtate 
+        E2 = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
+        E2[:size, :size] = self.A
+        E2[:size, size:] = self.B
+        E2[size:, :size] = self.B.conjugate() #AE added conjugtate 
+        E2[size:, size:] = self.A.conjugate() #AE added conjugtate 
 
-        E2_eff = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
-        E2_EE = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
-        E2_EP = np.zeros((size * 2, size_ep * 2), dtype=complex) #AE complex
-        E2_PE = np.zeros((size_ep * 2, size * 2), dtype=complex) #AE complex
-        E2_PP = np.zeros((size_ep * 2, size_ep * 2), dtype=complex) #AE complex
+        # E2_eff = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
+        # E2_EE = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
+        # E2_EP = np.zeros((size * 2, size_ep * 2), dtype=complex) #AE complex
+        # E2_PE = np.zeros((size_ep * 2, size * 2), dtype=complex) #AE complex
+        # E2_PP = np.zeros((size_ep * 2, size_ep * 2), dtype=complex) #AE complex
 
-        E2_EE[:size, :size] = self.A_EE
-        E2_EE[:size, size:] = self.B_EE
-        E2_EE[size:, :size] = self.B_EE.conjugate() #AE added conjugtate 
-        E2_EE[size:, size:] = self.A_EE.conjugate() #AE added conjugtate 
+        # E2_EE[:size, :size] = self.A_EE
+        # E2_EE[:size, size:] = self.B_EE
+        # E2_EE[size:, :size] = self.B_EE.conjugate() #AE added conjugtate 
+        # E2_EE[size:, size:] = self.A_EE.conjugate() #AE added conjugtate 
 
-        E2_EP[:size, :size_ep] = self.A_EP
-        E2_EP[:size, size_ep:] = self.B_EP
-        E2_EP[size:, :size_ep] = self.B_EP.conjugate() #AE added conjugtate 
-        E2_EP[size:, size_ep:] = self.A_EP.conjugate() #AE added conjugtate 
+        # E2_EP[:size, :size_ep] = self.A_EP
+        # E2_EP[:size, size_ep:] = self.B_EP
+        # E2_EP[size:, :size_ep] = self.B_EP.conjugate() #AE added conjugtate 
+        # E2_EP[size:, size_ep:] = self.A_EP.conjugate() #AE added conjugtate 
 
-        E2_PE[:size_ep, :size] = self.A_PE
-        E2_PE[:size_ep, size:] = self.B_PE
-        E2_PE[size_ep:, :size] = self.B_PE.conjugate() #AE added conjugtate 
-        E2_PE[size_ep:, size:] = self.A_PE.conjugate() #AE added conjugtate 
+        # E2_PE[:size_ep, :size] = self.A_PE
+        # E2_PE[:size_ep, size:] = self.B_PE
+        # E2_PE[size_ep:, :size] = self.B_PE.conjugate() #AE added conjugtate 
+        # E2_PE[size_ep:, size:] = self.A_PE.conjugate() #AE added conjugtate 
 
-        E2_PP[:size_ep, :size_ep] = self.A_PP
-        E2_PP[:size_ep, size_ep:] = self.B_PP
-        E2_PP[size_ep:, :size_ep] = self.B_PP.conjugate() #AE added conjugtate 
-        E2_PP[size_ep:, size_ep:] = self.A_PP.conjugate() #AE added conjugtate 
+        # E2_PP[:size_ep, :size_ep] = self.A_PP
+        # E2_PP[:size_ep, size_ep:] = self.B_PP
+        # E2_PP[size_ep:, :size_ep] = self.B_PP.conjugate() #AE added conjugtate 
+        # E2_PP[size_ep:, size_ep:] = self.A_PP.conjugate() #AE added conjugtate 
 
-        E2_eff = E2_EE - E2_EP @ np.linalg.solve(E2_PP, E2_PE)
+        # E2_eff = E2_EE - E2_EP @ np.linalg.solve(E2_PP, E2_PE)
 
         self.E2 = E2
-        self.E2_eff = E2_eff
-        self.E2_EP = E2_EP
-        self.E2_PP = E2_PP
-        self.E2_EE = E2_EE
-        self.E2_PE = E2_PE
+        # self.E2_eff = E2_eff
+        # self.E2_EP = E2_EP
+        # self.E2_PP = E2_PP
+        # self.E2_EE = E2_EE
+        # self.E2_PE = E2_PE
 
         (
             hess_eigval,
             _,
-        ) = np.linalg.eig(E2_eff)
+        ) = np.linalg.eig(E2)
         print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
         if np.abs(np.min(hess_eigval)) < 10**-8:
             print("WARNING: Small eigenvalue in Hessian")
         elif np.min(hess_eigval) < 0:
             print("Negative eigenvalue in Hessian.")
             #raise ValueError("Negative eigenvalue in Hessian.")
-        for i in hess_eigval:
-            if i < 0:
-                print("Negative eigenvalue in Hessian:",i)
-            #raise ValueError("Negative eigenvalue in Hessian.")
+        # for i in hess_eigval:
+        #     if i < 0:
+        #         print("Negative eigenvalue in Hessian:",i)
+        #     #raise ValueError("Negative eigenvalue in Hessian.")
 
-        S = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
-        S[:size, :size] = self.Sigma
-        S[:size, size:] = self.Delta
-        S[size:, :size] = -self.Delta.conjugate()
-        S[size:, size:] = -self.Sigma.conjugate()
+        # S = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
+        # S[:size, :size] = self.Sigma
+        # S[:size, size:] = self.Delta
+        # S[size:, :size] = -self.Delta.conjugate()
+        # S[size:, size:] = -self.Sigma.conjugate()
 
-        S_tot = np.zeros((size_total * 2, size_total * 2), dtype=complex) #AE complex
-        S_tot[:size_total, :size_total] = self.Sigma_tot
-        S_tot[:size_total, size_total:] = self.Delta_tot
-        S_tot[size_total:, :size_total] = -self.Delta_tot.conjugate()
-        S_tot[size_total:, size_total:] = -self.Sigma_tot.conjugate()
+        S_tot = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
+        S_tot[:size, :size] = self.Sigma_tot
+        S_tot[:size, size:] = self.Delta_tot
+        S_tot[size:, :size] = -self.Delta_tot.conjugate()
+        S_tot[size:, size:] = -self.Sigma_tot.conjugate()
 
 
         #print(np.linalg.eig(S)) AWE
         
         # print(S)
         print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma_tot)))}")
-        self.hessian = E2_eff
-        self.metric = S
+        self.hessian = E2
+        self.metric = S_tot
 
         # for i in range(len(self.hessian)):
         #     print(self.hessian[i][i], i)
@@ -324,7 +324,8 @@ class LinearResponseBaseClass:
         self.excitation_energies = np.real(eigval[sorting][size:]) 
         self.response_vectors = (eigvec[:, sorting][:, size:]) #Removed np.real
         self.normed_response_vectors = np.zeros_like(self.response_vectors, dtype=complex) #AE
-        self.num_q = len(self.q_ops)
+        # self.num_q = len(self.q_ops)
+        self.num_q = len(self.q_ops_resp)
         
         
         #PERNILLES

@@ -1322,7 +1322,7 @@ def get_orbital_response_property_gradient_real_imag(
     return prop_grad
 
 
-#@nb.jit(nopython=True)
+@nb.jit(nopython=True)
 def get_orbital_response_hessian_block(
     h: np.ndarray,
     g: np.ndarray,
@@ -1354,20 +1354,20 @@ def get_orbital_response_hessian_block(
     """
     A1e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)), dtype=np.complex128)
     A2e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)),  dtype=np.complex128)
-    A1e_eq = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)), dtype=np.complex128)
-    A1e_eq1 = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)), dtype=np.complex128)
-    A1e_eq2 = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)), dtype=np.complex128)
-    A2e_eq = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)),  dtype=np.complex128)
+    # A1e_eq = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)), dtype=np.complex128)
+    # A1e_eq1 = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)), dtype=np.complex128)
+    # A1e_eq2 = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)), dtype=np.complex128)
+
     for idx1, (T, U) in enumerate(kappa_spin_idx1):
         for idx2, (M, N) in enumerate(kappa_spin_idx2):
             # 1e contribution
             A1e[idx1, idx2] += h[N, T] * RDM1(M, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             A1e[idx1, idx2] += h[U, M] * RDM1(T, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
 
-            A1e_eq[idx1, idx2] += h[N, T] * RDM1(M, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-            A1e_eq[idx1, idx2] += h[U, M] * RDM1(T, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-            A1e_eq1[idx1, idx2] += h[N, T] * RDM1(M, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-            A1e_eq2[idx1, idx2] += h[U, M] * RDM1(T, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            # A1e_eq[idx1, idx2] += h[N, T] * RDM1(M, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            # A1e_eq[idx1, idx2] += h[U, M] * RDM1(T, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            # A1e_eq1[idx1, idx2] += h[N, T] * RDM1(M, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            # A1e_eq2[idx1, idx2] += h[U, M] * RDM1(T, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
 
             # if RDM1(M, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1).real != 0:
             #     print("idx1, idx2")
@@ -1394,7 +1394,6 @@ def get_orbital_response_hessian_block(
                 #     A1e_eq[idx1, idx2] -= h[P, M] * RDM1(P, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
                 
             # 2e contribution
-            for P in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
                 for Q in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
                     A2e[idx1, idx2] += g[U, M, P, Q] * RDM2(
                         T, N, P, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
@@ -1432,8 +1431,7 @@ def get_orbital_response_hessian_block(
                     A2e[idx1, idx2] += g[P, Q, N, T] * RDM2(
                         M, U, P, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
-            for P in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
-                for Q in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+
                     for R in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
                         if M == U:
                             A2e[idx1, idx2] -= g[N, P, Q, R] * RDM2(
@@ -1522,6 +1520,49 @@ def get_orbital_response_static_property_gradient_DHF(
             prop_grad[idx, :] += mo[:, N, P] * RDM1(M, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             prop_grad[idx, :] -= mo[:, P, M] * RDM1(P, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
     return  prop_grad
+
+
+@nb.jit(nopython=True) 
+def get_orbital_response_static_property_gradient_DHF_RMB_GIAO(
+    mo1: np.ndarray,
+    mo2: np.ndarray,
+    kappa_spin_idx: list[tuple[int, int]],
+    num_NES: int, 
+    num_inactive_spin_orbs: int,
+    num_active_spin_orbs: int,
+    rdm1: np.array,
+    rdm2: np.array,
+) -> np.ndarray:
+    r"""Calculate the orbital part of static property gradient.
+
+    .. math::
+        P^{\hat{q}} = \frac{1}{\sqrt{2}}\sum_{p}\left(x_{np}\Gamma^{[1]}_{mp} - x_{pm}\Gamma^{[1]}_{pn}\right)
+
+    Args:
+       mo: Property integral in MO basis.
+       kappa_idx: Orbital parameter indicies in spatial basis.
+       num_inactive_orbs: Number of inactive orbitals in spatial basis.
+       num_active_orbs: Number of active orbitals in spatial basis.
+       rdm1: Active part of 1-RDM
+
+    Returns:
+        Orbital part of static property gradient.
+    """
+    prop_grad = np.zeros((len(kappa_spin_idx), len(mo1)), dtype=np.complex128)
+    prop_grad2 = np.zeros((len(kappa_spin_idx), len(mo1)), dtype=np.complex128)
+    for idx, (N, M) in enumerate(kappa_spin_idx):
+        for P in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+            prop_grad[idx, :] += mo1[:, N, P] * RDM1(M, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            prop_grad[idx, :] -= mo1[:, P, M] * RDM1(P, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+
+            for Q in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+                for R in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+                    prop_grad2[idx, :] += mo2[:, N, P, Q, R] * RDM2(M, P, Q, R, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                    prop_grad2[idx, :] -= mo2[:, P, Q, N, R] * RDM2(M, Q, P, R, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                    prop_grad2[idx, :] -= mo2[:, P, M, Q, R] * RDM2(P, N, Q, R, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                    prop_grad2[idx, :] += mo2[:, P, Q, R, M] * RDM2(P, N, R, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+
+    return  prop_grad + .5 * prop_grad2
 
 @nb.jit(nopython=True)
 def get_1e_exp_value(
@@ -1693,5 +1734,23 @@ def get_e0(rdm1, rdm2, num_inactive_spin_orbs, num_active_spin_orbs, S_int):
     Y = get_Sy(rdm1, num_inactive_spin_orbs, num_active_spin_orbs, S_int)
     Z = get_Sz(rdm1, num_inactive_spin_orbs, num_active_spin_orbs, S_int)
     return np.sqrt(X**2 + Y**2 + Z**2)
+
+#@nb.jit(nopython=True)
+def get_diamagnetic_RMB_GIAO(rdm1, num_spin_orbs_NES, num_inactive_spin_orbs, num_active_spin_orbs, mo, natm):
+    dia = np.zeros((natm, 3, 3), dtype=np.complex128)
+
+    for ATM in range(natm):
+        for a in range(3):
+            for b in range(3):
+                for I in range(num_spin_orbs_NES, num_spin_orbs_NES + num_inactive_spin_orbs):
+                    dia[ATM, a, b] += mo[ATM, a, b, I, I] * RDM1(I, I, num_spin_orbs_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+                    
+                for P in range(num_spin_orbs_NES + num_inactive_spin_orbs, num_spin_orbs_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+                    for Q in range(num_spin_orbs_NES + num_inactive_spin_orbs, num_spin_orbs_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+                        dia[ATM, a, b] += mo[ATM, a, b, P, Q] * RDM1(Q, P, num_spin_orbs_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+
+    return dia
+
+
 
 

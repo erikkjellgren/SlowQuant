@@ -451,6 +451,8 @@ def make_h1_ao(mol):
 
     return h1
 
+
+
 def make_h2_ao_shield(mol):
     """
     Diamagnetic property Hessian integrals for all atom pairs.
@@ -467,20 +469,14 @@ def make_h2_ao_shield(mol):
     dia = np.zeros((natm, 3, 3, n4c, n4c), dtype=np.complex128)
 
     for I in range(natm):
-        mol.set_rinv_origin(mol.atom_coord(I))
-
-        #gauge_orig = None
-
-        gauge_orig = mol.set_common_orig([0,0,0])
-
         test = True
+
+        gauge_orig = mol.set_common_orig(mol.atom_coord(I))
         
         if test:
-            if gauge_orig is None: #This is running and matches pyscf
-                t11 = mol.intor('int1e_giao_sa10sa01_spinor', 9).reshape(3,3,n2c,n2c)
-                t11 += mol.intor('int1e_spgsa01_spinor', 9).reshape(3,3,n2c,n2c)
-            else:
-                t11 = mol.intor('int1e_cg_sa10sa01_spinor', 9).reshape(3,3,n2c,n2c)
+            t11 = mol.intor('int1e_giao_sa10sa01_spinor', 9).reshape(3,3,n2c,n2c)
+            t11 += mol.intor('int1e_spgsa01_spinor', 9).reshape(3,3,n2c,n2c)
+
         else:
             t11 = mol.intor('int1e_spgsa01_spinor', 9)
 
@@ -490,7 +486,6 @@ def make_h2_ao_shield(mol):
                 dia[I,x,y,:n2c,n2c:] = t11[x,y].conj().T * .5
 
     return dia  # (natm, 3, 3, n4c, n4c)
-
 
 def make_h1_ao_shield(mol):
     n2c = mol.nao_2c()
@@ -503,10 +498,6 @@ def make_h1_ao_shield(mol):
         mol.set_rinv_origin(mol.atom_coord(I))
         t01 = mol.intor('int1e_sa01sp_spinor', 3)  #TRUE
 
-
-        #t01 = mol.intor('int1e_giao_sa10sa01_spinor', 3)
-        #t01 = mol.intor('int1e_spgsa01_spinor', 3)
-
         for m in range(3):
             h01[I, m, :n2c, n2c:] = 0.5 * t01[m]
             h01[I, m, n2c:, :n2c] = 0.5 * t01[m].conj().T
@@ -514,7 +505,7 @@ def make_h1_ao_shield(mol):
     return h01
 
 
-def make_h_B_ao(mol):
+def make_h_B_ao_other(mol):
     n2c = mol.nao_2c()
     n4c = 2 * n2c
     natm = mol.natm
@@ -566,6 +557,19 @@ def make_h_B_2e_ao(mol):
 
     return g_ssss, g_lsss  # return AO integrals
 
+def make_h_B_ao(mol):
+    n2c = mol.nao_2c()
+    n4c = 2 * n2c
+
+    hB = np.zeros((3, n4c, n4c), dtype=complex)
+
+    t1 = mol.intor('int1e_cg_sa10sp_spinor', 3)
+
+    for b in range(3):
+        hB[b, :n2c, n2c:] =   0.5*t1[b]
+        hB[b, n2c:, :n2c] =   0.5*t1[b].conj().T
+
+    return hB
 
 # Old functions:
 
@@ -757,6 +761,160 @@ def RMB_corr_int(mol, origin=(0.0, 0.0, 0.0)):
     )
 
 
+def h_B_RMB_corr_int(mol):
+
+    return 0
+
+
+
+
+# GIAO-RMB integrals:
+def hB_RMB_GIAO(mol):
+    # LL 
+    vg = mol.intor('int1e_gnuc_spinor', 3)
+
+    # SS
+    wg = mol.intor('int1e_spgnucsp_spinor', 3)
+    v1 = mol.intor('int1e_giao_sa10nucsp_spinor', 3)
+
+    # LS / SL and SS
+    tg = mol.intor('int1e_spgsp_spinor', 3) # LS, SL, SS
+    t1 = mol.intor('int1e_giao_sa10sp_spinor', 3) # LS, SL, SS
+
+
+    t1cc = []
+
+    # Complex conjugate transpose sum:
+    for i in range(3):
+        t1cc.append(t1[i] + t1[i].conj().T)
+
+    # Construct integrals:
+    n2c = mol.nao_2c()
+    n4c = 2 * n2c
+
+    hB = np.zeros((3, n4c, n4c), dtype=complex)
+
+    for i in range(3):
+        # LL
+        hB[i, :n2c, :n2c] += vg[i]
+        # LS
+        hB[i, :n2c, n2c:] =  tg[i].conj().T * .5 + t1cc[i] * .5
+        # SL
+        hB[i, n2c:, :n2c] =  tg[i] * .5 + t1cc[i] * .5 
+        # SS
+        hB[i, n2c:, n2c:] += wg[i]*(.25/c**2) - tg[i]*.5 - t1cc[i] * .5 + (v1[i]+v1[i].conj().T) * (.25/c**2)
+
+    return hB
+    
+def sB_RMB_GIAO(mol):
+    # LL
+    ll = mol.intor('int1e_govlp_spinor', 3)
+
+    # SS
+    ss_1 = mol.intor('int1e_spgsp_spinor', 3)
+    ss_2 = mol.intor('int1e_giao_sa10sp_spinor', 3)
+
+    # Complec conjugation transpose combination:
+    ss_2_c = []
+    for i in range(3):
+        ss_2_c.append(ss_2[i] + ss_2[i].conj().T)
+
+    # Construct integrals:
+    n2c = mol.nao_2c()
+    n4c = 2 * n2c
+
+    sB = np.zeros((3, n4c, n4c), dtype=complex)
+
+    for i in range(3):
+        # LL
+        sB[i, :n2c,:n2c] = ll[i]
+        # SS
+        sB[i, n2c:,n2c:] = 1/(4*c**2) * (ss_1[i] + ss_2_c[i])
+    
+    return sB
+
+def gB_RMB_GIAO(mol):
+    # Integrals:
+    # LLLL
+    ll1 = mol.intor('int2e_g1_spinor', 3)
+
+    LLLL = []
+    for i in range(3):
+        LLLL.append(ll1[i]
+            + np.einsum("abcd->cdab", ll1[i])
+            )
+
+    # SSSS
+    ss1 = mol.intor('int2e_spgsp1spsp2_spinor', 3) * .0625 / c**4
+    ss2 = mol.intor('int2e_giao_sa10sp1spsp2_spinor', 3) * .0625 / c**4
+
+    SSSS =[]
+    for i in range(3):
+        SSSS.append(ss1[i]           
+            + np.einsum('abcd->cdab', ss1[i])
+
+            + ss2[i]
+            + np.einsum('abcd->bacd', ss2[i].conj())
+            + np.einsum('abcd->cdab', ss2[i])
+            + np.einsum('abcd->dcab', ss2[i].conj())
+        )
+
+    #np.einsum('abcd,cdab,abcd,bacd,cdab,dcab->abcd', ss1[i], ss1[i], ss2[i], ss2[i], ss2[i], ss2[i])
+
+    # LLSS and SSLL
+    ls1 = mol.intor('int2e_spgsp1_spinor', 3) * .25 / c**2
+    ls2 = mol.intor('int2e_g1spsp2_spinor', 3) * .25 / c**2
+    ls3 = mol.intor('int2e_giao_sa10sp1_spinor', 3) * .25 / c**2
+
+    LLSS = []
+    SSLL = []
+
+    for i in range(3):
+        SSLL.append(ls1[i]
+                    
+                    + np.einsum('abcd->cdab', ls2[i])
+
+                    + ls3[i]
+                    + np.einsum('abcd->bacd', ls3[i].conj())
+                    )
+
+    #SLSL.append(np.einsum("abcd,cdab,abcd,bacd->abcd", ls1[i], ls2[i], ls3[i], ls3[i]))
+
+        LLSS.append(np.einsum("abcd->cdab", SSLL[i]))
+
+
+    # Saving all integrals
+    gB = []
+
+    for i in range(3):
+        tmp = np.array([LLLL[i], SSSS[i], LLSS[i], SSLL[i]])
+        gB.append(tmp)
+
+    return np.array(gB)
+
+def hBm_RMB_GIAO(mol):
+    n2c = mol.nao_2c()
+    n4c = n2c * 2
+    natm = mol.natm
+
+    h11 = np.zeros((natm, 3, 3, n4c, n4c), dtype=np.complex128)
+
+    for I in range(natm):
+        mol.set_rinv_origin(mol.atom_coord(I))
+        t11 = mol.intor('int1e_giao_sa10sa01_spinor', 9).reshape(3,3,n2c,n2c)
+        t11 += mol.intor('int1e_spgsa01_spinor', 9).reshape(3,3,n2c,n2c)
+        for x in range(3):
+            for y in range(3):
+                # LS
+                h11[I,x,y,:n2c,n2c:] = t11[x,y].conj().T * .5
+                # SL
+                h11[I,x,y,n2c:,:n2c] = t11[x,y] * .5
+
+    return h11  # (natm, 3, 3, n4c, n4c)
+
+
+
+
 
 
 def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
@@ -819,13 +977,13 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     sscobj.mb = "RMB"
     sscobj.verbose = 5
     sscobj.with_fcsd = True
-    jj = sscobj.kernel()
+    #jj = sscobj.kernel()
 
 
     nmr = nmr_dhf.NMR(mf)
     nmr.cphf = True
     nmr.mb = 'RMB'      # or 'RKB'
-    nmr.gauge_orig = [0,0,0]  # GIAO
+    nmr.gauge_orig = None #[0,0,0]  # GIAO vs. # [0,0,0]
 
     shielding = nmr.kernel()
 
@@ -858,13 +1016,14 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     g_eri = np.array([mol.intor("int2e_spinor"), mol.intor('int2e_spsp1spsp2_spinor')*(0.0625/c**4),
                       mol.intor('int2e_spsp2_spinor')*(0.25/c**2), mol.intor('int2e_spsp1_spinor')*(0.25/c**2)],dtype=np.complex128)
 
+    #print(g_eri.shape)
     #dip_int = mol.intor("int1e_r")
 
     size = C_MO.shape[0] // 2
 
 
     # small random anti-Hermitian
-    eps = 0.005  # controls "step size"
+    eps = 0.001  # controls "step size"
     X_anti = np.random.randn(C_MO.shape[0],C_MO.shape[0]) + 1j*np.random.randn(C_MO.shape[0],C_MO.shape[0])
     A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian
 
@@ -920,9 +1079,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
             K_pairs.append((p,q))
             M_values.append(np.max(abs(M[p,:])))
 
-    print("Kramers pairs")
-    print(K_pairs)
-    print(M_values)
+    #print("Kramers pairs")
+    #print(K_pairs)
+    #print(M_values)
 
 
     WF2 = GeneralizedWaveFunctionUPS(
@@ -940,9 +1099,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         include_active_kappa=True,
     )
 
-    print("Kramers rotations:")
-    print(WF2.kappa_spin_idx)
-    print(WF2.kappa_spin_idx_ep)
+    #print("Kramers rotations:")
+    #print(WF2.kappa_spin_idx)
+    #print(WF2.kappa_spin_idx_ep)
 
 
     WF = GeneralizedWaveFunctionUPS(
@@ -1054,9 +1213,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     #WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
 
-
-
-    # print("rdm2 PySCF")
+    '''# print("rdm2 PySCF")
     # with np.printoptions(precision=4):
     #             print(np.round(WF2.rdm2, 4))
 
@@ -1074,7 +1231,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # print("D Mine")
     # with np.printoptions(precision=4):
-    #         print(np.round(D_mine, 4))
+    #         print(np.round(D_mine, 4))'''
 
 
     '''# gradient_ee = get_orbital_gradient_generalized_real_imag(
@@ -1173,8 +1330,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # print(WF.kappa_no_activeactive_spin_idx_resp)'''
 
 
-
-    U = WF2.c_mo.conj().T @ S_ovlp @ WF.c_mo
+    '''U = WF2.c_mo.conj().T @ S_ovlp @ WF.c_mo
 
     # with np.printoptions(precision=4):
     #     print(np.round(U, 4))
@@ -1184,9 +1340,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # with np.printoptions(precision=4):
     #     print(np.round(WF2.c_mo, 4))
-    #     print(np.round(WF.c_mo, 4))
+    #     print(np.round(WF.c_mo, 4)) '''
 
-    def time_reversal_matrix(n_spatial):
+    '''def time_reversal_matrix(n_spatial):
         """
         Time reversal operator in the Dirac representation.
 
@@ -1308,52 +1464,51 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         return overlap
 
     alpha_occ = WF.c_mo[:, 4]
-    beta_occ  = WF.c_mo[:, 5]
+    beta_occ  = WF.c_mo[:, 5]'''
 
     # check_kramers_pair(alpha_occ, beta_occ, S_ovlp)
+
+    #WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-10, maxiter = 1000)
+
 
 
     LR2 = generalized_naive_DHF.LinearResponse(WF2, excitations="S")
     
     LR2.calc_excitation_energies()
-    print("Excitation energies:", LR2.excitation_energies)
-    #print(np.round(LR.get_transition_dipole(dip_int).real,5))
-    #print(LR.get_oscillator_strengths(dip_int))
+    print("Excitation energies:", LR2.excitation_energies[LR2.excitation_energies < 1e4])
 
+    hm = make_h1_ao_shield(mol)
+    hB = hB_RMB_GIAO(mol)
+    hBm = hBm_RMB_GIAO(mol)
+    gB = gB_RMB_GIAO(mol)
+    sB = sB_RMB_GIAO(mol)
+    hB_test = make_h_B_ao(mol)
 
-    # h1_shield = make_h1_ao_shield(mol)
-    # h2_shield = make_h2_ao_shield(mol)
-    # hb_shield = make_h_B_ao(mol)
-    # g_ssss, g_lsss = make_h_B_2e_ao(mol)
+    print("PySCF")
+    print(sigma_iso)
 
-    # shieldings = LR.get_shieldings_4comp_iso(h1_shield, h2_shield, hb_shield, g_ssss, g_lsss)
-    # print("Shieldings:")
-    # print(shieldings)
-
-
-
-
-
-    # SSCC2 = LR2.get_SSCC_4comp_iso(h1, h2)
-    # for I in range(SSCC2.shape[0]):
-    #     for J in range(I+1, SSCC2.shape[1]):
-    #         print(f"K({mol.atom_symbol(I)}{I} - {mol.atom_symbol(J)}{J}) = {SSCC2[I,J]:.5f} Hz")
+    shieldings = LR2.get_shieldings_4comp_iso(hm, hBm, hB, gB, sB)
+    print("Shieldings before:")
+    print(shieldings)
 
 
 
-
-
-    WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-14, maxiter = 1000)
 
     LR = generalized_naive_DHF.LinearResponse(WF, excitations="S")
 
     LR.calc_excitation_energies()
-    print("Excitation energies:", LR.excitation_energies)
+    print("Excitation energies:",  LR.excitation_energies[LR.excitation_energies < 1e4])
     #print(np.round(LR.get_transition_dipole(dip_int).real,5))
     #print(LR.get_oscillator_strengths(dip_int))
 
 
-    # h1_shield = make_h1_ao_shield(mol)
+    shieldings = LR.get_shieldings_4comp_iso(hm, hBm, hB, gB, sB)
+    print("Shieldings after:")
+    print(shieldings)
+
+
+
+    '''# h1_shield = make_h1_ao_shield(mol)
     # h2_shield = make_h2_ao_shield(mol)
     # hb_shield = make_h_B_ao(mol)
     # g_ssss, g_lsss = make_h_B_2e_ao(mol)
@@ -1363,10 +1518,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # print(shieldings)
 
 
-    SSCC = LR.get_SSCC_4comp_iso(h1, h2)
-    for I in range(SSCC.shape[0]):
-        for J in range(I+1, SSCC.shape[1]):
-            print(f"K({mol.atom_symbol(I)}{I} - {mol.atom_symbol(J)}{J}) = {SSCC[I,J]:.5f} Hz")
+    # SSCC = LR.get_SSCC_4comp_iso(h1, h2)
+    # for I in range(SSCC.shape[0]):
+    #     for J in range(I+1, SSCC.shape[1]):
+    #         print(f"K({mol.atom_symbol(I)}{I} - {mol.atom_symbol(J)}{J}) = {SSCC[I,J]:.5f} Hz")
 
 
 
@@ -1430,7 +1585,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # print(np.abs(WF.h_mo - WF.h_mo.conj().T).max())                          # h Hermiticity
     # print(np.abs(WF.g_mo - WF.g_mo.transpose(2,3,0,1)).max())               # g exchange symmetry
-    # print(np.abs(WF.g_mo - WF.g_mo.transpose(1,0,3,2).conj()).max())
+    # print(np.abs(WF.g_mo - WF.g_mo.transpose(1,0,3,2).conj()).max())'''
 
 
 
@@ -1463,13 +1618,13 @@ def H2():
     # fixed_basis = split_general_contraction(raw)
     # basis = fixed_basis
 
-    #basis = "631-g"
+    basis = "631-g"
     #dyall_v2z = bse.get_basis('dyall-v2z', elements=['H'], fmt='nwchem')
     # with open('dyall2zp_H.nwchem', 'w') as f:
     #     f.write(dyall_v2z)
     #     f.close()
     #basis = dyall_v2z
-    basis = "sto-3g"
+    #basis = "sto-3g"
     #basis = "sto-6g"
     #active_space = ((1, 1), 8)
     active_space = ((1, 1), 2)
@@ -1479,6 +1634,30 @@ def H2():
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
+
+def N2():
+    geometry = geometry = """
+    N   0.000000   0.000000  -1.097700
+    N   0.000000   0.000000   1.097700
+                            """  
+
+    #basis = "631-g"
+    #dyall_v2z = bse.get_basis('dyall-v2z', elements=['H'], fmt='nwchem')
+    # with open('dyall2zp_H.nwchem', 'w') as f:
+    #     f.write(dyall_v2z)
+    #     f.close()
+    #basis = dyall_v2z
+    basis = "sto-3g"
+    #basis = "sto-6g"
+    active_space = ((7, 7), 14)
+    #active_space = ((1, 1), 2)
+    #active_space = (2, 4)
+    charge = 0
+    spin = 0
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+
 
 def O2():
     geometry = """O  0.0   0.0  0.0;
@@ -1518,12 +1697,29 @@ def H3():
 
 def LiH():
     geometry = """H  0.0   0.0  0.0;
-        Li  0.0  0.0  1"""
+        Li  0.0  0.0  1.3"""
     #basis = "cc-pvdz"
     #basis = "631-g"
     basis = "sto-3g"
-    #active_space = ((2, 2), 4)
-    active_space = ((1,1), 4)
+    #basis = "sto-6g"
+    active_space = ((2, 2), 4)
+    #active_space = ((1,1), 4)
+    charge = 0
+    spin = 0
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+
+def BeH2():
+    geometry = """Be   0.000000   0.000000   0.000000
+                  H    0.000000   0.000000   1.326000
+                  H    0.000000   0.000000  -1.326000"""
+    #basis = "cc-pvdz"
+    #basis = "631-g"
+    basis = "sto-3g"
+    #basis = "sto-6g"
+    active_space = ((3, 3), 6)
+    #active_space = ((1,1), 4)
     charge = 0
     spin = 0
     NR(
@@ -1555,9 +1751,10 @@ def H2O():
     #basis = "631-g"
     basis = "sto-3g"
     #basis = "sto-6g"
+    active_space = ((5, 5), 10)
     #active_space = ((5, 5), 14)
     #active_space = ((3,3),8)
-    active_space = ((2, 2), 4)
+    #active_space = ((2, 2), 4)
     charge = 0
     spin = 0
     NR(
@@ -1569,7 +1766,7 @@ def HI():
         I  0.0  0.0  1.60916 """
     #basis = "dyall-v2z"
     basis = "sto-3g"
-    active_space = ((2,2), 4)
+    active_space = ((27,27), 54)
     charge = 0
     spin = 0
     NR(
@@ -1581,7 +1778,7 @@ def HBr():
         Br  0.0  0.0  1.41443 """
     #basis = "dyall-v2z"
     basis = "sto-3g"
-    active_space = ((2,2), 6)
+    active_space = ((18,18), 36)
     charge = 0
     spin = 0
     NR(
@@ -1594,7 +1791,8 @@ def HCl():
     #basis = "dyall-v2z"
     basis = "sto-3g"
     #active_space = ((2,2), 6)
-    active_space = ((2,2), 6)
+    active_space = ((9,9), 18)
+    #active_space = ((),)
     charge = 0
     spin = 0
     NR(

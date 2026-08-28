@@ -234,7 +234,7 @@ class GeneralizedWaveFunctionUPS:
             self._kpartner[p] = q
             self._kpartner[q] = p
 
-        print(self._kpartner)
+        #print(self._kpartner)
 
         self._Kp = Kp # Kramers
         self._S_int = S_int
