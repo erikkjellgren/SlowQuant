@@ -93,6 +93,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Max iterations:",max_iter)
 
 
+
     # Small step
     # eps = 0.07  # controls "step size"
     # X_anti = np.random.randn(c_mo.shape[0],c_mo.shape[0]) + 1j*np.random.randn(c_mo.shape[0],c_mo.shape[0])
@@ -144,7 +145,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         include_active_kappa=active_k,
     )
 
-    GHF.run_wf_optimization_1step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter = max_iter)
+    #GHF.run_wf_optimization_1step(optimizer, orbital_optimization=orb_opt, tol = tolerance, maxiter = max_iter)
 
     print("\nGHF electronic energy after reoptimization:", GHF.energy_elec)
     GHF.spin_analysis()
@@ -181,12 +182,15 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     WF = GeneralizedWaveFunctionUPS(
         active_space,
-        GHF.c_mo,
+        #GHF.c_mo,
+        GHF_PySCF.c_mo,
         mol,
         method,
         ansatz_options = {"n_layers": nl, "is_spin_conserving" : spin_consv},
         include_active_kappa=active_k,
     )
+
+    print(WF.kappa_spin_idx)
 
     np.random.seed(rd_seed)
     new_thetas_real = np.random.uniform(bounds[0], bounds[1], len(WF.thetas_real)).tolist()
