@@ -7,7 +7,10 @@ from typing import Any
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
-from slowquant.molecularintegrals.integralfunctions import one_electron_integral_transform
+from slowquant.molecularintegrals.integralfunctions import (
+    one_electron_integral_transform,
+    two_electron_integral_transform,
+)
 from slowquant.unitary_coupled_cluster.operators import one_elec_op_0i_0a
 from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
 from slowquant.unitary_coupled_cluster.linear_response import naive
@@ -91,7 +94,12 @@ class properties():
         Returns:
             Polarisability tensor (in au).
         """
-        prop_grad = self.LR_singlet.get_property_gradient(self.wf.int_gen.electric_dipole)
+        prop_grad = self.LR_singlet.get_property_gradient(
+            one_electron_integral_transform(
+                self.wf.c_mo,
+                self.wf.int_gen.electric_dipole,
+            )
+        )
         
         if freq == 0:
             response = scipy.linalg.solve(self.LR_singlet.hessian, prop_grad)
@@ -120,29 +128,100 @@ class properties():
 
             # Diamagnetic term
             dia_ao = self.wf.int_gen.diamagnetic_shielding(common_orig=origin, atom_coord=origin)
+            dia_mo = one_electron_integral_transform(self.wf.c_mo, dia_ao)
 
-            for comp in dia_ao:
-                dia_mo = one_electron_integral_transform(self.wf.c_mo, comp)
-                dia_op = one_elec_op_0i_0a(dia_mo, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
+            for comp in dia_mo:
+                dia_op = one_elec_op_0i_0a(comp, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
                 dia_i.append(expectation_value(self.wf.ci_coeffs, 
                                                [dia_op], 
                                                self.wf.ci_coeffs, 
                                                *self.index_info))
             
-            dia_i = np.array(dia_i).reshape((3,3))
-            dia_shield[i,:,:] = dia_i - dia_i.trace() * np.eye(3)
+            dia_shield[i,:,:] = np.array(dia_i).reshape((3,3))
             
             # PSO
             property_gradient = self.LR_singlet.get_property_gradient(
-                self.wf.int_gen.orbital_paramagnetic(origin)
+                one_electron_integral_transform(
+                    self.wf.c_mo,
+                    self.wf.int_gen.orbital_paramagnetic(origin),
                 )
+            )
             response_vector = scipy.linalg.solve(self.LR_singlet.hessian, property_gradient)
 
             # Anguar Momentum
             property_gradient = self.LR_singlet.get_property_gradient(
-                self.wf.int_gen.angular_momentum(origin)
+                one_electron_integral_transform(
+                    self.wf.c_mo,
+                    self.wf.int_gen.angular_momentum(origin),
                 )
+            )
+            # Paramagnetic shielding tensor
+            para_shield[i,:,:] -= np.einsum('ix,iy->xy', response_vector, property_gradient)
+
+
+        dia_shield *= nist.ALPHA**2 * 1e6
+        para_shield *= nist.ALPHA**2 * 1e6
+
+        print('Shielding (in ppm):')
+        for i in range(len(atoms)):
+            print(f'{i}: \tTotal={np.trace(dia_shield[i,:,:] + para_shield[i,:,:]) / 3:.4f} \tDia={np.trace(dia_shield[i,:,:]) / 3:.4f} \tPara={np.trace(para_shield[i,:,:]) / 3:.4f}')
+
+        return dia_shield, para_shield
+
+    def get_nuclear_shielding_tensor_giao(self) -> tuple[np.ndarray, np.ndarray]:
+        """Calculate the shielding tensor of each nuclei.
+
+        Returns:
+            Diamagnetic and paramagnetic shielding tensor for each nuclei (in ppm).
+        """
+        atoms = self.wf.int_gen.atom_coordinates
+        dia_shield = np.zeros((len(atoms), 3, 3))
+        para_shield = np.zeros((len(atoms), 3, 3))
+
+        for i in range(len(atoms)):
+            dia_i = []
+            origin = atoms[i,:]
+
+            # Diamagnetic term
+            # Unmodified MOs
+            dia_mo = one_electron_integral_transform(self.wf.c_mo, self.wf.int_gen.diamagnetic_shielding_giao(atom_coord=origin))
+            S1_mo  = one_electron_integral_transform(self.wf.c_mo, self.wf.int_gen.overlap_giao)
+            pso_mo = one_electron_integral_transform(self.wf.c_mo, self.wf.int_gen.orbital_paramagnetic(origin))
+
+            # Orthonomalized MOs
+            dia_mo += 1/2 * np.einsum('vmo,won->vwmn', S1_mo, pso_mo).reshape(dia_mo.shape)
+            dia_mo += 1/2 * np.einsum('von,wmo->vwmn', S1_mo, pso_mo).reshape(dia_mo.shape)
+
+            for comp in dia_mo:
+                dia_op = one_elec_op_0i_0a(comp, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
+                dia_i.append(expectation_value(self.wf.ci_coeffs, 
+                                               [dia_op], 
+                                               self.wf.ci_coeffs, 
+                                               *self.index_info))
             
+            dia_shield[i,:,:] = np.array(dia_i).reshape((3,3))
+            
+            # PSO
+            property_gradient = self.LR_singlet.get_property_gradient(pso_mo)
+            response_vector = scipy.linalg.solve(self.LR_singlet.hessian, property_gradient)
+
+            # Anguar Momentum
+            # Unmodified MOs
+            h1mo = one_electron_integral_transform(self.wf.c_mo, self.wf.int_gen.angular_momentum_giao)
+            g1mo = two_electron_integral_transform(self.wf.c_mo, self.wf.int_gen.electron_electron_repulsion_giao)
+
+            # Orthonomalized MOs
+            h1mo -= 1/2 * np.einsum('vmo,on->vmn', S1_mo, self.wf.h_mo)
+            h1mo -= 1/2 * np.einsum('vno,mo->vmn', S1_mo.transpose(0,2,1), self.wf.h_mo)
+            g1mo -= 1/2 * np.einsum('vmo,onpq->vmnpq', S1_mo, self.wf.g_mo)
+            g1mo -= 1/2 * np.einsum('vno,mopq->vmnpq', S1_mo.transpose(0,2,1), self.wf.g_mo)
+            g1mo -= 1/2 * np.einsum('vpo,mnoq->vmnpq', S1_mo, self.wf.g_mo)
+            g1mo -= 1/2 * np.einsum('vqo,mnpo->vmnpq', S1_mo.transpose(0,2,1), self.wf.g_mo)
+
+            property_gradient = self.LR_singlet.get_property_gradient(
+                int1e = h1mo,
+                int2e = g1mo,
+            )
             # Paramagnetic shielding tensor
             para_shield[i,:,:] -= np.einsum('ix,iy->xy', response_vector, property_gradient)
 
@@ -167,12 +246,14 @@ class properties():
 
         # DSO term
         dso = np.zeros((len(nuc_pair), 3, 3))
-        dso_k = []
         for k, (i,j) in enumerate(nuc_pair):
+            dso_k = []
+
             dso_ao = self.wf.int_gen.orbital_diamagnetic(atom1_coord=atoms[i,:], atom2_coord=atoms[j,:])
-            for comp in dso_ao:
-                dso_mo = one_electron_integral_transform(self.wf.c_mo, comp)
-                dso_op = one_elec_op_0i_0a(dso_mo, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
+            dso_mo = one_electron_integral_transform(self.wf.c_mo, dso_ao)
+
+            for comp in dso_mo:
+                dso_op = one_elec_op_0i_0a(comp, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
                 dso_k.append(expectation_value(self.wf.ci_coeffs, 
                                                [dso_op], 
                                                self.wf.ci_coeffs, 
@@ -187,13 +268,18 @@ class properties():
         for i in range(len(atoms)):
             property_gradient.append(
                 self.LR_singlet.get_property_gradient(
-                self.wf.int_gen.orbital_paramagnetic(atoms[i,:])
+                    one_electron_integral_transform(
+                        self.wf.c_mo,
+                        self.wf.int_gen.orbital_paramagnetic(atoms[i,:]),
+                    )
                 )
             )
+
             response_vector.append(
                 scipy.linalg.solve(
                     self.LR_singlet.hessian, 
-                    property_gradient[i])
+                    property_gradient[i]
+                )
             )
         
         pso = np.zeros_like(dso)
@@ -202,7 +288,7 @@ class properties():
                 'ix,iy->xy', 
                 response_vector[i], 
                 property_gradient[j]
-                )
+            )
 
         # FC term
         property_gradient = []
@@ -210,13 +296,18 @@ class properties():
         for i in range(len(atoms)):
             property_gradient.append(
                 self.LR_triplet.get_property_gradient(
-                self.wf.int_gen.fermi_contact(atoms[i,:])
+                    one_electron_integral_transform(
+                        self.wf.c_mo,
+                        self.wf.int_gen.fermi_contact(atoms[i,:]),
+                    )
                 )
             )
+
             response_vector.append(
                 scipy.linalg.solve(
                     self.LR_triplet.hessian, 
-                    property_gradient[i])
+                    property_gradient[i],
+                )
             )
         
         fc = np.zeros_like(dso)
@@ -235,13 +326,18 @@ class properties():
         for i in range(len(atoms)):
             property_gradient.append(
                 self.LR_triplet.get_property_gradient(
-                self.wf.int_gen.spin_dipolar_fermi_contact(atoms[i,:])
+                    one_electron_integral_transform(
+                        self.wf.c_mo,
+                        self.wf.int_gen.spin_dipolar_fermi_contact(atoms[i,:]),
+                    )
                 ).reshape(-1, 3, 3)
             )
+
             response_vector.append(
                 scipy.linalg.solve(
                     self.LR_triplet.hessian, 
-                    property_gradient[i])
+                    property_gradient[i]
+                )
             )
         
         sdfc = np.zeros_like(dso)

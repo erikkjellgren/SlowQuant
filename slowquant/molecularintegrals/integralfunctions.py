@@ -193,7 +193,12 @@ def one_electron_integral_transform(C: np.ndarray, int1e: np.ndarray) -> np.ndar
     Returns:
         One-electron integrals in MO.
     """
-    return np.einsum("ai,bj,ab->ij", C, C, int1e, optimize=["einsum_path", (0, 2), (0, 1)])
+    if len(int1e.shape) == 2:
+        return np.einsum("ai,bj,ab->ij", C, C, int1e, optimize=["einsum_path", (0, 2), (0, 1)])
+    elif len(int1e.shape) == 3:
+        return np.einsum("ai,bj,vab->vij", C, C, int1e, optimize=["einsum_path", (0, 2), (0, 1)])
+    else:
+        raise ValueError(f"int1e must be a 2d- or 3d-array, got {len(int1e.shape)}d")
 
 
 def two_electron_integral_transform(C: np.ndarray, int2e: np.ndarray) -> np.ndarray:
@@ -206,6 +211,13 @@ def two_electron_integral_transform(C: np.ndarray, int2e: np.ndarray) -> np.ndar
     Returns:
         Two-electron integrals in MO.
     """
-    return np.einsum(
+    if len(int2e.shape) == 4:
+        return np.einsum(
         "ai,bj,ck,dl,abcd->ijkl", C, C, C, C, int2e, optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)]
     )
+    elif len(int2e.shape) == 5:
+        return np.einsum(
+                "ai,bj,ck,dl,vabcd->vijkl", C, C, C, C, int2e, optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)]
+    )
+    else:
+        raise ValueError(f"int2e must be a 4d or 5d-array, got {len(int2e.shape)}d")

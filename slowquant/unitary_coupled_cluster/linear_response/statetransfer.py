@@ -8,7 +8,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_response_hessian_block,
     get_triplet_orbital_response_hessian_block,
     get_orbital_response_metric_sigma,
-    get_orbital_response_property_gradient,
+    get_orbital_response_property_gradient_1e,
 )
 from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
     LinearResponseBaseClass,
@@ -197,7 +197,7 @@ class LinearResponse(LinearResponseBaseClass):
 
         if len(self.q_ops) != 0:
             # Orbital response part
-            V[:idx_shift_q, :] = get_orbital_response_property_gradient(
+            V[:idx_shift_q, :] = get_orbital_response_property_gradient_1e(
                 mo,
                 self.wf.kappa_no_activeactive_idx,
                 self.wf.num_inactive_orbs,

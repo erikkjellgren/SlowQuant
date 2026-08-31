@@ -9,10 +9,13 @@ from slowquant.SlowQuant import SlowQuant
 
 class IntegralManager:
     __slots__ = (
+        "_angular_momentum_giao",
         "_atom_coordinates",
         "_atom_charges",
         "_electric_dipole",
         "_electron_electron_repulsion",
+        "_electron_electron_repulsion_giao",
+        "_overlap_giao",
         "_h_ao",
         "_kinetic_energy",
         "_nuclear_electron_attraction",
@@ -33,6 +36,9 @@ class IntegralManager:
         self._h_ao: np.ndarray | None = None
         self._atom_coordinates: np.ndarray | None = None
         self._atom_charges: np.ndarray | None = None
+        self._angular_momentum_giao: np.ndarray | None = None
+        self._overlap_giao: np.ndarray | None = None
+        self._electron_electron_repulsion_giao: np.ndarray | None = None
 
     @property
     def num_elec(self) -> int:
@@ -136,6 +142,7 @@ class IntegralManager:
             self.int_obj.set_common_orig(common_orig)
             self.int_obj.set_rinv_origin(atom_coord)
             dia_shield = self.int_obj.intor('int1e_cg_a11part', comp=9)
+            dia_shield[::4] -= (dia_shield[0] + dia_shield[4] + dia_shield[8])
         else:
             raise ValueError("Got unknown integral object, {type(self.int_obj)}")
         return dia_shield
@@ -225,7 +232,7 @@ class IntegralManager:
     
     def fermi_contact(self, atom_coord) -> np.ndarray:
         if isinstance(self.int_obj, SlowQuant):
-            raise ValueError("Angular momentum integrals not implemented for integral object, {type(self.int_obj)}. Use integral object, {pyscf.gto.mole.Mole}")
+            raise ValueError("Fermi contact integrals not implemented for integral object, {type(self.int_obj)}. Use integral object, {pyscf.gto.mole.Mole}")
         elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
             amp_basis = self.int_obj.eval_gto("GTOval_sph", coords=[atom_coord])[0]
             fermi_contact = np.array([np.outer(np.conj(amp_basis), amp_basis)]) * nist.G_ELECTRON * 2/3 * np.pi
@@ -235,7 +242,7 @@ class IntegralManager:
     
     def spin_dipolar_fermi_contact(self, atom_coord) -> np.ndarray:
         if isinstance(self.int_obj, SlowQuant):
-            raise ValueError("Angular momentum integrals not implemented for integral object, {type(self.int_obj)}. Use integral object, {pyscf.gto.mole.Mole}")
+            raise ValueError("Spi dipolar integrals not implemented for integral object, {type(self.int_obj)}. Use integral object, {pyscf.gto.mole.Mole}")
         elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
             self.int_obj.set_rinv_origin(atom_coord)
             a01p = self.int_obj.intor('int1e_sa01sp', 12).reshape(3, 4, self.int_obj.nao, self.int_obj.nao) * nist.G_ELECTRON / 4
@@ -243,3 +250,62 @@ class IntegralManager:
         else:
             raise ValueError("Got unknown integral object, {type(self.int_obj)}")
         return spin_dip_fermi_cont
+
+    @property
+    def angular_momentum_giao(self) -> np.ndarray:
+        """Angular moment integrals in GIAOs."""
+        if isinstance(self._angular_momentum_giao, np.ndarray):
+            return self._angular_momentum_giao
+        if isinstance(self.int_obj, SlowQuant):
+            raise ValueError("Angular momentum integrals in GIAOs not implemented for integral object, {type(self.int_obj)}. Use integral object, {pyscf.gto.mole.Mole}")
+        elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
+            angular_momentum_giao = self.int_obj.intor("int1e_giao_irjxp", 3) / 2 + self.int_obj.intor("int1e_igkin", 3) + self.int_obj.intor("int1e_ignuc", 3)
+        else:
+            raise ValueError("Got unknown integral object, {type(self.int_obj)}")
+        self._angular_momentum_giao = angular_momentum_giao
+        return angular_momentum_giao
+
+    @property
+    def overlap_giao(self) -> np.ndarray:
+        """First derivative of the overlap integrals in GIAOs."""
+        if isinstance(self._overlap_giao, np.ndarray):
+            return self._overlap_giao
+        if isinstance(self.int_obj, SlowQuant):
+            raise ValueError("First derivative of the overlap integrals in GIAOs not implemented for integral object, {type(self.int_obj)}. Use integral object, {pyscf.gto.mole.Mole}")
+        elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
+            overlap_giao = self.int_obj.intor("int1e_igovlp", 3)
+        else:
+            raise ValueError("Got unknown integral object, {type(self.int_obj)}")
+        self._overlap_giao = overlap_giao
+        return overlap_giao
+
+    @property
+    def electron_electron_repulsion_giao(self) -> np.ndarray:
+        """First derivative of the electron-electron repulsion integrals in GIAOs."""
+        if isinstance(self._electron_electron_repulsion_giao, np.ndarray):
+            return self._electron_electron_repulsion_giao
+        if isinstance(self.int_obj, SlowQuant):
+            raise ValueError("First derivative of the electron-electron repulsion integrals in GIAOs not implemented for integral object, {type(self.int_obj)}. Use integral object, {pyscf.gto.mole.Mole}")
+        elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
+            electron_electron_repulsion_giao = self.int_obj.intor("int2e_ig1", 3)
+            electron_electron_repulsion_giao = electron_electron_repulsion_giao + electron_electron_repulsion_giao.transpose(0,3,4,1,2)
+        else:
+            raise ValueError("Got unknown integral object, {type(self.int_obj)}")
+        self._electron_electron_repulsion_giao = electron_electron_repulsion_giao
+        return electron_electron_repulsion_giao
+
+    def diamagnetic_shielding_giao(self, atom_coord) -> np.ndarray:
+        """Diamagnetic shielding integrals in GIAOs."""
+        if isinstance(self.int_obj, SlowQuant):
+            raise ValueError("Diamagnetic shielding integrals in GIAOs not implemented for integral object, {type(self.int_obj)}. Use integral object, {pyscf.gto.mole.Mole}")
+        elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
+            self.int_obj.set_rinv_origin(atom_coord)
+            self.int_obj.set_common_orig(atom_coord)
+            print(self.int_obj.intor('int1e_giao_a11part', comp=9)[0])
+            print(self.int_obj.intor('int1e_a01gp', comp=9)[0])
+            dia_shield = self.int_obj.intor('int1e_giao_a11part', comp=9)
+            dia_shield[::4] -= (dia_shield[0] + dia_shield[4] + dia_shield[8])
+            dia_shield += self.int_obj.intor('int1e_a01gp', comp=9)
+        else:
+            raise ValueError("Got unknown integral object, {type(self.int_obj)}")
+        return dia_shield
