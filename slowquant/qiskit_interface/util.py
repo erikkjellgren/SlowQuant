@@ -431,22 +431,24 @@ class Clique:
                 return clique_head.distr.get_distr(mitigation_flags)
         raise ValueError(f"Could not find matching clique for Pauli, {pauli}")
 
-    def get_empty_heads(self, mitigation_int) -> list[str]:
-        """Return all heads that do not have any data for a specific mitigation int.
+    def get_empty_heads(self, mitigation_flags: MitigationFlags | None = None) -> list[str]:
+        """Return all heads that do not have data for a mitigation configuration.
 
         Args:
-            mitigation_int: Mitigation integer, default is 0.
+            mitigation_flags: Mitigation flags object, default is None.
 
         Returns:
-            List of heads that have no data for the given mitigation integer.
+            List of heads that have no data for the given mitigation configuration.
         """
         empties = []
         for clique_head in self.cliques:
-            if clique_head.distr.is_empty(mitigation_int):
+            if clique_head.distr.is_empty(mitigation_flags):
                 empties.append(clique_head.head)
         return empties
 
-    def get_distr_heads(self, heads: list[str], mitigation_int: int = 0) -> list[dict[int, float]]:
+    def get_distr_heads(
+        self, heads: list[str], mitigation_flags: MitigationFlags | None = None
+    ) -> list[dict[int, float]]:
         """Return the distribution data for a list of heads and for a given mitigation int (default 0).
 
         This function looks only for the specific heads given, not trying to find pauli strings in commuting heads.
@@ -454,7 +456,7 @@ class Clique:
 
         Args:
             heads: List of clique heads.
-            mitigation_int: Mitigation integer, default is 0.
+            mitigation_flags: Mitigation flags object, default is None.
 
         Returns:
             List of distributions for the given heads and mitigation integer.
@@ -466,7 +468,11 @@ class Clique:
         for head in heads:
             for clique_heads in self.cliques:
                 if clique_heads.head == head:
-                    distr.append(clique_heads.distr.data[mitigation_int])
+                    distr.append(
+                        clique_heads.distr.data[
+                            mitigation_flags.to_int() if mitigation_flags is not None else 0
+                        ]
+                    )
                     break
 
         return distr
@@ -809,7 +815,7 @@ def postselection(
     mapper: FermionicMapper,
     num_elec: tuple[int, int],
     num_qubits: int,
-    do_generalized: bool = False
+    do_generalized: bool = False,
 ) -> dict[int, float]:
     r"""Perform post-selection on distribution in computational basis.
 
@@ -848,7 +854,7 @@ def postselection(
         for bitint, val in dist.items():
             bitstr = format(bitint, f"0{num_qubits}b")
             if bitstr.count("1") == np.sum(num_elec):
-                new_dist[int(bitstr,2)] = val
+                new_dist[int(bitstr, 2)] = val
                 prob_sum += val
 
     # elif isinstance(mapper, JordanWignerMapper):
@@ -928,8 +934,6 @@ def f2q(i: int, num_orbs: int) -> int:
     if i % 2 == 0:
         return i // 2
     return i // 2 + num_orbs
-
-
 
 
 def get_determinant_superposition_reference(
