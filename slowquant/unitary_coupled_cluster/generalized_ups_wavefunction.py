@@ -227,7 +227,6 @@ class GeneralizedWaveFunctionUPS:
                 self._kappa_real_old.append(0.0)
                 self._kappa_imag_old.append(0.0)
                 self.kappa_spin_idx.append((P, Q))
-        print(self.kappa_spin_idx)
 
         # Construct determinant basis
         self.ci_info = get_indexing_generalized(
