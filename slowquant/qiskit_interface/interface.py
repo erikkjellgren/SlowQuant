@@ -1050,7 +1050,17 @@ class QuantumInterface:
 
             if len(head_mit) != 0:
                 if self.mitigation_flags.do_M_mitigation:  # apply error mitigation if requested
-                    self._apply_M_mitigation(distr_raw, run_circuit, circuit_M)
+                    # Reuse distributions that already have the requested M mitigation.
+                    M_only_flags = copy.copy(self.mitigation_flags)
+                    M_only_flags.do_postselection = False
+                    empty_M_heads = self.saver[det_int].get_empty_heads(M_only_flags)
+                    if len(empty_M_heads) == 0:
+                        distr_raw = [
+                            distr.copy()
+                            for distr in self.saver[det_int].get_distr_heads(head_mit, M_only_flags)
+                        ]
+                    else:
+                        self._apply_M_mitigation(distr_raw, run_circuit, circuit_M)
 
                 if self.mitigation_flags.do_postselection:  # apply post-selection if requested
                     self._apply_postselection(distr_raw, head_mit)
