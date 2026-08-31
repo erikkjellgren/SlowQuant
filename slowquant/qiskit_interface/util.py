@@ -844,23 +844,23 @@ def postselection(
     """
     new_dist = {}
     prob_sum = 0.0
-    if isinstance(mapper, JordanWignerMapper) and do_generalized:
+    if isinstance(mapper, JordanWignerMapper):
         for bitint, val in dist.items():
             bitstr = format(bitint, f"0{num_qubits}b")
             if bitstr.count("1") == np.sum(num_elec):
                 new_dist[int(bitstr,2)] = val
                 prob_sum += val
 
-    elif isinstance(mapper, JordanWignerMapper):
-        for bitint, val in dist.items():
-            bitstr = format(bitint, f"0{num_qubits}b")
-            num_a = len(bitstr) // 2
-            # Remember that in Qiskit notation you read |0101> from right to left.
-            bitstr_a = bitstr[num_a:]
-            bitstr_b = bitstr[:num_a]
-            if bitstr_a.count("1") == num_elec[0] and bitstr_b.count("1") == num_elec[1]:
-                new_dist[int(bitstr, 2)] = val
-                prob_sum += val
+    # elif isinstance(mapper, JordanWignerMapper):
+    #     for bitint, val in dist.items():
+    #         bitstr = format(bitint, f"0{num_qubits}b")
+    #         num_a = len(bitstr) // 2
+    #         # Remember that in Qiskit notation you read |0101> from right to left.
+    #         bitstr_a = bitstr[num_a:]
+    #         bitstr_b = bitstr[:num_a]
+    #         if bitstr_a.count("1") == num_elec[0] and bitstr_b.count("1") == num_elec[1]:
+    #             new_dist[int(bitstr, 2)] = val
+    #             prob_sum += val
 
     elif isinstance(mapper, ParityMapper):
         for bitint, val in dist.items():
