@@ -163,6 +163,8 @@ class LinearResponse(LinearResponseBaseClass):
             if np.max(np.abs(grad)) > 10**-3:
                 print("Large Gradient detected in G of ", np.max(np.abs(grad)))
                 # raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad))) #AE udkommenteret
+
+                
         if len(self.q_ops) != 0:
             # Do orbital-orbital blocks
             self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(

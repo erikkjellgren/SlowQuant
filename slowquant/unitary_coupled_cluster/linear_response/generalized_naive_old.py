@@ -96,8 +96,732 @@ class LinearResponse(LinearResponseBaseClass):
         # self.G_ops_finite = sum(bool(x) for x in finite_excitations[len(self.q_ops):])
         # finite_excitations_idx = np.array(finite_excitations)
         
+
+
+        # Functions for the hessian:
+        
+            # self.A_EE[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
+            #     self.wf.h_mo,
+            #     self.wf.g_mo,
+            #     self.wf.kappa_no_activeactive_spin_idx_dagger,
+            #     self.wf.kappa_no_activeactive_spin_idx,
+            #     self.wf.num_spin_orbs_NES, 
+            #     self.wf.num_inactive_spin_orbs,
+            #     self.wf.num_active_spin_orbs,
+            #     self.wf.rdm1,
+            #     self.wf.rdm2,
+            # )
+
+            # self.A_EP = get_orbital_response_hessian_block(
+            #     self.wf.h_mo,
+            #     self.wf.g_mo,
+            #     self.wf.kappa_no_activeactive_spin_idx_dagger,
+            #     self.wf.kappa_no_activeactive_spin_idx_ep,
+            #     self.wf.num_spin_orbs_NES, 
+            #     self.wf.num_inactive_spin_orbs,
+            #     self.wf.num_active_spin_orbs,
+            #     self.wf.rdm1,
+            #     self.wf.rdm2,
+            # )
+
+            # self.A_PE = get_orbital_response_hessian_block(
+            #     self.wf.h_mo,
+            #     self.wf.g_mo,
+            #     self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+            #     self.wf.kappa_no_activeactive_spin_idx,
+            #     self.wf.num_spin_orbs_NES, 
+            #     self.wf.num_inactive_spin_orbs,
+            #     self.wf.num_active_spin_orbs,
+            #     self.wf.rdm1,
+            #     self.wf.rdm2,
+            # )
+
+            # self.A_PP = get_orbital_response_hessian_block(
+            #     self.wf.h_mo,
+            #     self.wf.g_mo,
+            #     self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+            #     self.wf.kappa_no_activeactive_spin_idx_ep,
+            #     self.wf.num_spin_orbs_NES, 
+            #     self.wf.num_inactive_spin_orbs,
+            #     self.wf.num_active_spin_orbs,
+            #     self.wf.rdm1,
+            #     self.wf.rdm2,
+            # )
+
+            
+
+            # self.B_EE = get_orbital_response_hessian_block(
+            #     self.wf.h_mo,
+            #     self.wf.g_mo,
+            #     self.wf.kappa_no_activeactive_spin_idx_dagger,
+            #     self.wf.kappa_no_activeactive_spin_idx_dagger,
+            #     self.wf.num_spin_orbs_NES, 
+            #     self.wf.num_inactive_spin_orbs,
+            #     self.wf.num_active_spin_orbs,
+            #     self.wf.rdm1,
+            #     self.wf.rdm2,
+            # )
+
+
+            # self.B_EP = get_orbital_response_hessian_block(
+            #     self.wf.h_mo,
+            #     self.wf.g_mo,
+            #     self.wf.kappa_no_activeactive_spin_idx_dagger,
+            #     self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+            #     self.wf.num_spin_orbs_NES, 
+            #     self.wf.num_inactive_spin_orbs,
+            #     self.wf.num_active_spin_orbs,
+            #     self.wf.rdm1,
+            #     self.wf.rdm2,
+            # )
+
+            # self.B_PE = get_orbital_response_hessian_block(
+            #     self.wf.h_mo,
+            #     self.wf.g_mo,
+            #     self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+            #     self.wf.kappa_no_activeactive_spin_idx_dagger,
+            #     self.wf.num_spin_orbs_NES, 
+            #     self.wf.num_inactive_spin_orbs,
+            #     self.wf.num_active_spin_orbs,
+            #     self.wf.rdm1,
+            #     self.wf.rdm2,
+            # )            
+
+            # self.B_PP = get_orbital_response_hessian_block(
+            #     self.wf.h_mo,
+            #     self.wf.g_mo,
+            #     self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+            #     self.wf.kappa_no_activeactive_spin_idx_ep_dagger,
+            #     self.wf.num_spin_orbs_NES, 
+            #     self.wf.num_inactive_spin_orbs,
+            #     self.wf.num_active_spin_orbs,
+            #     self.wf.rdm1,
+            #     self.wf.rdm2,
+            # )
+
+            
+            # self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
+            #     self.wf.kappa_no_activeactive_spin_idx,
+            #     self.wf.kappa_no_activeactive_spin_idx,
+            #     self.wf.num_spin_orbs_NES, 
+            #     self.wf.num_inactive_spin_orbs,
+            #     self.wf.num_active_spin_orbs,
+            #     self.wf.rdm1,
+            # )
+
+            # self.Sigma_EP = get_orbital_response_metric_sigma(
+            #     self.wf.kappa_no_activeactive_spin_idx,
+            #     self.wf.kappa_no_activeactive_spin_idx_ep,
+            #     self.wf.num_spin_orbs_NES, 
+            #     self.wf.num_inactive_spin_orbs,
+            #     self.wf.num_active_spin_orbs,
+            #     self.wf.rdm1,
+            # )
+
+
+            # self.A_EE = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
+            #         self.B_EE = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
+            #         self.A_EP = np.zeros((num_parameters, num_ep), dtype=complex) #AE complex
+            #         self.B_EP = np.zeros((num_parameters, num_ep), dtype=complex) #AE complex
+            #         self.A_PE = np.zeros((num_ep, num_parameters), dtype=complex) #AE complex
+            #         self.B_PE = np.zeros((num_ep, num_parameters), dtype=complex) #AE complex
+            #         self.A_PP = np.zeros((num_ep, num_ep), dtype=complex) #AE complex
+            #         self.B_PP = np.zeros((num_ep, num_ep), dtype=complex) #AE complex
+
+            # self.A_GG = np.zeros((len(self.G_ops), len(self.G_ops)), dtype=complex)
+            # self.B_GG = np.zeros((len(self.G_ops), len(self.G_ops)), dtype=complex)
+            # self.Sigma_tot = np.zeros((num_parameters + num_ep, num_parameters + num_ep), dtype=complex) #AE complex
+            # self.Sigma_EP = np.zeros((num_parameters, num_ep), dtype=complex) #AE complex
+            # self.Delta_tot = np.zeros((num_parameters + num_ep, num_parameters + num_ep), dtype=complex) #AE complex
+
+        # self.E2_eff = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
+        # self.E2_PP = np.zeros((num_ep, num_ep), dtype=complex) #AE complex
+        # self.E2_EP = np.zeros((num_parameters, num_ep), dtype=complex) #AE complex
+        # self.E2_PE = np.zeros((num_ep, num_ee), dtype=complex) #AE complex
+        # self.E2_EE = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
+        
+        
+
+        
+        # E2_eff = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
+        # E2_EE = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
+        # E2_EP = np.zeros((size * 2, size_ep * 2), dtype=complex) #AE complex
+        # E2_PE = np.zeros((size_ep * 2, size * 2), dtype=complex) #AE complex
+        # E2_PP = np.zeros((size_ep * 2, size_ep * 2), dtype=complex) #AE complex
+
+        # E2_EE[:size, :size] = self.A_EE
+        # E2_EE[:size, size:] = self.B_EE
+        # E2_EE[size:, :size] = self.B_EE.conjugate() #AE added conjugtate 
+        # E2_EE[size:, size:] = self.A_EE.conjugate() #AE added conjugtate 
+
+        # E2_EP[:size, :size_ep] = self.A_EP
+        # E2_EP[:size, size_ep:] = self.B_EP
+        # E2_EP[size:, :size_ep] = self.B_EP.conjugate() #AE added conjugtate 
+        # E2_EP[size:, size_ep:] = self.A_EP.conjugate() #AE added conjugtate 
+
+        # E2_PE[:size_ep, :size] = self.A_PE
+        # E2_PE[:size_ep, size:] = self.B_PE
+        # E2_PE[size_ep:, :size] = self.B_PE.conjugate() #AE added conjugtate 
+        # E2_PE[size_ep:, size:] = self.A_PE.conjugate() #AE added conjugtate 
+
+        # E2_PP[:size_ep, :size_ep] = self.A_PP
+        # E2_PP[:size_ep, size_ep:] = self.B_PP
+        # E2_PP[size_ep:, :size_ep] = self.B_PP.conjugate() #AE added conjugtate 
+        # E2_PP[size_ep:, size_ep:] = self.A_PP.conjugate() #AE added conjugtate 
+
+        # E2_eff = E2_EE - E2_EP @ np.linalg.solve(E2_PP, E2_PE)
+        # self.E2_eff = E2_eff
+        # self.E2_EP = E2_EP
+        # self.E2_PP = E2_PP
+        # self.E2_EE = E2_EE
+        # self.E2_PE = E2_PE
+
+        # S_tot = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
+        # S_tot[:size, :size] = self.Sigma_tot
+        # S_tot[:size, size:] = self.Delta_tot
+        # S_tot[size:, :size] = -self.Delta_tot.conjugate()
+        # S_tot[size:, size:] = -self.Sigma_tot.conjugate()
               
-              
+        
+        '''#eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)     
+        
+        
+                # s, U = np.linalg.eigh(S)
+        
+                # # keep ALL non-zero eigenvalues (positive + negative)
+                # idx = np.abs(s) > 1e-8
+                # s = s[idx]
+                # U = U[:, idx]
+        
+                # # --- Step 2: transform Hessian ---
+                # H_tilde = U.conj().T @ E2 @ U
+        
+                # # --- Step 3: build inverse sqrt of |S| ---
+                # S_inv_sqrt = np.diag(1.0 / np.sqrt(np.abs(s)))
+        
+                # # --- Step 4: effective matrix (indefinite case) ---
+                # H_eff = S_inv_sqrt @ H_tilde @ S_inv_sqrt
+        
+                # # --- Step 5: solve (general eigensolver, NOT eigh) ---
+                # eigval, eigvec = np.linalg.eig(H_eff)
+        
+                #v = U @ (S_inv_sqrt @ v)
+        
+        
+        
+        
+                    
+                #     # num=(eigvec.conj().T@(self.hessian)@eigvec)
+                #     # den=(eigvec.conj().T@(self.metric)@eigvec)
+                #     # print('eigenvalues on the diagonal?',num/den)
+                    
+                #     # for j in range(len(vec)):
+                #     #     print(vec[j], self.operator_labels[j])
+                
+        
+                #AE
+                # operator_labels = np.array(
+                #     self.operator_labels_q +
+                #     self.operator_labels_G +
+                #     self.operator_labels_q +
+                #     self.operator_labels_G,
+                #     dtype=object)
+                # for i in range(len(eigval)):
+                #     vec=eigvec[:,i]
+                #     absvec = np.abs(vec)
+                
+                #     print('Eigenvalue', eigval[i],'Max value eigvec', np.max(abs(vec)), 'Max value eigvec index', np.argmax(abs(vec)))
+                #     # k = np.argmax(np.abs(vec))
+                #     # print("dominant operator:", operator_labels[k])
+        
+                #     # top 3 contributors
+                #     top3 = np.argsort(absvec)[-3:][::-1]
+                #     # print(len(top3))
+                #     for j in top3:
+                #         print(
+                #         "  operator:", operator_labels[j],
+                #         " weight:", absvec[j])
+        
+        
+                #     # print(self.operator_labels[k])'''
+
+
+        # response_B = [
+        #     np.linalg.pinv(E2_mat, rcond=1e-10) @ prop_grads_B[I]
+        #     for I in range(natm)
+        # ]
+                    
+
+    # # Old functions:
+    # def get_occ_beta(self, RMB_int):
+    #     # Should only be indexed with occupied-occupied idx !!!
+
+    #     nao = RMB_int.shape[0] // 2
+
+    #     RMB_int_full = np.zeros((3, 4*nao, 4*nao), dtype=np.complex128)
+
+    #     for k in range(3):
+    #         RMB_int_full[k, 2*nao:, 2*nao:] = RMB_int[k]
+
+    #     RMB_int_occ_MO = DHF_one_electron_transform(self.wf.c_mo, RMB_int_full)
+
+    #     return - .25 * c**3 * RMB_int_occ_MO
+
+    # def get_shielding_P0(self, RMB_int, P0_int):
+    #     # OBS! on integral prefactors for P0_int!! (Maybe 1/c or 1/2 too much!)
+    #     # Use h1_AO integrals for P0_int
+
+    #     occ_beta = self.get_occ_beta(RMB_int)
+
+    #     P0_int_MO = DHF_one_electron_transform(self.wf.c_mo, P0_int)
+
+    #     P0 = 0
+
+    #     for i in range(self.wf.inactive_spin_idx + self.wf.active_occ_spin_idx):
+    #         for j in range(self.wf.inactive_spin_idx + self.wf.active_occ_spin_idx):
+    #             P0 += .5 * 1/c * occ_beta[j, i] * P0_int_MO[i, j]
+
+    #     return P0
+
+    # def prop_grad_RMB_corr(self, h_B):
+    #     # Use the h_B_AO or h2_AO integrals in the modified version!
+
+    #     h_b_MO = DHF_one_electron_transform(self.wf.c_mo, h_B)
+
+    #     corr =  np.zeros((len(self.wf.kappa_no_activeactive_spin_idx_resp), self.wf.c_mo.shape[1]), dtype=np.complex128)
+
+    #     for idx, (M, N) in enumerate(self.wf.kappa_no_activeactive_spin_idx_resp):
+    #         corr[idx, :] = 0
+
+
+    #     return corr
+
+
+
+# def get_property_gradient(self, property_integrals: np.ndarray) -> np.ndarray:
+#         """Calculate property gradient.
+
+#         Args:
+#             property_integrals: Integrals in AO basis.
+
+#         Returns:
+#             Property gradient.
+#         """
+#         in_shape = property_integrals.shape[:-2]
+#         size_mo = self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs + self.wf.num_virtual_spin_orbs
+#         # property_integrals = property_integrals.reshape(-1, size_mo, size_mo)
+#         num_mo = len(property_integrals)
+#         mo = np.zeros((num_mo, size_mo, size_mo), dtype=complex)
+#         for i, ao in enumerate(property_integrals):
+#             mo[i, :, :] += generalized_one_electron_transform(self.wf.c_mo, ao)
+
+#         idx_shift_q = len(self.q_ops)
+#         V = np.zeros((len(self.q_ops + self.G_ops), num_mo), dtype=complex)
+
+#         if len(self.q_ops) != 0:
+#             # Orbital response part
+#             V[:idx_shift_q, :] =  get_orbital_response_static_property_gradient(
+#                 mo,
+#                 self.wf.kappa_no_activeactive_spin_idx,
+#                 self.wf.num_inactive_spin_orbs,
+#                 self.wf.num_active_spin_orbs,
+#                 self.wf.rdm1,
+#             )
+#         for idx, G in enumerate(self.G_ops):
+#             G_ket = generalized_propagate_state([G], self.wf.ci_coeffs, *self.index_info)
+#             Gd_ket =generalized_propagate_state([G.dagger], self.wf.ci_coeffs, *self.index_info)
+#             # Inactive part
+#             for i in range(self.wf.num_inactive_spin_orbs):
+#                 E_ket = generalized_propagate_state([a_op_spin(i,True), a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info) 
+#                 # < 0 | G E | 0 >
+#                 val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
+#                 # - < 0 | E G | 0 >
+#                 val -= generalized_expectation_value(E_ket, [], G_ket, *self.index_info) # E_ket = Ed_ket for E(i,i)
+#                 V[idx + idx_shift_q, :] += mo[:, i, i] * val
+#             # Active part
+#             for p in range(self.wf.num_inactive_spin_orbs, self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
+#                 for q in range(
+#                     self.wf.num_inactive_spin_orbs, self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs
+#                 ):
+#                     E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(q,False)], self.wf.ci_coeffs, *self.index_info)
+#                     Ed_ket = generalized_propagate_state([a_op_spin(q,True)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
+#                     # < 0 | G E | 0 >
+#                     val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
+#                     # - < 0 | E G | 0 >
+#                     val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+#                     V[idx + idx_shift_q, :] += mo[:, p, q] * val
+#         if np.allclose(mo, mo.transpose(0, -1, -2)):
+#             return np.vstack((V, -1 * V)).reshape(-1, *in_shape)
+#         return np.vstack((V, V)).reshape(-1, *in_shape)
+    
+#     def get_property_gradient_4comp_old(self, property_integrals: np.ndarray) -> np.ndarray:
+#         """Calculate property gradient.
+
+#         Args:
+#             property_integrals: Integrals in AO basis.
+
+#         Returns:
+#             Property gradient.
+#         """
+#         in_shape = property_integrals.shape[:-2]
+#         size_mo = self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs + self.wf.num_virtual_spin_orbs
+#         # property_integrals = property_integrals.reshape(-1, size_mo, size_mo)
+#         num_mo = len(property_integrals)
+#         mo = np.zeros((num_mo, size_mo, size_mo), dtype=complex)
+#         for i, ao in enumerate(property_integrals):
+#             mo[i, :, :] += DHF_one_electron_transform(self.wf.c_mo, ao)
+
+#         idx_shift_q = len(self.q_ops_resp)
+#         V = np.zeros((len(self.q_ops_resp + self.G_ops), num_mo), dtype=complex)
+
+#         if len(self.q_ops_resp) != 0:
+#             # Orbital response part
+#             V[:idx_shift_q, :] =  get_orbital_response_static_property_gradient_DHF(
+#                 mo,
+#                 #self.wf.kappa_no_activeactive_spin_idx,
+#                 self.wf.kappa_no_activeactive_spin_idx_resp,
+#                 self.wf.num_spin_orbs_NES,
+#                 self.wf.num_inactive_spin_orbs,
+#                 self.wf.num_active_spin_orbs,
+#                 self.wf.rdm1,
+#             )
+#         for idx, G in enumerate(self.G_ops):
+#             G_ket = generalized_propagate_state([G], self.wf.ci_coeffs, *self.index_info)
+#             Gd_ket =generalized_propagate_state([G.dagger], self.wf.ci_coeffs, *self.index_info)
+#             # Inactive part
+#             for i in range(self.wf.num_inactive_spin_orbs):
+#                 E_ket = generalized_propagate_state([a_op_spin(i,True), a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info) 
+#                 # < 0 | G E | 0 >
+#                 val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
+#                 # - < 0 | E G | 0 >
+#                 val -= generalized_expectation_value(E_ket, [], G_ket, *self.index_info) # E_ket = Ed_ket for E(i,i)
+#                 V[idx + idx_shift_q, :] += mo[:, i, i] * val
+#             # Active part
+#             for p in range(self.wf.num_inactive_spin_orbs, self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
+#                 for q in range(
+#                     self.wf.num_inactive_spin_orbs, self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs
+#                 ):
+#                     E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(q,False)], self.wf.ci_coeffs, *self.index_info)
+#                     Ed_ket = generalized_propagate_state([a_op_spin(q,True)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
+#                     # < 0 | G E | 0 >
+#                     val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
+#                     # - < 0 | E G | 0 >
+#                     val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+#                     V[idx + idx_shift_q, :] += mo[:, p, q] * val
+#         if np.allclose(mo, mo.transpose(0, -1, -2)):
+#             return np.vstack((V, -1 * V.conjugate())).reshape(-1, *in_shape)
+#         return np.vstack((V, V.conjugate())).reshape(-1, *in_shape)
+#         #return np.vstack((V, V.conjugate())).reshape(-1, *in_shape)
+    
+#     def get_property_gradient_4comp_no_ep(self, property_integrals: np.ndarray) -> np.ndarray:
+#         in_shape = property_integrals.shape[:-2]
+#         size_mo = self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs + self.wf.num_virtual_spin_orbs
+#         num_mo = len(property_integrals)
+#         mo = np.zeros((num_mo, size_mo, size_mo), dtype=complex)
+#         for i, ao in enumerate(property_integrals):
+#             mo[i, :, :] += DHF_one_electron_transform(self.wf.c_mo, ao)
+
+#         idx_shift_q = len(self.q_ops)
+#         V = np.zeros((len(self.q_ops + self.G_ops), num_mo), dtype=complex)
+
+#         if len(self.q_ops) != 0:
+#             V[:idx_shift_q, :] = get_orbital_response_static_property_gradient_DHF(
+#                 mo,
+#                 self.wf.kappa_no_activeactive_spin_idx,
+#                 self.wf.num_spin_orbs_NES,
+#                 self.wf.num_inactive_spin_orbs,
+#                 self.wf.num_active_spin_orbs,
+#                 self.wf.rdm1,
+#             )
+
+
+#         for idx, G in enumerate(self.G_ops):
+#             G_ket = generalized_propagate_state([G], self.wf.ci_coeffs, *self.index_info)
+#             Gd_ket = generalized_propagate_state([G.dagger], self.wf.ci_coeffs, *self.index_info)
+#             for i in range(self.wf.num_spin_orbs_NES, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs):
+#                 E_ket = generalized_propagate_state([a_op_spin(i,True), a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
+#                 val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
+#                 val -= generalized_expectation_value(E_ket, [], G_ket, *self.index_info)
+#                 V[idx + idx_shift_q, :] += mo[:, i, i] * val
+#             for p in range(self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
+#                 for q in range(self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
+#                     E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(q,False)], self.wf.ci_coeffs, *self.index_info)
+#                     Ed_ket = generalized_propagate_state([a_op_spin(q,True)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
+#                     val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
+#                     val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+#                     V[idx + idx_shift_q, :] += mo[:, p, q] * val
+
+#         # Determine hermiticity per component to set correct sign of lower block
+#         lower_V = np.zeros_like(V)
+#         for i in range(num_mo):
+#             if np.allclose(mo[i], mo[i].conj().T, atol=1e-10):
+#                 # Hermitian operator: lower block is -V*
+#                 lower_V[:, i] = -V[:, i].conj()
+#             else:
+#                 # Anti-Hermitian operator: lower block is +V*
+#                 lower_V[:, i] = V[:, i].conj()
+
+#         return np.vstack((V, lower_V)).reshape(-1, *in_shape)
+    
+#         # Annas screening using A based on pernilles screening:
+
+#         # full_mask = np.concatenate([
+#         #             self.finite_excitations_idx,
+#         #             self.finite_excitations_idx,
+#         #         ])
+#         # for i in range(num_mo):
+#         #     if np.allclose(mo, mo.conj().transpose(0, -1, -2)):
+#         #         V_stacked= np.vstack((V, -1 * V.conj())).reshape(-1, *in_shape)
+#         #         V_stacked = V_stacked[full_mask, :]
+#         #         return V_stacked
+#         # else: 
+#         #     V_stacked =  np.vstack((V, V.conj())).reshape(-1, *in_shape)
+#         #     V_stacked=V_stacked[full_mask, :]
+#         #     return V_stacked
+
+#     def get_SSCC_4comp_old(self, h1_int, h2_int: np.ndarray) -> np.ndarray:
+#         prop_grad = self.get_property_gradient_4comp(h1_int)
+#         response = solve(self.hessian, prop_grad)
+#         para = np.einsum('ix,ix->x', prop_grad, response)
+
+#         dia = get_1e_exp_value(h2_int,self.wf.num_spin_orbs_NES,self.wf.num_inactive_spin_orbs,
+#                                self.wf.num_active_spin_orbs,self.wf.rdm1) * nist.ALPHA**4
+
+#         return para + dia
+    
+#     def get_SSCC_4comp_tensor(self, h1_int, h2_int: np.ndarray) -> np.ndarray:
+#         """
+#         Compute SSC tensor for all atom pairs.
+        
+#         h1_int: (natm, 3, n4c, n4c)  — paramagnetic perturbator at each nucleus
+#         h2_int: (natm, natm, 3, 3, n4c, n4c) — diamagnetic two-nucleus operator
+        
+#         Returns: (natm, natm, 3, 3) SSC tensor
+#         """
+#         natm = h1_int.shape[0]
+        
+#         # Precompute property gradients and responses for all atoms
+#         # prop_grads[I] has shape (3, ...) — gradient for nucleus I
+#         prop_grads = [self.get_property_gradient_4comp(h1_int[I]) for I in range(natm)]
+#         responses  = [solve(self.hessian, prop_grads[I]) for I in range(natm)]
+        
+#         tensor = np.zeros((natm, natm, 3, 3))
+        
+#         for I in range(natm):
+#             for J in range(I, natm):
+#                 # Paramagnetic: bilinear contraction of gradient I with response to J
+#                 para = np.einsum('ix,jx->ij', prop_grads[I], responses[J])  # (3, 3)
+                
+#                 # Diamagnetic: expectation value of two-nucleus operator
+#                 dia = get_1e_exp_value(
+#                     h2_int[I, J],
+#                     self.wf.num_spin_orbs_NES,
+#                     self.wf.num_inactive_spin_orbs,
+#                     self.wf.num_active_spin_orbs,
+#                     self.wf.rdm1
+#                 ) * nist.ALPHA**4  # (3, 3)
+                
+#                 tensor[I, J] = para + dia
+#                 tensor[J, I] = para + dia  # symmetric
+
+#         return tensor 
+        
+#     def get_SSCC_4comp_iso_old(self, h1_int: np.ndarray, h2_int: np.ndarray) -> np.ndarray:
+#         """
+#         Compute isotropic SSC constants for all atom pairs.
+        
+#         h1_int: (natm, 3, n4c, n4c)
+#         h2_int: (natm, natm, 3, 3, n4c, n4c)
+        
+#         Returns: (natm, natm) isotropic J-coupling constants in Hz
+#         """
+#         natm = h1_int.shape[0]
+        
+#         prop_grads = [self.get_property_gradient_4comp(h1_int[I]) for I in range(natm)]
+#         responses  = [solve(self.hessian, prop_grads[I]) for I in range(natm)]
+
+#         nuc_mag = .5 * (nist.E_MASS / nist.PROTON_MASS)
+#         au2Hz   = nist.HARTREE2J / nist.PLANCK
+
+#         isotropic_J = np.zeros((natm, natm))
+
+#         for I in range(natm):
+#             for J in range(I+1, natm):
+
+#                 #para = np.einsum('ix,jx->ij', prop_grads[I], responses[J])  # (3, 3)
+
+#                 para = np.zeros((3,3), dtype=np.complex128)
+#                 for alpha in range(3):
+#                     for beta in range(3):
+#                         para[alpha, beta] = np.einsum(
+#                             'i,i->', prop_grads[I][alpha, :], responses[J][beta, :])
+
+#                 dia = np.zeros((3, 3), dtype=np.complex128)
+
+#                 for alpha in range(3):
+#                     for beta in range(3):
+#                         dia[alpha, beta] = get_1e_exp_value(
+#                             h2_int[I, J, alpha, beta],  # (n4c, n4c)
+#                             self.wf.num_spin_orbs_NES,
+#                             self.wf.num_inactive_spin_orbs,
+#                             self.wf.num_active_spin_orbs,
+#                             self.wf.rdm1
+#                         )
+
+#                 J_tensor = (para + dia) * nist.ALPHA**4 * au2Hz * nuc_mag**2
+
+#                 iso = np.trace(J_tensor) / 3
+
+#                 isotropic_J[I, J] = iso
+#                 isotropic_J[J, I] = iso
+
+#         return isotropic_J  # (natm, natm)
+
+#     def get_SSCC_4comp_iso_nonreduced(self, h1: np.ndarray, h2: np.ndarray) -> np.ndarray:
+#         """
+#         Compute isotropic SSC constants for all atom pairs.
+        
+#         h1_int: (natm, 3, n4c, n4c)
+#         h2_int: (natm, natm, 3, 3, n4c, n4c)
+        
+#         Returns: (natm, natm) isotropic J-coupling constants in Hz
+#         """
+#         h1_int = np.zeros_like(h1)
+#         h2_int = np.zeros_like(h2)
+
+
+#         natm = h1_int.shape[0]
+
+#         for I in range(natm):
+#             for a in range(3):
+#                 h1[I,a] = DHF_one_electron_transform(self.wf.c_mo, h1[I,a])
+#             for J in range(I+1, natm):
+#                 for alpha in range(3):
+#                     for beta in range(3):
+#                         h2_int[I,J,alpha,beta] = DHF_one_electron_transform(self.wf.c_mo, h2[I,J,alpha,beta])
+
+        
+        
+#         prop_grads = [self.get_property_gradient_4comp(h1_int[I]) for I in range(natm)]
+#         responses  = [solve(self.hessian, prop_grads[I]) for I in range(natm)]
+
+#         nuc_mag = 0.5 * (nist.E_MASS / nist.PROTON_MASS)
+#         au2Hz   = nist.HARTREE2J / nist.PLANCK
+
+#         # Compute SSC for each atom pair in self.nuc_pair
+#         iso_ssc = []
+#         nuc_pair = []
+#         for I in range(natm):
+#             for J in range(I+1, natm):
+#                 nuc_pair.append((I,J))
+#                 para = np.zeros((3,3), dtype=np.complex128)
+#                 dia = np.zeros((3,3), dtype=np.complex128)
+
+#                 for alpha in range(3):
+#                     for beta in range(3):
+#                         para[alpha,beta] = np.einsum('i,i->', prop_grads[I][alpha,:], responses[J][beta,:])
+#                         dia[alpha,beta] = get_1e_exp_value(
+#                             h2_int[I,J,alpha,beta],
+#                             self.wf.num_spin_orbs_NES,
+#                             self.wf.num_inactive_spin_orbs,
+#                             self.wf.num_active_spin_orbs,
+#                             self.wf.rdm1
+#                         )
+
+#                 J_tensor = (para + dia) * nist.ALPHA**4 * au2Hz * nuc_mag**2
+#                 iso = np.trace(J_tensor) / 3
+#                 iso_ssc.append(iso.real)  # take real part to match PySCF
+#                 print(iso.imag)
+
+#             # Map back to full (natm x natm) tensor
+#             ktensor = np.zeros((natm, natm))
+#         for k, (i,j) in enumerate(nuc_pair):
+#             ktensor[i,j] = ktensor[j,i] = iso_ssc[k]
+
+#         return ktensor  # isotropic J (Hz) in full (natm x natm) array
+    
+#     def get_SSCC_4comp_iso_dia(self, h1: np.ndarray, h2: np.ndarray) -> np.ndarray:
+#         """
+#         Compute isotropic reduced SSC constants K for all atom pairs.
+        
+#         h1: (natm, 3, n4c, n4c)
+#         h2: (natm, natm, 3, 3, n4c, n4c)
+        
+#         Returns: (natm, natm) reduced isotropic K-coupling constants in Hz
+#         """
+#         h1_int = np.zeros_like(h1)
+#         h2_int = np.zeros_like(h2)
+
+#         natm = h1.shape[0]
+
+#         for I in range(natm):
+#             for a in range(3):
+#                 h1_int[I, a] = DHF_one_electron_transform(self.wf.c_mo, h1[I, a])
+#             for J in range(I+1, natm):
+#                 for alpha in range(3):
+#                     for beta in range(3):
+#                         h2_int[I, J, alpha, beta] = DHF_one_electron_transform(
+#                             self.wf.c_mo, h2[I, J, alpha, beta]
+#                         )
+
+
+#         prop_grads = [self.get_property_gradient_4comp(h1_int[I]) for I in range(natm)]
+#         responses  = [solve(self.hessian, prop_grads[I]) for I in range(natm)]
+
+
+
+#         nuc_mag = 0.5 * (nist.E_MASS / nist.PROTON_MASS)  # e*hbar/2m
+#         au2Hz   = nist.HARTREE2J / nist.PLANCK
+
+#         iso_ssc  = []
+#         nuc_pair = []
+
+#         for I in range(natm):
+#             for J in range(I+1, natm):
+#                 nuc_pair.append((I, J))
+
+#                 para = np.zeros((3, 3), dtype=np.complex128)
+#                 dia  = np.zeros((3, 3), dtype=np.complex128)
+
+#                 for alpha in range(3):
+#                     for beta in range(3):
+#                         para[alpha, beta] = np.einsum(
+#                             'i,i->', prop_grads[I][alpha, :], responses[J][beta, :]
+#                         ) * 2  # factor of 2 from PySCF make_para
+#                         dia[alpha, beta] = get_1e_exp_value(
+#                             h2_int[I, J, alpha, beta],
+#                             self.wf.num_spin_orbs_NES,
+#                             self.wf.num_inactive_spin_orbs,
+#                             self.wf.num_active_spin_orbs,
+#                             self.wf.rdm1,
+#                         )
+
+#                 # Reduced K: no gyromagnetic ratio — matching PySCF ktensor
+#                 K_tensor = (para + dia) * nist.ALPHA**4 * au2Hz * nuc_mag**2
+#                 iso_K = np.trace(K_tensor).real / 3
+#                 iso_ssc.append(iso_K)
+
+#         ktensor = np.zeros((natm, natm))
+#         for k, (i, j) in enumerate(nuc_pair):
+#             ktensor[i, j] = ktensor[j, i] = iso_ssc[k]
+
+#         return ktensor  # reduced K (Hz), (natm, natm)
+
+
+
+        # Screening:
+        # "Screening af A - Pernille"
+        # self.A = self.A[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape(
+        #             (np.sum(finite_excitations_idx), np.sum(finite_excitations_idx))
+        #         )
+        # self.B = self.B[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape(
+        #             (np.sum(finite_excitations_idx), np.sum(finite_excitations_idx))
+        #         )
+        # self.Sigma = self.Sigma[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape(
+        #             (np.sum(finite_excitations_idx), np.sum(finite_excitations_idx))
+        #         )
+        # self.Delta = np.zeros((len(self.Sigma), len(self.Sigma))
+        # ) 
               
               
                 

@@ -30,7 +30,7 @@ from pyscf.prop.ssc.dhf import SSC
 from pyscf.prop.ssc.dhf import sa01sa01_integral
 from pyscf.prop.nmr import dhf as nmr_dhf
 
-from pyscf.scf import dhf
+from pyscf.scf import dhf, hf
 from pyscf.prop.ssc.rhf import SSC as SSC_rhf
 
 
@@ -41,7 +41,7 @@ from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction_DHF import G
 from slowquant.unitary_coupled_cluster.linear_response import generalized_naive_DHF
 from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
 from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import generalized_expectation_value_energy
-from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a, generalized_hamiltonian_1i_1a, DHF_hamiltonian_full_space
+from slowquant.unitary_coupled_cluster.generalized_operators import DHF_hamiltonian_full_space, DHF_hamiltonian_0i_0a, DHF_hamiltonian_1i_1a, DHF_hamiltonian_full_space
 from slowquant.unitary_coupled_cluster.generalized_density_matrix_DHF import ( get_orbital_gradient_generalized_real_imag,
 get_orbital_gradient_expvalue_real_imag, get_nonsplit_gradient_expvalue, 
 get_gradient_finite_diff, get_electronic_energy_generalized, RDM2, get_orbital_response_hessian_block,
@@ -487,23 +487,6 @@ def make_h2_ao_shield(mol):
 
     return dia  # (natm, 3, 3, n4c, n4c)
 
-def make_h1_ao_shield(mol):
-    n2c = mol.nao_2c()
-    n4c = n2c * 2
-    natm = mol.natm
-
-    h01 = np.zeros((natm, 3, n4c, n4c), dtype=complex)
-
-    for I in range(natm):
-        mol.set_rinv_origin(mol.atom_coord(I))
-        t01 = mol.intor('int1e_sa01sp_spinor', 3)  #TRUE
-
-        for m in range(3):
-            h01[I, m, :n2c, n2c:] = 0.5 * t01[m]
-            h01[I, m, n2c:, :n2c] = 0.5 * t01[m].conj().T
-
-    return h01
-
 
 def make_h_B_ao_other(mol):
     n2c = mol.nao_2c()
@@ -557,19 +540,6 @@ def make_h_B_2e_ao(mol):
 
     return g_ssss, g_lsss  # return AO integrals
 
-def make_h_B_ao(mol):
-    n2c = mol.nao_2c()
-    n4c = 2 * n2c
-
-    hB = np.zeros((3, n4c, n4c), dtype=complex)
-
-    t1 = mol.intor('int1e_cg_sa10sp_spinor', 3)
-
-    for b in range(3):
-        hB[b, :n2c, n2c:] =   0.5*t1[b]
-        hB[b, n2c:, :n2c] =   0.5*t1[b].conj().T
-
-    return hB
 
 # Old functions:
 
@@ -743,7 +713,6 @@ def ang_mom_ao_int(mol, origin=(0.0, 0.0, 0.0)):
 
     return L_spinor
 
-
 def RMB_corr_int(mol, origin=(0.0, 0.0, 0.0)):
     """
     Spin-AO integrals of L + σ.
@@ -761,11 +730,37 @@ def RMB_corr_int(mol, origin=(0.0, 0.0, 0.0)):
     )
 
 
-def h_B_RMB_corr_int(mol):
+# Integrals:
+def make_hB_ao(mol):
+    n2c = mol.nao_2c()
+    n4c = 2 * n2c
 
-    return 0
+    hB = np.zeros((3, n4c, n4c), dtype=complex)
 
+    t1 = mol.intor('int1e_cg_sa10sp_spinor', 3)
 
+    for b in range(3):
+        hB[b, :n2c, n2c:] =   0.5*t1[b]
+        hB[b, n2c:, :n2c] =   0.5*t1[b].conj().T
+
+    return hB
+
+def make_hm_ao(mol):
+    n2c = mol.nao_2c()
+    n4c = n2c * 2
+    natm = mol.natm
+
+    h01 = np.zeros((natm, 3, n4c, n4c), dtype=complex)
+
+    for I in range(natm):
+        mol.set_rinv_origin(mol.atom_coord(I))
+        t01 = mol.intor('int1e_sa01sp_spinor', 3)  #TRUE
+
+        for m in range(3):
+            h01[I, m, :n2c, n2c:] = 0.5 * t01[m]
+            h01[I, m, n2c:, :n2c] = 0.5 * t01[m].conj().T
+
+    return h01
 
 
 # GIAO-RMB integrals:
@@ -951,6 +946,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     #print(type(mf))   # should be _SecondOrderDHF
 
+
+    hf.remove_overlap_zero_eigenvalue = False
+
     mf = scf.dhf.DHF(mol)
 
 
@@ -991,7 +989,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print(sigma_iso)
 
 
-    # print("PySCF e11 (raw, before Hz conversion):", jj)
+    '''# print("PySCF e11 (raw, before Hz conversion):", jj)
     # print("PySCF Tr(e11)/3:", np.trace(jj[0])/3)
 
 
@@ -1003,9 +1001,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # Diamagnetic: (natm, natm, 3, 3, n4c, n4c)
     h2 = make_h2_ao(mol)
-    #h2 = np.zeros_like(h1)
-
-
+    #h2 = np.zeros_like(h1)'''
 
 
     C_MO=np.array(mf.mo_coeff,dtype=complex)
@@ -1032,8 +1028,6 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     C_U = C_MO @ U_step
 
     S_int = mol.intor("int1e_ovlp")
-
-
 
     C_MO = mf.mo_coeff
     S_ovlp = mf.get_ovlp()
@@ -1084,60 +1078,84 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #print(M_values)
 
 
+    # WF2 = GeneralizedWaveFunctionUPS(
+    #     mol.nelectron,
+    #     active_space,
+    #     C_MO,
+    #     h_core,
+    #     g_eri,
+    #     K_pairs,
+    #     False,
+    #     S_ovlp,
+    #     "fUCCSD",
+    #     {"n_layers": 1, "is_spin_conserving" : False},
+    #     include_active_kappa=True,
+    # )
+
+    # np.random.seed(20)
+    # if len(WF2.thetas) > 0:
+    #     real = np.random.uniform(-0.05,0.05,len(WF2.thetas_real))
+    #     #imag = np.zeros_like(WF.thetas_imag)
+    #     imag = np.random.uniform(-0.05,0.05,len(WF2.thetas_real))
+    #     WF2.set_thetas(real, imag)
+
+
+
+
+    # data = np.load("LiH((1,1),4).npz") 
+    # data = np.load("HF((5,5),12).npz") 
+    # data = np.load("LiH((2,2),6).npz") 
+    # data = np.load("HF((1,1),4).npz")
+    data = np.load("HF((2,2),6).npz")
     WF2 = GeneralizedWaveFunctionUPS(
-        mol.nelectron,
         active_space,
-        C_MO,
-        #C_U,
-        h_core,
-        g_eri,
+        data["c_mo"],
+        mol,
         K_pairs,
         False,
-        S_ovlp,
         "fUCCSD",
-        {"n_layers": 0, "is_spin_conserving" : False},
+        {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
+    WF2.set_thetas(data["thetas_real"], data["thetas_imag"])
 
     #print("Kramers rotations:")
     #print(WF2.kappa_spin_idx)
     #print(WF2.kappa_spin_idx_ep)
 
-
     WF = GeneralizedWaveFunctionUPS(
-        mol.nelectron,
         active_space,
         #C_MO,
         C_U,
-        h_core,
-        g_eri,
         K_pairs,
         False,
-        S_ovlp,
         "fUCCSD",
         {"n_layers": 0, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
-    np.random.seed(20)
-
-    if len(WF.thetas) > 0:
-        real = np.random.uniform(-0.05,0.05,len(WF.thetas_real))
-        #imag = np.zeros_like(WF.thetas_imag)
-        imag = np.random.uniform(-0.05,0.05,len(WF.thetas_real))
-
-        WF.set_thetas(real, imag)
-
-
     print("DHF", mf.energy_elec()[0])
 
-    h_mo = DHF_one_electron_transform(C_MO, h_core)
+    # h_mo = DHF_one_electron_transform(C_MO, h_core)
+    # g_mo = DHF_two_electron_transform(C_MO, g_eri)
 
-    g_mo = DHF_two_electron_transform(C_MO, g_eri)
+    print("Nr. of kappas:", len(WF2.kappa_spin_idx))
+    print("Nr. of spin orbitals:", WF2.num_spin_orbs)
+    print("Nr. of inactive spin orbitals:", WF2.num_inactive_spin_orbs)
+    print("Nr. of active spin orbitals:", WF2.num_active_spin_orbs)
+    print("Nr. of virtual spin orbitals:", WF2.num_virtual_spin_orbs)
+    print("Nr. of positronic spin orbitals:", WF2.num_spin_orbs_NES)
+    print("Inactive spin orbitals idx:", WF2.inactive_spin_idx)
+    print("Active spin orbitals idx:", WF2.active_spin_idx)
+    print("Virtual spin orbitals idx:", WF2.virtual_spin_idx)
+    print("Positronic spin orbitals idx:", WF2.positronic_spin_idx)
+    print("Active occupied:", WF2.active_occ_spin_idx)
+    print("Active unoccupied:", WF2.active_unocc_spin_idx)
+    #print("qs: ", WF2.kappa_no_activeactive_spin_idx_resp)
 
-    H = DHF_hamiltonian_full_space(h_mo[size:,size:], g_mo[size:,size:,size:,size:], WF.num_spin_orbs_NES)
+    '''H = DHF_hamiltonian_full_space(h_mo[size:,size:], g_mo[size:,size:,size:,size:], WF.num_spin_orbs_NES)
 
-    '''#H = generalized_hamiltonian_full_space(h_mo, g_mo, WF.num_spin_orbs)
+    #H = generalized_hamiltonian_full_space(h_mo, g_mo, WF.num_spin_orbs)
 
 
     #print(WF.rdm1)
@@ -1165,25 +1183,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #             WF.ci_info,
     #         )
 
-    # print(E2)'''
+    # print(E2)
 
 
-    print("Nr. of kappas:", len(WF.kappa_spin_idx))
-
-
-    print("Nr. of spin orbitals:", WF.num_spin_orbs)
-    print("Nr. of inactive spin orbitals:", WF.num_inactive_spin_orbs)
-    print("Nr. of active spin orbitals:", WF.num_active_spin_orbs)
-    print("Nr. of virtual spin orbitals:", WF.num_virtual_spin_orbs)
-    print("Nr. of positronic spin orbitals:", WF.num_spin_orbs_NES)
-    print("Inactive spin orbitals idx:", WF.inactive_spin_idx)
-    print("Active spin orbitals idx:", WF.active_spin_idx)
-    print("Virtual spin orbitals idx:", WF.virtual_spin_idx)
-    print("Positronic spin orbitals idx:", WF.positronic_spin_idx)
-    print("Active occupied:",WF.active_occ_spin_idx)
-    print("Active unoccupied:",WF.active_unocc_spin_idx)
-
-    '''# print("noactive_active", WF.kappa_no_activeactive_spin_idx)
+    # print("noactive_active", WF.kappa_no_activeactive_spin_idx)
     # print("noactive_active resp", WF.kappa_no_activeactive_spin_idx_resp)
     # print("Kappas ep:", WF.kappa_spin_idx_ep)
     # print("Kappas ee:", WF.kappa_spin_idx)
@@ -1209,11 +1212,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #                     RDM2(p,q,r,s,WF.num_spin_orbs_NES, WF.num_inactive_spin_orbs, WF.num_active_spin_orbs, WF.rdm1, WF.rdm2) 
     #                   + RDM2(r,q,p,s,WF.num_spin_orbs_NES, WF.num_inactive_spin_orbs, WF.num_active_spin_orbs, WF.rdm1, WF.rdm2)
     #                 ))
-    # print("err", err)'''
+    # print("err", err)
 
     #WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
 
-    '''# print("rdm2 PySCF")
+    # print("rdm2 PySCF")
     # with np.printoptions(precision=4):
     #             print(np.round(WF2.rdm2, 4))
 
@@ -1231,10 +1234,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # print("D Mine")
     # with np.printoptions(precision=4):
-    #         print(np.round(D_mine, 4))'''
+    #         print(np.round(D_mine, 4))
 
 
-    '''# gradient_ee = get_orbital_gradient_generalized_real_imag(
+    # gradient_ee = get_orbital_gradient_generalized_real_imag(
     #             WF.h_mo,
     #             WF.g_mo,
     #             WF.kappa_spin_idx,
@@ -1257,11 +1260,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #         )
     
     # print("max gradient ee", np.max(np.abs(gradient_ee)))
-    # print("max gradient ep", np.max(np.abs(gradient_ep)))'''
+    # print("max gradient ep", np.max(np.abs(gradient_ep)))
 
     #print(WF._calc_gradient_optimization_DHF(WF.kappa_real + WF.kappa_imag, theta_optimization=False, kappa_ee_optimization=True,kappa_ep_optimization=True))
 
-    '''#kappas = np.concatenate([WF.kappa_real, WF.kappa_real_ep, WF.kappa_imag, WF.kappa_imag_ep])
+    #kappas = np.concatenate([WF.kappa_real, WF.kappa_real_ep, WF.kappa_imag, WF.kappa_imag_ep])
 
     # gradient_test = get_orbital_gradient_generalized_real_imag(
     #             WF.h_mo,
@@ -1327,10 +1330,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     
     # print(E_tester_post)
 
-    # print(WF.kappa_no_activeactive_spin_idx_resp)'''
+    # print(WF.kappa_no_activeactive_spin_idx_resp)
 
 
-    '''U = WF2.c_mo.conj().T @ S_ovlp @ WF.c_mo
+    U = WF2.c_mo.conj().T @ S_ovlp @ WF.c_mo
 
     # with np.printoptions(precision=4):
     #     print(np.round(U, 4))
@@ -1340,9 +1343,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # with np.printoptions(precision=4):
     #     print(np.round(WF2.c_mo, 4))
-    #     print(np.round(WF.c_mo, 4)) '''
+    #     print(np.round(WF.c_mo, 4)) 
 
-    '''def time_reversal_matrix(n_spatial):
+    def time_reversal_matrix(n_spatial):
         """
         Time reversal operator in the Dirac representation.
 
@@ -1464,49 +1467,54 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         return overlap
 
     alpha_occ = WF.c_mo[:, 4]
-    beta_occ  = WF.c_mo[:, 5]'''
+    beta_occ  = WF.c_mo[:, 5]
 
-    # check_kramers_pair(alpha_occ, beta_occ, S_ovlp)
+    # check_kramers_pair(alpha_occ, beta_occ, S_ovlp)'''
 
-    WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-12, maxiter = 1000)
+    #WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-10, maxiter = 1000)
 
 
-
-    LR2 = generalized_naive_DHF.LinearResponse(WF2, excitations="S")
-    
-    LR2.calc_excitation_energies()
-    print("Excitation energies:", LR2.excitation_energies[LR2.excitation_energies < 1e4])
-
-    hm = make_h1_ao_shield(mol)
+    hm = make_hm_ao(mol)
     hB = hB_RMB_GIAO(mol)
     hBm = hBm_RMB_GIAO(mol)
     gB = gB_RMB_GIAO(mol)
     sB = sB_RMB_GIAO(mol)
-    hB_test = make_h_B_ao(mol)
-
-    print("PySCF")
-    print(sigma_iso)
-
-    shieldings = LR2.get_shieldings_4comp_iso(hm, hBm, hB, gB, sB)
-    print("Shieldings before:")
-    print(shieldings)
+    hB_test = make_hB_ao(mol)
 
 
+    #Optimization:
+    #WF2.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-10, maxiter = 1000)
+
+    # np.savez(
+    #     "HF((2,2),6)",
+    #     c_mo=WF2.c_mo,
+    #     thetas_real=WF2.thetas_real,
+    #     thetas_imag=WF2.thetas_imag
+    #     )
+
+    
+    LR2 = generalized_naive_DHF.LinearResponse(WF2, excitations="SD", screen = False)
+    LR2.calc_excitation_energies()
+
+    print("PySCF:", sigma_iso)
+
+    LR2.get_shieldings_4comp_iso(hm, hBm, hB, gB, sB, RMB = True)
 
 
-    LR = generalized_naive_DHF.LinearResponse(WF, excitations="S")
+    #LR = generalized_naive_DHF.LinearResponse(WF, excitations="S")
 
-    LR.calc_excitation_energies()
-    print("Excitation energies:",  LR.excitation_energies[LR.excitation_energies < 1e4])
+    #LR.calc_excitation_energies()
+    #print("Excitation energies:",  LR.excitation_energies[LR.excitation_energies < 1e4])
+
+    #shieldings = LR.get_shieldings_4comp_iso(hm, hBm, hB, gB, sB)
+    #print("Shieldings after:")
+    #print(shieldings)
+
+
+
+    
     #print(np.round(LR.get_transition_dipole(dip_int).real,5))
     #print(LR.get_oscillator_strengths(dip_int))
-
-
-    shieldings = LR.get_shieldings_4comp_iso(hm, hBm, hB, gB, sB)
-    print("Shieldings after:")
-    print(shieldings)
-
-
 
     '''# h1_shield = make_h1_ao_shield(mol)
     # h2_shield = make_h2_ao_shield(mol)
@@ -1606,19 +1614,16 @@ def split_general_contraction(basis_dict):
     return new_basis
 
 def H2():
-    geometry = geometry = """
-                            H   1.0215   -0.0252    0.5645
-                            H   1.1785   -0.5748    1.0355
-                            """  #0.74
+    geometry = """
+                H   1.0215   -0.0252    0.5645
+                H   1.1785   -0.5748    1.0355
+                """  #0.74
     #basis = "cc-pvdz"
-
     #J_631g = bse.get_basis('6-31g-J', elements=['H'], fmt='nwchem')
     # raw = {atom: gto.parse(bse.get_basis('6-31G-J', elements=[Z], fmt='nwchem', header=False))
     #    for atom, Z in [('H', 1)]}   # do this per element you use
     # fixed_basis = split_general_contraction(raw)
     # basis = fixed_basis
-
-    basis = "631-g"
     #dyall_v2z = bse.get_basis('dyall-v2z', elements=['H'], fmt='nwchem')
     # with open('dyall2zp_H.nwchem', 'w') as f:
     #     f.write(dyall_v2z)
@@ -1626,8 +1631,10 @@ def H2():
     #basis = dyall_v2z
     #basis = "sto-3g"
     #basis = "sto-6g"
+    basis = "631-g"
     #active_space = ((1, 1), 8)
-    active_space = ((1, 1), 2)
+    #active_space = ((1, 1), 4)
+    active_space = ((1,1),2)
     #active_space = (2, 4)
     charge = 0
     spin = 0
@@ -1657,7 +1664,6 @@ def N2():
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
-
 
 def O2():
     geometry = """O  0.0   0.0  0.0;
@@ -1702,8 +1708,10 @@ def LiH():
     #basis = "631-g"
     basis = "sto-3g"
     #basis = "sto-6g"
-    active_space = ((2, 2), 4)
-    #active_space = ((1,1), 4)
+    active_space = ((1, 1), 4)
+    #active_space = ((2,2), 6)
+    #active_space = ((2,2), 12)
+    #active_space = ((2,2),4)
     charge = 0
     spin = 0
     NR(
@@ -1731,10 +1739,16 @@ def HF():
                   F  0.0  0.0  0.9168"""
     #basis = "cc-pvdz"
     #basis = "631-g"
+    dyall_v2z = bse.get_basis('dyall-v2z', elements=['H', 'F'], fmt='nwchem')
+    #J_631g = bse.get_basis('6-31g-J', elements=['H', 'F'], fmt='nwchem')
     basis = "sto-3g"
-    #active_space = ((1, 1), 4)
-    active_space = ((5, 5), 10)
-    #active_space = (2, 4)
+    #basis = dyall_v2z
+    #basis= J_631g
+    #basis = "aug-cc-pvtz-J"
+    active_space = ((2, 2), 6)
+    #active_space = ((5, 5), 10)
+    #active_space = ((1,1), 4)
+    #active_space = ((5,5), 12)
     charge = 0
     spin = 0
     NR(
@@ -1751,10 +1765,11 @@ def H2O():
     #basis = "631-g"
     basis = "sto-3g"
     #basis = "sto-6g"
-    active_space = ((5, 5), 10)
+    #active_space = ((5, 5), 10)
     #active_space = ((5, 5), 14)
     #active_space = ((3,3),8)
-    #active_space = ((2, 2), 4)
+    #active_space = ((2, 2), 6)
+    active_space = ((1,1),4)
     charge = 0
     spin = 0
     NR(
@@ -1841,4 +1856,4 @@ def N3():
 
 ###RUN SCRIPT###
 
-H2O()
+HF()

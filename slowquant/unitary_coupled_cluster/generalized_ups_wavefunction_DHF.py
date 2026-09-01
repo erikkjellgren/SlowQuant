@@ -6,6 +6,11 @@ from typing import Any
 
 import numpy as np
 import scipy
+import pyscf
+
+from slowquant.SlowQuant import SlowQuant
+
+from slowquant.unitary_coupled_cluster.DHF_integral_manager import IntegralManager
 
 from slowquant.molecularintegrals.integralfunctions import (
     generalized_one_electron_transform,
@@ -28,7 +33,6 @@ from slowquant.unitary_coupled_cluster.generalized_density_matrix_DHF import (
 )
 from slowquant.unitary_coupled_cluster.generalized_operators import (
     a_op_spin,
-    generalized_hamiltonian_full_space,
     DHF_hamiltonian_full_space,
 )
 from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import (
@@ -41,7 +45,7 @@ from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import
     generalized_propagate_unitary, generalized_propagate_unitary_test_anna,
 )
 from slowquant.unitary_coupled_cluster.operators import G1, G2
-from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_0i_0a
+from slowquant.unitary_coupled_cluster.generalized_operators import DHF_hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import ( 
     UpsStructure,
@@ -83,14 +87,11 @@ def Trev(C):
 class GeneralizedWaveFunctionUPS:
     def __init__(
         self,
-        num_elec: int,
         cas: tuple[tuple[int, int], int],
         mo_coeffs: np.ndarray,
-        h_ao: np.ndarray,
-        g_ao: np.ndarray,
+        integral_generator: SlowQuant | pyscf.gto.mole.Mole,
         kpairs: list[tuple],
         Kp: bool,
-        S_int: np.ndarray,
         ansatz: str,
         ansatz_options: dict[str, Any] | None = None,
         include_active_kappa: bool = False,
@@ -108,6 +109,8 @@ class GeneralizedWaveFunctionUPS:
             ansatz_options: Ansatz options.
             include_active_kappa: Include active-active orbital rotations.
         """
+        self.int_gen: IntegralManager = IntegralManager(integral_generator)
+        num_elec = self.int_gen.num_elec
         if ansatz_options is None:
             ansatz_options = {}
         if len(cas) != 2:
@@ -127,8 +130,6 @@ class GeneralizedWaveFunctionUPS:
         # Init stuff
         self._c_mo_new = np.copy(mo_coeffs[int(mo_coeffs.shape[1]/2):]).astype(np.complex128) # DHF
         self._c_mo = np.copy(mo_coeffs).astype(np.complex128)
-        self._h_ao = h_ao
-        self._g_ao = g_ao
         self._rdm1 = None
         self._rdm2 = None
         self._h_mo = None
@@ -237,7 +238,7 @@ class GeneralizedWaveFunctionUPS:
         #print(self._kpartner)
 
         self._Kp = Kp # Kramers
-        self._S_int = S_int
+        self._S_int = self.int_gen.overlap
 
 
 
@@ -315,21 +316,28 @@ class GeneralizedWaveFunctionUPS:
                         self.kappa_redundant_spin_idx.append((P, Q))
                         continue
                 if include_active_kappa:
-                    if P in self.active_occ_spin_idx and Q in self.active_occ_spin_idx:
-                        if P != Q:
+                    if P in self.active_spin_idx and Q in self.active_spin_idx:
+                        if P==Q:
                             self._kappa_real_redundant.append(0.0)
                             self._kappa_imag_redundant.append(0.0)
                             self._kappa_real_redundant_old.append(0.0)
                             self._kappa_imag_redundant_old.append(0.0)
                             self.kappa_redundant_spin_idx.append((P, Q))
-                        continue
-                    if P in self.active_unocc_spin_idx and Q in self.active_unocc_spin_idx:
-                        self._kappa_real_redundant.append(0.0)
-                        self._kappa_imag_redundant.append(0.0)
-                        self._kappa_real_redundant_old.append(0.0)
-                        self._kappa_imag_redundant_old.append(0.0)
-                        self.kappa_redundant_spin_idx.append((P, Q))
-                        continue
+                            continue
+                    # if P in self.active_occ_spin_idx and Q in self.active_occ_spin_idx:
+                    #     self._kappa_real_redundant.append(0.0)
+                    #     self._kappa_imag_redundant.append(0.0)
+                    #     self._kappa_real_redundant_old.append(0.0)
+                    #     self._kappa_imag_redundant_old.append(0.0)
+                    #     self.kappa_redundant_spin_idx.append((P, Q))
+                    #     continue
+                    # if P in self.active_unocc_spin_idx and Q in self.active_unocc_spin_idx:
+                    #     self._kappa_real_redundant.append(0.0)
+                    #     self._kappa_imag_redundant.append(0.0)
+                    #     self._kappa_real_redundant_old.append(0.0)
+                    #     self._kappa_imag_redundant_old.append(0.0)
+                    #     self.kappa_redundant_spin_idx.append((P, Q))
+                    #     continue
                 if not (P in self.active_spin_idx and Q in self.active_spin_idx):
                     if P not in self.positronic_spin_idx and Q not in self.positronic_spin_idx:
                         self.kappa_no_activeactive_spin_idx_resp.append((P, Q))
@@ -338,7 +346,7 @@ class GeneralizedWaveFunctionUPS:
                         self.kappa_no_activeactive_spin_idx.append((P, Q))
                         self.kappa_no_activeactive_spin_idx_dagger.append((Q, P))
 
-                    if P in self.positronic_spin_idx and Q in self.active_spin_idx:
+                    if P in self.positronic_spin_idx and Q not in self.positronic_spin_idx and Q not in self.virtual_spin_idx:
                         self.kappa_no_activeactive_spin_idx_resp.append((Q, P)) # positronic included, Which one is dagger?
                         self.kappa_no_activeactive_spin_idx_dagger_resp.append((P, Q))
 
@@ -922,7 +930,7 @@ class GeneralizedWaveFunctionUPS:
             One-electron Hamiltonian integrals in MO basis.
         """
         #if self._h_mo is None:
-        self._h_mo = DHF_one_electron_transform(self.c_mo, self._h_ao) #DHF
+        self._h_mo = DHF_one_electron_transform(self.c_mo, self.int_gen.h_ao) #DHF
         return self._h_mo
 
     @property
@@ -933,7 +941,7 @@ class GeneralizedWaveFunctionUPS:
             Two-electron Hamiltonian integrals in MO basis.
         """
         #if self._g_mo is None:
-        self._g_mo = DHF_two_electron_transform(self.c_mo, self._g_ao) #DHF
+        self._g_mo = DHF_two_electron_transform(self.c_mo, self.int_gen.electron_electron_repulsion) #DHF
         return self._g_mo
 
     @property
@@ -944,7 +952,7 @@ class GeneralizedWaveFunctionUPS:
             One-electron Hamiltonian integrals in MO basis.
         """
         #if self._h_mo_ep is None:
-        self._h_mo_ep = DHF_one_electron_transform(self.c_mo_ep, self._h_ao) #DHF
+        self._h_mo_ep = DHF_one_electron_transform(self.c_mo_ep, self.int_gen.h_ao) #DHF
         return self._h_mo_ep
 
     @property
@@ -955,7 +963,7 @@ class GeneralizedWaveFunctionUPS:
             Two-electron Hamiltonian integrals in MO basis.
         """
         #if self._g_mo_ep is None:
-        self._g_mo_ep = DHF_two_electron_transform(self.c_mo_ep, self._g_ao) #DHF
+        self._g_mo_ep = DHF_two_electron_transform(self.c_mo_ep, self.int_gen.electron_electron_repulsion) #DHF
         return self._g_mo_ep
 
     @property
@@ -1204,13 +1212,8 @@ class GeneralizedWaveFunctionUPS:
         if self._energy_elec is None:
             self._energy_elec = generalized_expectation_value_energy(
                 self.ci_coeffs,
-                # Skal ændres til generalized_hamiltonian_0i_0a på et tidspunkt.
-                # [ virker ikke AE
-                #     generalized_hamiltonian_0i_0a(
-                #         self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs
-                #     )
-                # ],
-                [DHF_hamiltonian_full_space(self.h_mo[NES:,NES:], self.g_mo[NES:,NES:,NES:,NES:], self.num_spin_orbs_NES)],
+                [DHF_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs, self.num_spin_orbs_NES)],
+                #[DHF_hamiltonian_full_space(self.h_mo[NES:,NES:], self.g_mo[NES:,NES:,NES:,NES:], self.num_spin_orbs_NES)],
                 self.ci_coeffs,
                 self.ci_info,
             )
@@ -1685,7 +1688,7 @@ class GeneralizedWaveFunctionUPS:
             #     self.num_inactive_spin_orbs,
             #     self.num_active_spin_orbs,
             # )
-            Hamiltonian = generalized_hamiltonian_full_space( #AE rettet virker ikke (H0i_ai)
+            Hamiltonian = DHF_hamiltonian_full_space( #AE rettet virker ikke (H0i_ai)
                 self.h_mo,
                 self.g_mo,
                 self.num_inactive_spin_orbs,
@@ -1795,13 +1798,13 @@ class GeneralizedWaveFunctionUPS:
                 self.rdm1,
                 self.rdm2,
             ) 
-            print("E", E)
+            #print("Energy e-p optimization:", E)
         if theta_optimization:
             NES = self.num_spin_orbs_NES 
             E = generalized_expectation_value_energy(
                 self.ci_coeffs,
-                # [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
-                [DHF_hamiltonian_full_space(self.h_mo[NES:,NES:], self.g_mo[NES:,NES:,NES:,NES:], self.num_spin_orbs_NES)],
+                [DHF_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs, self.num_spin_orbs_NES)],
+                #[DHF_hamiltonian_full_space(self.h_mo[NES:,NES:], self.g_mo[NES:,NES:,NES:,NES:], self.num_spin_orbs_NES)],
                 self.ci_coeffs,
                 self.ci_info,
             )
@@ -1870,7 +1873,7 @@ class GeneralizedWaveFunctionUPS:
                 self.rdm1,
                 self.rdm2,
             )
-            print("gradient", np.max(np.abs(gradient[:num_kappa])))
+            #print("Max e-p gradient:", np.max(np.abs(gradient[:num_kappa])))
         
             # for idx, (M, N) in enumerate(self.kappa_spin_idx):
             #     if M < self.num_spin_orbs_NES:
@@ -1888,19 +1891,21 @@ class GeneralizedWaveFunctionUPS:
             # )
 
         if theta_optimization:
-            # Hamiltonian = generalized_hamiltonian_0i_0a(
-            #    self.h_mo,
-            #    self.g_mo,
-            #    self.num_inactive_spin_orbs,
-            #    self.num_active_spin_orbs,
-            # )
-            size = self.num_spin_orbs_NES
-
-            Hamiltonian = DHF_hamiltonian_full_space(
-                self.h_mo[size:,size:],
-                self.g_mo[size:,size:,size:,size:],
-                self.num_spin_orbs_NES,
+            Hamiltonian = DHF_hamiltonian_0i_0a(
+               self.h_mo,
+               self.g_mo,
+               self.num_inactive_spin_orbs,
+               self.num_active_spin_orbs,
+               self.num_spin_orbs_NES,
             )
+
+            # size = self.num_spin_orbs_NES
+            # Hamiltonian = DHF_hamiltonian_full_space(
+            #     self.h_mo[size:,size:],
+            #     self.g_mo[size:,size:,size:,size:],
+            #     self.num_spin_orbs_NES,
+            # )
+
             # Reference bra state (no differentiations)
             bra_vec = generalized_propagate_state(
                 [Hamiltonian],
@@ -2061,8 +2066,6 @@ class GeneralizedWaveFunctionUPS:
                 thetas_i.append(parameters[i + num_kappa + len(self.thetas)])
             self.set_thetas(thetas_r, thetas_i)
         if kappa_optimization:
-            size = self.num_spin_orbs_NES
-
             gradient[:num_kappa] = get_orbital_gradient_generalized_real_imag(
                 self.h_mo,
                 self.g_mo,
@@ -2090,19 +2093,20 @@ class GeneralizedWaveFunctionUPS:
             # )
 
         if theta_optimization:
-            # Hamiltonian = generalized_hamiltonian_0i_0a(
-            #    self.h_mo,
-            #    self.g_mo,
-            #    self.num_inactive_spin_orbs,
-            #    self.num_active_spin_orbs,
-            # )
-            size = self.num_spin_orbs_NES
-
-            Hamiltonian = DHF_hamiltonian_full_space(
-                self.h_mo[size:,size:],
-                self.g_mo[size:,size:,size:,size:],
-                self.num_spin_orbs_NES,
+            Hamiltonian = DHF_hamiltonian_0i_0a(
+               self.h_mo,
+               self.g_mo,
+               self.num_inactive_spin_orbs,
+               self.num_active_spin_orbs,
+               self.num_spin_orbs_NES,
             )
+
+            #size = self.num_spin_orbs_NES
+            # Hamiltonian = DHF_hamiltonian_full_space(
+            #     self.h_mo[size:,size:],
+            #     self.g_mo[size:,size:,size:,size:],
+            #     self.num_spin_orbs_NES,
+            # )
             # Reference bra state (no differentiations)
             bra_vec = generalized_propagate_state(
                 [Hamiltonian],

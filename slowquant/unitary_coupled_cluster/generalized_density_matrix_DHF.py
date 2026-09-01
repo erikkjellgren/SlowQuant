@@ -5,7 +5,7 @@ import scipy as scipy
 from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import (generalized_expectation_value,
 generalized_expectation_value_energy)
 from slowquant.unitary_coupled_cluster.operators import a_op_spin
-from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a, DHF_hamiltonian_full_space
+from slowquant.unitary_coupled_cluster.generalized_operators import DHF_hamiltonian_full_space, DHF_hamiltonian_0i_0a
 
 
 from slowquant.molecularintegrals.integralfunctions import (
@@ -408,7 +408,7 @@ def get_electronic_energy_generalized(
     energy = 0
     for p in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
         for q in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
-            energy += h_int[p, q] * RDM1(p, q, num_NES, num_NES + num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            energy += h_int[p, q] * RDM1(p, q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
     for p in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
         for q in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
             for r in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
@@ -417,7 +417,7 @@ def get_electronic_energy_generalized(
                         1
                         / 2
                         * g_int[p, q, r, s]
-                        * RDM2(p, q, r, s, num_NES, num_NES + num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        * RDM2(p, q, r, s, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
                     )
     if energy.imag > 1e-10:
         print("Warning: Complex energy!",energy)
@@ -777,7 +777,6 @@ def get_orbital_gradient_generalized_real_imag(
                 gradient_r[idx] += h_int[P,N]*RDM1(P,M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
 
         #2-electron contribution
-        for P in range(num_NES, num_NES + num_inactive_spin_orbs+num_active_spin_orbs):
             for Q in range(num_NES, num_NES + num_inactive_spin_orbs+num_active_spin_orbs):
                 for R in range(num_NES, num_NES + num_inactive_spin_orbs+num_active_spin_orbs):
                     if M==N:
@@ -995,8 +994,8 @@ def get_orbital_response_metric_sigma(
                 sigma[idx1, idx2] += RDM1(M, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             if P == M:
                 sigma[idx1, idx2] -= RDM1(Q, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-    if sigma.imag.any() > 1e-10:
-        print("Warning: Response metric is complex!")
+    #if sigma.imag.any() > 1e-10:
+    #    print("Warning: Response metric is complex!")
     return sigma
 
 
@@ -1736,7 +1735,7 @@ def get_e0(rdm1, rdm2, num_inactive_spin_orbs, num_active_spin_orbs, S_int):
     return np.sqrt(X**2 + Y**2 + Z**2)
 
 #@nb.jit(nopython=True)
-def get_diamagnetic_RMB_GIAO(rdm1, num_spin_orbs_NES, num_inactive_spin_orbs, num_active_spin_orbs, mo, natm):
+def get_exp_val_RMB_GIAO(rdm1, num_spin_orbs_NES, num_inactive_spin_orbs, num_active_spin_orbs, mo, natm):
     dia = np.zeros((natm, 3, 3), dtype=np.complex128)
 
     for ATM in range(natm):

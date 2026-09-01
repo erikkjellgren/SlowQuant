@@ -7,7 +7,7 @@ from slowquant.unitary_coupled_cluster.operators import a_op_spin
 
 
 
-def DHF_hamiltonian_full_space(h_spin_mo: np.ndarray, g_spin_mo: np.ndarray, num_spin_orbs: int) -> FermionicOperator:
+def DHF_hamiltonian_full_space(h_spin_mo: np.ndarray, g_spin_mo: np.ndarray, num_inactive_spin_orbs: int, num_active_spin_orbs: int, num_spin_orbs_NES: int) -> FermionicOperator:
     r"""Construct full-space generalized electronic Hamiltonian.
 
     .. math::
@@ -21,29 +21,30 @@ def DHF_hamiltonian_full_space(h_spin_mo: np.ndarray, g_spin_mo: np.ndarray, num
     Returns:
         Generalized Hamiltonian operator in full-space.
     """
-    shift = num_spin_orbs
     H_operator = FermionicOperator({})
+    num_spin_orbs = num_spin_orbs_NES + num_inactive_spin_orbs + num_active_spin_orbs
     # Build operator
-    for p in range(num_spin_orbs):
+    for p in range(num_spin_orbs_NES, num_spin_orbs):
         for q in range(num_spin_orbs):
             if abs(h_spin_mo[p, q]) < 10**-14:
                 continue
-            H_operator += h_spin_mo[p, q] * (a_op_spin(shift + p, True)*a_op_spin(shift + q, False))
-    for p in range(num_spin_orbs):
-        for q in range(num_spin_orbs):
-            for r in range(num_spin_orbs):
-                for s in range(num_spin_orbs):
+            H_operator += h_spin_mo[p, q] * (a_op_spin(p, True)*a_op_spin(q, False))
+    for p in range(num_spin_orbs_NES, num_spin_orbs):
+        for q in range(num_spin_orbs_NES, num_spin_orbs):
+            for r in range(num_spin_orbs_NES, num_spin_orbs):
+                for s in range(num_spin_orbs_NES, num_spin_orbs):
                     if abs(g_spin_mo[p, q, r, s]) < 10**-14:
                         continue
-                    H_operator += 1 / 2 * g_spin_mo[p, q, r, s] * (a_op_spin(shift + p, True)*a_op_spin(shift + r, True)*a_op_spin(shift + s, False)*a_op_spin(shift + q, False))
+                    H_operator += 1 / 2 * g_spin_mo[p, q, r, s] * (a_op_spin(p, True)*a_op_spin(r, True)*a_op_spin(s, False)*a_op_spin(q, False))
     return H_operator
 
 
-def generalized_hamiltonian_0i_0a(
+def DHF_hamiltonian_0i_0a(
     h_mo: np.ndarray,
     g_mo: np.ndarray,
     num_inactive_spin_orbs: int,
     num_active_spin_orbs: int,
+    num_NES: int,
 ) -> FermionicOperator:
     """Get energy Hamiltonian operator.
     Args:
@@ -56,17 +57,17 @@ def generalized_hamiltonian_0i_0a(
     """
     hamiltonian_operator = FermionicOperator({})
     # Inactive one-electron
-    for P in range(num_inactive_spin_orbs):
+    for P in range(num_NES, num_NES + num_inactive_spin_orbs):
         if abs(h_mo[P, P]) > 10**-14:
             hamiltonian_operator += h_mo[P, P] * a_op_spin(P,dagger=True)*a_op_spin(P,dagger=False)
     # Active one-electron
-    for P in range(num_inactive_spin_orbs, num_inactive_spin_orbs + num_active_spin_orbs):
-        for Q in range(num_inactive_spin_orbs, num_inactive_spin_orbs + num_active_spin_orbs):
+    for P in range(num_NES + num_inactive_spin_orbs, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+        for Q in range(num_NES + num_inactive_spin_orbs, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
             if abs(h_mo[P, Q]) > 10**-14:
                 hamiltonian_operator += h_mo[P, Q] * a_op_spin(P,dagger=True)*a_op_spin(Q,dagger=False)
     # Inactive two-electron
-    for P in range(num_inactive_spin_orbs):
-        for Q in range(num_inactive_spin_orbs):
+    for P in range(num_NES, num_NES + num_inactive_spin_orbs):
+        for Q in range(num_NES, num_NES + num_inactive_spin_orbs):
             if abs(g_mo[P, P, Q, Q]) > 10**-14:
                 hamiltonian_operator += (1 / 2 * g_mo[P, P, Q, Q] 
                                          *a_op_spin(P,dagger=True)*a_op_spin(Q,dagger=True)
@@ -76,9 +77,9 @@ def generalized_hamiltonian_0i_0a(
                                          *a_op_spin(Q,dagger=True)*a_op_spin(P,dagger=True)
                                          *a_op_spin(Q,dagger=False)*a_op_spin(P,dagger=False))
     # Inactive-Active two-electron
-    for I in range(num_inactive_spin_orbs):
-        for P in range(num_inactive_spin_orbs, num_inactive_spin_orbs + num_active_spin_orbs):
-            for Q in range(num_inactive_spin_orbs, num_inactive_spin_orbs + num_active_spin_orbs):
+    for I in range(num_NES, num_NES + num_inactive_spin_orbs):
+        for P in range(num_NES + num_inactive_spin_orbs, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+            for Q in range(num_NES + num_inactive_spin_orbs, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
                 if abs(g_mo[I, I, P, Q]) > 10**-14:
                     hamiltonian_operator += (1 / 2 * g_mo[I, I, P, Q] 
                                             *a_op_spin(I,dagger=True)*a_op_spin(P,dagger=True)
@@ -96,10 +97,10 @@ def generalized_hamiltonian_0i_0a(
                                             *a_op_spin(I,dagger=True)*a_op_spin(Q,dagger=True)
                                             *a_op_spin(I,dagger=False)*a_op_spin(P,dagger=False))
                     
-    for P in range(num_inactive_spin_orbs, num_inactive_spin_orbs + num_active_spin_orbs):
-        for Q in range(num_inactive_spin_orbs, num_inactive_spin_orbs + num_active_spin_orbs):
-            for R in range(num_inactive_spin_orbs, num_inactive_spin_orbs + num_active_spin_orbs):
-                for S in range(num_inactive_spin_orbs, num_inactive_spin_orbs + num_active_spin_orbs):
+    for P in range(num_NES + num_inactive_spin_orbs, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+        for Q in range(num_NES + num_inactive_spin_orbs, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+            for R in range(num_NES + num_inactive_spin_orbs, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+                for S in range(num_NES + num_inactive_spin_orbs, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
                     if abs(g_mo[P, Q, R, S]) > 10**-14:
                         hamiltonian_operator += 1 / 2 * (g_mo[P, Q, R, S] 
                                          *a_op_spin(P,dagger=True)*a_op_spin(R,dagger=True)
@@ -107,12 +108,13 @@ def generalized_hamiltonian_0i_0a(
     return hamiltonian_operator
 
 
-def generalized_hamiltonian_1i_1a(
+def DHF_hamiltonian_1i_1a(
     h_mo: np.ndarray,
     g_mo: np.ndarray,
     num_inactive_spin_orbs: int,
     num_active_spin_orbs: int,
     num_virtual_spin_orbs: int,
+    num_NES: int,
 ) -> FermionicOperator:
     """Get Hamiltonian operator that works together with an extra inactive and an extra virtual index.
 
@@ -128,19 +130,19 @@ def generalized_hamiltonian_1i_1a(
     """
     num_spin_orbs = num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs
     hamiltonian_operator = FermionicOperator({})
-    virtual_start = num_inactive_spin_orbs + num_active_spin_orbs
-    for P in range(num_spin_orbs):
-        for Q in range(num_spin_orbs):
+    virtual_start = num_NES + num_inactive_spin_orbs + num_active_spin_orbs
+    for P in range(num_NES, num_NES + num_spin_orbs):
+        for Q in range(num_NES, num_NES + num_spin_orbs):
             if P >= virtual_start and Q >= virtual_start:
                 continue
             if P < num_inactive_spin_orbs and Q < num_inactive_spin_orbs and P != Q:
                 continue
             if abs(h_mo[P, Q]) > 10**-14:
                 hamiltonian_operator += h_mo[P, Q] * a_op_spin(P,dagger=True)*a_op_spin(Q,dagger=False)
-    for P in range(num_spin_orbs):
-        for Q in range(num_spin_orbs):
-            for R in range(num_spin_orbs):
-                for S in range(num_spin_orbs):
+    for P in range(num_NES, num_NES + num_spin_orbs):
+        for Q in range(num_NES, num_NES + num_spin_orbs):
+            for R in range(num_NES, num_NES + num_spin_orbs):
+                for S in range(num_NES, num_NES + num_spin_orbs):
                     num_virt, num_act = (0,0)
                     for item in [P,Q,R,S]:
                         if item >= virtual_start:
@@ -167,12 +169,13 @@ def generalized_hamiltonian_1i_1a(
     return hamiltonian_operator
 
 
-def generalized_hamiltonian_2i_2a(
+def DHF_hamiltonian_2i_2a(
     h_mo: np.ndarray,
     g_mo: np.ndarray,
     num_inactive_spin_orbs: int,
     num_active_spin_orbs: int,
     num_virtual_spin_orbs: int,
+    num_NES: int,
 ) -> FermionicOperator:
     """Get Hamiltonian operator that works together with an extra inactive and an extra virtual index.
 
@@ -188,19 +191,19 @@ def generalized_hamiltonian_2i_2a(
     """
     num_spin_orbs = num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs
     hamiltonian_operator = FermionicOperator({})
-    virtual_start = num_inactive_spin_orbs + num_active_spin_orbs
-    for P in range(num_spin_orbs):
-        for Q in range(num_spin_orbs):
+    virtual_start = num_NES + num_inactive_spin_orbs + num_active_spin_orbs
+    for P in range(num_NES, num_NES + num_spin_orbs):
+        for Q in range(num_NES, num_NES + num_spin_orbs):
             if P >= virtual_start and Q >= virtual_start:
                 continue
             if P < num_inactive_spin_orbs and Q < num_inactive_spin_orbs and P != Q:
                 continue
             if abs(h_mo[P, Q]) > 10**-14:
                 hamiltonian_operator += h_mo[P, Q] * a_op_spin(P,dagger=True)*a_op_spin(Q,dagger=False)
-    for P in range(num_spin_orbs):
-        for Q in range(num_spin_orbs):
-            for R in range(num_spin_orbs):
-                for S in range(num_spin_orbs):
+    for P in range(num_NES, num_NES + num_spin_orbs):
+        for Q in range(num_NES, num_NES + num_spin_orbs):
+            for R in range(num_NES, num_NES + num_spin_orbs):
+                for S in range(num_NES, num_NES + num_spin_orbs):
                     num_virt, num_act = (0,0)
                     for item in [P,Q,R,S]:
                         if item >= virtual_start:
@@ -227,7 +230,7 @@ def generalized_hamiltonian_2i_2a(
     return hamiltonian_operator
 
 
-def generalized_one_elec_op_0i_0a(ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int) -> FermionicOperator:
+def DHF_one_elec_op_0i_0a(ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int, num_NES: int) -> FermionicOperator:
     """Create one-electron operator that makes no changes in the inactive and virtual orbitals.
 
     Args:
@@ -240,12 +243,12 @@ def generalized_one_elec_op_0i_0a(ints_mo: np.ndarray, num_inactive_orbs: int, n
     """
     one_elec_op = FermionicOperator({})
     # Inactive one-electron
-    for i in range(num_inactive_orbs):
+    for i in range(num_NES, num_NES + num_inactive_orbs):
         if abs(ints_mo[i, i]) > 10**-14:
             one_elec_op += ints_mo[i, i] * a_op_spin(i, True) * a_op_spin(i, False)
     # Active one-electron
-    for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
-        for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+    for p in range(num_NES + num_inactive_orbs, num_NES +num_inactive_orbs + num_active_orbs):
+        for q in range(num_NES + num_inactive_orbs, num_NES + num_inactive_orbs + num_active_orbs):
             if abs(ints_mo[p, q]) > 10**-14:
                 one_elec_op += ints_mo[p, q] * a_op_spin(p, True) * a_op_spin(q, False)
     return one_elec_op

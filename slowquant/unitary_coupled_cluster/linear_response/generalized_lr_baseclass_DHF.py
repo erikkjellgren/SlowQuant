@@ -16,9 +16,9 @@ from slowquant.unitary_coupled_cluster.operators import (
     G2_generalized,
 )
 from slowquant.unitary_coupled_cluster.generalized_operators import (
-    generalized_hamiltonian_0i_0a,
-    generalized_hamiltonian_1i_1a,
-    generalized_hamiltonian_full_space,
+    DHF_hamiltonian_0i_0a,
+    DHF_hamiltonian_1i_1a,
+    DHF_hamiltonian_full_space,
 )
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction_DHF import GeneralizedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.util import (
@@ -41,6 +41,9 @@ class LinearResponseBaseClass:
         self,
         wave_function: GeneralizedWaveFunctionUPS, #Anna har fjernet WaveFunctionUCC + ændret til at alt løber over spin orbitaler
         excitations: str,
+        screen: bool = True,
+        thresh_A: float = 1e-6,
+        thresh_m: float = 1e-6,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
@@ -66,20 +69,17 @@ class LinearResponseBaseClass:
 
         self.G_ops: list[FermionicOperator] = []
         self.q_ops: list[FermionicOperator] = []
-        self.q_ops_resp: list[FermionicOperator] = []
+        self.q_ops_old: list[FermionicOperator] = []
         excitations = excitations.lower()
         self.operator_labels_q = [] #AE
-        self.operator_labels_q_resp = [] #AE
+        self.operator_labels_q_old = [] #AE
         self.operator_labels_G = [] #AE
-        self.G_ops_finite: int = 0 #PERNILLE
-        self.q_ops_finite: int = 0 #PERNILLE
+        self.screen = screen
+        self.thresh_A = thresh_A
+        self.thresh_m = thresh_m
+
 
         if "s" in excitations:
-            # print("Active occupied spin idx") # AWE
-            # print(self.wf.active_occ_spin_idx) # AWE
-            # print("Active unooccupied spin idx") # AWE
-            # print(self.wf.active_unocc_spin_idx) # AWE
-            # print("Excitation idx")
             for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx, is_spin_conserving=False): ## -diagonal jf HJ. Cross?, # is_spin_conserving  AWE
                 self.G_ops.append(G1(i, a)) #AE from G1
                 #print('G1', i,a)
@@ -111,115 +111,69 @@ class LinearResponseBaseClass:
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
 
         for p, q in self.wf.kappa_no_activeactive_spin_idx:
-            self.q_ops.append(G1(p, q)) #AE from G1 skal det være generalized??
-            self.operator_labels_q.append(('q',p,q))
-            # print('qs:',p,q)
+            self.q_ops_old.append(G1(p, q))
+            self.operator_labels_q_old.append(('q',p,q))
         for p, q in self.wf.kappa_no_activeactive_spin_idx_resp:
-            self.q_ops_resp.append(G1(p, q)) #AE from G1 skal det være generalized??
-            self.operator_labels_q_resp.append(('q',p,q))
-        # print('no active active', self.wf.kappa_no_activeactive_spin_idx)
-        # print(operator_labels)
+            self.q_ops.append(G1(p, q))
+            self.operator_labels_q.append(('q',p,q))
+
+        self.finite_excitations_idx: list[bool] = [True] * (len(self.q_ops)+len(self.G_ops))
+        self.q_ops_finite: list[bool] = [True] * len(self.q_ops)
+        self.G_ops_finite: list[bool] = [True] * len(self.G_ops)
+        self.num_q_ops_finite = len(self.q_ops)
+        self.num_G_ops_finite = len(self.G_ops)
+
+
+        # Hessian and metric:
         num_parameters = len(self.G_ops) + len(self.q_ops)
-        num_ep = len(self.wf.kappa_no_activeactive_spin_idx_ep)
-        num_ee = len(self.wf.kappa_no_activeactive_spin_idx)
 
-        self.E2 = np.zeros((num_parameters + num_ep, num_parameters + num_ep), dtype=complex) #AE complex
-
-        self.E2_eff = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
-        self.E2_PP = np.zeros((num_ep, num_ep), dtype=complex) #AE complex
-        self.E2_EP = np.zeros((num_parameters, num_ep), dtype=complex) #AE complex
-        self.E2_PE = np.zeros((num_ep, num_ee), dtype=complex) #AE complex
-        self.E2_EE = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
-
-        self.A = np.zeros((num_parameters + num_ep, num_parameters + num_ep), dtype=complex) #AE complex
-        self.B = np.zeros((num_parameters + num_ep, num_parameters + num_ep), dtype=complex) #AE complex
-
-        self.A_EE = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
-        self.B_EE = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
-        self.A_EP = np.zeros((num_parameters, num_ep), dtype=complex) #AE complex
-        self.B_EP = np.zeros((num_parameters, num_ep), dtype=complex) #AE complex
-        self.A_PE = np.zeros((num_ep, num_parameters), dtype=complex) #AE complex
-        self.B_PE = np.zeros((num_ep, num_parameters), dtype=complex) #AE complex
-        self.A_PP = np.zeros((num_ep, num_ep), dtype=complex) #AE complex
-        self.B_PP = np.zeros((num_ep, num_ep), dtype=complex) #AE complex
-
-        self.A_GG = np.zeros((len(self.G_ops), len(self.G_ops)), dtype=complex)
-        self.B_GG = np.zeros((len(self.G_ops), len(self.G_ops)), dtype=complex)
-
+        self.A = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
+        self.B = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
         self.Sigma = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
-        self.Sigma_tot = np.zeros((num_parameters + num_ep, num_parameters + num_ep), dtype=complex) #AE complex
-        self.Sigma_EP = np.zeros((num_parameters, num_ep), dtype=complex) #AE complex
-
-
         self.Delta = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
-        self.Delta_tot = np.zeros((num_parameters + num_ep, num_parameters + num_ep), dtype=complex) #AE complex
-        self.H_1i_1a = generalized_hamiltonian_1i_1a(
+
+        self.hessian = None
+        self.metric = None
+
+        # Hamiltonians:
+        self.H_1i_1a = DHF_hamiltonian_1i_1a(
             self.wf.h_mo,
             self.wf.g_mo,
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
             self.wf.num_virtual_spin_orbs,
+            self.wf.num_spin_orbs_NES,
         )
-        # self.H_0i_0a = generalized_hamiltonian_0i_0a( #AE: virker ikke!
-        #     self.wf.h_mo,
-        #     self.wf.g_mo,
-        #     self.wf.num_inactive_spin_orbs,
-        #     self.wf.num_active_spin_orbs,
-        # )
+        self.H_0i_0a = DHF_hamiltonian_0i_0a(
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.num_inactive_spin_orbs,
+            self.wf.num_active_spin_orbs,
+            self.wf.num_spin_orbs_NES,
+        )
+
+        self.H = DHF_hamiltonian_full_space(
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.num_inactive_spin_orbs,
+            self.wf.num_active_spin_orbs,
+            self.wf.num_spin_orbs_NES,
+        )
+        
+
+        # Shieldings and coupling constants:
+        self.shieldings = None
+        self.sscc = None
         
 
     def calc_excitation_energies(self) -> None:
         """Calculate excitation energies."""
-        size_ee = len(self.wf.kappa_no_activeactive_spin_idx)
-        size_ep = len(self.wf.kappa_no_activeactive_spin_idx_ep)
-        size = size_ee + size_ep
-
-
-        E2 = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
-        E2[:size, :size] = self.A
-        E2[:size, size:] = self.B
-        E2[size:, :size] = self.B.conjugate() #AE added conjugtate 
-        E2[size:, size:] = self.A.conjugate() #AE added conjugtate 
-
-        # E2_eff = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
-        # E2_EE = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
-        # E2_EP = np.zeros((size * 2, size_ep * 2), dtype=complex) #AE complex
-        # E2_PE = np.zeros((size_ep * 2, size * 2), dtype=complex) #AE complex
-        # E2_PP = np.zeros((size_ep * 2, size_ep * 2), dtype=complex) #AE complex
-
-        # E2_EE[:size, :size] = self.A_EE
-        # E2_EE[:size, size:] = self.B_EE
-        # E2_EE[size:, :size] = self.B_EE.conjugate() #AE added conjugtate 
-        # E2_EE[size:, size:] = self.A_EE.conjugate() #AE added conjugtate 
-
-        # E2_EP[:size, :size_ep] = self.A_EP
-        # E2_EP[:size, size_ep:] = self.B_EP
-        # E2_EP[size:, :size_ep] = self.B_EP.conjugate() #AE added conjugtate 
-        # E2_EP[size:, size_ep:] = self.A_EP.conjugate() #AE added conjugtate 
-
-        # E2_PE[:size_ep, :size] = self.A_PE
-        # E2_PE[:size_ep, size:] = self.B_PE
-        # E2_PE[size_ep:, :size] = self.B_PE.conjugate() #AE added conjugtate 
-        # E2_PE[size_ep:, size:] = self.A_PE.conjugate() #AE added conjugtate 
-
-        # E2_PP[:size_ep, :size_ep] = self.A_PP
-        # E2_PP[:size_ep, size_ep:] = self.B_PP
-        # E2_PP[size_ep:, :size_ep] = self.B_PP.conjugate() #AE added conjugtate 
-        # E2_PP[size_ep:, size_ep:] = self.A_PP.conjugate() #AE added conjugtate 
-
-        # E2_eff = E2_EE - E2_EP @ np.linalg.solve(E2_PP, E2_PE)
-
-        self.E2 = E2
-        # self.E2_eff = E2_eff
-        # self.E2_EP = E2_EP
-        # self.E2_PP = E2_PP
-        # self.E2_EE = E2_EE
-        # self.E2_PE = E2_PE
+        size = len(self.G_ops) + len(self.q_ops)
 
         (
             hess_eigval,
             _,
-        ) = np.linalg.eig(E2)
+        ) = np.linalg.eig(self.hessian)
         print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
         if np.abs(np.min(hess_eigval)) < 10**-8:
             print("WARNING: Small eigenvalue in Hessian")
@@ -230,121 +184,26 @@ class LinearResponseBaseClass:
         #     if i < 0:
         #         print("Negative eigenvalue in Hessian:",i)
         #     #raise ValueError("Negative eigenvalue in Hessian.")
-
-        # S = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
-        # S[:size, :size] = self.Sigma
-        # S[:size, size:] = self.Delta
-        # S[size:, :size] = -self.Delta.conjugate()
-        # S[size:, size:] = -self.Sigma.conjugate()
-
-        S_tot = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
-        S_tot[:size, :size] = self.Sigma_tot
-        S_tot[:size, size:] = self.Delta_tot
-        S_tot[size:, :size] = -self.Delta_tot.conjugate()
-        S_tot[size:, size:] = -self.Sigma_tot.conjugate()
-
-
-        #print(np.linalg.eig(S)) AWE
         
-        # print(S)
-        print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma_tot)))}")
-        self.hessian = E2
-        self.metric = S_tot
-
-        # for i in range(len(self.hessian)):
-        #     print(self.hessian[i][i], i)
+        print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}")
                 
-        eigval, eigvec, sigma_eigs, keep = solve_lr_drop_sigma_null(self.hessian, self.metric, cut=1e-10)
+        eigval, eigvec, sigma_eigs, keep = solve_lr_drop_sigma_null(self.hessian, self.metric, cut=self.thresh_m)
 
-        #eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)     
-
-
-        # s, U = np.linalg.eigh(S)
-
-        # # keep ALL non-zero eigenvalues (positive + negative)
-        # idx = np.abs(s) > 1e-8
-        # s = s[idx]
-        # U = U[:, idx]
-
-        # # --- Step 2: transform Hessian ---
-        # H_tilde = U.conj().T @ E2 @ U
-
-        # # --- Step 3: build inverse sqrt of |S| ---
-        # S_inv_sqrt = np.diag(1.0 / np.sqrt(np.abs(s)))
-
-        # # --- Step 4: effective matrix (indefinite case) ---
-        # H_eff = S_inv_sqrt @ H_tilde @ S_inv_sqrt
-
-        # # --- Step 5: solve (general eigensolver, NOT eigh) ---
-        # eigval, eigvec = np.linalg.eig(H_eff)
-
-        #v = U @ (S_inv_sqrt @ v)
-
-
-
-
-            
-        #     # num=(eigvec.conj().T@(self.hessian)@eigvec)
-        #     # den=(eigvec.conj().T@(self.metric)@eigvec)
-        #     # print('eigenvalues on the diagonal?',num/den)
-            
-        #     # for j in range(len(vec)):
-        #     #     print(vec[j], self.operator_labels[j])
-        
-
-        #AE
-        # operator_labels = np.array(
-        #     self.operator_labels_q +
-        #     self.operator_labels_G +
-        #     self.operator_labels_q +
-        #     self.operator_labels_G,
-        #     dtype=object)
-        # for i in range(len(eigval)):
-        #     vec=eigvec[:,i]
-        #     absvec = np.abs(vec)
-        
-        #     print('Eigenvalue', eigval[i],'Max value eigvec', np.max(abs(vec)), 'Max value eigvec index', np.argmax(abs(vec)))
-        #     # k = np.argmax(np.abs(vec))
-        #     # print("dominant operator:", operator_labels[k])
-
-        #     # top 3 contributors
-        #     top3 = np.argsort(absvec)[-3:][::-1]
-        #     # print(len(top3))
-        #     for j in top3:
-        #         print(
-        #         "  operator:", operator_labels[j],
-        #         " weight:", absvec[j])
-
-
-        #     # print(self.operator_labels[k])
-
-            
    
         sorting = np.argsort(np.real(eigval.real)) #AE added np.real
-        self.excitation_energies = np.real(eigval[sorting][size:]) 
+        tmp = eigval[sorting][size:]
+        self.excitation_energies = np.real(tmp[tmp < 1e4]) 
         self.response_vectors = (eigvec[:, sorting][:, size:]) #Removed np.real
         self.normed_response_vectors = np.zeros_like(self.response_vectors, dtype=complex) #AE
-        # self.num_q = len(self.q_ops)
-        self.num_q = len(self.q_ops_resp)
-        
-        
-        #PERNILLES
-        # self.num_q = self.q_ops_finite
-        # self.num_qG = size
-        
-        
-        self.num_G = size - self.num_q
+
+        self.num_q = len(self.q_ops)       
+        self.num_G = len(self.G_ops)
+
+
         self.Z_q = self.response_vectors[: self.num_q, :]
         self.Z_G = self.response_vectors[self.num_q : self.num_q + self.num_G, :]
         self.Y_q = self.response_vectors[self.num_q + self.num_G : 2 * self.num_q + self.num_G]
         self.Y_G = self.response_vectors[2 * self.num_q + self.num_G :]
-        
-        
-        #Pernille
-        # self.Z_qG = self.response_vectors[: self.num_qG, :]
-        # self.Y_qG = self.response_vectors[self.num_qG :]
-        # self.Z_qG_normed = np.zeros_like(self.Z_qG, dtype=complex)
-        # self.Y_qG_normed = np.zeros_like(self.Y_qG, dtype=complex)
         
         self.Z_q_normed = np.zeros_like(self.Z_q, dtype=complex) #AE
         self.Z_G_normed = np.zeros_like(self.Z_G, dtype=complex) #AE
@@ -362,15 +221,13 @@ class LinearResponseBaseClass:
             self.Y_q_normed[:, state_number] = self.Y_q[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real)
             self.Y_G_normed[:, state_number] = self.Y_G[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real)
             
-            # #Pernille
-            # self.Z_qG_normed[:, state_number] = self.Z_qG[:, state_number] * (1 / norm) ** 0.5
-            # self.Y_qG_normed[:, state_number] = self.Y_qG[:, state_number] * (1 / norm) ** 0.5
-        
-            
             self.normed_response_vectors[:, state_number] = (
                 self.response_vectors[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real)  #AE added abs
             )
-        #return E2
+
+        with np.printoptions(precision=5, suppress=True, formatter={'float_kind': lambda x: f'{x:.5f}'}):
+            print("Excitation energies:", self.excitation_energies)
+
 
 
     def get_excited_state_norm(self) -> np.ndarray:
@@ -388,18 +245,11 @@ class LinearResponseBaseClass:
             YYq = np.outer(self.Y_q[:, state_number], self.Y_q[:, state_number].conj().T)
             ZZG = np.outer(self.Z_G[:, state_number], self.Z_G[:, state_number].conj().T)
             YYG = np.outer(self.Y_G[:, state_number], self.Y_G[:, state_number].conj().T)
-
             
             norms[state_number] = np.sum(self.metric[: self.num_q, : self.num_q] * (ZZq - YYq)) + np.sum(
                 self.metric[self.num_q : self.num_q + self.num_G, self.num_q : self.num_q + self.num_G]
                 * (ZZG - YYG)
             )
-
-            
-            #Pernille
-            # ZZqG = np.outer(self.Z_qG[:, state_number], self.Z_qG[:, state_number].transpose())
-            # YYqG = np.outer(self.Y_qG[:, state_number], self.Y_qG[:, state_number].transpose())
-            # norms[state_number] = np.sum(self.metric[: self.num_qG, : self.num_qG] * (ZZqG - YYqG))
             
         return norms
 
