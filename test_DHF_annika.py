@@ -980,8 +980,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     nmr = nmr_dhf.NMR(mf)
     nmr.cphf = True
-    nmr.mb = 'RKB'      # or 'RKB'
-    nmr.gauge_orig = [0,0,0]  # GIAO vs. # [0,0,0]
+    nmr.mb = 'RMB'      # or 'RKB'
+    nmr.gauge_orig = None #[0,0,0]  # GIAO vs. # [0,0,0]
 
     shielding = nmr.kernel()
 
@@ -1078,23 +1078,23 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #print(M_values)
 
 
-    # WF2 = GeneralizedWaveFunctionUPS(
-    #     active_space,
-    #     C_MO,
-    #     mol, 
-    #     K_pairs,
-    #     False,
-    #     "fUCCSD",
-    #     {"n_layers": 1, "is_spin_conserving" : False},
-    #     include_active_kappa=True,
-    # )
+    WF2 = GeneralizedWaveFunctionUPS(
+        active_space,
+        C_MO,
+        mol, 
+        K_pairs,
+        False,
+        "fUCCSD",
+        {"n_layers": 1, "is_spin_conserving" : False},
+        include_active_kappa=True,
+    )
 
-    # np.random.seed(20)
-    # if len(WF2.thetas) > 0:
-    #     real = np.random.uniform(-0.05,0.05,len(WF2.thetas_real))
-    #     #imag = np.zeros_like(WF.thetas_imag)
-    #     imag = np.random.uniform(-0.05,0.05,len(WF2.thetas_real))
-    #     WF2.set_thetas(real, imag)
+    np.random.seed(20)
+    if len(WF2.thetas) > 0:
+        real = np.random.uniform(-0.05,0.05,len(WF2.thetas_real))
+        #imag = np.zeros_like(WF.thetas_imag)
+        imag = np.random.uniform(-0.05,0.05,len(WF2.thetas_real))
+        WF2.set_thetas(real, imag)
 
 
 
@@ -1103,19 +1103,20 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # data = np.load("HF((5,5),12).npz") 
     # data = np.load("LiH((2,2),6).npz") 
     # data = np.load("HF((1,1),4).npz")
-    data = np.load("HF((2,2),6).npz")
-    WF2 = GeneralizedWaveFunctionUPS(
-        active_space,
-        data["c_mo"],
-        #C_MO,
-        mol,
-        K_pairs,
-        False,
-        "fUCCSD",
-        {"n_layers": 1, "is_spin_conserving" : False},
-        include_active_kappa=True,
-    )
-    WF2.set_thetas(data["thetas_real"], data["thetas_imag"])
+    # data = np.load("HF((2,2),6).npz")
+
+    # WF2 = GeneralizedWaveFunctionUPS(
+    #     active_space,
+    #     data["c_mo"],
+    #     #C_MO,
+    #     mol,
+    #     K_pairs,
+    #     False,
+    #     "fUCCSD",
+    #     {"n_layers": 1, "is_spin_conserving" : False},
+    #     include_active_kappa=True,
+    # )
+    # WF2.set_thetas(data["thetas_real"], data["thetas_imag"])
 
     #print("Kramers rotations:")
     #print(WF2.kappa_spin_idx)
@@ -1474,14 +1475,14 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
     #Optimization:
-    #WF2.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-12, maxiter = 1000)
+    WF2.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-12, maxiter = 1000)
 
-    # np.savez(
-    #     "HF((2,2),6)",
-    #     c_mo=WF2.c_mo,
-    #     thetas_real=WF2.thetas_real,
-    #     thetas_imag=WF2.thetas_imag
-    #     )
+    np.savez(
+        "H2-dyallv2z((1,1),6)",
+        c_mo=WF2.c_mo,
+        thetas_real=WF2.thetas_real,
+        thetas_imag=WF2.thetas_imag
+        )
 
     LR2 = generalized_naive_DHF.LinearResponse(WF2, excitations="SD", screen = False)
     LR2.calc_excitation_energies()
@@ -1614,16 +1615,18 @@ def H2():
     #    for atom, Z in [('H', 1)]}   # do this per element you use
     # fixed_basis = split_general_contraction(raw)
     # basis = fixed_basis
-    #dyall_v2z = bse.get_basis('dyall-v2z', elements=['H'], fmt='nwchem')
+    dyall_v2z = bse.get_basis('dyall-v2z', elements=['H'], fmt='nwchem')
+    dyall_cv2z = bse.get_basis('dyall-cv2z', elements=['H'], fmt='nwchem')
     # with open('dyall2zp_H.nwchem', 'w') as f:
     #     f.write(dyall_v2z)
     #     f.close()
     #basis = dyall_v2z
+    basis = dyall_cv2z
     #basis = "sto-3g"
     #basis = "sto-6g"
-    basis = "631-g"
+    #basis = "631-g"
     #active_space = ((1, 1), 8)
-    active_space = ((1, 1), 4)
+    active_space = ((1, 1), 6)
     #active_space = ((1,1), 2)
     #active_space = (2, 4)
     charge = 0
@@ -1731,8 +1734,8 @@ def HF():
     #basis = "631-g"
     dyall_v2z = bse.get_basis('dyall-v2z', elements=['H', 'F'], fmt='nwchem')
     #J_631g = bse.get_basis('6-31g-J', elements=['H', 'F'], fmt='nwchem')
-    basis = "sto-3g"
-    #basis = dyall_v2z
+    #basis = "sto-3g"
+    basis = dyall_v2z
     #basis= J_631g
     #basis = "aug-cc-pvtz-J"
     active_space = ((2, 2), 6)
@@ -1846,4 +1849,4 @@ def N3():
 
 ###RUN SCRIPT###
 
-HF()
+H2()
