@@ -35,6 +35,10 @@ class quantumLRBaseClass:
             excitations: Which excitation orders to include in response.
         """
         self.wf = wf
+        for i in range(self.wf.num_active_orbs):
+            if self.wf._ref_det[2 * i] != self.wf._ref_det[2 * i + 1]:
+                print("WARNING: Linear response is not tested for open-shell reference determinants.")
+                break
         # Create operators
         self.H_0i_0a = hamiltonian_0i_0a(wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
         self.H_1i_1a = hamiltonian_1i_1a(

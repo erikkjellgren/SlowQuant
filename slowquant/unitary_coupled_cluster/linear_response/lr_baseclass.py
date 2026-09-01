@@ -56,6 +56,10 @@ class LinearResponseBaseClass:
             )
         else:
             raise ValueError(f"Got incompatible wave function type, {type(self.wf)}")
+        for i in range(self.wf.num_active_orbs):
+            if self.wf._ref_det[2 * i] != self.wf._ref_det[2 * i + 1]:
+                print("WARNING: Linear response is not tested for open-shell reference determinants.")
+                break
 
         self.G_ops: list[FermionicOperator] = []
         self.q_ops: list[FermionicOperator] = []

@@ -1,6 +1,7 @@
 # type: ignore
 import numba as nb
 import numpy as np
+import pyscf
 
 import slowquant.SlowQuant as sq
 import slowquant.unitary_coupled_cluster.linear_response.allstatetransfer as allstlr
@@ -27,9 +28,8 @@ def test_ups_naivelr() -> None:
         SQobj,
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
-        include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True)
     LR = naivelr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.129476) < 10**-4
@@ -78,9 +78,10 @@ def test_LiH_sto3g_allST():
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
-        "SD",
+        excitations=["SAS", "SAD"],
+        include_active_kappa=False,
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True)
     WF2 = WaveFunctionUPS(
         (2, 2),
         WF.c_mo,
@@ -88,7 +89,7 @@ def test_LiH_sto3g_allST():
         "tUPS",
         ansatz_options={"n_layers": 1},
     )
-    WF2.run_wf_optimization_1step("BFGS", False)
+    WF2.run_wf_optimization(orbital_optimization=False)
     # Linear Response
     LR = allstlr.LinearResponse(
         WF2,
@@ -145,9 +146,8 @@ def test_ups_water_44() -> None:
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         "fUCCSD",
-        include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("bfgs", True)
+    WF.run_wf_optimization(orbital_optimization=True)
     # Changed threshold from 10-8 to 10-6, due to loss of precision in optimizer.
     # Change back again when optimization code has been made more stable.
     assert abs(WF.energy_elec - -84.00619955119978) < 10**-6
@@ -186,14 +186,13 @@ def test_saups_h2_3states() -> None:
         ),
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
-        include_active_kappa=True,
     )
 
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True)
 
     assert abs(WF.excitation_energies[0] - 0.974553) < 10**-6
     assert abs(WF.excitation_energies[1] - 1.632364) < 10**-6
-    osc = WF.get_oscillator_strenghts()
+    osc = WF.get_oscillator_strengths()
     assert abs(osc[0] - 0.8706) < 10**-3
     assert abs(osc[1] - 0.0) < 10**-3
 
@@ -230,14 +229,13 @@ def test_saups_h3_3states() -> None:
         ),
         "tUPS",
         ansatz_options={"n_layers": 2, "skip_last_singles": True},
-        include_active_kappa=True,
     )
 
-    WF.run_wf_optimization_2step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True, opt_type="2step")
 
     assert abs(WF.excitation_energies[0] - 0.838466) < 10**-6
     assert abs(WF.excitation_energies[1] - 0.838466) < 10**-6
-    osc = WF.get_oscillator_strenghts()
+    osc = WF.get_oscillator_strengths()
     assert abs(osc[0] - 0.7569) < 10**-3
     assert abs(osc[1] - 0.7569) < 10**-3
 
@@ -258,9 +256,9 @@ def test_sa_doubles() -> None:
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         ansatz="fUCC",
-        ansatz_options={"n_layers": 1, "SAS": True, "SAD": True},
+        ansatz_options={"n_layers": 1, "excitations": ["SAS", "SAD"]},
     )
-    WF.run_wf_optimization_1step("BFGS")
+    WF.run_wf_optimization(orbital_optimization=False)
     assert abs(WF.energy_elec - -8.874521029611891) < 10**-8
 
 
@@ -281,9 +279,9 @@ def test_SA_sa_doubles() -> None:
         SQobj,
         ([[1]], [["111100000000"]]),
         ansatz="SAfUCCSD",
-        ansatz_options={"n_layers": 1, "SAS": True, "SAD": True},
+        ansatz_options={"n_layers": 1, "excitations": ["SAS", "SAD"]},
     )
-    WF.run_wf_optimization_1step("BFGS")
+    WF.run_wf_optimization(orbital_optimizer=False)
     assert abs(WF.energy_states[0] - -8.874521029611891) < 10**-8
 
 
@@ -305,10 +303,8 @@ def test_ups_water_44_threaded() -> None:
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         "fUCCSD",
-        ansatz_options={},
-        include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization(orbital_optimization=True, one_step_optimizer="SLSQP")
     assert abs(WF.energy_elec - -83.97256228053688) < 10**-8
     nb.set_num_threads(1)
 
@@ -346,14 +342,12 @@ def test_saups_h3_3states_threaded() -> None:
         ),
         "tUPS",
         ansatz_options={"n_layers": 2, "skip_last_singles": True},
-        include_active_kappa=True,
     )
-
-    WF.run_wf_optimization_2step("BFGS", True)
+    WF.run_wf_optimization(orbital_optimization=True, opt_type="2step")
 
     assert abs(WF.excitation_energies[0] - 0.838466) < 10**-6
     assert abs(WF.excitation_energies[1] - 0.838466) < 10**-6
-    osc = WF.get_oscillator_strenghts()
+    osc = WF.get_oscillator_strengths()
     assert abs(osc[0] - 0.7569) < 10**-3
     assert abs(osc[1] - 0.7569) < 10**-3
     nb.set_num_threads(1)
@@ -386,10 +380,11 @@ def test_pptUPS_h2o() -> None:
         mo_coeff,
         integral_generator,
         "tUPS",  # our circuit Ansatz
-        ansatz_options={"n_layers": 1, "do_pp": True},  # we use 1 layer
+        ansatz_options={"n_layers": 1},  # we use 1 layer
+        do_pp=True,
     )
 
-    WF.run_wf_optimization_1step("bfgs", orbital_optimization=False)
+    WF.run_wf_optimization(orbital_optimization=False)
 
     assert abs(WF.energy_elec + 83.96387402720552) < 10**-6
 
@@ -413,7 +408,78 @@ def test_ups_n2_fuccsdtq56() -> None:
         SQobj.hartree_fock.mo_coeff,
         SQobj,
         "fUCC",
-        ansatz_options={"S": True, "D": True, "T": True, "Q": True, "5": True, "6": True},
+        ansatz_options={"excitations": ["S", "D", "T", "Q", "5", "6"]},
     )
-    WF.run_wf_optimization_1step("bfgs", False)
+    WF.run_wf_optimization(orbital_optimization=False)
     assert abs(WF.energy_elec - -131.1965135680604533) < 10**-6
+
+
+def test_ups_pp_lr() -> None:
+    """Test that the linear response are independent of reference for fUCCSD.
+
+    When using a fUCCSD wave function, the linear response results should be
+    independent of reference (if it is closed-shell).
+    """
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """O   0.0  0.0           0.1035174918;
+    H   0.0  0.7955612117 -0.4640237459;
+    H   0.0 -0.7955612117 -0.4640237459;""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("STO-3G")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    WF = WaveFunctionUPS(
+        (4, 4),
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
+        "fUCCSD",
+        ansatz_options={"n_layers": 2},
+    )
+    WF.run_wf_optimization(orbital_optimization=False)
+    # Hack to turn off orbital part in response.
+    WF.kappa_no_activeactive_idx = []
+    WF.kappa_no_activeactive_idx_dagger = []
+    LR = naivelr.LinearResponse(WF, excitations="SD")
+    LR.calc_excitation_energies()
+    ppWF = WaveFunctionUPS(
+        (4, 4),
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
+        "fUCCSD",
+        ansatz_options={"n_layers": 2},
+        do_pp=True,
+    )
+    ppWF.run_wf_optimization(orbital_optimization=False)
+    # Hack to turn off orbital part in response.
+    ppWF.kappa_no_activeactive_idx = []
+    ppWF.kappa_no_activeactive_idx_dagger = []
+    ppLR = naivelr.LinearResponse(ppWF, excitations="SD")
+    ppLR.calc_excitation_energies()
+    for exc, ppexc in zip(LR.excitation_energies, ppLR.excitation_energies):
+        assert abs(exc - ppexc) < 10**-6
+    for osc, pposc in zip(LR.get_oscillator_strength(), ppLR.get_oscillator_strength()):
+        assert abs(osc - pposc) < 10**-3
+
+
+def test_H3_fuccsdt_openshell() -> None:
+    """Test UPS wavefunction works with a open-shell reference."""
+    mol = pyscf.M(
+        atom="H   0.0 0.0 0.0; H   1.0 0.0 0.0; H   0.5 0.8660254038  0.0;",
+        basis="sto-3g",
+        unit="angstrom",
+        spin=1,
+    )
+    rohf = pyscf.scf.ROHF(mol).run()
+
+    WF = WaveFunctionUPS(
+        (3, 3),
+        rohf.mo_coeff,
+        mol,
+        "fUCC",
+        ansatz_options={"excitations": ["S", "D", "T"]},
+        reference_determinant="111000",
+    )
+    WF.run_wf_optimization(orbital_optimization=False)
+    assert abs(WF.energy_elec - -2.951920725362) < 10**-7
