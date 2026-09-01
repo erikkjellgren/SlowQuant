@@ -1,6 +1,8 @@
 from collections.abc import Generator, Sequence
 from typing import Any
 
+import numpy as np
+
 
 def iterate_t1_sa(
     active_occ_idx: Sequence[int],
@@ -948,7 +950,7 @@ class UpsStructure:
                     self.excitation_operator_type.append(f"sa_double_{op_case}")
                     self.excitation_indices.append((i, j, a, b))
                     # Rotosolve not implemented for SA doubles
-                    # self.grad_param_R[f"p{self.n_params:09d}"] = None
+                    self.grad_param_R[f"p{self.n_params:09d}"] = np.nan
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
 
