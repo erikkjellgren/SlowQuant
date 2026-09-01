@@ -99,6 +99,9 @@ class quantumLRBaseClass:
 
         self.orbs = [self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs]
 
+        self._hessian = None
+        self._metric = None
+
     def get_operator_info(self) -> None:
         """Information about operators."""
         # q operators
@@ -317,32 +320,44 @@ class quantumLRBaseClass:
                                 + f" | {Sigma_row[nr]:3.6f}".center(10)
                             )
 
+    @property
+    def hessian(self) -> np.ndarray:
+        if self._hessian is None:
+            size = len(self.A)
+            self._hessian = np.zeros((size * 2, size * 2))
+            self._hessian[:size, :size] = self.A
+            self._hessian[:size, size:] = self.B
+            self._hessian[size:, :size] = self.B
+            self._hessian[size:, size:] = self.A
+
+            (
+            hess_eigval,
+            _,
+            ) = np.linalg.eig(self._hessian)
+            print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
+            if np.min(hess_eigval) < 0:
+                raise ValueError("Negative eigenvalue in Hessian.")
+
+        return self._hessian
+    
+    @property
+    def metric(self) -> np.ndarray:
+        if self._metric is None:
+            size = len(self.Sigma)
+            self._metric = np.zeros((size * 2, size * 2))
+            self._metric[:size, :size] = self.Sigma
+            self._metric[:size, size:] = self.Delta
+            self._metric[size:, :size] = -self.Delta
+            self._metric[size:, size:] = -self.Sigma
+
+            print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}")
+
+        return self._metric
+
     def get_excitation_energies(self) -> np.ndarray:
         """Solve LR eigenvalue problem."""
         # Build Hessian and Metric
         size = len(self.A)
-        self.Delta = np.zeros_like(self.Sigma)
-        self.hessian = np.zeros((size * 2, size * 2))
-        self.hessian[:size, :size] = self.A
-        self.hessian[:size, size:] = self.B
-        self.hessian[size:, :size] = self.B
-        self.hessian[size:, size:] = self.A
-        self.metric = np.zeros((size * 2, size * 2))
-        self.metric[:size, :size] = self.Sigma
-        self.metric[:size, size:] = self.Delta
-        self.metric[size:, :size] = -self.Delta
-        self.metric[size:, size:] = -self.Sigma
-
-        # Check eigenvalues of Hessian/Metric
-        (
-            hess_eigval,
-            _,
-        ) = scipy.linalg.eig(self.hessian)
-        print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
-        if np.min(hess_eigval) < 0:
-            print("WARNING: Negative eigenvalue in Hessian.")
-        print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.metric)))}")
-
         # Solve eigenvalue equation
         eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)
         sorting = np.argsort(eigval)

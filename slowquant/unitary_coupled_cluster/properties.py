@@ -212,11 +212,11 @@ class properties():
 
             # Orthonomalized MOs
             h1mo -= 1/2 * np.einsum('vmo,on->vmn', S1_mo, self.wf.h_mo)
-            h1mo -= 1/2 * np.einsum('vno,mo->vmn', S1_mo.transpose(0,2,1), self.wf.h_mo)
+            h1mo -= 1/2 * np.einsum('von,mo->vmn', S1_mo, self.wf.h_mo)
             g1mo -= 1/2 * np.einsum('vmo,onpq->vmnpq', S1_mo, self.wf.g_mo)
-            g1mo -= 1/2 * np.einsum('vno,mopq->vmnpq', S1_mo.transpose(0,2,1), self.wf.g_mo)
+            g1mo -= 1/2 * np.einsum('von,mopq->vmnpq', S1_mo, self.wf.g_mo)
             g1mo -= 1/2 * np.einsum('vpo,mnoq->vmnpq', S1_mo, self.wf.g_mo)
-            g1mo -= 1/2 * np.einsum('vqo,mnpo->vmnpq', S1_mo.transpose(0,2,1), self.wf.g_mo)
+            g1mo -= 1/2 * np.einsum('voq,mnpo->vmnpq', S1_mo, self.wf.g_mo)
 
             property_gradient = self.LR_singlet.get_property_gradient(
                 int1e = h1mo,

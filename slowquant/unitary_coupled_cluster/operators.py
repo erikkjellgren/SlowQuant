@@ -793,7 +793,7 @@ def one_elec_op_full_space(ints_mo: np.ndarray, num_orbs: int) -> FermionicOpera
     return one_elec_op
 
 
-def one_elec_op_0i_0a(ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int) -> FermionicOperator:
+def one_elec_op_0i_0a(ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int, triplet = False) -> FermionicOperator:
     """Create one-electron operator that makes no changes in the inactive and virtual orbitals.
 
     Args:
@@ -804,16 +804,21 @@ def one_elec_op_0i_0a(ints_mo: np.ndarray, num_inactive_orbs: int, num_active_or
     Returns:
         One-electron operator for active-space.
     """
+    # check spin-adaptation
+    if not triplet:
+        E = Epq
+    else:
+        E = Tpq
     one_elec_op = FermionicOperator({})
     # Inactive one-electron
     for i in range(num_inactive_orbs):
         if abs(ints_mo[i, i]) > 10**-14:
-            one_elec_op += ints_mo[i, i] * Epq(i, i)
+            one_elec_op += ints_mo[i, i] * E(i, i)
     # Active one-electron
     for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
         for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
             if abs(ints_mo[p, q]) > 10**-14:
-                one_elec_op += ints_mo[p, q] * Epq(p, q)
+                one_elec_op += ints_mo[p, q] * E(p, q)
     return one_elec_op
 
 

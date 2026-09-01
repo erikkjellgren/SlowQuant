@@ -15,6 +15,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_triplet_orbital_response_hessian_block,
     get_orbital_response_metric_sigma,
     get_orbital_response_property_gradient_response,
+    get_orbital_response_property_gradient_1e,
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.operators import (
@@ -545,3 +546,36 @@ class quantumLR(quantumLRBaseClass):
             transition_dipoles[state_number, 2] = q_part_z + transition_dipole_z
 
         return transition_dipoles
+
+
+    def get_property_gradient(self, int1e: np.ndarray) -> np.ndarray:
+        """Calculate property gradient.
+
+        Args:
+            int1e: one-electron property integrals in MO basis.
+
+        Returns:
+            Property gradient.
+        """
+
+        idx_shift_q = len(self.q_ops)
+        V = np.zeros((len(self.q_ops + self.G_ops), len(int1e)))
+
+        if len(self.q_ops) != 0:
+            # Orbital response part
+            V[:idx_shift_q, :] = get_orbital_response_property_gradient_1e(
+                int1e,
+                self.wf.kappa_no_activeactive_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.rdm1,
+            )
+
+        for comp, op_int in enumerate(int1e):
+            op = one_elec_op_0i_0a(op_int, self.wf.num_inactive_orbs, self.wf.num_active_orbs, triplet=self.triplet)
+            for idx, G in enumerate(self.G_ops):
+                V[idx + idx_shift_q, comp] = self.wf.QI.quantum_expectation_value(commutator(G, op).get_folded_operator(*self.orbs))
+        
+        if np.allclose(int1e, int1e.transpose(0, -1, -2)):
+            return np.vstack((V, -1 * V))
+        return np.vstack((V, V))
