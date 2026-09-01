@@ -980,8 +980,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     nmr = nmr_dhf.NMR(mf)
     nmr.cphf = True
-    nmr.mb = 'RMB'      # or 'RKB'
-    nmr.gauge_orig = None #[0,0,0]  # GIAO vs. # [0,0,0]
+    nmr.mb = 'RKB'      # or 'RKB'
+    nmr.gauge_orig = [0,0,0]  # GIAO vs. # [0,0,0]
 
     shielding = nmr.kernel()
 
@@ -1079,14 +1079,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
     # WF2 = GeneralizedWaveFunctionUPS(
-    #     mol.nelectron,
     #     active_space,
     #     C_MO,
-    #     h_core,
-    #     g_eri,
+    #     mol, 
     #     K_pairs,
     #     False,
-    #     S_ovlp,
     #     "fUCCSD",
     #     {"n_layers": 1, "is_spin_conserving" : False},
     #     include_active_kappa=True,
@@ -1110,6 +1107,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF2 = GeneralizedWaveFunctionUPS(
         active_space,
         data["c_mo"],
+        #C_MO,
         mol,
         K_pairs,
         False,
@@ -1127,6 +1125,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         active_space,
         #C_MO,
         C_U,
+        mol,
         K_pairs,
         False,
         "fUCCSD",
@@ -1474,16 +1473,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-10, maxiter = 1000)
 
 
-    hm = make_hm_ao(mol)
-    hB = hB_RMB_GIAO(mol)
-    hBm = hBm_RMB_GIAO(mol)
-    gB = gB_RMB_GIAO(mol)
-    sB = sB_RMB_GIAO(mol)
-    hB_test = make_hB_ao(mol)
-
-
     #Optimization:
-    #WF2.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-10, maxiter = 1000)
+    #WF2.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-12, maxiter = 1000)
 
     # np.savez(
     #     "HF((2,2),6)",
@@ -1492,13 +1483,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #     thetas_imag=WF2.thetas_imag
     #     )
 
-    
     LR2 = generalized_naive_DHF.LinearResponse(WF2, excitations="SD", screen = False)
     LR2.calc_excitation_energies()
 
     print("PySCF:", sigma_iso)
 
-    LR2.get_shieldings_4comp_iso(hm, hBm, hB, gB, sB, RMB = True)
+    LR2.get_shieldings_4comp_iso(RMB_GIAO = True)
 
 
     #LR = generalized_naive_DHF.LinearResponse(WF, excitations="S")
@@ -1633,8 +1623,8 @@ def H2():
     #basis = "sto-6g"
     basis = "631-g"
     #active_space = ((1, 1), 8)
-    #active_space = ((1, 1), 4)
-    active_space = ((1,1),2)
+    active_space = ((1, 1), 4)
+    #active_space = ((1,1), 2)
     #active_space = (2, 4)
     charge = 0
     spin = 0

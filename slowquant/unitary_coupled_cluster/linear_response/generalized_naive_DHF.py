@@ -480,17 +480,17 @@ class LinearResponse(LinearResponseBaseClass):
         mux = generalized_one_electron_transform(self.wf.c_mo, dipole_integrals[0])
         muy = generalized_one_electron_transform(self.wf.c_mo, dipole_integrals[1])
         muz = generalized_one_electron_transform(self.wf.c_mo, dipole_integrals[2])
-        mux_op = generalized_one_elec_op_0i_0a(
+        mux_op = DHF_one_elec_op_0i_0a(
             mux,
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
         )
-        muy_op = generalized_one_elec_op_0i_0a(
+        muy_op = DHF_one_elec_op_0i_0a(
             muy,
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
         )
-        muz_op = generalized_one_elec_op_0i_0a(
+        muz_op = DHF_one_elec_op_0i_0a(
             muz,
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
@@ -1287,14 +1287,23 @@ class LinearResponse(LinearResponseBaseClass):
 
         return ktensor  # reduced K (Hz), (natm, natm)
     
-    def get_shieldings_4comp_iso(self, h_m: np.ndarray, h_Bm: np.ndarray, h_B: np.ndarray, g_B: np.ndarray, s_B : np.ndarray, RMB = True, output = False) -> np.ndarray:
-        # Linear response contribution:
+    def get_shieldings_4comp_iso(self, RMB_GIAO = True, output = False) -> np.ndarray:
+        # Integrals:
+        h_m = self.wf.int_gen.h_m
+        if RMB_GIAO:
+            h_Bm = self.wf.int_gen.h_Bm_RMB_GIAO
+            h_B = self.wf.int_gen.h_B_RMB_GIAO
+            g_B = self.wf.int_gen.g_B
+            s_B = self.wf.int_gen.S_B
+        else:
+            h_B = self.wf.int_gen.h_B
 
+        # Linear response contribution:
         # Property gradients:
         natm = h_m.shape[0]
         prop_grads_m =  [self.get_property_gradient_4comp(h_m[I]) for I in range(natm)]
 
-        if RMB:
+        if RMB_GIAO:
             prop_grads_B  = self.get_property_gradient_4comp_RMB_GIAO(h_B, g_B, s_B)
         else:
             prop_grads_B =  self.get_property_gradient_4comp(h_B)
@@ -1387,7 +1396,7 @@ class LinearResponse(LinearResponseBaseClass):
                         response_B[:, beta]
                     ).real
 
-        if RMB:
+        if RMB_GIAO:
             # Expectation value contribution:
             size_mo = (
                 self.wf.num_spin_orbs_NES
@@ -1431,10 +1440,10 @@ class LinearResponse(LinearResponseBaseClass):
         unit_ppm = nist.ALPHA**2 * 1e6
 
         sc_resp *= unit_ppm
-        if RMB:
+        if RMB_GIAO:
             sc_exp *= unit_ppm
 
-        if RMB:
+        if RMB_GIAO:
             sigma_tot = sc_resp + sc_exp
         else:
             sigma_tot = sc_resp
@@ -1443,7 +1452,7 @@ class LinearResponse(LinearResponseBaseClass):
             with np.printoptions(precision=7, suppress=True, formatter={'float_kind': lambda x: f'{x:.7f}'}):
                 print("Response:")
                 print(sc_resp.real)
-            if RMB:
+            if RMB_GIAO:
                 with np.printoptions(precision=7, suppress=True, formatter={'float_kind': lambda x: f'{x:.7f}'}):
                     print("Expectation value:")
                     print(sc_exp.real)
