@@ -165,8 +165,6 @@ class LinearResponseBaseClass:
         print('cond E', np.linalg.cond(S))
 
         
-        print('Vi er her ideal')
-
         # hessian_for = self.hessian
         # print('Hessian før', hessian_for)
         # metric_for = self.metric
