@@ -7,6 +7,9 @@ from pyscf.x2c import sfx2c1e
 from pyscf import cc
 import scipy.linalg
 from scipy.linalg import expm
+from pathlib import Path
+import os
+
 
 
 # from pyscf.x2c.x2c import dip_moment
@@ -73,6 +76,35 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF.set_thetas(ny_theta_real, ny_theta_imag)
 
     WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
+
+    # Saving the data:
+    directory = os.getcwd()
+    name = "" #Rememember to give the run a name
+
+    # Saving the data:
+    j,k = 0,0
+    while j < 100:
+        if j < 10:
+            if os.path.exists("%s/%s_UCCSD_0%s.npz" % (directory, name, j)):
+                k = j + 1
+        else:
+            if os.path.exists("%s/%s_UCCSD_%s.npz" % (directory, name, j)):
+                k = j +1
+        j += 1
+
+    if k < 10:
+        k = f"0{k}"
+
+    data_file_UCCSD = Path("%s_UCCSD_%s.npz" % (name, k))
+
+    print("\nName of the UCCSD data file:", data_file_UCCSD)
+
+    np.savez(
+        data_file_UCCSD,
+        c_mo=WF.c_mo,
+        thetas_real=WF.thetas_real,
+        thetas_imag=WF.thetas_imag
+        )
 
     print('Calc energy',WF._energy_elec)
     print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
