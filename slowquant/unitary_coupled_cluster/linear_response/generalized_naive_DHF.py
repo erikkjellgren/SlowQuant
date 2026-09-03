@@ -84,7 +84,7 @@ class LinearResponse(LinearResponseBaseClass):
                 )
             # # Man behøver ikke regne hele A, men det er bare lige nemt at gøre for qq
             for i, q in enumerate(self.q_ops):
-                if abs(A[i, i]).real > self.thresh_A or abs(A[i, i]).imag > self.thresh_A:  # whatever rimeligt threshold
+                if abs(A[i, i]) > self.thresh_A:  # whatever rimeligt threshold
                     finite_excitations.append(True)
                 else:
                     finite_excitations.append(False)
@@ -100,7 +100,7 @@ class LinearResponse(LinearResponseBaseClass):
                     HGI_ket,
                     *self.index_info,
                 )
-                if abs(A).real > self.thresh_A or abs(A).imag > self.thresh_A:  # whatever rimeligt threshold
+                if abs(A) > self.thresh_A:  # whatever rimeligt threshold
                     finite_excitations.append(True)
                 else:
                     finite_excitations.append(False)
@@ -124,10 +124,10 @@ class LinearResponse(LinearResponseBaseClass):
             # Reshaping the hessian and metric elements:
             size = self.num_q_ops_finite + self.num_G_ops_finite
 
-            self.A = self.A.reshape(size, size)
-            self.B = self.B.reshape(size, size)
-            self.Sigma = self.Sigma.reshape(size, size)
-            self.Delta = self.Delta.reshape(size, size)
+            self.A = np.zeros((size, size), dtype=complex)
+            self.B = np.zeros((size, size), dtype=complex)
+            self.Sigma = np.zeros((size, size), dtype=complex)
+            self.Delta = np.zeros((size, size), dtype=complex)
         
 
         # q gradient:
@@ -715,43 +715,41 @@ class LinearResponse(LinearResponseBaseClass):
                 V[idx + idx_shift_q, :] += mo_trans[:, i, i] * val
 
                 for j in range(self.wf.num_spin_orbs_NES, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs):
-                    pass
                     # 2e contribution to the G part of the property gradient:
-                    # E_ket = generalized_propagate_state([a_op_spin(i,True)*a_op_spin(j,True)*a_op_spin(j,False)*a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
-                    # Ed_ket = generalized_propagate_state([a_op_spin(i,True)*a_op_spin(j,True)*a_op_spin(j,False)*a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
-                    # val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                    # val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
-                    # V[idx + idx_shift_q, :] += mo2e_trans[:, i, i, j, j] * val *.5
-                    # E_ket = generalized_propagate_state([a_op_spin(j,True)*a_op_spin(i,True)*a_op_spin(j,False)*a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
-                    # Ed_ket = generalized_propagate_state([a_op_spin(i,True)*a_op_spin(j,True)*a_op_spin(j,False)*a_op_spin(j,False)], self.wf.ci_coeffs, *self.index_info)
-                    # val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                    # val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
-                    # V[idx + idx_shift_q, :] += mo2e_trans[:, i, j, j, i] * val * .5
+                    E_ket = generalized_propagate_state([a_op_spin(i,True)*a_op_spin(j,True)*a_op_spin(j,False)*a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
+                    Ed_ket = generalized_propagate_state([a_op_spin(i,True)*a_op_spin(j,True)*a_op_spin(j,False)*a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
+                    val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
+                    val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+                    V[idx + idx_shift_q, :] += mo2e_trans[:, i, i, j, j] * val *.5
+                    E_ket = generalized_propagate_state([a_op_spin(j,True)*a_op_spin(i,True)*a_op_spin(j,False)*a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
+                    Ed_ket = generalized_propagate_state([a_op_spin(i,True)*a_op_spin(j,True)*a_op_spin(i,False)*a_op_spin(j,False)], self.wf.ci_coeffs, *self.index_info)
+                    val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
+                    val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+                    V[idx + idx_shift_q, :] += mo2e_trans[:, i, j, j, i] * val * .5
 
                 for p in range(self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
                     for q in range(self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
-                        pass
                         # 2e contribution to the G part of the property gradient:
-                        # E_ket = generalized_propagate_state([a_op_spin(i,True)*a_op_spin(p,True)*a_op_spin(q,False)*a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
-                        # Ed_ket = generalized_propagate_state([a_op_spin(i,True)*a_op_spin(q,True)*a_op_spin(p,False)*a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
-                        # val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                        # val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
-                        # V[idx + idx_shift_q, :] += mo2e_trans[:, i, i, p, q] * val * .5
-                        # E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(i,True)*a_op_spin(i,False)*a_op_spin(q,False)], self.wf.ci_coeffs, *self.index_info)
-                        # Ed_ket = generalized_propagate_state([a_op_spin(q,True)*a_op_spin(i,True)*a_op_spin(i,False)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
-                        # val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                        # val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
-                        # V[idx + idx_shift_q, :] += mo2e_trans[:, p, q, i, i] * val * .5
-                        # E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(i,True)*a_op_spin(q,False)*a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
-                        # Ed_ket = generalized_propagate_state([a_op_spin(i,True)*a_op_spin(q,True)*a_op_spin(p,False)*a_op_spin(q,False)], self.wf.ci_coeffs, *self.index_info)
-                        # val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                        # val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
-                        # V[idx + idx_shift_q, :] += mo2e_trans[:, p, i, i, q] * val * .5
-                        # E_ket = generalized_propagate_state([a_op_spin(i,True)*a_op_spin(q,True)*a_op_spin(i,False)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
-                        # Ed_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(i,True)*a_op_spin(q,False)*a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
-                        # val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                        # val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
-                        # V[idx + idx_shift_q, :] += mo2e_trans[:, i, p, q, i] * val * .5
+                        E_ket = generalized_propagate_state([a_op_spin(i,True)*a_op_spin(p,True)*a_op_spin(q,False)*a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
+                        Ed_ket = generalized_propagate_state([a_op_spin(i,True)*a_op_spin(q,True)*a_op_spin(p,False)*a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
+                        val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
+                        val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+                        V[idx + idx_shift_q, :] += mo2e_trans[:, i, i, p, q] * val * .5
+                        E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(i,True)*a_op_spin(i,False)*a_op_spin(q,False)], self.wf.ci_coeffs, *self.index_info)
+                        Ed_ket = generalized_propagate_state([a_op_spin(q,True)*a_op_spin(i,True)*a_op_spin(i,False)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
+                        val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
+                        val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+                        V[idx + idx_shift_q, :] += mo2e_trans[:, p, q, i, i] * val * .5
+                        E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(i,True)*a_op_spin(q,False)*a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
+                        Ed_ket = generalized_propagate_state([a_op_spin(i,True)*a_op_spin(q,True)*a_op_spin(i,False)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
+                        val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
+                        val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+                        V[idx + idx_shift_q, :] += mo2e_trans[:, p, i, i, q] * val * .5
+                        E_ket = generalized_propagate_state([a_op_spin(i,True)*a_op_spin(q,True)*a_op_spin(i,False)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
+                        Ed_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(i,True)*a_op_spin(q,False)*a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
+                        val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
+                        val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+                        V[idx + idx_shift_q, :] += mo2e_trans[:, i, p, q, i] * val * .5
 
             for p in range(self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
                 for q in range(self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
@@ -764,6 +762,18 @@ class LinearResponse(LinearResponseBaseClass):
 
                     for r in range(self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
                         for s in range(self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
+                            # 2e contribution to the G part of the property gradient:
+                            E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(r,True)*a_op_spin(s,False)*a_op_spin(q,False)], self.wf.ci_coeffs, *self.index_info)
+                            Ed_ket = generalized_propagate_state([a_op_spin(q,True)*a_op_spin(s,True)*a_op_spin(r,False)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
+                            val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
+                            val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+                            V[idx + idx_shift_q, :] += mo2e_trans[:, p, q, r, s] * val * .5
+
+            # Naive
+            for p in range(self.wf.num_spin_orbs_NES, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
+                for q in range(self.wf.num_spin_orbs_NES, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
+                    for r in range(self.wf.num_spin_orbs_NES, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
+                        for s in range(self.wf.num_spin_orbs_NES, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
                             pass
                             # 2e contribution to the G part of the property gradient:
                             # E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(r,True)*a_op_spin(s,False)*a_op_spin(q,False)], self.wf.ci_coeffs, *self.index_info)
@@ -771,19 +781,6 @@ class LinearResponse(LinearResponseBaseClass):
                             # val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
                             # val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
                             # V[idx + idx_shift_q, :] += mo2e_trans[:, p, q, r, s] * val * .5
-
-            # Naive
-            for p in range(self.wf.num_spin_orbs_NES, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
-                for q in range(self.wf.num_spin_orbs_NES, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
-                    for r in range(self.wf.num_spin_orbs_NES, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
-                        for s in range(self.wf.num_spin_orbs_NES, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
-                            #pass
-                            # 2e contribution to the G part of the property gradient:
-                            E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(r,True)*a_op_spin(s,False)*a_op_spin(q,False)], self.wf.ci_coeffs, *self.index_info)
-                            Ed_ket = generalized_propagate_state([a_op_spin(q,True)*a_op_spin(s,True)*a_op_spin(r,False)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
-                            val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                            val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
-                            V[idx + idx_shift_q, :] += mo2e_trans[:, p, q, r, s] * val * .5
 
         # Determine hermiticity per component to set correct sign of lower block
         lower_V = np.zeros_like(V)
@@ -1308,81 +1305,42 @@ class LinearResponse(LinearResponseBaseClass):
         else:
             prop_grads_B =  self.get_property_gradient_4comp(h_B)
 
-        # Missing!
+        # Also screening in the metric:
         def solve_lr_drop_sigma_null(H, sigma, prop_grads1=None, prop_grads2=None, cut=self.thresh_m):
-            """
-            H: Hessian
-            sigma: metric / overlap-like matrix
-            prop_grads: optional list or array of RHS vectors (or dict of them)
-
-            Returns:
-                w, v, s, keep, (and projected prop_grads if given)
-            """
-
-            # 1) Hermitize
             Hh = 0.5 * (H + H.conj().T)
             Sh = 0.5 * (sigma + sigma.conj().T)
 
-            # 2) eigen-decompose metric
             s, U = la.eigh(Sh)
+            scale = np.max(np.abs(s))
 
-            # 3) select non-null subspace
-            keep = np.abs(s) > cut * np.max(np.abs(s))
-            Uk = U[:, keep]
+            if scale == 0:
+                raise ValueError("Metric sigma is identically zero.")
 
-            # 4) project operators
+            Uk = U[:, np.abs(s) > cut * scale]
+
             Hk = Uk.conj().T @ Hh @ Uk
             Sk = Uk.conj().T @ Sh @ Uk
 
-            # 5) project property gradients (THIS WAS MISSING)
             prop_grads_k1 = None
             if prop_grads1 is not None:
+                prop_grads_k1 = np.einsum(
+                    "ji,ajk->aik",
+                    Uk.conj(),
+                    np.asarray(prop_grads1),
+                    optimize=True,
+                )
 
-                # case 1: single vector
-                if isinstance(prop_grads1, np.ndarray) and prop_grads1.ndim == 1:
-                    prop_grads_k1 = Uk.conj().T @ prop_grads1
-
-                # case 2: list of vectors
-                elif isinstance(prop_grads1, (list, tuple)):
-                    prop_grads_k1 = [Uk.conj().T @ g for g in prop_grads1]
-
-                # case 3: stacked array (n_props, n_dim)
-                elif isinstance(prop_grads1, np.ndarray) and prop_grads1.ndim == 2:
-                    prop_grads_k1 = np.array([Uk.conj().T @ g for g in prop_grads1])
-
-                else:
-                    raise ValueError("Unsupported prop_grads format")
-                
-            # 5) project property gradients
             prop_grads_k2 = None
             if prop_grads2 is not None:
-
-                # case 1: single vector
-                if isinstance(prop_grads2, np.ndarray) and prop_grads2.ndim == 1:
-                    prop_grads_k2 = Uk.conj().T @ prop_grads2
-
-                # case 2: list of vectors
-                elif isinstance(prop_grads2, (list, tuple)):
-                    prop_grads_k2 = [Uk.conj().T @ g for g in prop_grads2]
-
-                # case 3: stacked array (n_props, n_dim)
-                elif isinstance(prop_grads2, np.ndarray) and prop_grads2.ndim == 2:
-                    prop_grads_k2 = np.array([Uk.conj().T @ g for g in prop_grads2])
-
-                else:
-                    raise ValueError("Unsupported prop_grads format")
-
-            # 6) solve reduced generalized eigenproblem
-            w, y = la.eig(Hk, Sk)
-
-            # 7) backtransform eigenvectors
-            v = Uk @ y
+                prop_grads_k2 = Uk.conj().T @ np.asarray(prop_grads2)
 
             return Hk, Sk, prop_grads_k1, prop_grads_k2
 
+        #H_T, S_T, prop_grads_m_T, prop_grads_B_T = solve_lr_drop_sigma_null(self.hessian, self.metric, prop_grads_m, prop_grads_B)
 
         # Solving for responses:
         response_B  = solve(self.hessian, prop_grads_B)
+        #response_B_T = solve(H_T, prop_grads_B_T)
 
         # Calculating linear response contribution:
         sc_resp = np.zeros((natm, 3, 3))

@@ -41,9 +41,9 @@ class LinearResponseBaseClass:
         self,
         wave_function: GeneralizedWaveFunctionUPS, #Anna har fjernet WaveFunctionUCC + ændret til at alt løber over spin orbitaler
         excitations: str,
-        screen: bool = True,
-        thresh_A: float = 1e-6,
-        thresh_m: float = 1e-6,
+        screen: bool,
+        thresh_A: float,
+        thresh_m: float,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
@@ -186,9 +186,11 @@ class LinearResponseBaseClass:
         #     #raise ValueError("Negative eigenvalue in Hessian.")
         
         print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}")
-                
-        eigval, eigvec, sigma_eigs, keep = solve_lr_drop_sigma_null(self.hessian, self.metric, cut=self.thresh_m)
 
+        eigval, eigvec = la.eig(self.hessian, self.metric) 
+
+        # Extra screening in the metric:        
+        #eigval, eigvec, sigma_eigs, keep = solve_lr_drop_sigma_null(self.hessian, self.metric, cut=self.thresh_m)
    
         sorting = np.argsort(np.real(eigval.real)) #AE added np.real
         tmp = eigval[sorting][size:]
@@ -236,8 +238,6 @@ class LinearResponseBaseClass:
         Returns:
             Norm of excited states.
         """
-
-
         norms = np.zeros(len(self.response_vectors[0]),dtype=complex) #AE complex
         for state_number in range(len(self.response_vectors[0])):
             # Get Z_q Z_G Y_q and Y_G matrices

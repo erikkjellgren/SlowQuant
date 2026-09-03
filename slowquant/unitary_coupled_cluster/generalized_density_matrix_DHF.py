@@ -909,7 +909,6 @@ def get_orbital_gradient_response_real_imag(
     """
     gradient_r = np.zeros(len(kappa_idx), dtype=np.complex128)
     gradient_i = np.zeros(len(kappa_idx), dtype=np.complex128)
-    shift=len(kappa_idx)
     for idx, (M, N) in enumerate(kappa_idx):
         # 1e contribution
         for P in range(num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
@@ -1554,6 +1553,7 @@ def get_orbital_response_static_property_gradient_DHF_RMB_GIAO(
             prop_grad[idx, :] += mo1[:, N, P] * RDM1(M, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             prop_grad[idx, :] -= mo1[:, P, M] * RDM1(P, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
 
+            # Optimize this? It is in the same approach as the Hessian!!
             for Q in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
                 for R in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
                     prop_grad2[idx, :] += mo2[:, N, P, Q, R] * RDM2(M, P, Q, R, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
@@ -1734,7 +1734,7 @@ def get_e0(rdm1, rdm2, num_inactive_spin_orbs, num_active_spin_orbs, S_int):
     Z = get_Sz(rdm1, num_inactive_spin_orbs, num_active_spin_orbs, S_int)
     return np.sqrt(X**2 + Y**2 + Z**2)
 
-#@nb.jit(nopython=True)
+@nb.jit(nopython=True)
 def get_exp_val_RMB_GIAO(rdm1, num_spin_orbs_NES, num_inactive_spin_orbs, num_active_spin_orbs, mo, natm):
     dia = np.zeros((natm, 3, 3), dtype=np.complex128)
 
