@@ -194,12 +194,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-10, maxiter = 1000)
 
     # Save WF:
-    np.savez(
-        "HF-6-31g_pp",
-        c_mo=WF.c_mo,
-        thetas_real=WF.thetas_real,
-        thetas_imag=WF.thetas_imag
-        )
+    # np.savez(
+    #     "HF-6-31g_pp",
+    #     c_mo=WF.c_mo,
+    #     thetas_real=WF.thetas_real,
+    #     thetas_imag=WF.thetas_imag
+    #     )
 
     LR = generalized_naive_DHF.LinearResponse(WF, excitations="SD", screen = True)
     LR.calc_excitation_energies()
@@ -346,15 +346,15 @@ def HF():
     #basis = "631-g"
     dyall_v2z = bse.get_basis('dyall-v2z', elements=['H', 'F'], fmt='nwchem')
     #J_631g = bse.get_basis('6-31g-J', elements=['H', 'F'], fmt='nwchem')
-    #basis = "sto-3g"
+    basis = "sto-3g"
     #basis = dyall_v2z
     #basis= J_631g
     #basis = "aug-cc-pvtz-J"
     L_atom = bse.get_basis('6-311g**', elements=['F'], fmt='nwchem')
-    basis={
-        'H': '6-311g**',
-        'F': L_atom,
-    }
+    # basis={
+    #     'H': '6-311g**',
+    #     'F': L_atom,
+    # }
     active_space = ((2, 2), 6)
     #active_space = ((5, 5), 10)
     #active_space = ((1,1), 4)

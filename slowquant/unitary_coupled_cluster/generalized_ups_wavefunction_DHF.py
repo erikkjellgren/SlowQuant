@@ -1493,20 +1493,31 @@ class GeneralizedWaveFunctionUPS:
                 angle_bound = np.pi / 500
                 bounds_ep = [(-angle_bound, angle_bound) for _ in range(2 * len(self.kappa_spin_idx_ep))]
 
+                
                 optimizer = Optimizers(
                     energy_ep,
-                    "trust-constr",
-                    #optimizer_name,
+                    optimizer_name,
                     grad=gradient_ep,
                     maxiter=maxiter,
                     tol=tol,
                     is_silent=is_silent_subiterations,
                     energy_eval_callback=lambda: self.num_energy_evals,
-                    maxls = 100,
-                    maxcor = 10,
-                    bounds=bounds_ep,
-                    gtol = 1e-6,
-                            )
+                )
+
+                # optimizer = Optimizers(
+                #     energy_ep,
+                #     "trust-constr",
+                #     #optimizer_name,
+                #     grad=gradient_ep,
+                #     maxiter=maxiter,
+                #     tol=tol,
+                #     is_silent=is_silent_subiterations,
+                #     energy_eval_callback=lambda: self.num_energy_evals,
+                #     maxls = 100,
+                #     maxcor = 10,
+                #     bounds=bounds_ep,
+                #     gtol = 1e-6,
+                #             )
 
                 self._old_opt_parameters = np.zeros(2 * len(self.kappa_spin_idx_ep), dtype=np.float64) + 10**20
                 self._E_opt_old = 0.0
