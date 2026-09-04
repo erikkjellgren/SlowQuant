@@ -6,6 +6,7 @@ import pyscf
 from slowquant.SlowQuant import SlowQuant
 from pyscf import lib
 c = lib.param.LIGHT_SPEED
+from pyscf.prop.ssc.dhf import sa01sa01_integral
 
 
 class IntegralManager:
@@ -23,6 +24,9 @@ class IntegralManager:
         "_h_Bm_RMB_GIAO",
         "_S_B",
         "_g_B",
+        "_S_m",
+        "_h_m_RMB",
+        "_h_m_RMB",
     )
 
     def __init__(self, integral_obj: SlowQuant | pyscf.gto.mole.Mole) -> None:
@@ -44,6 +48,9 @@ class IntegralManager:
         self._h_Bm_RMB_GIAO: np.ndarray | None = None
         self._S_B: np.ndarray | None = None
         self._g_B: np.ndarray | None = None
+        self._S_m: np.ndarray | None = None
+        self._h_mm_RMB: np.ndarray | None = None
+        self._h_m_RMB: np.ndarray | None = None
 
     @property
     def num_elec(self) -> int:
@@ -374,3 +381,84 @@ class IntegralManager:
             raise ValueError(f"Got unknown integral object, {type(self.int_obj)}")
         self._g_B = g_B
         return g_B
+
+    @property
+    def S_m(self) -> np.ndarray:
+        """S_B integral in AO."""
+        if isinstance(self._S_m, np.ndarray):
+            return self._S_m
+        elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
+            natm = self.int_obj.natm
+            n2c = self.int_obj.nao_2c()
+            n4c = n2c * 2
+            S_m = np.zeros((natm, 3, n4c, n4c), dtype=complex)
+
+            for I in range(natm):
+                self.int_obj.set_rinv_origin(self.int_obj.atom_coord(I))
+                a01int = self.int_obj.intor('int1e_sa01sp_spinor', 3)
+
+                tm = a01int[I] + a01int[I].conj().T
+
+                S_m[I][n2c:, n2c:] = tm * (.25/c**2)  # sign? and complex conjugate contribution? factors?
+
+        else:
+            raise ValueError(f"Got unknown integral object, {type(self.int_obj)}")
+        self._S_m = S_m
+        return S_m
+
+    @property
+    def h_m_RMB(self) -> np.ndarray:
+        """h_m integral in AO."""
+        if isinstance(self._h_m_RMB, np.ndarray):
+            return self._h_m_RMB
+        elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
+            n2c = self.int_obj.nao_2c()
+            n4c = n2c * 2
+            natm = self.int_obj.natm
+
+            h_m = np.zeros((natm, 3, n4c, n4c), dtype=complex)
+
+            for I in range(natm):
+                self.int_obj.set_rinv_origin(self.int_obj.atom_coord(I))
+                t01 = self.int_obj.intor('int1e_sa01sp_spinor', 3)  #TRUE
+
+                for m in range(3):
+                    h_m[I, m, :n2c, n2c:] = 0.5 * t01[m]
+                    h_m[I, m, n2c:, :n2c] = 0.5 * t01[m].conj().T
+        else:
+            raise ValueError(f"Got unknown integral object, {type(self.int_obj)}")
+        self._h_m_RMB = h_m
+        return h_m
+
+    @property
+    def h_mm_RMB(self) -> np.ndarray:
+        """h_Bm RMB GIAO integral in AO."""
+        if isinstance(self._h_mm_RMB, np.ndarray):
+            return self._h_mm_RMB
+        elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
+            n2c = self.int_obj.nao_2c()
+            n4c = n2c * 2
+            natm = self.int_obj.natm
+
+            h_mm = np.zeros((natm, natm, 3, 3, n4c, n4c), dtype=np.complex128)
+
+            for I in range(natm):
+                for J in range(I, natm):
+                    orig1 = self.int_obj.atom_coord(I)
+                    orig2 = self.int_obj.atom_coord(J)
+                    a01a01 = sa01sa01_integral(self.int_obj, orig1, orig2)  # (3, 3, n2c, n2c)
+
+                    block = np.zeros((3, 3, n4c, n4c), dtype=np.complex128)
+                    block[:, :, n2c:, :n2c] =  0.5 * a01a01
+                    block[:, :, :n2c, n2c:] =  0.5 * a01a01.conj().transpose(0, 1, 3, 2)
+
+                    h_mm[I, J] = block
+                    h_mm[J, I] = block  # symmetric
+
+        else:
+            raise ValueError(f"Got unknown integral object, {type(self.int_obj)}")
+        self._h_mm_RMB = h_mm
+        return h_mm
+
+
+    
