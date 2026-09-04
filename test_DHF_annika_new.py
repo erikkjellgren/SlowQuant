@@ -347,10 +347,14 @@ def HF():
     #basis = "631-g"
     dyall_v2z = bse.get_basis('dyall-v2z', elements=['H', 'F'], fmt='nwchem')
     #J_631g = bse.get_basis('6-31g-J', elements=['H', 'F'], fmt='nwchem')
-    basis = "sto-3g"
+    #basis = "sto-3g"
     #basis = dyall_v2z
     #basis= J_631g
     #basis = "aug-cc-pvtz-J"
+    basis={
+        'H': '6-311g**',
+        'F': '6-311g**',
+    }
     active_space = ((2, 2), 6)
     #active_space = ((5, 5), 10)
     #active_space = ((1,1), 4)
@@ -386,8 +390,13 @@ def HI():
     geometry = """H  0.0   0.0  0.0;
         I  0.0  0.0  1.60916 """
     #basis = "dyall-v2z"
-    basis = "sto-3g"
-    active_space = ((27,27), 54)
+    #basis = "sto-3g"
+    basis={
+        'H': '6-311g**',
+        'I': '6-311g**',
+    }
+    active_space = ((2, 2), 6)
+    #active_space = ((27,27), 54)
     charge = 0
     spin = 0
     NR(
@@ -398,8 +407,13 @@ def HBr():
     geometry = """H  0.0   0.0  0.0;
         Br  0.0  0.0  1.41443 """
     #basis = "dyall-v2z"
-    basis = "sto-3g"
-    active_space = ((18,18), 36)
+    #basis = "sto-3g"
+    basis={
+        'H': '6-311g**',
+        'Br': '6-311g**',
+    }
+    active_space = ((2, 2), 6)
+    #active_space = ((18,18), 36)
     charge = 0
     spin = 0
     NR(
@@ -410,9 +424,13 @@ def HCl():
     geometry = """H  0.0   0.0  0.0;
                   Cl  0.0  0.0  1.41443 """  # 1.41443
     #basis = "dyall-v2z"
-    basis = "sto-3g"
-    #active_space = ((2,2), 6)
-    active_space = ((9,9), 18)
+    #basis = "sto-3g"
+    basis={
+        'H': '6-311g**',
+        'Cl': '6-311g**',
+    }
+    active_space = ((2, 2), 6)
+    #active_space = ((9,9), 18)
     #active_space = ((),)
     charge = 0
     spin = 0
