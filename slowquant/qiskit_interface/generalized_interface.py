@@ -137,7 +137,6 @@ class QuantumInterface:
         unocc_spin_idx,
         num_spin_orbs: int,
         num_elec: tuple[int, int],
-        do_generalized: bool = False,
     ) -> None:
         """Construct qiskit circuit.
 
@@ -1088,7 +1087,7 @@ class QuantumInterface:
                         self._apply_M_mitigation(distr_raw, run_circuit, circuit_M)
 
                 if self.mitigation_flags.do_postselection:  # apply post-selection if requested
-                    self._apply_postselection(distr_raw, head_mit)
+                    self._apply_postselection(distr_raw, head_mit, self.ansatz_options)
 
                 # save mitigated results
                 self.saver[det_int].update_distr(head_mit, distr_raw, self.mitigation_flags)
@@ -1294,7 +1293,7 @@ class QuantumInterface:
             for i, dist in enumerate(distr):
                 distr[i] = correct_distribution(dist, Minv)
 
-    def _apply_postselection(self, distr: list[dict[int, float]], heads: list[str]) -> None:
+    def _apply_postselection(self, distr: list[dict[int, float]], heads: list[str], ansatz_options) -> None:
         """Apply post-selection to the distributions.
 
         Args:
@@ -1304,7 +1303,7 @@ class QuantumInterface:
         for i, (dist, head) in enumerate(zip(distr, heads)):
             if "X" not in head and "Y" not in head:
                 distr[i] = postselection(
-                    dist, self.mapper, self.num_elec, self.num_qubits, self.do_generalized
+                    dist, self.mapper, self.num_elec, self.num_qubits, self.ansatz_options
                 )
 
     def _one_call_sampler_distributions(
