@@ -350,9 +350,10 @@ def HF():
     #basis = dyall_v2z
     #basis= J_631g
     #basis = "aug-cc-pvtz-J"
+    L_atom = bse.get_basis('6-311g**', elements=['F'], fmt='nwchem')
     basis={
-        'H': '6-31g**',
-        'F': '6-31g**',
+        'H': '6-311g**',
+        'F': L_atom,
     }
     active_space = ((2, 2), 6)
     #active_space = ((5, 5), 10)
@@ -390,9 +391,10 @@ def HI():
         I  0.0  0.0  1.60916 """
     #basis = "dyall-v2z"
     #basis = "sto-3g"
+    L_atom = bse.get_basis('6-311g**', elements=['I'], fmt='nwchem')
     basis={
-        'H': '6-31g**',
-        'I': '6-31g**',
+        'H': '6-311g**',
+        'F': L_atom,
     }
     active_space = ((2, 2), 6)
     #active_space = ((27,27), 54)
@@ -407,9 +409,10 @@ def HBr():
         Br  0.0  0.0  1.41443 """
     #basis = "dyall-v2z"
     #basis = "sto-3g"
+    L_atom = bse.get_basis('6-311g**', elements=['Br'], fmt='nwchem')
     basis={
-        'H': '6-31g**',
-        'Br': '6-31g**',
+        'H': '6-311g**',
+        'F': L_atom,
     }
     active_space = ((2, 2), 6)
     #active_space = ((18,18), 36)
@@ -424,9 +427,10 @@ def HCl():
                   Cl  0.0  0.0  1.41443 """  # 1.41443
     #basis = "dyall-v2z"
     #basis = "sto-3g"
+    L_atom = bse.get_basis('6-311g**', elements=['Cl'], fmt='nwchem')
     basis={
-        'H': '6-31g**',
-        'Cl': '6-31g**',
+        'H': '6-311g**',
+        'F': L_atom,
     }
     active_space = ((2, 2), 6)
     #active_space = ((9,9), 18)
