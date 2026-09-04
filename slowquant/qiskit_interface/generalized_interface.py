@@ -22,7 +22,7 @@ from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
-from slowquant.qiskit_interface.generalized_custom_ansatz import SDSfUCC, fUCC, tUPS
+from slowquant.qiskit_interface.generalized_custom_ansatz import SDSfUCC, fUCC, gtUPS, tUPS
 from slowquant.qiskit_interface.util import (
     Clique,
     MitigationFlags,
@@ -91,6 +91,7 @@ class QuantumInterface:
             "fUCC",
             "SDSfUCC",
             "HF",
+            "gtups"
         )
         if not isinstance(ansatz, QuantumCircuit) and ansatz not in allowed_ansatz:
             raise ValueError(
@@ -205,6 +206,8 @@ class QuantumInterface:
             self.circuit = QuantumCircuit(self.num_qubits)  # empty ansatz circuit
         elif self.ansatz == "tUPS":
             self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+        elif self.ansatz == "gtups":
+            self.circuit, self.grad_param_R_r, self.grad_param_R_phi = gtUPS(occ_spin_idx, unocc_spin_idx, num_spin_orbs, self.num_elec, self.mapper, self.ansatz_options)
         elif self.ansatz == "QNP":
             self.ansatz_options["do_qnp"] = True
             self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
