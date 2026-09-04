@@ -133,23 +133,23 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
     # WF object:
-    # WF = GeneralizedWaveFunctionUPS(
-    #     active_space,
-    #     C_MO,
-    #     mol, 
-    #     K_pairs,
-    #     False,
-    #     "fUCCSD",
-    #     {"n_layers": 0, "is_spin_conserving" : False},
-    #     include_active_kappa=True,
-    # )
+    WF = GeneralizedWaveFunctionUPS(
+        active_space,
+        C_MO,
+        mol, 
+        K_pairs,
+        False,
+        "fUCCSD",
+        {"n_layers": 1, "is_spin_conserving" : False},
+        include_active_kappa=True,
+    )
 
-    # np.random.seed(20)
-    # if len(WF.thetas) > 0:
-    #     real = np.random.uniform(-0.05,0.05,len(WF.thetas_real))
-    #     #imag = np.zeros_like(WF.thetas_imag)
-    #     imag = np.random.uniform(-0.05,0.05,len(WF.thetas_real))
-    #     WF.set_thetas(real, imag)
+    np.random.seed(20)
+    if len(WF.thetas) > 0:
+        real = np.random.uniform(-0.05,0.05,len(WF.thetas_real))
+        #imag = np.zeros_like(WF.thetas_imag)
+        imag = np.random.uniform(-0.05,0.05,len(WF.thetas_real))
+        WF.set_thetas(real, imag)
 
 
     # data = np.load("LiH((1,1),4).npz") 
@@ -157,21 +157,21 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # data = np.load("LiH((2,2),6).npz") 
     # data = np.load("HF((1,1),4).npz")
     # data = np.load("H2-6-31g-J((1,1),4).npz")
-    data = np.load("HF((2,2),6).npz")
+    # data = np.load("HF((2,2),6).npz")
     # data = np.load("H2-dyallv2z((1,1),6).npz")
 
-    WF = GeneralizedWaveFunctionUPS(
-        active_space,
-        data["c_mo"],
-        #C_MO,
-        mol,
-        K_pairs,
-        False,
-        "fUCCSD",
-        {"n_layers": 1, "is_spin_conserving" : False},
-        include_active_kappa=True,
-    )
-    WF.set_thetas(data["thetas_real"], data["thetas_imag"])
+    # WF = GeneralizedWaveFunctionUPS(
+    #     active_space,
+    #     data["c_mo"],
+    #     #C_MO,
+    #     mol,
+    #     K_pairs,
+    #     False,
+    #     "fUCCSD",
+    #     {"n_layers": 1, "is_spin_conserving" : False},
+    #     include_active_kappa=True,
+    # )
+    # WF.set_thetas(data["thetas_real"], data["thetas_imag"])
 
 
     print("DHF", mf.energy_elec()[0])
@@ -191,16 +191,15 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
     #Optimization:
-    #WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-12, maxiter = 1000)
+    WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-10, maxiter = 1000)
 
     # Save WF:
-    # np.savez(
-    #     "H2-6-311g_pp_ss-J((1,1),6)",
-    #     #"H2-6-31g-J((1,1),4)",
-    #     c_mo=WF.c_mo,
-    #     thetas_real=WF.thetas_real,
-    #     thetas_imag=WF.thetas_imag
-    #     )
+    np.savez(
+        "HF-6-31g_pp",
+        c_mo=WF.c_mo,
+        thetas_real=WF.thetas_real,
+        thetas_imag=WF.thetas_imag
+        )
 
     LR = generalized_naive_DHF.LinearResponse(WF, excitations="SD", screen = True)
     LR.calc_excitation_energies()
@@ -352,8 +351,8 @@ def HF():
     #basis= J_631g
     #basis = "aug-cc-pvtz-J"
     basis={
-        'H': '6-311g**',
-        'F': '6-311g**',
+        'H': '6-31g**',
+        'F': '6-31g**',
     }
     active_space = ((2, 2), 6)
     #active_space = ((5, 5), 10)
@@ -392,8 +391,8 @@ def HI():
     #basis = "dyall-v2z"
     #basis = "sto-3g"
     basis={
-        'H': '6-311g**',
-        'I': '6-311g**',
+        'H': '6-31g**',
+        'I': '6-31g**',
     }
     active_space = ((2, 2), 6)
     #active_space = ((27,27), 54)
@@ -409,8 +408,8 @@ def HBr():
     #basis = "dyall-v2z"
     #basis = "sto-3g"
     basis={
-        'H': '6-311g**',
-        'Br': '6-311g**',
+        'H': '6-31g**',
+        'Br': '6-31g**',
     }
     active_space = ((2, 2), 6)
     #active_space = ((18,18), 36)
@@ -426,8 +425,8 @@ def HCl():
     #basis = "dyall-v2z"
     #basis = "sto-3g"
     basis={
-        'H': '6-311g**',
-        'Cl': '6-311g**',
+        'H': '6-31g**',
+        'Cl': '6-31g**',
     }
     active_space = ((2, 2), 6)
     #active_space = ((9,9), 18)
