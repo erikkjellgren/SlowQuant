@@ -197,9 +197,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # np.savez(
     #     "H2-6-311g_pp_ss-J((1,1),6)",
     #     #"H2-6-31g-J((1,1),4)",
-    #     c_mo=WF2.c_mo,
-    #     thetas_real=WF2.thetas_real,
-    #     thetas_imag=WF2.thetas_imag
+    #     c_mo=WF.c_mo,
+    #     thetas_real=WF.thetas_real,
+    #     thetas_imag=WF.thetas_imag
     #     )
 
     LR = generalized_naive_DHF.LinearResponse(WF, excitations="SD", screen = True)

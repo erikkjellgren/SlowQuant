@@ -26,7 +26,7 @@ class IntegralManager:
         "_g_B",
         "_S_m",
         "_h_m_RMB",
-        "_h_m_RMB",
+        "_h_mm_RMB",
     )
 
     def __init__(self, integral_obj: SlowQuant | pyscf.gto.mole.Mole) -> None:
