@@ -215,12 +215,13 @@ def HF():
     #basis = "631-g"
     dyall_v2z = bse.get_basis('dyall-v2z', elements=['H', 'F'], fmt='nwchem')
     J_631g = bse.get_basis('6-31g-J', elements=['H'], fmt='nwchem')
+    sap = bse.get_basis('sapporo-DZP', elements=['F'], fmt='nwchem')
     basis={
-        'H': J_631g,
-        'F': '3-21g',
+        'H': '6-31g**',
+        'F': '6-31g**',
     }
     #basis = "sto-3g"
-    #basis = dyall_v2z
+    basis = dyall_v2z
     #basis= J_631g
     #basis = "aug-cc-pvtz-J"
     #active_space = ((2, 2), 6)
@@ -257,13 +258,14 @@ def H2O():
 def HI():
     geometry = """H  0.0   0.0  0.0;
         I  0.0  0.0  1.60916 """
-    #basis = "dyall-v2z"
+    basis = "dyall-v2z"
     #basis = "sto-3g"
     J_631g = bse.get_basis('6-31g-J', elements=['H'], fmt='nwchem')
-    basis={
-        'H': J_631g,
-        'I': '3-21g',
-    }
+    sap = bse.get_basis('sapporo-DZP', elements=['I'], fmt='nwchem')
+    # basis={
+    #     'H': '6-31g**',
+    #     'I': sap,
+    # }
     active_space = ((27,27), 54)
     charge = 0
     spin = 0
@@ -277,9 +279,10 @@ def HBr():
     #basis = "dyall-v2z"
     #basis = "sto-3g"
     J_631g = bse.get_basis('6-31g-J', elements=['H'], fmt='nwchem')
+    sap = bse.get_basis('6-31g**', elements=['Br'], fmt='nwchem')
     basis={
-        'H': J_631g,
-        'Br': '3-21g',
+        'H': '6-31g**',
+        'Br': sap,
     }
     active_space = ((18,18), 36)
     charge = 0
@@ -291,13 +294,14 @@ def HBr():
 def HCl():
     geometry = """H  0.0   0.0  0.0;
                   Cl  0.0  0.0  1.41443 """  # 1.41443
-    #basis = "dyall-v2z"
+    basis = "6-31g**"
     #basis = "sto-3g"
     J_631g = bse.get_basis('6-31g-J', elements=['H'], fmt='nwchem')
-    basis={
-        'H': J_631g,
-        'Cl': '3-21g',
-    }
+    sap = bse.get_basis('sapporo-DZP', elements=['Cl'], fmt='nwchem')
+    #basis={
+    #    'H': '6-31g**',
+    #    'Cl': sap,
+    #}
     #active_space = ((2,2), 6)
     active_space = ((9,9), 18)
     #active_space = ((),)
@@ -347,4 +351,4 @@ def N3():
 
 
 ###RUN SCRIPT###
-HI()
+HBr()

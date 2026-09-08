@@ -797,33 +797,26 @@ class LinearResponse(LinearResponseBaseClass):
 
 
     # Working functions for shieldings and coupling constants: 
-    def get_SSCC_4comp_iso(self, h1: np.ndarray, h2: np.ndarray) -> np.ndarray:
-        h1_int = np.zeros_like(h1)
-        natm = h1.shape[0]
-
-        for I in range(natm):
-            for a in range(3):
-                #h1_int[I, a] = DHF_one_electron_transform(self.wf.c_mo, h1[I, a])
-                h1_int[I, a] = h1[I, a]
-
-        test = True
+    def get_SSCC_4comp_iso(self, RMB = False, output = False) -> np.ndarray:
+        # Integrals:
+        h_m = self.wf.int_gen.h_m
+        natm = h_m.shape[0]
 
         # Property gradients and responses for all nuclei
-        # prop_grads = [self.get_property_gradient_4comp(h1_int[I]) for I in range(natm)]
-
-        # responses = [
-        #     np.linalg.pinv(E2, rcond=1e-6) @ prop_grads_eff[I]
-        #     for I in range(natm)
-        # ]
-
-        # responses  = [solve(E2_mat, prop_grads[I]) for I in range(natm)]
+        # Missing construction of Property gradient for RMB!!
+        prop_grads = [self.get_property_gradient_4comp(h_m[I]) for I in range(natm)]
 
         nuc_mag = 0.5 * (nist.E_MASS / nist.PROTON_MASS)
         au2Hz   = nist.HARTREE2J / nist.PLANCK
 
-        if test == True:
+        responses  = [solve(self.hessian, prop_grads[I]) for I in range(natm)]
+
+        if RMB:
+            # Integrals:
+            h_mm = self.wf.int_gen.h_mm_RMB
+
             # AO -> MO transformation of the integrals needed for the diamagnetic contribution: 
-            natm = h2.shape[0]
+            natm = h_mm.shape[0]
 
             size_mo = (
                 self.wf.num_spin_orbs_NES +
@@ -840,7 +833,7 @@ class LinearResponse(LinearResponseBaseClass):
                     nuc_pair.append((I, J))
                     for a in range(3):
                         for b in range(3):
-                            ao = h2[I, J, a, b]
+                            ao = h_mm[I, J, a, b]
 
                             mo[I, J, a, b] = mo[J, I, a, b] = DHF_one_electron_transform(
                                 self.wf.c_mo,
@@ -848,7 +841,9 @@ class LinearResponse(LinearResponseBaseClass):
                             )
 
             # Making the diamagnetic contribution: 
-            ssc_dia = np.zeros((natm, natm, 3, 3), dtype=complex)
+            sscc_exp = np.zeros((natm, natm, 3, 3), dtype=complex)
+
+            # Missing UMO to OMO integral transformation!
    
             for k, (I, J) in enumerate(nuc_pair):
                 for x in range(3):
@@ -856,7 +851,7 @@ class LinearResponse(LinearResponseBaseClass):
 
                         val = 0.0 + 0.0j
 
-                        for i in range(size_mo):
+                        for i in range(self.wf.num_spin_orbs_NES, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
                             for j in range(size_mo):
 
                                 val += (
@@ -864,32 +859,26 @@ class LinearResponse(LinearResponseBaseClass):
                                     *RDM1(i, j, self.wf.num_spin_orbs_NES, self.wf.num_inactive_spin_orbs, self.wf.num_active_spin_orbs, self.wf.rdm1)
                                 )
 
-                        ssc_dia[I, J, x, y] = ssc_dia[J, I, x, y] = val
+                        sscc_exp[I, J, x, y] = sscc_exp[J, I, x, y] = val
 
             # Making the paramagnetic contribution:
-            ssc_para = np.zeros((natm, natm, 3, 3), dtype=np.complex128)
+            sscc_resp = np.zeros((natm, natm, 3, 3), dtype=np.complex128)
 
             for k, (I, J) in enumerate(nuc_pair):
                 for alpha in range(3):
                     for beta in range(3):
-                        ssc_para[I, J, alpha, beta] = ssc_para[J, I, alpha, beta] = np.einsum('i,i->',
-                                    -prop_grads_eff[I][:, alpha].conj(), responses[J][:, beta]).real
+                        sscc_resp[I, J, alpha, beta] = sscc_resp[J, I, alpha, beta] = np.einsum('i,i->',
+                                    -prop_grads[I][:, alpha].conj(), responses[J][:, beta]).real
                         
             # Factors:
-            ssc_dia *= nist.ALPHA**4
-            ssc_para *= nist.ALPHA**4
+            sscc_exp *= nist.ALPHA**4
+            sscc_resp *= nist.ALPHA**4
 
             ktensor = np.zeros((natm, natm))
 
             for k, (I, J) in enumerate(nuc_pair):
-                ktensor[I, J] = ktensor[J, I] = au2Hz * nuc_mag ** 2 * np.trace(ssc_para[I, J] + ssc_dia[I, J]).real / 3 
-                #ktensor[I, J] = ktensor[J, I] = au2Hz * nuc_mag ** 2 * np.trace(ssc_para[I, J]).real / 3 
-
-                print("Diamagnetic contribution:")
-                print(np.round(ssc_dia[I,J].real, 10))
-                print("Paramagnetic contribution:")
-                print(np.round(ssc_para[I,J].real, 10))
-            
+                ktensor[I, J] = ktensor[J, I] = au2Hz * nuc_mag ** 2 * np.trace(sscc_resp[I, J] + sscc_exp[I, J]).real / 3 
+        
         else:
             iso_ssc  = []
             nuc_pair = []
@@ -922,7 +911,20 @@ class LinearResponse(LinearResponseBaseClass):
             for k, (i, j) in enumerate(nuc_pair):
                 ktensor[i, j] = ktensor[j, i] = iso_ssc[k]
 
-        return ktensor  # reduced K (Hz), (natm, natm)
+        if output:
+            with np.printoptions(precision=7, suppress=True, formatter={'float_kind': lambda x: f'{x:.7f}'}):
+                print("Response:")
+                print(sscc_resp.real)
+            if RMB:
+                with np.printoptions(precision=7, suppress=True, formatter={'float_kind': lambda x: f'{x:.7f}'}):
+                    print("Expectation value:")
+                    print(sscc_exp.real)
+
+        with np.printoptions(precision=7, suppress=True, formatter={'float_kind': lambda x: f'{x:.7f}'}):
+            print("Spin-spin coupling constants:")
+            print(ktensor)
+        
+        self.sscc = ktensor # reduced K (Hz), (natm, natm)
     
     def get_shieldings_4comp_iso(self, RMB_GIAO = True, output = False) -> np.ndarray:
         # Integrals:
@@ -1058,7 +1060,8 @@ class LinearResponse(LinearResponseBaseClass):
         sigma_iso = np.trace(sigma_tot.real, axis1=1, axis2=2) / 3
 
         with np.printoptions(precision=7, suppress=True, formatter={'float_kind': lambda x: f'{x:.7f}'}):
-            print("Shieldings:", sigma_iso)
+            print("Shieldings:")
+            print(sigma_iso)
 
         self.shieldings = sigma_iso
 

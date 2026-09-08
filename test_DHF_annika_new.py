@@ -59,7 +59,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     """.........."""
     print("active space:", {active_space})
     # PySCF
-    mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin, cart = False)
+    mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin, cart = False, nucmod='gaussian')
 
     hf.remove_overlap_zero_eigenvalue = False
     mf = scf.dhf.DHF(mol)
@@ -76,7 +76,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     sscobj.mb = "RMB"
     sscobj.verbose = 5
     sscobj.with_fcsd = True
-    #jj = sscobj.kernel()
+    jj = sscobj.kernel()
 
     # Shieldings PySCF:
     nmr = nmr_dhf.NMR(mf)
@@ -140,7 +140,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         K_pairs,
         False,
         "fUCCSD",
-        {"n_layers": 1, "is_spin_conserving" : False},
+        {"n_layers": 0, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
@@ -191,7 +191,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
     #Optimization:
-    WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-10, maxiter = 1000)
+    #WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-10, maxiter = 1000)
 
     # Save WF:
     # np.savez(
@@ -207,6 +207,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("PySCF:", sigma_iso)
 
     LR.get_shieldings_4comp_iso(RMB_GIAO = True, output = True)
+
+    LR.get_SSCC_4comp_iso()
 
 
 
@@ -228,17 +230,17 @@ def H2():
     # with open('dyall2zp_H.nwchem', 'w') as f:
     #     f.write(dyall_v2z)
     #     f.close()
-    basis = dyall_v2z
+    #basis = dyall_v2z
     #basis = dyall_cv2z
     #basis = "sto-3g"
     #basis = "sto-6g"
     #basis = "631-g"
     #basis = "6-311-g"
-    #basis = J_6_31g
+    basis = J_6_31g
     #basis = J_6_311g_pp_ss
     #active_space = ((1, 1), 8)
     #active_space = ((1, 1), 6)
-    active_space = ((1,1), 2)
+    active_space = ((1,1),2)
     #active_space = ((1,1),4)
     #active_space = (2, 4)
     charge = 0
@@ -350,13 +352,13 @@ def HF():
     #basis = dyall_v2z
     #basis= J_631g
     #basis = "aug-cc-pvtz-J"
-    L_atom = bse.get_basis('6-311g**', elements=['F'], fmt='nwchem')
+    L_atom = bse.get_basis('6-31g**', elements=['F'], fmt='nwchem')
     # basis={
-    #     'H': '6-311g**',
+    #     'H': '6-31g**',
     #     'F': L_atom,
     # }
-    active_space = ((2, 2), 6)
-    #active_space = ((5, 5), 10)
+    #active_space = ((2, 2), 6)
+    active_space = ((5, 5), 10)
     #active_space = ((1,1), 4)
     #active_space = ((5,5), 12)
     charge = 0
@@ -391,10 +393,10 @@ def HI():
         I  0.0  0.0  1.60916 """
     #basis = "dyall-v2z"
     #basis = "sto-3g"
-    L_atom = bse.get_basis('6-311g**', elements=['I'], fmt='nwchem')
+    L_atom = bse.get_basis('6-31g**', elements=['I'], fmt='nwchem')
     basis={
-        'H': '6-311g**',
-        'F': L_atom,
+        'H': '6-31g**',
+        'I': L_atom,
     }
     active_space = ((2, 2), 6)
     #active_space = ((27,27), 54)
@@ -409,13 +411,13 @@ def HBr():
         Br  0.0  0.0  1.41443 """
     #basis = "dyall-v2z"
     #basis = "sto-3g"
-    L_atom = bse.get_basis('6-311g**', elements=['Br'], fmt='nwchem')
+    L_atom = bse.get_basis('6-31g-J', elements=['H'], fmt='nwchem')
     basis={
-        'H': '6-311g**',
-        'F': L_atom,
+        'H': '6-31g',
+        'Br': '6-31g',
     }
-    active_space = ((2, 2), 6)
-    #active_space = ((18,18), 36)
+    #active_space = ((2, 2), 6)
+    active_space = ((18,18), 36)
     charge = 0
     spin = 0
     NR(
@@ -427,13 +429,13 @@ def HCl():
                   Cl  0.0  0.0  1.41443 """  # 1.41443
     #basis = "dyall-v2z"
     #basis = "sto-3g"
-    L_atom = bse.get_basis('6-311g**', elements=['Cl'], fmt='nwchem')
+    L_atom = bse.get_basis('pcj-2', elements=['H','Cl'], fmt='nwchem')
     basis={
-        'H': '6-311g**',
-        'F': L_atom,
+        'H':  L_atom,
+        'Cl': L_atom,
     }
-    active_space = ((2, 2), 6)
-    #active_space = ((9,9), 18)
+    #active_space = ((2, 2), 6)
+    active_space = ((9,9), 18)
     #active_space = ((),)
     charge = 0
     spin = 0
@@ -481,4 +483,4 @@ def N3():
 
 
 ###RUN SCRIPT###
-HF()
+HCl()
