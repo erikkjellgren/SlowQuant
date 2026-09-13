@@ -235,16 +235,42 @@ basis. For tUPS on CAS(2,2) that builds a spin-flip operator which annihilates t
 the energy comes back unchanged and *looks* fine. Phase 4 must not be judged by whether things
 run.
 
-### Phase 4 — `operator_state_algebra.py` ansatz branches
-- [ ] One helper converting a `UpsStructure`/`UccStructure` entry to blocked spin indices; call it
-      once per `exc_type` branch (collapses ~90 edits into ~14).
-- [ ] Apply D6 to the offset sites.
-- [ ] `get_determinant_expansion_from_operator_on_HF`: blocked HF string.
-- [ ] **Gate: state-vector test files green.**
+### Phase 4 — `operator_state_algebra.py` ansatz branches **and `util.py`**
 
-### Phase 5+6 — `util.py` iterators and the Qiskit interface *(one commit, per D7)*
-- [ ] `iterate_t1`–`t6` spin tests `a % 2 == 0` → `a < N`; `iterate_pair_t2*`; `create_tiled`
-      doubles; `create_SDSfUCC`.
+**Scope correction.** The plan had `util.py` in Phase 5, but its `iterate_t*` iterators are fed
+the index lists the wave function classes build, and Phase 3 made those blocked. A spin test of
+`a % 2 == 0` against a blocked index is simply wrong, so `util.py` had to move here. Phase 5 is
+now the Qiskit interface alone.
+
+- [x] `embed_spatial_indices` and `embed_spin_indices` in `operator_state_algebra.py` replace all
+      84 `+ offset` / `+ 2 * offset` sites (D6). The spin variant is where blocking actually bites:
+      α shifts by `offset`, β by `offset + (N_ext − N_act)`.
+- [x] `get_ucc_T` takes `ci_info` instead of a bare `offset`, since embedding now needs the width
+      of the target space as well as the offset.
+- [x] `G1(i*2, a*2)` / `G1(i*2+1, a*2+1)` in the spin-adapted singles branches become
+      `alpha_idx` / `beta_idx`; the 36 `G1_sa`/`G2_sa` calls gained `num_orbs`.
+- [x] `get_determinant_expansion_from_operator_on_HF` builds a blocked HF string.
+- [x] `util.py`: the 48 `% 2` spin tests become half-of-the-register tests; `iterate_t1`–`t6` take
+      `num_orbs`; the generalized variants derive it from `num_spin_orbs`; `iterate_pair_t2` and
+      `create_tiled`'s doubles emit blocked indices; `create_SDSfUCC`'s same-spin test and spatial
+      extraction converted.
+- [x] `UpsStructure` and `UccStructure` carry `num_active_orbs`. The excitation indices are only
+      interpretable together with the size of the space they were built over, which the structures
+      previously did not record.
+
+**Gate result: 20 passed, 25 failed.** All but two failures are `TypeError: G1_sa` from
+linear response (Phase 7) plus the known CH3 UHF flake. The exception is
+`test_ups_n2_fuccsdtq56`, which is discussed under "the invariance caveat" below.
+
+**Noted in passing, not fixed:** `create_SDSfUCC`'s `do_pD` branch labels a two-index excitation
+`"double"` where the analogous `do_GpD` branch uses `"sa_single"`; `"double"` unpacks four indices,
+so that path would raise. It is unreachable from the named ansätze. Filed separately.
+
+### Phase 5 — the Qiskit interface *(`util.py` moved to Phase 4)*
+- [ ] `circuit_wavefunction.py` and `sa_circuit_wavefunction.py` build their own interleaved index
+      lists; they must be converted the same way as Phase 3 did for the state-vector classes.
+- [ ] `get_determinant_expansion_from_operator_on_HF` now returns **blocked** determinant strings,
+      which `qiskit_interface/linear_response/{selfconsistent,statetransfer}.py` consume.
 - [ ] `f2q` → identity; `get_qiskit_form` remap → delete; `get_reordering_sign` at
       `interface.py:821` → drops out; `get_determinant_reference` → `qc.x(i)`.
 - [ ] `post_selection` is **unaffected** (endianness is a readout concern, already in Qiskit's frame).
@@ -276,9 +302,37 @@ D2/D3/D4 kernel rewrite, per-spin parity, factorized single-spin operator applic
 | θ parameter ordering drifts | 5+6 | Qiskit/state-vector mismatch | compare parameter name lists element-wise |
 | SA superposition relative signs | 3 | wrong SA energies only | apply reordering sign to coefficients |
 
-## 4. What must not change
+## 4. What must not change, and the invariance caveat
 
 Energies, excitation energies, oscillator strengths, RDMs and θ **values** are invariant under a
 relabeling of spin orbitals. CI coefficient vectors are **not** — they get permuted *and*
-individually sign-flipped. The existing suite asserts only invariants, which is what makes it a
-usable oracle.
+individually sign-flipped.
+
+**The caveat, found in Phase 4.** That invariance covers the *relabeling*. It does not cover the
+change in **iteration order** that comes with it. `iterate_t1`–`t6` walk the spin-index lists, and
+those lists went from α₀β₀α₁β₁… to α₀α₁…β₀β₁…, so the excitations come out in a different order.
+
+For a single exponential that is harmless — `WaveFunctionUCC` builds one `expm(T)`, T is a sum, and
+order does not matter. Every UCC energy test passes unchanged, through quadruples.
+
+For a **factorized** ansatz it is not harmless. fUCC is a product of exponentials of
+non-commuting generators, so reordering the factors changes the variational manifold itself.
+`test_ups_n2_fuccsdtq56` (N2/STO-3G, CAS(6,6), fUCC through sextuples, 399 parameters) converges
+to −131.1964192800081 instead of the recorded −131.1965135680605.
+
+Evidence that this is the reordering and not a bug:
+
+- The excitation **set** is unchanged. Dumping the fUCC S+D generators as (spatial, spin) pairs
+  from `master` and from this branch gives the same 26 excitations, same set, different order —
+  nothing lost, nothing spurious.
+- Repeated BFGS restarts converge to exactly −131.1964192800081, so it is a true stationary point,
+  not an unconverged one.
+- Both numbers sit **above** the CASCI limit for that space, −131.1966323482769, so neither
+  ordering spans the full CAS and an order-dependent result is expected.
+- tUPS, whose factor order is generated by `create_tiled` and is *unchanged* by the migration,
+  matches exactly.
+
+So the suite is a reliable oracle for everything except the variational minimum of a factorized
+ansatz whose factor order the migration changed. **Decision pending:** accept the new ordering and
+re-record that reference, or make the iterators reproduce the pre-migration factor order so
+previously published numbers stay reproducible.

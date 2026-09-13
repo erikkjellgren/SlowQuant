@@ -183,7 +183,7 @@ class WaveFunctionUCC:
         self._ci_coeffs = np.copy(self.csf_coeffs)
         # Construct UCC Structure
         self._excitations = excitations  # Needed for saving the wave function
-        self.ucc_layout = UccStructure()
+        self.ucc_layout = UccStructure(self.num_active_orbs)
         if "s" in excitations.lower():
             self.ucc_layout.add_sa_singles(self.active_occ_idx_shifted, self.active_unocc_idx_shifted)
         if "d" in excitations.lower():
@@ -1066,7 +1066,7 @@ class WaveFunctionUCC:
             E = self.ci_coeffs @ Hket
             theta_params = np.zeros_like(self.thetas)
             Tmat = build_operator_matrix(
-                get_ucc_T(self.thetas, self.ucc_layout),
+                get_ucc_T(self.thetas, self.ucc_layout, self.ci_info),
                 self.ci_info,
             )
             for i in range(len(theta_params)):
@@ -1074,7 +1074,7 @@ class WaveFunctionUCC:
                 step_size = eps * sign_step * max(1, abs(theta_params[i]))
                 theta_params[i] += step_size
                 Tmat_plus = build_operator_matrix(
-                    get_ucc_T(theta_params, self.ucc_layout),
+                    get_ucc_T(theta_params, self.ucc_layout, self.ci_info),
                     self.ci_info,
                 )
                 bra = ss.linalg.expm_multiply(Tmat + Tmat_plus, self.csf_coeffs, traceA=0.0)

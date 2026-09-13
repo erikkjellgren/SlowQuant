@@ -17,6 +17,7 @@ from slowquant.unitary_coupled_cluster.operators import (
     G1_sa,
     G2_sa,
 )
+from slowquant.unitary_coupled_cluster.spin_ordering import alpha_idx, beta_idx
 from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
 
 
@@ -408,6 +409,44 @@ def apply_operator_SA_threaded(
         sign = 1.0 - 2.0 * (phase_changes & 1)
         tmp_state[:, i] += sign * factor * state[:, det2idx[det]]  # Update value
     return tmp_state
+
+
+def embed_spatial_indices(exc_indices: Sequence[int], ci_info: CI_Info) -> list[int]:
+    """Embed ansatz spatial orbital indices into the CI space.
+
+    Args:
+        exc_indices: Spatial orbital indices, counted from the start of the active space.
+        ci_info: Information about the CI space.
+
+    Returns:
+        Spatial orbital indices in the CI space.
+    """
+    return [p + ci_info.space_extension_offset for p in exc_indices]
+
+
+def embed_spin_indices(exc_indices: Sequence[int], ci_info: CI_Info, num_active_orbs: int) -> list[int]:
+    """Embed ansatz spin-orbital indices into the CI space.
+
+    The ansatz is built over num_active_orbs spatial orbitals. When the CI space is extended
+    those orbitals sit at an offset inside a larger space, and because the ordering is blocked
+    the alpha and beta halves are shifted by different amounts.
+
+    Args:
+        exc_indices: Spin-orbital indices in the active space of the ansatz.
+        ci_info: Information about the CI space.
+        num_active_orbs: Number of active spatial orbitals the ansatz is built over.
+
+    Returns:
+        Spin-orbital indices in the CI space.
+    """
+    offset = ci_info.space_extension_offset
+    embedded = []
+    for idx in exc_indices:
+        if idx < num_active_orbs:
+            embedded.append(idx + offset)
+        else:
+            embedded.append(idx - num_active_orbs + offset + ci_info.num_active_orbs)
+    return embedded
 
 
 def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bool = False) -> np.ndarray:
@@ -888,7 +927,7 @@ def construct_ucc_state(
         New state vector with unitaries applied.
     """
     # Build up T matrix based on excitations in ucc_struct and given thetas
-    T = get_ucc_T(thetas, ucc_struct, ci_info.space_extension_offset)
+    T = get_ucc_T(thetas, ucc_struct, ci_info)
     # Evil matrix construction
     Tmat = build_operator_matrix(T, ci_info)
     if dagger:
@@ -899,7 +938,7 @@ def construct_ucc_state(
 def get_ucc_T(
     thetas: Sequence[float],
     ucc_struct: UccStructure,
-    offset: int = 0,
+    ci_info: CI_Info,
 ) -> FermionicOperator:
     """Construct UCC operator.
 
@@ -907,7 +946,7 @@ def get_ucc_T(
         thetas: Active-space parameters.
                Ordered as (S, D, T, ...).
         ucc_struct: UCCStructure object.
-        offset: Offset needed for extended spaces.
+        ci_info: Information about the CI space.
 
     Returns:
         UCC operator.
@@ -920,40 +959,44 @@ def get_ucc_T(
         if abs(theta) < 10**-28:
             continue
         if exc_type == "sa_single":
-            (i, a) = np.array(exc_indices) + offset
-            T += theta * G1_sa(i, a, True)
+            (i, a) = embed_spatial_indices(exc_indices, ci_info)
+            T += theta * G1_sa(i, a, True, num_orbs=ci_info.num_active_orbs)
         elif exc_type == "sa_double_1":
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T += theta * G2_sa(i, j, a, b, 1, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T += theta * G2_sa(i, j, a, b, 1, True, num_orbs=ci_info.num_active_orbs)
         elif exc_type == "sa_double_2":
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T += theta * G2_sa(i, j, a, b, 2, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T += theta * G2_sa(i, j, a, b, 2, True, num_orbs=ci_info.num_active_orbs)
         elif exc_type == "sa_double_3":
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T += theta * G2_sa(i, j, a, b, 3, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T += theta * G2_sa(i, j, a, b, 3, True, num_orbs=ci_info.num_active_orbs)
         elif exc_type == "sa_double_4":
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T += theta * G2_sa(i, j, a, b, 4, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T += theta * G2_sa(i, j, a, b, 4, True, num_orbs=ci_info.num_active_orbs)
         elif exc_type == "sa_double_5":
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T += theta * G2_sa(i, j, a, b, 5, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T += theta * G2_sa(i, j, a, b, 5, True, num_orbs=ci_info.num_active_orbs)
         elif exc_type == "single":
-            (i, a) = np.array(exc_indices) + 2 * offset
+            (i, a) = embed_spin_indices(exc_indices, ci_info, ucc_struct.num_active_orbs)
             T += theta * G1(i, a, True)
         elif exc_type == "double":
-            (i, j, a, b) = np.array(exc_indices) + 2 * offset
+            (i, j, a, b) = embed_spin_indices(exc_indices, ci_info, ucc_struct.num_active_orbs)
             T += theta * G2(i, j, a, b, True)
         elif exc_type == "triple":
-            (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
+            (i, j, k, a, b, c) = embed_spin_indices(exc_indices, ci_info, ucc_struct.num_active_orbs)
             T += theta * G3(i, j, k, a, b, c, True)
         elif exc_type == "quadruple":
-            (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
+            (i, j, k, l, a, b, c, d) = embed_spin_indices(exc_indices, ci_info, ucc_struct.num_active_orbs)
             T += theta * G4(i, j, k, l, a, b, c, d, True)
         elif exc_type == "quintuple":
-            (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + 2 * offset
+            (i, j, k, l, m, a, b, c, d, e) = embed_spin_indices(
+                exc_indices, ci_info, ucc_struct.num_active_orbs
+            )
             T += theta * G5(i, j, k, l, m, a, b, c, d, e, True)
         elif exc_type == "sextuple":
-            (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + 2 * offset
+            (i, j, k, l, m, n, a, b, c, d, e, f) = embed_spin_indices(
+                exc_indices, ci_info, ucc_struct.num_active_orbs
+            )
             T += theta * G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
         else:
             raise ValueError(f"Got unknown excitation type, {exc_type}")
@@ -988,7 +1031,6 @@ def construct_ups_state(
     """
     out = state.copy()
     order = 1
-    offset = ci_info.space_extension_offset
     if dagger:
         order = -1
     # Loop over all excitation in UPSStructure
@@ -1001,10 +1043,10 @@ def construct_ups_state(
             theta = -theta
         if exc_type in ("sa_single",):
             A = 1  # 2**(-1/2)
-            (i, a) = np.array(exc_indices) + offset
+            (i, a) = embed_spatial_indices(exc_indices, ci_info)
             # Create T matrix
-            Ta = G1(i * 2, a * 2, True)
-            Tb = G1(i * 2 + 1, a * 2 + 1, True)
+            Ta = G1(alpha_idx(i, ci_info.num_active_orbs), alpha_idx(a, ci_info.num_active_orbs), True)
+            Tb = G1(beta_idx(i, ci_info.num_active_orbs), beta_idx(a, ci_info.num_active_orbs), True)
             # Analytical application on state vector
             out = (
                 out
@@ -1043,26 +1085,32 @@ def construct_ups_state(
         elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
             # Create T matrix
             if exc_type == "single":
-                (i, a) = np.array(exc_indices) + 2 * offset
+                (i, a) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
                 T = G1(i, a, True)
             elif exc_type == "double":
-                (i, j, a, b) = np.array(exc_indices) + 2 * offset
+                (i, j, a, b) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
                 T = G2(i, j, a, b, True)
             elif exc_type == "triple":
-                (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
+                (i, j, k, a, b, c) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
                 T = G3(i, j, k, a, b, c, True)
             elif exc_type == "quadruple":
-                (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
+                (i, j, k, l, a, b, c, d) = embed_spin_indices(
+                    exc_indices, ci_info, ups_struct.num_active_orbs
+                )
                 T = G4(i, j, k, l, a, b, c, d, True)
             elif exc_type == "quintuple":
-                (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + 2 * offset
+                (i, j, k, l, m, a, b, c, d, e) = embed_spin_indices(
+                    exc_indices, ci_info, ups_struct.num_active_orbs
+                )
                 T = G5(i, j, k, l, m, a, b, c, d, e, True)
             elif exc_type == "sextuple":
-                (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + 2 * offset
+                (i, j, k, l, m, n, a, b, c, d, e, f) = embed_spin_indices(
+                    exc_indices, ci_info, ups_struct.num_active_orbs
+                )
                 T = G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
             elif exc_type == "sa_double_1":
-                (i, j, a, b) = np.array(exc_indices) + offset
-                T = G2_sa(i, j, a, b, 1, True)
+                (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+                T = G2_sa(i, j, a, b, 1, True, num_orbs=ci_info.num_active_orbs)
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
             # Analytical application on state vector
@@ -1085,11 +1133,11 @@ def construct_ups_state(
             )
         elif exc_type in ("sa_double_2", "sa_double_3"):
             if exc_type == "sa_double_2":
-                (i, j, a, b) = np.array(exc_indices) + offset
-                T = G2_sa(i, j, a, b, 2, True)
+                (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+                T = G2_sa(i, j, a, b, 2, True, num_orbs=ci_info.num_active_orbs)
             elif exc_type == "sa_double_3":
-                (i, j, a, b) = np.array(exc_indices) + offset
-                T = G2_sa(i, j, a, b, 3, True)
+                (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+                T = G2_sa(i, j, a, b, 3, True, num_orbs=ci_info.num_active_orbs)
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
             S = (1, math.sqrt(2) / 2)
@@ -1126,8 +1174,8 @@ def construct_ups_state(
             )
             out += (k4[0] * (np.cos(S[0] * theta) - 1) + k4[1] * (np.cos(S[1] * theta) - 1)) * tmp
         elif exc_type in ("sa_double_4",):
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T = G2_sa(i, j, a, b, 4, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, 4, True, num_orbs=ci_info.num_active_orbs)
             S = (1, math.sqrt(2), math.sqrt(2) / 2, 1 / 2)  # type: ignore
             k1 = (2 / 3, -math.sqrt(2) / 42, -8 * math.sqrt(2) / 3, 128 / 21)  # type: ignore
             k3 = (13 / 3, -math.sqrt(2) / 6, -44 * math.sqrt(2) / 3, 64 / 3)  # type: ignore
@@ -1234,8 +1282,8 @@ def construct_ups_state(
                 + k8[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
             ) * tmp
         elif exc_type in ("sa_double_5",):
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T = G2_sa(i, j, a, b, 5, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, 5, True, num_orbs=ci_info.num_active_orbs)
             S = (math.sqrt(2), math.sqrt(2) / 2, math.sqrt(3) / 3, math.sqrt(3) / 2, math.sqrt(3) / 6)  # type: ignore
             k1 = (  # type: ignore
                 math.sqrt(2) / 1150,
@@ -1440,7 +1488,6 @@ def construct_ups_state_SA(
     """
     out = state.copy()
     order = 1
-    offset = ci_info.space_extension_offset
     if dagger:
         order = -1
     # Loop over all excitation in UPSStructure
@@ -1453,10 +1500,10 @@ def construct_ups_state_SA(
             theta = -theta
         if exc_type in ("sa_single",):
             A = 1  # 2**(-1/2)
-            (i, a) = np.array(exc_indices) + offset
+            (i, a) = embed_spatial_indices(exc_indices, ci_info)
             # Create T matrices
-            Ta = G1(i * 2, a * 2, True)
-            Tb = G1(i * 2 + 1, a * 2 + 1, True)
+            Ta = G1(alpha_idx(i, ci_info.num_active_orbs), alpha_idx(a, ci_info.num_active_orbs), True)
+            Tb = G1(beta_idx(i, ci_info.num_active_orbs), beta_idx(a, ci_info.num_active_orbs), True)
             # Analytical application on state vector
             out = (
                 out
@@ -1495,26 +1542,32 @@ def construct_ups_state_SA(
         elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
             # Create T matrix
             if exc_type == "single":
-                (i, a) = np.array(exc_indices) + 2 * offset
+                (i, a) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
                 T = G1(i, a, True)
             elif exc_type == "double":
-                (i, j, a, b) = np.array(exc_indices) + 2 * offset
+                (i, j, a, b) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
                 T = G2(i, j, a, b, True)
             elif exc_type == "triple":
-                (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
+                (i, j, k, a, b, c) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
                 T = G3(i, j, k, a, b, c, True)
             elif exc_type == "quadruple":
-                (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
+                (i, j, k, l, a, b, c, d) = embed_spin_indices(
+                    exc_indices, ci_info, ups_struct.num_active_orbs
+                )
                 T = G4(i, j, k, l, a, b, c, d, True)
             elif exc_type == "quintuple":
-                (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + 2 * offset
+                (i, j, k, l, m, a, b, c, d, e) = embed_spin_indices(
+                    exc_indices, ci_info, ups_struct.num_active_orbs
+                )
                 T = G5(i, j, k, l, m, a, b, c, d, e, True)
             elif exc_type == "sextuple":
-                (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + 2 * offset
+                (i, j, k, l, m, n, a, b, c, d, e, f) = embed_spin_indices(
+                    exc_indices, ci_info, ups_struct.num_active_orbs
+                )
                 T = G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
             elif exc_type == "sa_double_1":
-                (i, j, a, b) = np.array(exc_indices) + offset
-                T = G2_sa(i, j, a, b, 1, True)
+                (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+                T = G2_sa(i, j, a, b, 1, True, num_orbs=ci_info.num_active_orbs)
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
             # Analytical application on state vector
@@ -1537,11 +1590,11 @@ def construct_ups_state_SA(
             )
         elif exc_type in ("sa_double_2", "sa_double_3"):
             if exc_type == "sa_double_2":
-                (i, j, a, b) = np.array(exc_indices) + offset
-                T = G2_sa(i, j, a, b, 2, True)
+                (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+                T = G2_sa(i, j, a, b, 2, True, num_orbs=ci_info.num_active_orbs)
             elif exc_type == "sa_double_3":
-                (i, j, a, b) = np.array(exc_indices) + offset
-                T = G2_sa(i, j, a, b, 3, True)
+                (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+                T = G2_sa(i, j, a, b, 3, True, num_orbs=ci_info.num_active_orbs)
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
             S = (1, math.sqrt(2) / 2)
@@ -1578,8 +1631,8 @@ def construct_ups_state_SA(
             )
             out += (k4[0] * (np.cos(S[0] * theta) - 1) + k4[1] * (np.cos(S[1] * theta) - 1)) * tmp
         elif exc_type in ("sa_double_4",):
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T = G2_sa(i, j, a, b, 4, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, 4, True, num_orbs=ci_info.num_active_orbs)
             S = (1, math.sqrt(2), math.sqrt(2) / 2, 1 / 2)  # type: ignore
             k1 = (2 / 3, -math.sqrt(2) / 42, -8 * math.sqrt(2) / 3, 128 / 21)  # type: ignore
             k3 = (13 / 3, -math.sqrt(2) / 6, -44 * math.sqrt(2) / 3, 64 / 3)  # type: ignore
@@ -1686,8 +1739,8 @@ def construct_ups_state_SA(
                 + k8[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
             ) * tmp
         elif exc_type in ("sa_double_5",):
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T = G2_sa(i, j, a, b, 5, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, 5, True, num_orbs=ci_info.num_active_orbs)
             S = (math.sqrt(2), math.sqrt(2) / 2, math.sqrt(3) / 3, math.sqrt(3) / 2, math.sqrt(3) / 6)  # type: ignore
             k1 = (  # type: ignore
                 math.sqrt(2) / 1150,
@@ -1890,15 +1943,14 @@ def propagate_unitary(
     exc_type = ups_struct.excitation_operator_type[idx]
     exc_indices = ups_struct.excitation_indices[idx]
     theta = thetas[idx]
-    offset = ci_info.space_extension_offset
     if abs(theta) < 10**-28:
         return np.copy(state)
     if exc_type in ("sa_single",):
         A = 1  # 2**(-1/2)
-        (i, a) = np.array(exc_indices) + offset
+        (i, a) = embed_spatial_indices(exc_indices, ci_info)
         # Create T matrix
-        Ta = G1(i * 2, a * 2, True)
-        Tb = G1(i * 2 + 1, a * 2 + 1, True)
+        Ta = G1(alpha_idx(i, ci_info.num_active_orbs), alpha_idx(a, ci_info.num_active_orbs), True)
+        Tb = G1(beta_idx(i, ci_info.num_active_orbs), beta_idx(a, ci_info.num_active_orbs), True)
         # Analytical application on state vector
         out = (
             state
@@ -1937,26 +1989,30 @@ def propagate_unitary(
     elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
         # Create T matrix
         if exc_type == "single":
-            (i, a) = np.array(exc_indices) + 2 * offset
+            (i, a) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
             T = G1(i, a, True)
         elif exc_type == "double":
-            (i, j, a, b) = np.array(exc_indices) + 2 * offset
+            (i, j, a, b) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
             T = G2(i, j, a, b, True)
         elif exc_type == "triple":
-            (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
+            (i, j, k, a, b, c) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
             T = G3(i, j, k, a, b, c, True)
         elif exc_type == "quadruple":
-            (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
+            (i, j, k, l, a, b, c, d) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
             T = G4(i, j, k, l, a, b, c, d, True)
         elif exc_type == "quintuple":
-            (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + 2 * offset
+            (i, j, k, l, m, a, b, c, d, e) = embed_spin_indices(
+                exc_indices, ci_info, ups_struct.num_active_orbs
+            )
             T = G5(i, j, k, l, m, a, b, c, d, e, True)
         elif exc_type == "sextuple":
-            (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + 2 * offset
+            (i, j, k, l, m, n, a, b, c, d, e, f) = embed_spin_indices(
+                exc_indices, ci_info, ups_struct.num_active_orbs
+            )
             T = G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
         elif exc_type == "sa_double_1":
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T = G2_sa(i, j, a, b, 1, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, 1, True, num_orbs=ci_info.num_active_orbs)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Analytical application on state vector
@@ -1979,11 +2035,11 @@ def propagate_unitary(
         )
     elif exc_type in ("sa_double_2", "sa_double_3"):
         if exc_type == "sa_double_2":
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T = G2_sa(i, j, a, b, 2, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, 2, True, num_orbs=ci_info.num_active_orbs)
         elif exc_type == "sa_double_3":
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T = G2_sa(i, j, a, b, 3, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, 3, True, num_orbs=ci_info.num_active_orbs)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         S = (1, math.sqrt(2) / 2)
@@ -2021,8 +2077,8 @@ def propagate_unitary(
         )
         out += (k4[0] * (np.cos(S[0] * theta) - 1) + k4[1] * (np.cos(S[1] * theta) - 1)) * tmp
     elif exc_type in ("sa_double_4",):
-        (i, j, a, b) = np.array(exc_indices) + offset
-        T = G2_sa(i, j, a, b, 4, True)
+        (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+        T = G2_sa(i, j, a, b, 4, True, num_orbs=ci_info.num_active_orbs)
         S = (1, math.sqrt(2), math.sqrt(2) / 2, 1 / 2)  # type: ignore
         k1 = (2 / 3, -math.sqrt(2) / 42, -8 * math.sqrt(2) / 3, 128 / 21)  # type: ignore
         k3 = (13 / 3, -math.sqrt(2) / 6, -44 * math.sqrt(2) / 3, 64 / 3)  # type: ignore
@@ -2130,8 +2186,8 @@ def propagate_unitary(
             + k8[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
         ) * tmp
     elif exc_type in ("sa_double_5",):
-        (i, j, a, b) = np.array(exc_indices) + offset
-        T = G2_sa(i, j, a, b, 5, True)
+        (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+        T = G2_sa(i, j, a, b, 5, True, num_orbs=ci_info.num_active_orbs)
         S = (math.sqrt(2), math.sqrt(2) / 2, math.sqrt(3) / 3, math.sqrt(3) / 2, math.sqrt(3) / 6)  # type: ignore
         k1 = (  # type: ignore
             math.sqrt(2) / 1150,
@@ -2335,15 +2391,14 @@ def propagate_unitary_SA(
     exc_type = ups_struct.excitation_operator_type[idx]
     exc_indices = ups_struct.excitation_indices[idx]
     theta = thetas[idx]
-    offset = ci_info.space_extension_offset
     if abs(theta) < 10**-28:
         return np.copy(state)
     if exc_type in ("sa_single",):
         A = 1  # 2**(-1/2)
-        (i, a) = np.array(exc_indices) + offset
+        (i, a) = embed_spatial_indices(exc_indices, ci_info)
         # Create T matrix
-        Ta = G1(i * 2, a * 2, True)
-        Tb = G1(i * 2 + 1, a * 2 + 1, True)
+        Ta = G1(alpha_idx(i, ci_info.num_active_orbs), alpha_idx(a, ci_info.num_active_orbs), True)
+        Tb = G1(beta_idx(i, ci_info.num_active_orbs), beta_idx(a, ci_info.num_active_orbs), True)
         # Analytical application on state vector
         out = (
             state
@@ -2382,26 +2437,30 @@ def propagate_unitary_SA(
     elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
         # Create T matrix
         if exc_type == "single":
-            (i, a) = np.array(exc_indices) + 2 * offset
+            (i, a) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
             T = G1(i, a, True)
         elif exc_type == "double":
-            (i, j, a, b) = np.array(exc_indices) + 2 * offset
+            (i, j, a, b) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
             T = G2(i, j, a, b, True)
         elif exc_type == "triple":
-            (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
+            (i, j, k, a, b, c) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
             T = G3(i, j, k, a, b, c, True)
         elif exc_type == "quadruple":
-            (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
+            (i, j, k, l, a, b, c, d) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
             T = G4(i, j, k, l, a, b, c, d, True)
         elif exc_type == "quintuple":
-            (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + 2 * offset
+            (i, j, k, l, m, a, b, c, d, e) = embed_spin_indices(
+                exc_indices, ci_info, ups_struct.num_active_orbs
+            )
             T = G5(i, j, k, l, m, a, b, c, d, e, True)
         elif exc_type == "sextuple":
-            (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + 2 * offset
+            (i, j, k, l, m, n, a, b, c, d, e, f) = embed_spin_indices(
+                exc_indices, ci_info, ups_struct.num_active_orbs
+            )
             T = G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
         elif exc_type == "sa_double_1":
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T = G2_sa(i, j, a, b, 1, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, 1, True, num_orbs=ci_info.num_active_orbs)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Analytical application on state vector
@@ -2424,11 +2483,11 @@ def propagate_unitary_SA(
         )
     elif exc_type in ("sa_double_2", "sa_double_3"):
         if exc_type == "sa_double_2":
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T = G2_sa(i, j, a, b, 2, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, 2, True, num_orbs=ci_info.num_active_orbs)
         elif exc_type == "sa_double_3":
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T = G2_sa(i, j, a, b, 3, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, 3, True, num_orbs=ci_info.num_active_orbs)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         S = (1, math.sqrt(2) / 2)
@@ -2466,8 +2525,8 @@ def propagate_unitary_SA(
         )
         out += (k4[0] * (np.cos(S[0] * theta) - 1) + k4[1] * (np.cos(S[1] * theta) - 1)) * tmp
     elif exc_type in ("sa_double_4",):
-        (i, j, a, b) = np.array(exc_indices) + offset
-        T = G2_sa(i, j, a, b, 4, True)
+        (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+        T = G2_sa(i, j, a, b, 4, True, num_orbs=ci_info.num_active_orbs)
         S = (1, math.sqrt(2), math.sqrt(2) / 2, 1 / 2)  # type: ignore
         k1 = (2 / 3, -math.sqrt(2) / 42, -8 * math.sqrt(2) / 3, 128 / 21)  # type: ignore
         k3 = (13 / 3, -math.sqrt(2) / 6, -44 * math.sqrt(2) / 3, 64 / 3)  # type: ignore
@@ -2575,8 +2634,8 @@ def propagate_unitary_SA(
             + k8[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
         ) * tmp
     elif exc_type in ("sa_double_5",):
-        (i, j, a, b) = np.array(exc_indices) + offset
-        T = G2_sa(i, j, a, b, 5, True)
+        (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+        T = G2_sa(i, j, a, b, 5, True, num_orbs=ci_info.num_active_orbs)
         S = (math.sqrt(2), math.sqrt(2) / 2, math.sqrt(3) / 3, math.sqrt(3) / 2, math.sqrt(3) / 6)  # type: ignore
         k1 = (  # type: ignore
             math.sqrt(2) / 1150,
@@ -2790,13 +2849,12 @@ def get_grad_action(
     # Select unitary operation based on idx
     exc_type = ups_struct.excitation_operator_type[idx]
     exc_indices = ups_struct.excitation_indices[idx]
-    offset = ci_info.space_extension_offset
     if exc_type in ("sa_single",):
         # Create T matrix
         A = 1  # 2**(-1/2)
-        (i, a) = np.array(exc_indices) + offset
-        Ta = G1(i * 2, a * 2, True)
-        Tb = G1(i * 2 + 1, a * 2 + 1, True)
+        (i, a) = embed_spatial_indices(exc_indices, ci_info)
+        Ta = G1(alpha_idx(i, ci_info.num_active_orbs), alpha_idx(a, ci_info.num_active_orbs), True)
+        Tb = G1(beta_idx(i, ci_info.num_active_orbs), beta_idx(a, ci_info.num_active_orbs), True)
         # Apply missing T factor of derivative
         tmp = propagate_state(
             [A * (Ta + Tb)],
@@ -2819,38 +2877,42 @@ def get_grad_action(
     ):
         # Create T matrix
         if exc_type == "single":
-            (i, a) = np.array(exc_indices) + 2 * offset
+            (i, a) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
             T = G1(i, a, True)
         elif exc_type == "double":
-            (i, j, a, b) = np.array(exc_indices) + 2 * offset
+            (i, j, a, b) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
             T = G2(i, j, a, b, True)
         elif exc_type == "triple":
-            (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
+            (i, j, k, a, b, c) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
             T = G3(i, j, k, a, b, c, True)
         elif exc_type == "quadruple":
-            (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
+            (i, j, k, l, a, b, c, d) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
             T = G4(i, j, k, l, a, b, c, d, True)
         elif exc_type == "quintuple":
-            (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + 2 * offset
+            (i, j, k, l, m, a, b, c, d, e) = embed_spin_indices(
+                exc_indices, ci_info, ups_struct.num_active_orbs
+            )
             T = G5(i, j, k, l, m, a, b, c, d, e, True)
         elif exc_type == "sextuple":
-            (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + 2 * offset
+            (i, j, k, l, m, n, a, b, c, d, e, f) = embed_spin_indices(
+                exc_indices, ci_info, ups_struct.num_active_orbs
+            )
             T = G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
         elif exc_type == "sa_double_1":
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T = G2_sa(i, j, a, b, 1, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, 1, True, num_orbs=ci_info.num_active_orbs)
         elif exc_type == "sa_double_2":
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T = G2_sa(i, j, a, b, 2, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, 2, True, num_orbs=ci_info.num_active_orbs)
         elif exc_type == "sa_double_3":
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T = G2_sa(i, j, a, b, 3, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, 3, True, num_orbs=ci_info.num_active_orbs)
         elif exc_type == "sa_double_4":
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T = G2_sa(i, j, a, b, 4, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, 4, True, num_orbs=ci_info.num_active_orbs)
         elif exc_type == "sa_double_5":
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T = G2_sa(i, j, a, b, 5, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, 5, True, num_orbs=ci_info.num_active_orbs)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Apply missing T factor of derivative
@@ -2901,13 +2963,12 @@ def get_grad_action_SA(
     # Select unitary operation based on idx
     exc_type = ups_struct.excitation_operator_type[idx]
     exc_indices = ups_struct.excitation_indices[idx]
-    offset = ci_info.space_extension_offset
     if exc_type in ("sa_single",):
         # Create T matrix
         A = 1  # 2**(-1/2)
-        (i, a) = np.array(exc_indices) + offset
-        Ta = G1(i * 2, a * 2, True)
-        Tb = G1(i * 2 + 1, a * 2 + 1, True)
+        (i, a) = embed_spatial_indices(exc_indices, ci_info)
+        Ta = G1(alpha_idx(i, ci_info.num_active_orbs), alpha_idx(a, ci_info.num_active_orbs), True)
+        Tb = G1(beta_idx(i, ci_info.num_active_orbs), beta_idx(a, ci_info.num_active_orbs), True)
         # Apply missing T factor of derivative
         tmp = propagate_state_SA(
             [A * (Ta + Tb)],
@@ -2930,38 +2991,42 @@ def get_grad_action_SA(
     ):
         # Create T matrix
         if exc_type == "single":
-            (i, a) = np.array(exc_indices) + 2 * offset
+            (i, a) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
             T = G1(i, a, True)
         elif exc_type == "double":
-            (i, j, a, b) = np.array(exc_indices) + 2 * offset
+            (i, j, a, b) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
             T = G2(i, j, a, b, True)
         elif exc_type == "triple":
-            (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
+            (i, j, k, a, b, c) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
             T = G3(i, j, k, a, b, c, True)
         elif exc_type == "quadruple":
-            (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
+            (i, j, k, l, a, b, c, d) = embed_spin_indices(exc_indices, ci_info, ups_struct.num_active_orbs)
             T = G4(i, j, k, l, a, b, c, d, True)
         elif exc_type == "quintuple":
-            (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + 2 * offset
+            (i, j, k, l, m, a, b, c, d, e) = embed_spin_indices(
+                exc_indices, ci_info, ups_struct.num_active_orbs
+            )
             T = G5(i, j, k, l, m, a, b, c, d, e, True)
         elif exc_type == "sextuple":
-            (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + 2 * offset
+            (i, j, k, l, m, n, a, b, c, d, e, f) = embed_spin_indices(
+                exc_indices, ci_info, ups_struct.num_active_orbs
+            )
             T = G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
         elif exc_type == "sa_double_1":
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T = G2_sa(i, j, a, b, 1, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, 1, True, num_orbs=ci_info.num_active_orbs)
         elif exc_type == "sa_double_2":
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T = G2_sa(i, j, a, b, 2, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, 2, True, num_orbs=ci_info.num_active_orbs)
         elif exc_type == "sa_double_3":
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T = G2_sa(i, j, a, b, 3, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, 3, True, num_orbs=ci_info.num_active_orbs)
         elif exc_type == "sa_double_4":
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T = G2_sa(i, j, a, b, 4, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, 4, True, num_orbs=ci_info.num_active_orbs)
         elif exc_type == "sa_double_5":
-            (i, j, a, b) = np.array(exc_indices) + offset
-            T = G2_sa(i, j, a, b, 5, True)
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, 5, True, num_orbs=ci_info.num_active_orbs)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Apply missing T factor of derivative
@@ -2993,15 +3058,12 @@ def get_determinant_expansion_from_operator_on_HF(
     Returns:
         Determinant expansion.
     """
+    # Blocked ordering, so the alpha string is followed by the beta string.
     hf_det_ = ""
-    for i in range(2 * num_active_orbs):
-        if i % 2 == 0 and i // 2 < num_active_elec_alpha:
-            hf_det_ += "1"
-            continue
-        if i % 2 == 1 and i // 2 < num_active_elec_beta:
-            hf_det_ += "1"
-            continue
-        hf_det_ += "0"
+    for p in range(num_active_orbs):
+        hf_det_ += "1" if p < num_active_elec_alpha else "0"
+    for p in range(num_active_orbs):
+        hf_det_ += "1" if p < num_active_elec_beta else "0"
     hf_det = int(hf_det_, 2)
 
     coeffs = []
