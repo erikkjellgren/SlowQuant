@@ -1,3 +1,11 @@
+r"""Fermionic operator constructors.
+
+Spin-orbital indices follow the alpha/beta-blocked ordering defined in spin_ordering, so
+they only mean something together with the number of spatial orbitals of the space they
+live in. That is why the constructors taking spatial indices also take that count: pass
+num_orbs for a full-space operator and num_active_orbs for an active-space one.
+"""
+
 import numpy as np
 
 from slowquant.unitary_coupled_cluster.fermionic_operator import (

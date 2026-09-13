@@ -9,15 +9,15 @@ Two parallel implementations of the same physics, kept parameter-compatible:
 ## Commands
 
 ```bash
-pytest tests/                      # full suite, 89 tests
+pytest tests/                      # full suite, 137 tests, ~12 min
 pytest tests/test_unitary_product_state.py -x    # state-vector only
 pre-commit run --all-files         # ruff check + ruff format + mypy
 ```
 
 **Known pre-existing failure.** `tests/test_properties.py::test_properties_ch3_sto3g` fails on
 `master` (UHF spin contamination 0.015082 vs an expected 0.0152 ± 1e-4 — off by 1.2e-4, i.e. a
-marginal tolerance rather than a wrong number). Treat a 1-failed/97-passed run as green unless
-the failure is a different one.
+marginal tolerance rather than a wrong number). Treat a run whose only failure is this one as
+green.
 
 **Import path warning.** A second checkout lives at `~/gitreps/SlowQuant` and is on `PYTHONPATH`.
 Running from this directory picks up the local package (cwd wins over `PYTHONPATH`, verified for
@@ -32,10 +32,20 @@ PYTHONPATH=/home/kjellgren/gitreps/SlowQuant_claude python script.py
 
 - **Never multiply folded operators.** `FermionicOperator.get_folded_operator` is valid only as
   the last step. Build the product first, fold last.
-- **Spin-orbital index ordering is interleaved:** spin orbital of (spatial `p`, spin σ) is `2p + σ`.
-  Determinants are ints with `2N` bits, index 0 at the **most significant** bit.
-  (A migration to spin-blocked ordering is in progress — see `docs/spin_blocked_migration.md`
-  if present, and update this section when it lands.)
+- **Spin-orbital ordering is α/β-blocked, matching Qiskit Nature:** the spin orbital of
+  (spatial `p`, spin σ) is `p` for α and `p + N` for β, where `N` is the number of spatial
+  orbitals *of the space the index lives in*. Determinants are ints with `2N` bits, index 0 at
+  the **most significant** bit, so the α string occupies the high half of the integer and the β
+  string the low half: `det >> N` and `det & ((1 << N) - 1)`. `spin_ordering.py` is the single
+  source of truth; use `alpha_idx`/`beta_idx`/`spatial_idx`/`is_alpha` rather than open-coding.
+- **Interleaved ordering survives only as a human-readable input format** — reference
+  determinants, state-averaged state specifications. Convert it at the boundary with
+  `det_interleaved_to_blocked`, and remember the sign (below).
+- **The CI space is a product of an α and a β string space.** `get_indexing` enumerates α in the
+  outer loop and β in the inner one, so a determinant's index is
+  `idx_alpha*num_beta_strings + idx_beta`, and `CI_Info` carries the per-spin maps. This is load
+  bearing for any future factorized operator-state algebra — **do not reorder those loops.**
+  It does not hold for `get_indexing_extended`, which is not a spin product.
 - **`Epq`, `epqrs`, `G1_sa`, `G2_sa` take spatial indices; `G1`–`G6` take spin-orbital indices.**
   Mixing them up is silent.
 - **Orbital-count names are fixed and meaningful** — the name states which space an index lives in:
@@ -44,8 +54,18 @@ PYTHONPATH=/home/kjellgren/gitreps/SlowQuant_claude python script.py
 - **`util.py` is shared with the Qiskit implementation.** `UpsStructure.excitation_indices` is
   consumed by `qiskit_interface/operators_circuits.py`, and several tests assert
   `qWF.thetas = WF.thetas` round-trips. Changing excitation ordering there is never a local edit.
-- **Relabeling spin orbitals carries a sign.** Determinant basis vectors pick up a permutation
-  sign (`get_reordering_sign`); relative signs in multi-determinant states are physical.
+- **Rewriting a determinant in the other ordering carries a sign.** A determinant is an ordered
+  product of creation operators, so the relabeling permutes them (`get_reordering_sign`). For a
+  single determinant that is a global phase, but for a user-supplied *superposition* the relative
+  signs are physical — get this wrong and an open-shell singlet silently becomes a triplet.
+- **A factorized ansatz is order dependent.** fUCC and friends are products of exponentials of
+  non-commuting generators, so the order the excitations are generated in is part of the ansatz,
+  not a detail. Energies from a factorized ansatz are therefore *not* invariant under a change to
+  the iteration order, unlike everything else. A single `expm(T)`, as in `WaveFunctionUCC`, is.
+- **`_double_excitation_efficient` only supports some index topologies.** Writing the sorted
+  creation/annihilation indices as `c`/`a`, it is correct for `aacc`, `acac` and `ccaa`, and
+  wrong for `acca`, `caac` and `caca`. It raises on the unsupported ones; do not loosen that
+  check without re-running `tests/test_excitation_circuits.py`.
 - Numba is set to **1 thread at import** (`operator_state_algebra._init`). `propagate_state`
   picks its serial/threaded kernel from `nb.get_num_threads()`.
 - `do_unsafe=True` tolerates determinants falling outside the CI space; leaving it `False`
@@ -64,6 +84,8 @@ PYTHONPATH=/home/kjellgren/gitreps/SlowQuant_claude python script.py
 
 - Plan first for anything touching more than ~2 files.
 - Small, reviewable commits — one migration step per commit.
-- The test suite asserts only invariants (energies, excitation energies, oscillator strengths),
-  so it is a reliable oracle for refactors that should not change results.
+- The test suite mostly asserts invariants (energies, excitation energies, oscillator strengths),
+  so it is a good oracle for refactors that should not change results. Two exceptions: the
+  variational minimum of a *factorized* ansatz depends on the factor order, and the noisy
+  `FakeTorino` tests in `test_qiskit_interface.py` depend on the qubit-to-orbital assignment.
 - Keep the name convention and coding style as close as possible to the original, but only when it does not sacrifice   performance.
