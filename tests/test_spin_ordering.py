@@ -1,7 +1,10 @@
 import itertools
 import math
 
+import pytest
+
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
+from slowquant.unitary_coupled_cluster.operators import a_op
 from slowquant.unitary_coupled_cluster.spin_ordering import (
     alpha_idx,
     beta_idx,
@@ -194,3 +197,24 @@ def test_ci_space_determinants_have_correct_occupations() -> None:
                 for det in ci_info.idx2det:
                     assert (det >> num_active_orbs).bit_count() == num_active_elec_alpha
                     assert (det & mask).bit_count() == num_active_elec_beta
+
+
+def test_a_op_matches_spin_orb_idx() -> None:
+    """Test that a_op's inlined index agrees with the spin_ordering definition.
+
+    a_op writes the blocked index out instead of calling spin_orb_idx, because it runs once per
+    term when a Hamiltonian is built. This pins the two together.
+    """
+    for num_orbs in NUM_ORBS_TESTED:
+        for p in range(num_orbs):
+            for spin in ("alpha", "beta"):
+                for dagger in (True, False):
+                    ((idx, op_dagger),) = next(iter(a_op(p, spin, dagger, num_orbs).operators))
+                    assert idx == spin_orb_idx(p, spin, num_orbs), f"{p} {spin} {num_orbs}"
+                    assert op_dagger is dagger
+
+
+def test_a_op_rejects_unknown_spin() -> None:
+    """Test that a_op still validates the spin argument."""
+    with pytest.raises(ValueError, match="alpha"):
+        a_op(0, "up", True, 2)

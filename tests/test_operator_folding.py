@@ -19,6 +19,8 @@ from slowquant.unitary_coupled_cluster.ci_spaces import det_from_spin_strings, g
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.operator_state_algebra import build_operator_matrix
 from slowquant.unitary_coupled_cluster.operators import (
+    G3,
+    G4,
     Epq,
     epqrs,
     hamiltonian_0i_0a,
@@ -148,3 +150,55 @@ def test_folded_operator_matches_full_space_block(space: tuple[int, int, int, in
             active_ci_info,
         )
         assert np.allclose(folded, reference, atol=1e-10), f"{space} {name}"
+
+
+def test_folded_high_rank_operators() -> None:
+    """Test folding of operator strings longer than four.
+
+    Linear response folds G3 to G6, and nothing else in the suite covers strings of that length,
+    so the inactive-orbital bookkeeping in the fold is only exercised here.
+    """
+    num_inactive_orbs, num_active_orbs, num_virtual_orbs = 1, 4, 0
+    num_act_alpha = num_act_beta = 2
+    num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
+
+    full_ci_info = get_indexing(
+        0, num_orbs, 0, num_inactive_orbs + num_act_alpha, num_inactive_orbs + num_act_beta
+    )
+    active_ci_info = get_indexing(
+        num_inactive_orbs, num_active_orbs, num_virtual_orbs, num_act_alpha, num_act_beta
+    )
+    block_idx = [
+        full_ci_info.det2idx[
+            active_det_to_full_det(det, num_inactive_orbs, num_active_orbs, num_virtual_orbs)
+        ]
+        for det in active_ci_info.idx2det
+    ]
+
+    # Blocked indices for five spatial orbitals: alpha 0-4, beta 5-9. The inactive orbital is
+    # spatial 0, so active alpha is 1-4 and active beta 6-9, occupied up to the second of each.
+    operators = {
+        "G3 active": G3(1, 2, 6, 3, 4, 8),
+        "G3 active anti-hermitian": G3(1, 2, 6, 3, 4, 8, True),
+        "G4 active": G4(1, 2, 6, 7, 3, 4, 8, 9),
+        "G4 active anti-hermitian": G4(1, 2, 6, 7, 3, 4, 8, 9, True),
+        # An unpaired inactive index has to fold away entirely.
+        "G3 unpaired inactive": G3(0, 1, 6, 3, 4, 8),
+        # Paired inactive operators do contribute, and their sign is the delicate part.
+        "inactive number operator times G3": Epq(0, 0, num_orbs) * G3(1, 2, 6, 3, 4, 8),
+        "rank 6 spanning inactive": Epq(0, 0, num_orbs) * Epq(1, 3, num_orbs) * Epq(3, 1, num_orbs),
+        "rank 6 inactive excitation pair": Epq(0, 1, num_orbs) * Epq(1, 0, num_orbs) * Epq(2, 3, num_orbs),
+        "rank 8 spanning inactive": epqrs(0, 0, 1, 3, num_orbs) * epqrs(3, 1, 2, 2, num_orbs),
+    }
+
+    seen_ranks: set[int] = set()
+    for name, op in operators.items():
+        reference = build_operator_matrix(op, full_ci_info)[np.ix_(block_idx, block_idx)]
+        folded = build_operator_matrix(
+            op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs),
+            active_ci_info,
+        )
+        assert np.allclose(folded, reference, atol=1e-10), name
+        seen_ranks.update(len(key) for key in op.operators)
+    # The point of this test is the long strings, so make sure they are actually present.
+    assert max(seen_ranks) >= 8, seen_ranks

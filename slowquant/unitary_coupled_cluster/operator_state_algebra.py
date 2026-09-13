@@ -439,6 +439,10 @@ def embed_spin_indices(exc_indices: Sequence[int], ci_info: CI_Info, num_active_
     Returns:
         Spin-orbital indices in the CI space.
     """
+    if num_active_orbs < 1 and len(exc_indices) > 0:
+        # A structure whose builder was never run reports zero, which would silently make every
+        # index look like beta.
+        raise ValueError("Cannot embed spin-orbital indices without the size of the ansatz space.")
     offset = ci_info.space_extension_offset
     embedded = []
     for idx in exc_indices:

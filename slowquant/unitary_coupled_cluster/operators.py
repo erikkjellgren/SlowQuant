@@ -11,7 +11,6 @@ import numpy as np
 from slowquant.unitary_coupled_cluster.fermionic_operator import (
     FermionicOperator,
 )
-from slowquant.unitary_coupled_cluster.spin_ordering import spin_orb_idx
 
 
 def a_op(spinless_idx: int, spin: str, dagger: bool, num_orbs: int) -> FermionicOperator:
@@ -26,7 +25,16 @@ def a_op(spinless_idx: int, spin: str, dagger: bool, num_orbs: int) -> Fermionic
     Returns:
         Annihilation/creation operator.
     """
-    return FermionicOperator({((spin_orb_idx(spinless_idx, spin, num_orbs), dagger),): 1})
+    # Hot path, called once per term when building a Hamiltonian, so the blocked index is
+    # written out rather than taken from spin_ordering.spin_orb_idx. The two are pinned to each
+    # other by tests/test_spin_ordering.py.
+    if spin == "alpha":
+        idx = spinless_idx
+    elif spin == "beta":
+        idx = spinless_idx + num_orbs
+    else:
+        raise ValueError(f'spin must be "alpha" or "beta" got {spin}')
+    return FermionicOperator({((idx, dagger),): 1})
 
 
 def a_op_spin(spin_idx: int, dagger: bool) -> FermionicOperator:
