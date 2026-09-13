@@ -31,6 +31,8 @@ These helpers are used when constructing operators and determinant spaces, not i
 Numba kernels, so they are kept as plain Python.
 """
 
+from collections.abc import Sequence
+
 
 def alpha_idx(p: int, num_orbs: int) -> int:
     """Get spin-orbital index of an alpha spin orbital.
@@ -207,3 +209,21 @@ def get_reordering_sign(det: str) -> int:
         elif num_alpha % 2 == 1:
             sign *= -1
     return sign
+
+
+def spin_indices(spatial_indices: Sequence[int], num_orbs: int) -> list[int]:
+    """Get the spin-orbital indices of a set of spatial orbitals, both spins.
+
+    The alpha indices come first and the beta indices second, matching the blocked ordering,
+    so the returned list is ascending whenever the input is.
+
+    Args:
+        spatial_indices: Spatial orbital indices.
+        num_orbs: Number of spatial orbitals in the space the indices live in.
+
+    Returns:
+        Spin-orbital indices.
+    """
+    return [alpha_idx(p, num_orbs) for p in spatial_indices] + [
+        beta_idx(p, num_orbs) for p in spatial_indices
+    ]

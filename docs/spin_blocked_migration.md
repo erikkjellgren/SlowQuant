@@ -205,16 +205,35 @@ virtual orbitals and so need Phase 2.
       than active, and unequal α/β occupation.
 - [x] **All four oracle cases now pass.**
 
-### Phase 3 — wave function classes *(three near-copies)*
-`ups_`, `ucc_`, `sa_ups_wavefunction.py` — a change in one almost always belongs in all three.
-- [ ] Spin-space construction (occupied α = `[0, n_α)`, occupied β = `[N, N+n_β)`).
-- [ ] Spatial extraction `idx // 2` → `idx % N`.
-- [ ] `_shifted` index lists — per-spin shift, not one contiguous shift.
-- [ ] `hf_det` → `"1"*n_α + "0"*(N_act−n_α) + "1"*n_β + "0"*(N_act−n_β)`.
-- [ ] Perfect-pairing determinant: keep the builder interleaved (human-readable), convert at the end.
-- [ ] **SA-UPS `states`:** convert each user determinant *and multiply its coefficient by the
-      reordering sign* — relative signs in a superposition are physical. Do this before the
-      orthonormality check.
+### Phase 3 — wave function classes — **done**
+`ups_`, `ucc_`, `sa_ups_wavefunction.py`, changed together.
+- [x] Spin-space construction rewritten. The old code derived the spaces by walking interleaved
+      spin-orbital indices and halving; it now derives the spatial partition directly from
+      `cas` and builds spin indices with `spin_ordering.spin_indices`. Shorter and no longer
+      ordering-dependent. The three blocks were identical apart from an even-electron check
+      that `ucc_wavefunction` never had, and that asymmetry is preserved rather than "fixed".
+- [x] `_shifted` lists are built per spin from the shifted spatial indices, not by subtracting a
+      single minimum, which is invalid when the active space is two separate blocks.
+- [x] `hf_det`, and the perfect-pairing determinant, stay in the human-readable interleaved form
+      (including the `"1100"` blocks and the MO-column swap) and are converted with
+      `det_interleaved_to_blocked` where they are looked up.
+- [x] **SA-UPS `states`:** determinants converted *and coefficients multiplied by the reordering
+      sign*, before the orthonormality check. Verified on the open-shell singlet used in the
+      tests: `["10010000", "01100000"]` get signs `+1` and `−1`, so the user's
+      `[+1/√2, −1/√2]` is stored as `[+1/√2, +1/√2]`. Same physical state — without the sign it
+      would silently have become the triplet.
+- [x] Operator call sites updated. `sa_ups` builds its RDM operators on **active-local** indices
+      with `do_folding=False`, so those take `num_active_orbs` while the other two classes take
+      `num_orbs` — the first real instance of the full-vs-active hazard D1 predicted, made
+      visible by the argument naming.
+
+**Phase 4 boundary, as observed.** `WaveFunctionUCC` now raises a `TypeError` when the state is
+built (`get_ucc_T` calls `G1_sa` without `num_orbs`), which is the keyword-only guard working.
+`WaveFunctionUPS` does **not** raise: `construct_ups_state` only calls `G1`–`G6`, which take raw
+spin indices, so it happily applies `G1(i*2, a*2)` — interleaved arithmetic against a blocked
+basis. For tUPS on CAS(2,2) that builds a spin-flip operator which annihilates the reference, so
+the energy comes back unchanged and *looks* fine. Phase 4 must not be judged by whether things
+run.
 
 ### Phase 4 — `operator_state_algebra.py` ansatz branches
 - [ ] One helper converting a `UpsStructure`/`UccStructure` entry to blocked spin indices; call it
