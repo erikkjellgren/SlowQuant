@@ -21,6 +21,7 @@ from slowquant.unitary_coupled_cluster.operators import (
     one_elec_op_0i_0a,
     one_elec_op_1i_1a,
 )
+from slowquant.unitary_coupled_cluster.spin_ordering import det_interleaved_to_blocked
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
@@ -67,13 +68,16 @@ class LinearResponse(LinearResponseBaseClass):
         num_det = len(ci_info.idx2det)
         self.csf_coeffs = np.zeros(num_det)
         hf_det = int(
-            "1" * self.wf.int_gen.num_elec + "0" * (self.wf.num_spin_orbs - self.wf.int_gen.num_elec), 2
+            det_interleaved_to_blocked(
+                "1" * self.wf.int_gen.num_elec + "0" * (self.wf.num_spin_orbs - self.wf.int_gen.num_elec)
+            ),
+            2,
         )
         self.csf_coeffs[ci_info.det2idx[hf_det]] = 1
         self.ci_coeffs = propagate_state(["U"], self.csf_coeffs, *self.index_info_extended)
         self.q_ops: list[FermionicOperator] = []
         for i, a in self.wf.kappa_hf_like_idx:
-            op = 2 ** (-1 / 2) * Epq(a, i)
+            op = 2 ** (-1 / 2) * Epq(a, i, self.wf.num_orbs)
             self.q_ops.append(op)
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
@@ -194,16 +198,19 @@ class LinearResponse(LinearResponseBaseClass):
             mux,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
         muy_op_G = one_elec_op_0i_0a(
             muy,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
         muz_op_G = one_elec_op_0i_0a(
             muz,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
         mux_op_q = one_elec_op_1i_1a(
             mux, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs

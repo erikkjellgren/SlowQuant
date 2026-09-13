@@ -313,10 +313,24 @@ emitting a wrong circuit. Every builder was enumerated and emits only `aacc` and
 `tests/test_excitation_circuits.py` pins all of this, including that the unsupported orderings
 raise.
 
-### Phase 7 — linear response
-- [ ] `lr_baseclass.py` in both packages; the eight state-vector variants.
-- [ ] `density_matrix.py` needs **no changes** (purely spatial/RDM).
-- [ ] **Gate: full suite green.**
+### Phase 7 — linear response — **done**
+- [x] `lr_baseclass.py` in both packages and all variants. The operator manifolds are built over
+      full-space indices and folded afterwards, so every `G1_sa`, `G2_sa`, `Epq` and `iterate_t*`
+      call there takes `num_orbs`, not `num_active_orbs`.
+- [x] The full-space reference determinant in `selfconsistent`, `allselfconsistent` and
+      `allstatetransfer` is converted. These build it over *all* spin orbitals for the extended
+      CI space, so a type checker could never have caught it — it is a determinant string, not a
+      signature.
+- [x] `density_matrix.py` needed **no changes**, as predicted in the original survey: it is purely
+      spatial and RDM based.
+- [x] The extended CI space is the one place D6 actually bites, and it works: `propagate_state`
+      with `["U"]` over `get_indexing_extended`'s space routes through `embed_spin_indices`, which
+      shifts α by the offset and β by the offset plus the space-size difference.
+- [x] **mypy is clean across the whole repository**, which is the signal that the API ripple from
+      Phases 1-3 has fully landed.
+- [x] State-vector gate: `test_unitary_coupled_cluster.py` + `test_oscillator_strength.py`,
+      **24 passed, 0 failed** — naive, projected, self-consistent, state-transfer and all-ST, for
+      both UCC and UPS wave functions.
 
 ### Phase 8 — cleanup
 - [ ] Delete now-identity conversions; update docstrings that describe the interleaved convention.

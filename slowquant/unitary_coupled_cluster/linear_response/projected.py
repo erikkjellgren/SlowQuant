@@ -297,16 +297,19 @@ class LinearResponse(LinearResponseBaseClass):
             mux,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
         muy_op = one_elec_op_0i_0a(
             muy,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
         muz_op = one_elec_op_0i_0a(
             muz,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
         mux_ket = propagate_state([mux_op], self.wf.ci_coeffs, *self.index_info)
         muy_ket = propagate_state([muy_op], self.wf.ci_coeffs, *self.index_info)

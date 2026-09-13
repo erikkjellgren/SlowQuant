@@ -23,6 +23,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
 from slowquant.unitary_coupled_cluster.operators import (
     one_elec_op_0i_0a,
 )
+from slowquant.unitary_coupled_cluster.spin_ordering import det_interleaved_to_blocked
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
@@ -69,7 +70,10 @@ class LinearResponse(LinearResponseBaseClass):
         num_det = len(ci_info.idx2det)
         self.csf_coeffs = np.zeros(num_det)
         hf_det = int(
-            "1" * self.wf.int_gen.num_elec + "0" * (self.wf.num_spin_orbs - self.wf.int_gen.num_elec), 2
+            det_interleaved_to_blocked(
+                "1" * self.wf.int_gen.num_elec + "0" * (self.wf.num_spin_orbs - self.wf.int_gen.num_elec)
+            ),
+            2,
         )
         self.csf_coeffs[ci_info.det2idx[hf_det]] = 1
         self.ci_coeffs = propagate_state(["U"], self.csf_coeffs, *self.index_info_extended)
@@ -289,16 +293,19 @@ class LinearResponse(LinearResponseBaseClass):
             mux,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
         muy_op = one_elec_op_0i_0a(
             muy,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
         muz_op = one_elec_op_0i_0a(
             muz,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
         Udmuxd_ket = propagate_state(["Ud", mux_op.dagger], self.ci_coeffs, *self.index_info_extended)
         Udmuyd_ket = propagate_state(["Ud", muy_op.dagger], self.ci_coeffs, *self.index_info_extended)
