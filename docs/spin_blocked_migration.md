@@ -160,14 +160,26 @@ git worktree add /tmp/sq_master master
 PYTHONPATH=/tmp/sq_master python <script>   # note the two-checkout PATH hazard in CLAUDE.md
 ```
 
-### Phase 1 — convention core: `ci_spaces.py` + `operators.py`
-- [ ] `get_indexing`: build blocked strings (α then β concatenated). Preserve loop order (D3).
-- [ ] `get_indexing_extended`: four interleave sites; these *simplify* under blocking.
-- [ ] `CI_Info`: factorization metadata (D4).
-- [ ] `a_op` + signature ripple (D1).
-- [ ] **Test:** unit-level, not through the wave function classes — build `ci_info` + Hamiltonian
-      + a hand-made reference vector, assert ⟨HF|H|HF⟩ matches the oracle for a CAS-only case
-      (no inactive, no virtual, so folding is trivial).
+### Phase 1 — convention core: `ci_spaces.py` + `operators.py` — **done**
+- [x] `get_indexing`: builds blocked determinants via `det_from_spin_strings`, which *is* D2 made
+      executable. Loop order preserved and now documented as load-bearing (D3).
+- [x] `get_indexing_extended`: four interleave sites replaced; they did simplify.
+- [x] `CI_Info`: `alpha_str2idx`, `beta_str2idx`, `num_alpha_strings`, `num_beta_strings` (D4),
+      left empty/0 for the extended space, which is not a spin product. Stored as plain dicts
+      rather than `| None`, so future consumers do not each need an Optional check.
+- [x] `a_op` + signature ripple (D1). `num_orbs` is positional for `a_op`, `Epq`, `epqrs` and
+      `Eminuspq`, so a missed call site raises `TypeError`. It is **keyword-only** for `G1_sa`
+      and `G2_sa`: both already end in a bool/int with a default, so a positional addition could
+      silently bind to the wrong parameter, and `bool` is a subtype of `int` so mypy would not
+      catch it. `hamiltonian_0i_0a` and `one_elec_op_0i_0a` gained `num_virtual_orbs`, matching
+      their `1i_1a` siblings, so they can compute the full-space size. `G1`–`G6` are untouched:
+      they already take spin-orbital indices.
+- [x] **Test:** the `h2_sto3g_cas22` oracle case (no inactive, no virtual, so folding is trivial)
+      reproduces the interleaved CI spectrum, ⟨HF|H|HF⟩ and RDM1 exactly. Product-structure and
+      occupation tests added to `test_spin_ordering.py`.
+
+The other three oracle cases fail on `ci_eigenvalues`, as expected — they have inactive and/or
+virtual orbitals and so need Phase 2.
 
 ### Phase 2 — folding *(highest risk)*
 - [ ] `get_folded_operator`: space classification (two ranges per spin), index remap

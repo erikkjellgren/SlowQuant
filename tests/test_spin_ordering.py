@@ -1,5 +1,7 @@
 import itertools
+import math
 
+from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
 from slowquant.unitary_coupled_cluster.spin_ordering import (
     alpha_idx,
     beta_idx,
@@ -157,3 +159,38 @@ def test_reordering_sign_matches_pre_migration_implementation() -> None:
     for num_orbs in NUM_ORBS_TESTED:
         for det in all_determinants(num_orbs):
             assert get_reordering_sign(det) == reordering_sign_pre_migration(det)
+
+
+def test_ci_space_is_a_spin_product() -> None:
+    r"""Test that the CI space factorizes into an alpha and a beta string space.
+
+    The determinant index must satisfy :math:`I = I_\alpha N_\beta + I_\beta`, and the
+    determinant integer must split into the two spin strings. A future factorized
+    operator-state algebra rests on both, so this pins the enumeration order of get_indexing.
+    """
+    for num_active_orbs in (2, 3, 4):
+        for num_active_elec_alpha in range(num_active_orbs + 1):
+            for num_active_elec_beta in range(num_active_orbs + 1):
+                ci_info = get_indexing(0, num_active_orbs, 0, num_active_elec_alpha, num_active_elec_beta)
+                num_alpha = math.comb(num_active_orbs, num_active_elec_alpha)
+                num_beta = math.comb(num_active_orbs, num_active_elec_beta)
+                assert len(ci_info.idx2det) == num_alpha * num_beta
+                assert ci_info.num_alpha_strings == num_alpha
+                assert ci_info.num_beta_strings == num_beta
+                mask = (1 << num_active_orbs) - 1
+                for idx, det in enumerate(ci_info.idx2det):
+                    idx_alpha = ci_info.alpha_str2idx[det >> num_active_orbs]
+                    idx_beta = ci_info.beta_str2idx[det & mask]
+                    assert idx_alpha * ci_info.num_beta_strings + idx_beta == idx
+
+
+def test_ci_space_determinants_have_correct_occupations() -> None:
+    """Test that every determinant in the CI space has the requested alpha and beta occupation."""
+    for num_active_orbs in (2, 3, 4):
+        for num_active_elec_alpha in range(num_active_orbs + 1):
+            for num_active_elec_beta in range(num_active_orbs + 1):
+                ci_info = get_indexing(0, num_active_orbs, 0, num_active_elec_alpha, num_active_elec_beta)
+                mask = (1 << num_active_orbs) - 1
+                for det in ci_info.idx2det:
+                    assert (det >> num_active_orbs).bit_count() == num_active_elec_alpha
+                    assert (det & mask).bit_count() == num_active_elec_beta

@@ -1,5 +1,5 @@
 import itertools
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 
 import numba as nb
 import numba.typed as nbt
@@ -8,11 +8,15 @@ import numpy as np
 
 class CI_Info:
     __slots__ = (
+        "alpha_str2idx",
+        "beta_str2idx",
         "det2idx",
         "idx2det",
         "num_active_elec_alpha",
         "num_active_elec_beta",
         "num_active_orbs",
+        "num_alpha_strings",
+        "num_beta_strings",
         "num_inactive_orbs",
         "num_virtual_orbs",
         "space_extension_offset",
@@ -27,8 +31,23 @@ class CI_Info:
         num_active_elec_beta: int,
         idx2det: np.ndarray,
         det2idx: dict[int, int],
+        alpha_str2idx: dict[int, int] | None = None,
+        beta_str2idx: dict[int, int] | None = None,
     ) -> None:
-        """Initialize configuration expansion information object.
+        r"""Initialize configuration expansion information object.
+
+        The spin-orbital ordering is alpha/beta-blocked, so a determinant integer splits into an
+        alpha string in the high half and a beta string in the low half, see spin_ordering.
+
+        When the expansion is a product of an alpha and a beta string space, which is the case for
+        get_indexing but not for get_indexing_extended, the per-spin index maps relate the two,
+
+        .. math::
+            I = I_\alpha N_\beta + I_\beta
+
+        These are not used by the operator-state algebra yet. They are stored because the product
+        structure is what a future factorized algebra would be built on. For an expansion that is
+        not a spin product the maps are empty and num_alpha_strings and num_beta_strings are zero.
 
         Args:
             num_inactive_orbs: Number of inactive spatial orbitals.
@@ -38,6 +57,8 @@ class CI_Info:
             num_active_elec_beta: Number of active beta electrons.
             idx2det: Index to determinant mapping.
             det2idx: Determinant to index mapping.
+            alpha_str2idx: Alpha string to alpha index mapping, if the space is a spin product.
+            beta_str2idx: Beta string to beta index mapping, if the space is a spin product.
         """
         self.num_inactive_orbs = num_inactive_orbs
         self.num_active_orbs = num_active_orbs
@@ -51,6 +72,10 @@ class CI_Info:
             nb_dict[k] = v
         self.det2idx = nb_dict
         self.space_extension_offset = 0
+        self.alpha_str2idx = {} if alpha_str2idx is None else alpha_str2idx
+        self.beta_str2idx = {} if beta_str2idx is None else beta_str2idx
+        self.num_alpha_strings = len(self.alpha_str2idx)
+        self.num_beta_strings = len(self.beta_str2idx)
 
 
 def generate_spin_strings(num_orbs: int, num_elec: int) -> Generator[list[int], None, None]:
@@ -71,6 +96,43 @@ def generate_spin_strings(num_orbs: int, num_elec: int) -> Generator[list[int], 
         for idx in indices:
             string[idx] = 1
         yield string
+
+
+def spin_string_to_int(occupation: Sequence[int]) -> int:
+    """Convert an occupation list of a single spin to an integer.
+
+    The first orbital is the most significant bit.
+
+    Args:
+        occupation: Occupation of each spatial orbital for one spin.
+
+    Returns:
+        Spin string as an integer.
+    """
+    spin_string = 0
+    for occ in occupation:
+        spin_string = (spin_string << 1) | occ
+    return spin_string
+
+
+def det_from_spin_strings(alpha_string: int, beta_string: int, num_orbs: int) -> int:
+    r"""Combine an alpha and a beta spin string into a determinant.
+
+    With alpha/beta-blocked ordering the alpha string occupies the high half of the determinant
+    integer and the beta string the low half,
+
+    .. math::
+        \left|\text{det}\right> = \left|\alpha\right>\otimes\left|\beta\right>
+
+    Args:
+        alpha_string: Alpha spin string as an integer.
+        beta_string: Beta spin string as an integer.
+        num_orbs: Number of spatial orbitals in the space.
+
+    Returns:
+        Determinant as an integer.
+    """
+    return (alpha_string << num_orbs) | beta_string
 
 
 def get_indexing(
@@ -95,13 +157,19 @@ def get_indexing(
     idx = 0
     idx2det = []
     det2idx = {}
-    # Loop over all possible particle and spin conserving determinant combinations
-    for alpha_string in generate_spin_strings(num_active_orbs, num_active_elec_alpha):
-        for beta_string in generate_spin_strings(num_active_orbs, num_active_elec_beta):
-            det_str = ""
-            for a, b in zip(alpha_string, beta_string):
-                det_str += str(a) + str(b)
-            det = int(det_str, 2)  # save determinant as int
+    alpha_str2idx = {}
+    beta_str2idx = {}
+    # Loop over all possible particle and spin conserving determinant combinations.
+    # Alpha is the outer loop and beta the inner one, so the index of a determinant is
+    # idx_alpha*num_beta_strings + idx_beta. This product structure is relied upon, do not
+    # reorder the loops.
+    for idx_alpha, alpha_string in enumerate(generate_spin_strings(num_active_orbs, num_active_elec_alpha)):
+        alpha_str = spin_string_to_int(alpha_string)
+        alpha_str2idx[alpha_str] = idx_alpha
+        for idx_beta, beta_string in enumerate(generate_spin_strings(num_active_orbs, num_active_elec_beta)):
+            beta_str = spin_string_to_int(beta_string)
+            beta_str2idx[beta_str] = idx_beta
+            det = det_from_spin_strings(alpha_str, beta_str, num_active_orbs)
             idx2det.append(det)  # relate index to determinant
             det2idx[det] = idx  # relate determinant to index
             idx += 1
@@ -113,6 +181,8 @@ def get_indexing(
         num_active_elec_beta,
         np.array(idx2det, dtype=int),
         det2idx,
+        alpha_str2idx,
+        beta_str2idx,
     )
 
 
@@ -143,6 +213,8 @@ def get_indexing_extended(
     """
     if order > 2:
         raise ValueError("Excitation order needs to be <= 2")
+    # The extended space spans all orbitals, so determinants are built over the full space.
+    num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
     # Obtain additional determinants from single excitations that break active space particle symmetry
     inactive_singles = []
     virtual_singles = []
@@ -163,13 +235,11 @@ def get_indexing_extended(
     # Particle and spin conserving determinants in active space. No excitation in occ and virtual orbs.
     for alpha_string in generate_spin_strings(num_active_orbs, num_active_elec_alpha):
         for beta_string in generate_spin_strings(num_active_orbs, num_active_elec_beta):
-            det_str = ""
-            for a, b in zip(
-                [1] * num_inactive_orbs + alpha_string + [0] * num_virtual_orbs,
-                [1] * num_inactive_orbs + beta_string + [0] * num_virtual_orbs,
-            ):
-                det_str += str(a) + str(b)
-            det = int(det_str, 2)
+            det = det_from_spin_strings(
+                spin_string_to_int([1] * num_inactive_orbs + alpha_string + [0] * num_virtual_orbs),
+                spin_string_to_int([1] * num_inactive_orbs + beta_string + [0] * num_virtual_orbs),
+                num_orbs,
+            )
             if det in idx2det:
                 continue
             idx2det.append(det)
@@ -186,13 +256,11 @@ def get_indexing_extended(
         )
         for alpha_string in generate_spin_strings(num_active_orbs, active_alpha_elec):
             for beta_string in generate_spin_strings(num_active_orbs, num_active_elec_beta):
-                det_str = ""
-                for a, b in zip(
-                    alpha_inactive + alpha_string + alpha_virtual,
-                    [1] * num_inactive_orbs + beta_string + [0] * num_virtual_orbs,
-                ):
-                    det_str += str(a) + str(b)
-                det = int(det_str, 2)
+                det = det_from_spin_strings(
+                    spin_string_to_int(alpha_inactive + alpha_string + alpha_virtual),
+                    spin_string_to_int([1] * num_inactive_orbs + beta_string + [0] * num_virtual_orbs),
+                    num_orbs,
+                )
                 if det in idx2det:
                     continue
                 idx2det.append(det)
@@ -209,13 +277,11 @@ def get_indexing_extended(
         )
         for alpha_string in generate_spin_strings(num_active_orbs, num_active_elec_alpha):
             for beta_string in generate_spin_strings(num_active_orbs, active_beta_elec):
-                det_str = ""
-                for a, b in zip(
-                    [1] * num_inactive_orbs + alpha_string + [0] * num_virtual_orbs,
-                    beta_inactive + beta_string + beta_virtual,
-                ):
-                    det_str += str(a) + str(b)
-                det = int(det_str, 2)
+                det = det_from_spin_strings(
+                    spin_string_to_int([1] * num_inactive_orbs + alpha_string + [0] * num_virtual_orbs),
+                    spin_string_to_int(beta_inactive + beta_string + beta_virtual),
+                    num_orbs,
+                )
                 if det in idx2det:
                     continue
                 idx2det.append(det)
@@ -234,13 +300,11 @@ def get_indexing_extended(
                 )  # singles inactive and virtual determinants in beta
                 for alpha_string in generate_spin_strings(num_active_orbs, active_alpha_elec):
                     for beta_string in generate_spin_strings(num_active_orbs, active_beta_elec):
-                        det_str = ""
-                        for a, b in zip(
-                            alpha_inactive + alpha_string + alpha_virtual,
-                            beta_inactive + beta_string + beta_virtual,
-                        ):
-                            det_str += str(a) + str(b)
-                        det = int(det_str, 2)
+                        det = det_from_spin_strings(
+                            spin_string_to_int(alpha_inactive + alpha_string + alpha_virtual),
+                            spin_string_to_int(beta_inactive + beta_string + beta_virtual),
+                            num_orbs,
+                        )
                         if det in idx2det:
                             continue
                         idx2det.append(det)

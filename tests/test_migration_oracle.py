@@ -28,6 +28,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     expectation_value,
 )
 from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
+from slowquant.unitary_coupled_cluster.spin_ordering import det_interleaved_to_blocked
 
 ORACLE_PATH = pathlib.Path(__file__).parent / "reference_data" / "migration_oracle.json"
 
@@ -82,12 +83,15 @@ def compute_oracle_values(geometry: str, basis: str, cas: tuple[int, int]) -> di
         num_active_elec_beta,
     )
 
-    H = hamiltonian_0i_0a(h_mo, g_mo, num_inactive_orbs, num_active_orbs)
+    H = hamiltonian_0i_0a(h_mo, g_mo, num_inactive_orbs, num_active_orbs, num_virtual_orbs)
     H_folded = H.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs)
     H_mat = build_operator_matrix(H_folded, ci_info)
 
     num_active_spin_orbs = 2 * num_active_orbs
-    hf_det = "1" * num_active_elec + "0" * (num_active_spin_orbs - num_active_elec)
+    # Reference determinants stay human readable, i.e. interleaved, and are converted.
+    hf_det = det_interleaved_to_blocked(
+        "1" * num_active_elec + "0" * (num_active_spin_orbs - num_active_elec)
+    )
     csf_coeffs = np.zeros(len(ci_info.idx2det))
     csf_coeffs[ci_info.det2idx[int(hf_det, 2)]] = 1
 
@@ -95,7 +99,7 @@ def compute_oracle_values(geometry: str, basis: str, cas: tuple[int, int]) -> di
     for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
         for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
             rdm1[p - num_inactive_orbs, q - num_inactive_orbs] = expectation_value(
-                csf_coeffs, [Epq(p, q)], csf_coeffs, ci_info
+                csf_coeffs, [Epq(p, q, num_orbs)], csf_coeffs, ci_info
             )
 
     return {
