@@ -3,6 +3,8 @@ from __future__ import annotations
 import copy
 import re
 
+from slowquant.unitary_coupled_cluster.spin_ordering import alpha_idx, beta_idx
+
 
 def operator_to_qiskit_key(operator_string: tuple[tuple[int, bool], ...], remapping: dict[int, int]) -> str:
     """Make key string to index a fermionic operator in a dict structure.
@@ -409,65 +411,64 @@ class FermionicOperator:
            Folded fermionic operator.
         """
         operators: dict[tuple[tuple[int, bool], ...], float] = {}
-        inactive_idx = []
-        active_idx = []
-        virtual_idx = []
-        # Get indices of spaces
-        for i in range(2 * num_inactive_orbs + 2 * num_active_orbs + 2 * num_virtual_orbs):
-            if i < 2 * num_inactive_orbs:
-                inactive_idx.append(i)
-            elif i < 2 * num_inactive_orbs + 2 * num_active_orbs:
-                active_idx.append(i)
-            else:
-                virtual_idx.append(i)
+        num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
+        # Occupation mask of the inactive spin orbitals, which are filled in both bra and ket.
+        # Spin-orbital index i is bit i here, this mask is local to the folding.
+        inactive_filled = 0
+        for p in range(num_inactive_orbs):
+            inactive_filled |= 1 << alpha_idx(p, num_orbs)
+            inactive_filled |= 1 << beta_idx(p, num_orbs)
 
         # Loop over string of annihilation operators
-        for op_key in self.operators.keys():
-            virtual = []
-            virtual_dagger = []
-            inactive = []
-            inactive_dagger = []
-            active = []
-            active_dagger = []
-            fac = 1
-            # Loop over individual annihilation operator and sort into spaces
-            for anni in op_key:
-                if anni[1]:
-                    if anni[0] in inactive_idx:
-                        inactive_dagger.append(anni[0])
-                    elif anni[0] in active_idx:
-                        active_dagger.append((anni[0] - 2 * num_inactive_orbs, anni[1]))
-                    elif anni[0] in virtual_idx:
-                        virtual_dagger.append(anni[0])
-                elif anni[0] in inactive_idx:
-                    inactive.append(anni[0])
-                elif anni[0] in active_idx:
-                    active.append((anni[0] - 2 * num_inactive_orbs, anni[1]))
-                elif anni[0] in virtual_idx:
-                    virtual.append(anni[0])
-            # Any virtual indices will make the operator evaluate to zero.
-            if len(virtual) != 0 or len(virtual_dagger) != 0:
+        for op_key, coeff in self.operators.items():
+            phase_changes = 0
+            inactive_occ = inactive_filled
+            # Net number of active alpha electrons added so far by the operators applied.
+            active_alpha_change = 0
+            active_op = []
+            is_zero = False
+            # Apply the operators right to left, as they act on the ket.
+            for orb_idx, dagger in op_key[::-1]:
+                spatial_idx = orb_idx % num_orbs
+                if spatial_idx >= num_inactive_orbs + num_active_orbs:
+                    # Any virtual index makes the operator evaluate to zero, the virtual
+                    # orbitals are empty in both bra and ket.
+                    is_zero = True
+                    break
+                # Phase from the inactive orbitals the operator has to be moved past. The
+                # active orbitals below it are left to the folded operator itself, which sees
+                # them in the active-space determinant and counts the same number.
+                phase_changes += (inactive_occ & ((1 << orb_idx) - 1)).bit_count()
+                if spatial_idx < num_inactive_orbs:
+                    if orb_idx >= num_orbs:
+                        # Every alpha orbital lies below an inactive beta one, so this operator
+                        # also has to be moved past the active alpha electrons. Their number at
+                        # the start of the string is a constant of the CI space and drops out,
+                        # the inactive operators pair up so an even number of them are beta.
+                        # What is left is how the operators applied so far changed that number.
+                        phase_changes += active_alpha_change
+                    orb_bit = 1 << orb_idx
+                    if dagger == bool(inactive_occ & orb_bit):
+                        # Creating an occupied or annihilating an empty inactive orbital.
+                        is_zero = True
+                        break
+                    inactive_occ ^= orb_bit
+                elif orb_idx < num_orbs:
+                    # Active alpha, remapped to the first block of the active space.
+                    active_op.append((spatial_idx - num_inactive_orbs, dagger))
+                    active_alpha_change += 1 if dagger else -1
+                else:
+                    # Active beta, remapped to the second block of the active space.
+                    active_op.append((num_active_orbs + spatial_idx - num_inactive_orbs, dagger))
+            # The inactive orbitals must be left as they were found.
+            if is_zero or inactive_occ != inactive_filled:
                 continue
-            active_op = active_dagger + active  # list
-            bra_side = inactive_dagger
-            ket_side = inactive
-            # The inactive bra and ket side must end up giving identical state vectors.
-            if bra_side != ket_side:
-                continue
-            if len(inactive_dagger) % 2 == 1 and len(active_dagger) % 2 == 1:
-                fac *= -1
-            # Calculate sign coming from flipping the order of the ket side.
-            # It has to be "flipped" to match the order on the bra side.
-            ket_flip_fac = 1
-            for i in range(1, len(ket_side) + 1):
-                if i % 2 == 0:
-                    ket_flip_fac *= -1
-            fac *= ket_flip_fac
-            new_key = tuple(active_op)
+            fac = 1 - 2 * (phase_changes & 1)
+            new_key = tuple(active_op[::-1])
             if new_key in operators.keys():
-                operators[new_key] += fac * self.operators[op_key]
+                operators[new_key] += fac * coeff
             else:
-                operators[new_key] = fac * self.operators[op_key]
+                operators[new_key] = fac * coeff
         return FermionicOperator(operators)
 
     def get_info(self) -> tuple[list[list[int]], list[list[int]], list[float]]:

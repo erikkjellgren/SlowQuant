@@ -181,12 +181,29 @@ PYTHONPATH=/tmp/sq_master python <script>   # note the two-checkout PATH hazard 
 The other three oracle cases fail on `ci_eigenvalues`, as expected — they have inactive and/or
 virtual orbitals and so need Phase 2.
 
-### Phase 2 — folding *(highest risk)*
-- [ ] `get_folded_operator`: space classification (two ranges per spin), index remap
+### Phase 2 — folding — **done**
+- [x] `get_folded_operator`: space classification by `orb_idx % num_orbs`, index remap
       (α `n_i+k → k`, β `N+n_i+k → n_a+k`).
-- [ ] **Re-derive the inactive/active anticommutation sign from scratch.** Do not translate it.
-      This is the one edit that produces plausible-but-wrong numbers.
-- [ ] **Test:** a case *with* inactive and virtual orbitals, against the oracle.
+- [x] The sign is no longer a closed form. It is obtained by **simulating the string on the
+      inactive subsystem**, applying operators right to left from a filled inactive space and
+      accumulating the number of occupied inactive orbitals each operator has to be moved past.
+      Terms are dropped when a virtual index appears, when an inactive creation hits an occupied
+      orbital (or an annihilation an empty one), or when the inactive occupations are not
+      restored. This is ordering-agnostic and does not assume a normal-ordered input.
+- [x] **The subtlety that broke the first attempt.** Every α orbital lies below every inactive β
+      one, so an inactive β operator must also move past the *active* α electrons. Their count at
+      the start of the string is a constant of the CI space and cancels — the inactive operators
+      pair up, so an even number of them are β — but the *running change* caused by active α
+      operators earlier in the string does not. Tracking that change is what `active_alpha_change`
+      does. Without it, `epqrs(0,0,1,1)` on a space with one inactive orbital comes out with the
+      wrong sign on the α–β cross terms.
+- [x] **Test:** `tests/test_operator_folding.py` builds the operator matrix over the whole
+      orbital space, restricts it to the determinants with inactive filled and virtual empty, and
+      compares that block to the folded operator's matrix. The reference needs no sign reasoning
+      at all, so it is a real check rather than a restatement of the implementation. Six orbital
+      spaces, covering no inactive/no virtual, inactive only, virtual only, both, more inactive
+      than active, and unequal α/β occupation.
+- [x] **All four oracle cases now pass.**
 
 ### Phase 3 — wave function classes *(three near-copies)*
 `ups_`, `ucc_`, `sa_ups_wavefunction.py` — a change in one almost always belongs in all three.
