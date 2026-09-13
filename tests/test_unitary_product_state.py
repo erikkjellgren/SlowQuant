@@ -399,6 +399,13 @@ def test_ups_n2_fuccsdtq56() -> None:
 
     Test added after bug was discovered that didnt allow for,
     T, Q, 5, and 6 excitation orders to run.
+
+    The reference energy is specific to the order in which the excitations are applied. fUCC is a
+    product of exponentials of non-commuting generators, so the factor order is part of the
+    ansatz, and with 399 parameters this one still does not span the CAS, whose CI ground state
+    is -131.1966323482769. The order follows the spin-orbital ordering, so it changed when that
+    went from interleaved to alpha/beta-blocked. The excitation set is unchanged, and the value
+    below was re-recorded then.
     """
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -416,4 +423,4 @@ def test_ups_n2_fuccsdtq56() -> None:
         ansatz_options={"S": True, "D": True, "T": True, "Q": True, "5": True, "6": True},
     )
     WF.run_wf_optimization_1step("bfgs", False)
-    assert abs(WF.energy_elec - -131.1965135680604533) < 10**-6
+    assert abs(WF.energy_elec - -131.1964192800081) < 10**-6

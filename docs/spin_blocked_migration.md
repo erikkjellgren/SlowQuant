@@ -333,6 +333,8 @@ Evidence that this is the reordering and not a bug:
   matches exactly.
 
 So the suite is a reliable oracle for everything except the variational minimum of a factorized
-ansatz whose factor order the migration changed. **Decision pending:** accept the new ordering and
-re-record that reference, or make the iterators reproduce the pre-migration factor order so
-previously published numbers stay reproducible.
+ansatz whose factor order the migration changed. **Decided:** keep the natural ascending blocked
+order, which is also the α-major layout the future factorization work wants, and re-record that
+one reference with the reasoning in the test's docstring. fUCC numbers produced before the
+migration therefore do not reproduce bit-for-bit; the difference here is 9.4e-5 Hartree, well
+inside the gap to the CAS limit.
