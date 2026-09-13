@@ -7,6 +7,10 @@ from qiskit.transpiler import CouplingMap, PassManager
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 
+from slowquant.unitary_coupled_cluster.spin_ordering import (
+    interleaved_to_blocked as f2q,
+)
+
 
 def to_CBS_measurement(op: str, transpiled: list[QuantumCircuit] | None = None) -> QuantumCircuit:
     r"""Convert a Pauli string to Pauli measurement circuit.
@@ -973,33 +977,6 @@ def postselection(
     return new_dist
 
 
-def f2q(i: int, num_orbs: int) -> int:
-    r"""Convert fermionic index to qubit index.
-
-    The fermionic index is assumed to follow the convention,
-
-    .. math::
-        \left|0_\alpha 0_\beta 1_\alpha 1_\beta ... N_\alpha N_\beta\right>
-
-    The qubit index follows,
-
-    .. math::
-       \left|0_\alpha 1_\alpha ... N_\alpha 0_\beta 1_\beta ... N_\beta\right>
-
-    This function assumes Jordan-Wigner mapping.
-
-    Args:
-        i: Fermionic index.
-        num_orbs: Number of spatial orbitals.
-
-    Returns:
-        Qubit index.
-    """
-    if i % 2 == 0:
-        return i // 2
-    return i // 2 + num_orbs
-
-
 def get_determinant_superposition_reference(
     det1: str, det2: str, num_orbs: int, mapper: JordanWignerMapper
 ) -> QuantumCircuit:
@@ -1090,30 +1067,6 @@ def get_determinant_reference(det: str, num_orbs: int, mapper: FermionicMapper) 
         if occ == "1":
             qc.x(idx)
     return qc
-
-
-def get_reordering_sign(det: str) -> int:
-    """Get sign from reordering determinant.
-
-    The reordering is done from spin-paired to spin-blocked.
-
-    Args:
-        det: Determinant.
-
-    Returns:
-        Phase factor from the reordering.
-    """
-    sign = 1
-    alphas = 0
-    for i, occ in enumerate(det[::-1]):
-        # Doing reverse thus alpha are the uneven
-        if i % 2 == 1 and occ == "1":
-            alphas += 1
-        # Doing the reverse thus beta are the even
-        elif i % 2 == 0 and occ == "1":
-            if alphas % 2 == 1:
-                sign *= -1
-    return sign
 
 
 def pauliop_to_dict(op: SparsePauliOp) -> dict[str, float]:

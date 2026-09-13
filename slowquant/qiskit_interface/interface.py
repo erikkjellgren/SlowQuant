@@ -31,13 +31,13 @@ from slowquant.qiskit_interface.util import (
     get_bitstring_sign,
     get_determinant_reference,
     get_determinant_superposition_reference,
-    get_reordering_sign,
     layout_conserving_compose,
     pauliop_to_dict,
     postselection,
     to_CBS_measurement,
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
+from slowquant.unitary_coupled_cluster.spin_ordering import get_reordering_sign
 from slowquant.unitary_coupled_cluster.util import UpsStructure
 
 
