@@ -331,6 +331,19 @@ raise.
 - [x] State-vector gate: `test_unitary_coupled_cluster.py` + `test_oscillator_strength.py`,
       **24 passed, 0 failed** — naive, projected, self-consistent, state-transfer and all-ST, for
       both UCC and UPS wave functions.
+- [x] Quantum gate: `test_qiskit_unitary_product_state.py`, **14 passed, 0 failed**, including the
+      self-consistent and state-transfer quantum linear response.
+
+### Full suite: **133 passed, 4 failed**
+
+The four are the known CH3 UHF flake, and three tests in `test_qiskit_interface.py`
+(`test_state_average_M`, `test_state_average_Mplus`, `test_no_saving`) that assert on values from
+a noisy `FakeTorino` simulation with a pinned `initial_layout`. Qubits 0-3 now mean
+α₀,α₁,β₀,β₁ rather than α₀,β₀,α₁,β₁, so a fixed physical layout puts the orbitals on different
+physical qubits with different error rates. The ideal-simulator comparisons inside those same
+tests pass, and both index topologies transpile to identical gate counts (depth 21, 14 cx, 8 ry,
+6 h, 4 x), so no circuit got worse. **Decision pending:** re-record those three references, or
+re-pick the layout so it maps sensibly onto the blocked ordering.
 
 ### Phase 8 — cleanup
 - [ ] Delete now-identity conversions; update docstrings that describe the interleaved convention.
