@@ -7,10 +7,6 @@ from qiskit.transpiler import CouplingMap, PassManager
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 
-from slowquant.unitary_coupled_cluster.spin_ordering import (
-    interleaved_to_blocked as f2q,
-)
-
 
 def to_CBS_measurement(op: str, transpiled: list[QuantumCircuit] | None = None) -> QuantumCircuit:
     r"""Convert a Pauli string to Pauli measurement circuit.
@@ -995,11 +991,11 @@ def get_determinant_superposition_reference(
         raise TypeError("Only implemented for JordanWignerMapper. Got: {type(mapper)}")
     qc = QuantumCircuit(2 * num_orbs)
     for i, occ in enumerate(det1):
-        idx = f2q(i, num_orbs)
+        idx = i
         if occ == "1":
             qc.x(idx)
     for i, (occ1, occ2) in enumerate(zip(det1, det2)):
-        idx = f2q(i, num_orbs)
+        idx = i
         if occ1 == "0" and occ2 == "1":
             hadamard_idx = idx
             qc.h(idx)
@@ -1007,7 +1003,7 @@ def get_determinant_superposition_reference(
     else:  # No break
         raise ValueError("Failed to find idx for Hadamard gate")
     for i, (occ1, occ2) in enumerate(zip(det1, det2)):
-        idx = f2q(i, num_orbs)
+        idx = i
         if occ1 == occ2 or idx == hadamard_idx:
             continue
         if occ1 == "1" or occ2 == "1":
@@ -1033,14 +1029,14 @@ def get_determinant_superposition_reference_MAnsatz0(
         raise TypeError("Only implemented for JordanWignerMapper. Got: {type(mapper)}")
     qc = QuantumCircuit(2 * num_orbs)
     for i, (occ1, occ2) in enumerate(zip(det1, det2)):
-        idx = f2q(i, num_orbs)
+        idx = i
         if occ1 == "0" and occ2 == "1":
             hadamard_idx = idx
             break
     else:  # No break
         raise ValueError("Failed to find idx for Hadamard gate")
     for i, (occ1, occ2) in enumerate(zip(det1, det2)):
-        idx = f2q(i, num_orbs)
+        idx = i
         if occ1 == occ2 or idx == hadamard_idx:
             continue
         if occ1 == "1" or occ2 == "1":
@@ -1063,7 +1059,7 @@ def get_determinant_reference(det: str, num_orbs: int, mapper: FermionicMapper) 
         raise TypeError("Only implemented for JordanWignerMapper. Got: {type(mapper)}")
     qc = QuantumCircuit(2 * num_orbs)
     for i, occ in enumerate(det):
-        idx = f2q(i, num_orbs)
+        idx = i
         if occ == "1":
             qc.x(idx)
     return qc

@@ -628,7 +628,9 @@ def test_custom() -> None:
 
     qc = qWF.QI.circuit.copy()
     qc_param = qWF.QI.parameters
-    qc_H = hamiltonian_0i_0a(qWF.h_mo, qWF.g_mo, qWF.num_inactive_orbs, qWF.num_active_orbs)
+    qc_H = hamiltonian_0i_0a(
+        qWF.h_mo, qWF.g_mo, qWF.num_inactive_orbs, qWF.num_active_orbs, qWF.num_virtual_orbs
+    )
     qc_H = qc_H.get_folded_operator(qWF.num_inactive_orbs, qWF.num_active_orbs, qWF.num_virtual_orbs)
 
     # Define the Sampler

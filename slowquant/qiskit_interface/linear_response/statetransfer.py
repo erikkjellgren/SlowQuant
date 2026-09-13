@@ -27,15 +27,12 @@ class quantumLR(quantumLRBaseClass):
         self.B = np.zeros((self.num_G, self.num_G))
         self.Sigma = np.zeros((self.num_G, self.num_G))
         self.states = {}
+        # Blocked ordering, so the alpha string is followed by the beta string.
         hf_det = ""
-        for i in range(2 * self.wf.num_active_orbs):
-            if i % 2 == 0 and i // 2 < self.wf.num_active_elec_alpha:
-                hf_det += "1"
-                continue
-            if i % 2 == 1 and i // 2 < self.wf.num_active_elec_beta:
-                hf_det += "1"
-                continue
-            hf_det += "0"
+        for p_idx in range(self.wf.num_active_orbs):
+            hf_det += "1" if p_idx < self.wf.num_active_elec_alpha else "0"
+        for p_idx in range(self.wf.num_active_orbs):
+            hf_det += "1" if p_idx < self.wf.num_active_elec_beta else "0"
         self.states = {"HF": ([1.0], [hf_det])}
         for i, G in enumerate(self.G_ops):
             coeffs, dets = get_determinant_expansion_from_operator_on_HF(
@@ -94,9 +91,24 @@ class quantumLR(quantumLRBaseClass):
         mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
         muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
         muz = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[2])
-        mux_op = one_elec_op_0i_0a(mux, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-        muy_op = one_elec_op_0i_0a(muy, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-        muz_op = one_elec_op_0i_0a(muz, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
+        mux_op = one_elec_op_0i_0a(
+            mux,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
+        )
+        muy_op = one_elec_op_0i_0a(
+            muy,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
+        )
+        muz_op = one_elec_op_0i_0a(
+            muz,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
+        )
         mux_active = mux_op.get_folded_operator(*self.orbs)
         muy_active = muy_op.get_folded_operator(*self.orbs)
         muz_active = muz_op.get_folded_operator(*self.orbs)

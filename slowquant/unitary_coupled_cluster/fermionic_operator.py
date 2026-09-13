@@ -6,13 +6,14 @@ import re
 from slowquant.unitary_coupled_cluster.spin_ordering import alpha_idx, beta_idx
 
 
-def operator_to_qiskit_key(operator_string: tuple[tuple[int, bool], ...], remapping: dict[int, int]) -> str:
+def operator_to_qiskit_key(operator_string: tuple[tuple[int, bool], ...]) -> str:
     """Make key string to index a fermionic operator in a dict structure.
+
+    SlowQuant and Qiskit Nature use the same alpha/beta-blocked ordering of the spin orbitals,
+    so the indices carry over unchanged.
 
     Args:
         operator_string: Fermionic operators.
-        remapping: Map that takes indices from alpha,beta,alpha,beta
-                   to alpha,alpha,beta,beta ordering.
 
     Returns:
         Dictionary key.
@@ -20,9 +21,9 @@ def operator_to_qiskit_key(operator_string: tuple[tuple[int, bool], ...], remapp
     op_key = ""
     for a in operator_string:
         if a[1]:
-            op_key += f" +_{remapping[a[0]]}"
+            op_key += f" +_{a[0]}"
         else:
-            op_key += f" -_{remapping[a[0]]}"
+            op_key += f" -_{a[0]}"
     return op_key[1:]
 
 
@@ -356,26 +357,17 @@ class FermionicOperator:
             operator[op_key] = fac
         return operator
 
-    def get_qiskit_form(self, num_orbs: int) -> dict[str, float]:
+    def get_qiskit_form(self) -> dict[str, float]:
         """Get fermionic operator on qiskit form.
 
-        Args:
-            num_orbs: Number of spatial orbitals.
+        Both use alpha/beta-blocked spin-orbital ordering, so only the key format changes.
 
         Returns:
             Fermionic operators on qiskit form.
         """
         qiskit_form = {}
-        remapping = {}
-        #  Map indices from alpha,beta,alpha,beta to alpha,alpha,beta,beta.
-        for i in range(2 * num_orbs):
-            if i < num_orbs:
-                remapping[2 * i] = i
-            else:
-                remapping[2 * i + 1 - 2 * num_orbs] = i
         for op_key in self.operators.keys():
-            qiskit_str = operator_to_qiskit_key(op_key, remapping)
-            qiskit_form[qiskit_str] = self.operators[op_key]
+            qiskit_form[operator_to_qiskit_key(op_key)] = self.operators[op_key]
         return qiskit_form
 
     def get_folded_operator(

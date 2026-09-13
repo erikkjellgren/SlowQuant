@@ -148,5 +148,5 @@ class _HartreeFock:
         H = hamiltonian_full_space(h_mo, g_mo, num_orbs)
 
         if qiskit_form:
-            return H.get_qiskit_form(num_orbs)
+            return H.get_qiskit_form()
         return H

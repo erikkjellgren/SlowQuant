@@ -7,8 +7,8 @@ from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
-from slowquant.qiskit_interface.util import f2q
 from slowquant.unitary_coupled_cluster.operators import a_op_spin
+from slowquant.unitary_coupled_cluster.spin_ordering import alpha_idx, beta_idx
 from slowquant.unitary_coupled_cluster.util import UpsStructure
 
 
@@ -123,8 +123,6 @@ def _single_excitation_efficient(
     Returns:
         Single excitation circuit.
     """
-    k = f2q(k, num_orbs)
-    i = f2q(i, num_orbs)
     if k <= i:
         raise ValueError(f"k={k}, must be larger than i={i}")
     if k - 1 == i:
@@ -179,37 +177,44 @@ def _double_excitation_efficient(
     Returns:
         Double excitation circuit.
     """
-    if k < i or k < j:
-        raise ValueError(f"Operator only implemented for k, {k}, larger than i, {i}, and j, {j}")
-    if l < i or l < j:
-        raise ValueError(f"Operator only implemented for l, {l}, larger than i, {i}, and j, {j}")
+    if len({k, l, i, j}) != 4:
+        raise ValueError(f"Operator needs four distinct spin orbitals, got k={k}, l={l}, i={i}, j={j}")
+    # The circuit is only valid for certain interleavings of the creation and annihilation
+    # indices, because the Jordan-Wigner strings run between them in sorted order. Writing the
+    # sorted indices as c for creation and a for annihilation, "aacc" is a same-spin double and
+    # "acac" a double whose two spins share a pair of spatial orbitals; "ccaa" is "aacc" with the
+    # excitation reversed, which the swaps below normalise. The nested and crossed orderings
+    # "acca", "caac" and "caca" are not implemented. Under interleaved spin-orbital ordering only
+    # "aacc" ever occurred, which is why this used to be a simple comparison.
+    sorted_kinds = "".join(kind for _, kind in sorted(((k, "c"), (l, "c"), (i, "a"), (j, "a"))))
+    if sorted_kinds not in ("aacc", "acac", "ccaa"):
+        raise ValueError(
+            f"Operator not implemented for this ordering of creation and annihilation indices, "
+            f"got {sorted_kinds} for k={k}, l={l}, i={i}, j={j}"
+        )
     n_alpha = 0
     n_beta = 0
-    if i % 2 == 0:
+    if i < num_orbs:
         n_alpha += 1
     else:
         n_beta += 1
-    if j % 2 == 0:
+    if j < num_orbs:
         n_alpha += 1
     else:
         n_beta += 1
-    if k % 2 == 0:
+    if k < num_orbs:
         n_alpha += 1
     else:
         n_beta += 1
-    if l % 2 == 0:
+    if l < num_orbs:
         n_alpha += 1
     else:
         n_beta += 1
     if n_alpha % 2 != 0 or n_beta % 2 != 0:
         raise ValueError("Operator only implemented for spin conserving operators.")
     fac = 1
-    if k % 2 == l % 2 and k % 2 == 0 and i % 2 != 0:
+    if (k < num_orbs) == (l < num_orbs) and k < num_orbs and i >= num_orbs:
         fac *= -1
-    k = f2q(k, num_orbs)
-    l = f2q(l, num_orbs)
-    i = f2q(i, num_orbs)
-    j = f2q(j, num_orbs)
     if k > l:
         l, k = k, l
         fac *= -1
@@ -315,10 +320,8 @@ def _sa_single_excitation_efficient(
     Returns:
         Single singlet spin-adapted excitation circuit.
     """
-    # qc = single_excitation(2 * k, 2 * i, num_orbs, qc, 2 ** (-1 / 2) * theta)
-    # qc = single_excitation(2 * k + 1, 2 * i + 1, num_orbs, qc, 2 ** (-1 / 2) * theta)
-    qc = _single_excitation_efficient(2 * k, 2 * i, num_orbs, qc, theta)
-    qc = _single_excitation_efficient(2 * k + 1, 2 * i + 1, num_orbs, qc, theta)
+    qc = _single_excitation_efficient(alpha_idx(k, num_orbs), alpha_idx(i, num_orbs), num_orbs, qc, theta)
+    qc = _single_excitation_efficient(beta_idx(k, num_orbs), beta_idx(i, num_orbs), num_orbs, qc, theta)
     return qc
 
 
@@ -349,7 +352,7 @@ def _single_excitation_trotter(
     num_spin_orbs = 2 * num_orbs
     op = a_op_spin(a, True) * a_op_spin(i, False)
     T = op - op.dagger
-    op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
+    op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(), num_spin_orbs))
     ops = np.array([str(pauli) for pauli in op_mapped.paulis])
     factors = np.array([(1.0j * x).real for x in op_mapped.coeffs])
     sort_idx = np.argsort(ops)
@@ -397,7 +400,7 @@ def _double_excitation_trotter(
     factors = []
     op = a_op_spin(a, True) * a_op_spin(b, True) * a_op_spin(j, False) * a_op_spin(i, False)
     T = op - op.dagger
-    op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
+    op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(), num_spin_orbs))
     ops = np.array([str(pauli) for pauli in op_mapped.paulis])
     factors = np.array([(1.0j * x).real for x in op_mapped.coeffs])
     sort_idx = np.argsort(ops)
@@ -433,8 +436,10 @@ def _sa_single_excitation_trotter(
     Returns:
         Trotterized fermionic spin-adapted singlet single excitation circuit.
     """
-    qc = _single_excitation_trotter(2 * i, 2 * a, num_orbs, qc, theta, mapper)
-    qc = _single_excitation_trotter(2 * i + 1, 2 * a + 1, num_orbs, qc, theta, mapper)
+    qc = _single_excitation_trotter(
+        alpha_idx(i, num_orbs), alpha_idx(a, num_orbs), num_orbs, qc, theta, mapper
+    )
+    qc = _single_excitation_trotter(beta_idx(i, num_orbs), beta_idx(a, num_orbs), num_orbs, qc, theta, mapper)
     return qc
 
 

@@ -25,6 +25,11 @@ from slowquant.unitary_coupled_cluster.operators import (
     one_elec_op_0i_0a,
 )
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
+from slowquant.unitary_coupled_cluster.spin_ordering import (
+    det_interleaved_to_blocked,
+    get_reordering_sign,
+    spin_indices,
+)
 
 
 class WaveFunctionSACircuit:
@@ -90,71 +95,38 @@ class WaveFunctionSACircuit:
         self._sa_energy: float | None = None
         self._state_energies = None
         self.num_energy_evals = 0  # number of energy measurements on quanutm
-        active_space = []
-        orbital_counter = 0
+        # Construct spin orbital spaces and indices.
+        # The reference is closed shell, so the lowest spatial orbitals are doubly occupied and
+        # the active space sits around the division between occupied and unoccupied.
         num_elec = self.int_gen.num_elec
-        for i in range(num_elec - cas[0], num_elec):
-            active_space.append(i)
-            orbital_counter += 1
-        for i in range(num_elec, num_elec + 2 * cas[1] - orbital_counter):
-            active_space.append(i)
-        for i in range(num_elec):
-            if i in active_space:
-                self.active_spin_idx.append(i)
-                self.active_occ_spin_idx.append(i)
-                self.num_active_spin_orbs += 1
-            else:
-                self.inactive_spin_idx.append(i)
-                self.num_inactive_spin_orbs += 1
-        for i in range(num_elec, self.num_spin_orbs):
-            if i in active_space:
-                self.active_spin_idx.append(i)
-                self.active_unocc_spin_idx.append(i)
-                self.num_active_spin_orbs += 1
-            else:
-                self.virtual_spin_idx.append(i)
-                self.num_virtual_spin_orbs += 1
-        self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
-        self.num_active_orbs = self.num_active_spin_orbs // 2
-        self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
+        self.num_active_orbs = cas[1]
+        self.num_inactive_orbs = (num_elec - self.num_active_elec) // 2
+        self.num_virtual_orbs = self.num_orbs - self.num_inactive_orbs - self.num_active_orbs
+        self.num_inactive_spin_orbs = 2 * self.num_inactive_orbs
+        self.num_active_spin_orbs = 2 * self.num_active_orbs
+        self.num_virtual_spin_orbs = 2 * self.num_virtual_orbs
         # Construct spatial idx
-        self.inactive_idx: list[int] = []
-        self.virtual_idx: list[int] = []
-        self.active_idx: list[int] = []
-        self.active_occ_idx: list[int] = []
-        self.active_unocc_idx: list[int] = []
-        for idx in self.inactive_spin_idx:
-            if idx // 2 not in self.inactive_idx:
-                self.inactive_idx.append(idx // 2)
-        for idx in self.active_spin_idx:
-            if idx // 2 not in self.active_idx:
-                self.active_idx.append(idx // 2)
-        for idx in self.virtual_spin_idx:
-            if idx // 2 not in self.virtual_idx:
-                self.virtual_idx.append(idx // 2)
-        for idx in self.active_occ_spin_idx:
-            if idx // 2 not in self.active_occ_idx:
-                self.active_occ_idx.append(idx // 2)
-        for idx in self.active_unocc_spin_idx:
-            if idx // 2 not in self.active_unocc_idx:
-                self.active_unocc_idx.append(idx // 2)
-        # Make shifted indices
-        if len(self.active_spin_idx) != 0:
-            active_shift = np.min(self.active_spin_idx)
-            for active_idx in self.active_spin_idx:
-                self.active_spin_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_occ_spin_idx:
-                self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_unocc_spin_idx:
-                self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
-        if len(self.active_idx) != 0:
-            active_shift = np.min(self.active_idx)
-            for active_idx in self.active_idx:
-                self.active_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_occ_idx:
-                self.active_occ_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_unocc_idx:
-                self.active_unocc_idx_shifted.append(active_idx - active_shift)
+        active_start = self.num_inactive_orbs
+        active_end = active_start + self.num_active_orbs
+        active_unocc_start = active_start + self.num_active_elec_alpha
+        self.inactive_idx: list[int] = list(range(active_start))
+        self.active_idx: list[int] = list(range(active_start, active_end))
+        self.virtual_idx: list[int] = list(range(active_end, self.num_orbs))
+        self.active_occ_idx: list[int] = list(range(active_start, active_unocc_start))
+        self.active_unocc_idx: list[int] = list(range(active_unocc_start, active_end))
+        # Spin orbital indices, the alpha block followed by the beta block
+        self.inactive_spin_idx = spin_indices(self.inactive_idx, self.num_orbs)
+        self.active_spin_idx = spin_indices(self.active_idx, self.num_orbs)
+        self.virtual_spin_idx = spin_indices(self.virtual_idx, self.num_orbs)
+        self.active_occ_spin_idx = spin_indices(self.active_occ_idx, self.num_orbs)
+        self.active_unocc_spin_idx = spin_indices(self.active_unocc_idx, self.num_orbs)
+        # Make shifted indices, counted from the start of the active space
+        self.active_idx_shifted = [p - active_start for p in self.active_idx]
+        self.active_occ_idx_shifted = [p - active_start for p in self.active_occ_idx]
+        self.active_unocc_idx_shifted = [p - active_start for p in self.active_unocc_idx]
+        self.active_spin_idx_shifted = spin_indices(self.active_idx_shifted, self.num_active_orbs)
+        self.active_occ_spin_idx_shifted = spin_indices(self.active_occ_idx_shifted, self.num_active_orbs)
+        self.active_unocc_spin_idx_shifted = spin_indices(self.active_unocc_idx_shifted, self.num_active_orbs)
         # Find non-redundant kappas
         self._kappa = []
         kappa_idx = []
@@ -198,7 +170,17 @@ class WaveFunctionSACircuit:
         self.kappa_redundant_idx = np.array(kappa_redundant_idx, dtype=int)
         self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
         self.num_states = len(states[0])
-        self.states = states
+        # Determinants are given in the human readable interleaved ordering. Rewriting one in the
+        # blocked ordering permutes its creation operators, which carries a sign. For a single
+        # determinant that is a global phase, but these states are superpositions, so the
+        # relative signs are physical.
+        self.states = (
+            [
+                [coeff * get_reordering_sign(on_vec) for coeff, on_vec in zip(coeffs, on_vecs)]
+                for coeffs, on_vecs in zip(states[0], states[1])
+            ],
+            [[det_interleaved_to_blocked(on_vec) for on_vec in on_vecs] for on_vecs in states[1]],
+        )
         # Setup Qiskit stuff
         self.QI = quantum_interface
         if self.QI.ansatz_options.get("do_pp"):
@@ -367,7 +349,7 @@ class WaveFunctionSACircuit:
                 p_idx = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
                     q_idx = q - self.num_inactive_orbs
-                    rdm1_op = Epq(p, q).get_folded_operator(
+                    rdm1_op = Epq(p, q, self.num_orbs).get_folded_operator(
                         self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                     )
                     val = 0.0
@@ -415,7 +397,9 @@ class WaveFunctionSACircuit:
                             s_lim = p + 1
                         for s in range(self.num_inactive_orbs, s_lim):
                             s_idx = s - self.num_inactive_orbs
-                            pdm2_op = (Epq(p, q) * Epq(r, s)).get_folded_operator(
+                            pdm2_op = (
+                                Epq(p, q, self.num_orbs) * Epq(r, s, self.num_orbs)
+                            ).get_folded_operator(
                                 self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                             )
                             val = 0.0
@@ -459,6 +443,7 @@ class WaveFunctionSACircuit:
                 self.g_mo,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
+                self.num_virtual_orbs,
             )
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             sa_energy = 0.0
@@ -478,6 +463,7 @@ class WaveFunctionSACircuit:
             self.g_mo,
             self.num_inactive_orbs,
             self.num_active_orbs,
+            self.num_virtual_orbs,
         )
         H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
         sa_energy = 0.0
@@ -725,6 +711,7 @@ class WaveFunctionSACircuit:
             self.g_mo,
             self.num_inactive_orbs,
             self.num_active_orbs,
+            self.num_virtual_orbs,
         ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
         for i, (coeffs_i, csf_i) in enumerate(zip(self.states[0], self.states[1])):
             for j, (coeffs_j, csf_j) in enumerate(zip(self.states[0], self.states[1])):
@@ -785,9 +772,9 @@ class WaveFunctionSACircuit:
         mo_integral = one_electron_integral_transform(self.c_mo, ao_integral)
         transition_property = np.zeros(self.num_states - 1)
         state_op = np.zeros((self.num_states, self.num_states))
-        op = one_elec_op_0i_0a(mo_integral, self.num_inactive_orbs, self.num_active_orbs).get_folded_operator(
-            self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
-        )
+        op = one_elec_op_0i_0a(
+            mo_integral, self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+        ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
         for i, (coeffs_i, csf_i) in enumerate(zip(self.states[0], self.states[1])):
             for j, (coeffs_j, csf_j) in enumerate(zip(self.states[0], self.states[1])):
                 state_op[i, j] = self.QI.quantum_expectation_value_csfs(
@@ -847,7 +834,9 @@ class WaveFunctionSACircuit:
             self.kappa = parameters[:num_kappa]
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
-        H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+        H = hamiltonian_0i_0a(
+            self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+        )
         H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
         energy_states = []
         for coeffs, csf in zip(self.states[0], self.states[1]):
@@ -895,7 +884,9 @@ class WaveFunctionSACircuit:
                 self.rdm2,
             )
         if theta_optimization:
-            H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+            H = hamiltonian_0i_0a(
+                self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+            )
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             for i in range(len(self.thetas)):
                 R = self.QI.grad_param_R[self.QI.param_names[i]]
