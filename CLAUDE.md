@@ -88,4 +88,5 @@ PYTHONPATH=/home/kjellgren/gitreps/SlowQuant_claude python script.py
   so it is a good oracle for refactors that should not change results. Two exceptions: the
   variational minimum of a *factorized* ansatz depends on the factor order, and the noisy
   `FakeTorino` tests in `test_qiskit_interface.py` depend on the qubit-to-orbital assignment.
-- Keep the name convention and coding style as close as possible to the original, but only when it does not sacrifice   performance.
+- Keep the name convention and coding style as close as possible to the original, but only when it does not sacrifice performance.
+- When merging into "forwarded_master" always do a squash merge.
