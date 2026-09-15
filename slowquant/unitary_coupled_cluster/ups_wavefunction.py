@@ -490,7 +490,7 @@ class WaveFunctionUPS:
             One-electron reduced density matrix.
         """
         if self._rdm1 is None:
-            if can_build_rdm12_as_gram(self.num_active_orbs, len(self.ci_coeffs)):
+            if can_build_rdm12_as_gram(self.num_active_orbs, len(self.ci_info.idx2det)):
                 self._rdm1, self._rdm2 = build_rdm12_as_gram(
                     self.ci_coeffs,
                     self.ci_info,
@@ -522,7 +522,7 @@ class WaveFunctionUPS:
             Two-electron reduced density matrix.
         """
         if self._rdm2 is None:
-            if can_build_rdm12_as_gram(self.num_active_orbs, len(self.ci_coeffs)):
+            if can_build_rdm12_as_gram(self.num_active_orbs, len(self.ci_info.idx2det)):
                 self._rdm1, self._rdm2 = build_rdm12_as_gram(
                     self.ci_coeffs,
                     self.ci_info,
