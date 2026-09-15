@@ -426,9 +426,9 @@ def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bo
     det2idx = ci_info.det2idx
     num_active_orbs = ci_info.num_active_orbs
     num_dets = len(idx2det)  # number of spin and particle conserving determinants
-    op_mat = np.zeros((num_dets, num_dets), dtype=np.float64)  # basis
+    op_mat = np.zeros((num_dets, num_dets), dtype=float)  # basis
     # Create bitstrings for parity check. Contains occupied determinant up to orbital index.
-    parity_check = np.zeros(2 * num_active_orbs + 1, dtype=np.int64)
+    parity_check = np.zeros(2 * num_active_orbs + 1, dtype=int)
     num = 0
     for i in range(2 * num_active_orbs - 1, -1, -1):
         num += 2**i
@@ -500,9 +500,9 @@ def propagate_state(
     else:
         is_parallel = True
     new_state = np.copy(state)
-    tmp_state = np.zeros_like(state, dtype=np.float64)
+    tmp_state = np.zeros_like(state, dtype=float)
     # Create bitstrings for parity check. Contains occupied determinant up to orbital index.
-    parity_check = np.zeros(2 * num_active_orbs + 1, dtype=np.int64)
+    parity_check = np.zeros(2 * num_active_orbs + 1, dtype=int)
     num = 0
     for i in range(2 * num_active_orbs - 1, -1, -1):
         num += 2**i
@@ -640,9 +640,9 @@ def propagate_state_SA(
     else:
         is_parallel = True
     new_state = np.copy(state)
-    tmp_state = np.zeros_like(state, dtype=np.float64)
+    tmp_state = np.zeros_like(state, dtype=float)
     # Create bitstrings for parity check. Contains occupied determinant up to orbital index.
-    parity_check = np.zeros(2 * num_active_orbs + 1, dtype=np.int64)
+    parity_check = np.zeros(2 * num_active_orbs + 1, dtype=int)
     num = 0
     for i in range(2 * num_active_orbs - 1, -1, -1):
         num += 2**i
