@@ -548,7 +548,12 @@ def iterate_pair_t2(
     """
     for i in active_occ_idx:
         for a in active_unocc_idx:
-            yield alpha_idx(a, num_orbs), alpha_idx(i, num_orbs), beta_idx(a, num_orbs), beta_idx(i, num_orbs)
+            yield (
+                alpha_idx(a, num_orbs),
+                alpha_idx(i, num_orbs),
+                beta_idx(a, num_orbs),
+                beta_idx(i, num_orbs),
+            )
 
 
 def iterate_pair_t2_generalized(
@@ -564,113 +569,137 @@ def iterate_pair_t2_generalized(
     """
     for i in range(num_orbs):
         for a in range(i + 1, num_orbs):
-            yield alpha_idx(a, num_orbs), alpha_idx(i, num_orbs), beta_idx(a, num_orbs), beta_idx(i, num_orbs)
+            yield (
+                alpha_idx(a, num_orbs),
+                alpha_idx(i, num_orbs),
+                beta_idx(a, num_orbs),
+                beta_idx(i, num_orbs),
+            )
 
 
 class UccStructure:
     __slots__ = ("excitation_indices", "excitation_operator_type", "n_params", "num_active_orbs")
 
-    def __init__(self, num_active_orbs: int) -> None:
-        """Intialize the unitary coupled cluster ansatz structure.
-
-        Args:
-            num_active_orbs: Number of active spatial orbitals the ansatz is built over.
-        """
+    def __init__(self) -> None:
+        """Intialize the unitary coupled cluster ansatz structure."""
         self.excitation_indices: list[tuple[int, ...]] = []
         self.excitation_operator_type: list[str] = []
         self.n_params = 0
-        self.num_active_orbs = num_active_orbs
+        # Set by the builder, the excitation indices are only meaningful with it.
+        self.num_active_orbs: int = 0
 
-    def add_sa_singles(self, active_occ_idx: Sequence[int], active_unocc_idx: Sequence[int]) -> None:
-        """Add spin-adapted singles.
-
-        Args:
-            active_occ_idx: Active strongly occupied spatial orbital indices.
-            active_unocc_idx: Active weakly occupied spatial orbital indices.
-        """
-        for a, i, _ in iterate_t1_sa(active_occ_idx, active_unocc_idx):
-            self.excitation_indices.append((i, a))
-            self.excitation_operator_type.append("sa_single")
-            self.n_params += 1
-
-    def add_sa_doubles(self, active_occ_idx: Sequence[int], active_unocc_idx: Sequence[int]) -> None:
-        """Add spin-adapted doubles.
-
-        Args:
-            active_occ_idx: Active strongly occupied spatial orbital indices.
-            active_unocc_idx: Active weakly occupied spatial orbital indices.
-        """
-        for a, i, b, j, _, op_type in iterate_t2_sa(active_occ_idx, active_unocc_idx):
-            self.excitation_indices.append((i, j, a, b))
-            if op_type == 1:
-                self.excitation_operator_type.append("sa_double_1")
-            elif op_type == 2:
-                self.excitation_operator_type.append("sa_double_2")
-            elif op_type == 3:
-                self.excitation_operator_type.append("sa_double_3")
-            elif op_type == 4:
-                self.excitation_operator_type.append("sa_double_4")
-            elif op_type == 5:
-                self.excitation_operator_type.append("sa_double_5")
-            self.n_params += 1
-
-    def add_triples(self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int]) -> None:
-        """Add alpha-number and beta-number conserving triples.
-
-        Args:
-            active_occ_spin_idx: Active strongly occupied spin orbital indices.
-            active_unocc_spin_idx: Active weakly occupied spin orbital indices.
-        """
-        for a, i, b, j, c, k in iterate_t3(active_occ_spin_idx, active_unocc_spin_idx, self.num_active_orbs):
-            self.excitation_indices.append((i, j, k, a, b, c))
-            self.excitation_operator_type.append("triple")
-            self.n_params += 1
-
-    def add_quadruples(
-        self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int]
+    def add_excitations(
+        self,
+        excitations: list[str],
+        occ_idx: list[int],
+        unocc_idx: list[int],
+        occ_spin_idx: list[int],
+        unocc_spin_idx: list[int],
+        num_orbs: int,
     ) -> None:
-        """Add alpha-number and beta-number conserving quadruples.
+        """Add fermionic excitations.
 
         Args:
-            active_occ_spin_idx: Active strongly occupied spin orbital indices.
-            active_unocc_spin_idx: Active weakly occupied spin orbital indices.
+            excitations: List of fermionic excitations to include.
+            occ_idx: Strongly occupied spatial orbital indices.
+            unocc_idx: Weakly occupied spatial orbital indices.
+            occ_spin_idx: Stongly occupied spin orbital indices.
+            unocc_spin_idx: Weakly occupied spin orbital indices.
+            num_orbs: Number of spatial orbitals.
         """
-        for a, i, b, j, c, k, d, l in iterate_t4(
-            active_occ_spin_idx, active_unocc_spin_idx, self.num_active_orbs
-        ):
-            self.excitation_indices.append((i, j, k, l, a, b, c, d))
-            self.excitation_operator_type.append("quadruple")
-            self.n_params += 1
-
-    def add_quintuples(
-        self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int]
-    ) -> None:
-        """Add alpha-number and beta-number conserving quintuples.
-
-        Args:
-            active_occ_spin_idx: Active strongly occupied spin orbital indices.
-            active_unocc_spin_idx: Active weakly occupied spin orbital indices.
-        """
-        for a, i, b, j, c, k, d, l, e, m in iterate_t5(
-            active_occ_spin_idx, active_unocc_spin_idx, self.num_active_orbs
-        ):
-            self.excitation_indices.append((i, j, k, l, m, a, b, c, d, e))
-            self.excitation_operator_type.append("quintuple")
-            self.n_params += 1
-
-    def add_sextuples(self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int]) -> None:
-        """Add alpha-number and beta-number conserving sextuples.
-
-        Args:
-            active_occ_spin_idx: Active strongly occupied spin orbital indices.
-            active_unocc_spin_idx: Active weakly occupied spin orbital indices.
-        """
-        for a, i, b, j, c, k, d, l, e, m, f, n in iterate_t6(
-            active_occ_spin_idx, active_unocc_spin_idx, self.num_active_orbs
-        ):
-            self.excitation_indices.append((i, j, k, l, m, n, a, b, c, d, e, f))
-            self.excitation_operator_type.append("sextuple")
-            self.n_params += 1
+        excitations = [x.lower() for x in excitations]
+        self.num_active_orbs = num_orbs
+        valid_excitations = (
+            "s",
+            "gs",
+            "sas",
+            "sags",
+            "d",
+            "gd",
+            "pd",
+            "gpd",
+            "t",
+            "q",
+            "5",
+            "6",
+            "sad",
+            "sagd",
+        )
+        for excitation in excitations:
+            if excitation not in valid_excitations:
+                raise ValueError(
+                    f"Got unknown excitation, {excitation}. Valid excitations are: {valid_excitations}"
+                )
+        if "s" in excitations:
+            for a, i in iterate_t1(occ_spin_idx, unocc_spin_idx, num_orbs):
+                self.excitation_operator_type.append("single")
+                self.excitation_indices.append((i, a))
+                self.n_params += 1
+        if "gs" in excitations:
+            for a, i in iterate_t1_generalized(2 * num_orbs):
+                self.excitation_operator_type.append("single")
+                self.excitation_indices.append((i, a))
+                self.n_params += 1
+        if "sas" in excitations:
+            for a, i, _ in iterate_t1_sa(occ_idx, unocc_idx):
+                self.excitation_operator_type.append("sa_single")
+                self.excitation_indices.append((i, a))
+                self.n_params += 1
+        if "sags" in excitations:
+            for a, i, _ in iterate_t1_sa_generalized(num_orbs):
+                self.excitation_operator_type.append("sa_single")
+                self.excitation_indices.append((i, a))
+                self.n_params += 1
+        if "d" in excitations:
+            for a, i, b, j in iterate_t2(occ_spin_idx, unocc_spin_idx, num_orbs):
+                self.excitation_operator_type.append("double")
+                self.excitation_indices.append((i, j, a, b))
+                self.n_params += 1
+        if "gd" in excitations:
+            for a, i, b, j in iterate_t2_generalized(2 * num_orbs):
+                self.excitation_operator_type.append("double")
+                self.excitation_indices.append((i, j, a, b))
+                self.n_params += 1
+        if "pd" in excitations:
+            for a, i, b, j in iterate_pair_t2(occ_idx, unocc_idx, num_orbs):
+                self.excitation_operator_type.append("double")
+                self.excitation_indices.append((i, j, a, b))
+                self.n_params += 1
+        if "gpd" in excitations:
+            for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
+                self.excitation_operator_type.append("double")
+                self.excitation_indices.append((i, j, a, b))
+                self.n_params += 1
+        if "t" in excitations:
+            for a, i, b, j, c, k in iterate_t3(occ_spin_idx, unocc_spin_idx, num_orbs):
+                self.excitation_operator_type.append("triple")
+                self.excitation_indices.append((i, j, k, a, b, c))
+                self.n_params += 1
+        if "q" in excitations:
+            for a, i, b, j, c, k, d, l in iterate_t4(occ_spin_idx, unocc_spin_idx, num_orbs):
+                self.excitation_operator_type.append("quadruple")
+                self.excitation_indices.append((i, j, k, l, a, b, c, d))
+                self.n_params += 1
+        if "5" in excitations:
+            for a, i, b, j, c, k, d, l, e, m in iterate_t5(occ_spin_idx, unocc_spin_idx, num_orbs):
+                self.excitation_operator_type.append("quintuple")
+                self.excitation_indices.append((i, j, k, l, m, a, b, c, d, e))
+                self.n_params += 1
+        if "6" in excitations:
+            for a, i, b, j, c, k, d, l, e, m, f, n in iterate_t6(occ_spin_idx, unocc_spin_idx, num_orbs):
+                self.excitation_operator_type.append("sextuple")
+                self.excitation_indices.append((i, j, k, l, m, n, a, b, c, d, e, f))
+                self.n_params += 1
+        if "sad" in excitations:
+            for a, i, b, j, _, op_case in iterate_t2_sa(occ_idx, unocc_idx):
+                self.excitation_operator_type.append(f"sa_double_{op_case}")
+                self.excitation_indices.append((i, j, a, b))
+                self.n_params += 1
+        if "sagd" in excitations:
+            for a, i, b, j, _, op_case in iterate_t2_sa_generalized(num_orbs):
+                self.excitation_operator_type.append(f"sa_double_{op_case}")
+                self.excitation_indices.append((i, j, a, b))
+                self.n_params += 1
 
 
 class UpsStructure:
@@ -688,10 +717,10 @@ class UpsStructure:
         self.excitation_indices: list[tuple[int, ...]] = []
         self.excitation_operator_type: list[str] = []
         self.n_params: int = 0
-        self.grad_param_R: dict[str, int] = {}
-        self.param_names: list[str] = []
         # Set by the builder, the excitation indices are only meaningful with it.
         self.num_active_orbs: int = 0
+        self.grad_param_R: dict[str, int] = {}
+        self.param_names: list[str] = []
 
     def create_tiled(self, num_active_orbs: int, ansatz_options: dict[str, Any]) -> None:
         """Create tUPS ansatz.
@@ -701,8 +730,12 @@ class UpsStructure:
 
         Ansatz Options:
             * n_layers [int]: Number of layers.
-            * do_qnp [bool]: Do QNP tiling. (default: False)
-            * skip_last_singles [bool]: Skip last layer of singles operators. (default: False)
+            * do_tups [bool]: Do tUPS tiling.
+                             (default: False)
+            * do_qnp [bool]: Do QNP tiling.
+                             (default: False)
+            * skip_last_singles [bool]: Skip last layer of singles operators.
+                                        (default: False)
 
         Args:
             num_active_orbs: Number of spatial active orbitals.
@@ -711,14 +744,14 @@ class UpsStructure:
         Returns:
             tUPS ansatz.
         """
+        self.num_active_orbs = num_active_orbs
         # Options
-        valid_options = ("n_layers", "do_qnp", "skip_last_singles", "do_tups", "do_pp")
+        valid_options = ("n_layers", "do_qnp", "skip_last_singles", "do_tups")
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(f"Got unknown option for tUPS, {option}. Valid options are: {valid_options}")
         if "n_layers" not in ansatz_options.keys():
             raise ValueError("tUPS require the option 'n_layers'")
-        self.num_active_orbs = num_active_orbs
         n_layers = ansatz_options["n_layers"]
         do_tups = False
         do_qnp = False
@@ -816,15 +849,20 @@ class UpsStructure:
         #. 10.1021/acs.jctc.8b01004 (k-UpCCGSD)
 
         Ansatz Options:
+            excitations [list[str]]: List of fermionic excitations to include.
             * n_layers [int]: Number of layers.
-            * S [bool]: Add single excitations.
-            * GS [bool]: Add generalized single excitations.
-            * SAS [bool]: Add spin-adapted single excitations.
-            * SAGS [bool]: Add generalized spin-adapted single excitations.
-            * D [bool]: Add double excitations.
-            * GD [bool]: Add generalized double excitations.
-            * pD [bool]: Add pair double excitations.
-            * GpD [bool]: Add generalized pair double excitations.
+
+        Possible excitations:
+            * S: Add single excitations.
+            * GS: Add generalized single excitations.
+            * SAS: Add spin-adapted single excitations.
+            * SAGS: Add generalized spin-adapted single excitations.
+            * D: Add double excitations.
+            * GD: Add generalized double excitations.
+            * pD: Add pair double excitations.
+            * GpD: Add generalized pair double excitations.
+            * SAD: Add spin-adapted doubles.
+            * SAGD: Add generalized spin-adapted doubles.
 
         Args:
             occ_idx: Strongly occupied spatial orbital indices.
@@ -837,173 +875,135 @@ class UpsStructure:
         Returns:
             Factorized UCC ansatz.
         """
+        self.num_active_orbs = num_orbs
         # Options
-        valid_options = (
-            "n_layers",
-            "S",
-            "D",
-            "SAGS",
-            "pD",
-            "GpD",
-            "SAS",
-            "T",
-            "Q",
-            "5",
-            "6",
-            "SAD",
-            "GS",
-            "GD",
-        )
+        valid_options = ("n_layers", "excitations")
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(f"Got unknown option for fUCC, {option}. Valid options are: {valid_options}")
         if "n_layers" not in ansatz_options.keys():
             raise ValueError("fUCC require the option 'n_layers'")
-        self.num_active_orbs = num_orbs
-        do_S = False
-        do_GS = False
-        do_SAS = False
-        do_SAGS = False
-        do_D = False
-        do_GD = False
-        do_pD = False
-        do_GpD = False
-        do_T = False
-        do_Q = False
-        do_5 = False
-        do_6 = False
-        do_SAD = False
-        if "S" in ansatz_options.keys():
-            do_S = ansatz_options["S"]
-        if "GS" in ansatz_options.keys():
-            do_GS = ansatz_options["GS"]
-        if "SAS" in ansatz_options.keys():
-            do_SAS = ansatz_options["SAS"]
-        if "SAGS" in ansatz_options.keys():
-            do_SAGS = ansatz_options["SAGS"]
-        if "D" in ansatz_options.keys():
-            do_D = ansatz_options["D"]
-        if "GD" in ansatz_options.keys():
-            do_GD = ansatz_options["GD"]
-        if "pD" in ansatz_options.keys():
-            do_pD = ansatz_options["pD"]
-        if "GpD" in ansatz_options.keys():
-            do_GpD = ansatz_options["GpD"]
-        if "T" in ansatz_options.keys():
-            do_T = ansatz_options["T"]
-        if "Q" in ansatz_options.keys():
-            do_Q = ansatz_options["Q"]
-        if "5" in ansatz_options.keys():
-            do_5 = ansatz_options["5"]
-        if "6" in ansatz_options.keys():
-            do_6 = ansatz_options["6"]
-        if "SAD" in ansatz_options.keys():
-            do_SAD = ansatz_options["SAD"]
-        if True not in (
-            do_S,
-            do_SAS,
-            do_SAGS,
-            do_D,
-            do_pD,
-            do_GpD,
-            do_T,
-            do_Q,
-            do_5,
-            do_6,
-            do_SAD,
-            do_GS,
-            do_GD,
-        ):
+        if len(ansatz_options["excitations"]) == 0:
             raise ValueError("fUCC requires some excitations got none.")
+        excitations = [x.lower() for x in ansatz_options["excitations"]]
+        valid_excitations = (
+            "s",
+            "gs",
+            "sas",
+            "sags",
+            "d",
+            "gd",
+            "pd",
+            "gpd",
+            "t",
+            "q",
+            "5",
+            "6",
+            "sad",
+            "sagd",
+        )
+        for excitation in excitations:
+            if excitation not in valid_excitations:
+                raise ValueError(
+                    f"Got unknown excitation, {excitation}. Valid excitations are: {valid_excitations}"
+                )
         n_layers = ansatz_options["n_layers"]
         # Layer loop
         for _ in range(n_layers):
-            if do_S:
+            if "s" in excitations:
                 for a, i in iterate_t1(occ_spin_idx, unocc_spin_idx, num_orbs):
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((i, a))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
-            if do_GS:
+            if "gs" in excitations:
                 for a, i in iterate_t1_generalized(2 * num_orbs):
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((i, a))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
-            if do_SAS:
+            if "sas" in excitations:
                 for a, i, _ in iterate_t1_sa(occ_idx, unocc_idx):
                     self.excitation_operator_type.append("sa_single")
                     self.excitation_indices.append((i, a))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
-            if do_SAGS:
+            if "sags" in excitations:
                 for a, i, _ in iterate_t1_sa_generalized(num_orbs):
                     self.excitation_operator_type.append("sa_single")
                     self.excitation_indices.append((i, a))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
-            if do_D:
+            if "d" in excitations:
                 for a, i, b, j in iterate_t2(occ_spin_idx, unocc_spin_idx, num_orbs):
                     self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
-            if do_GD:
+            if "gd" in excitations:
                 for a, i, b, j in iterate_t2_generalized(2 * num_orbs):
                     self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
-            if do_pD:
+            if "pd" in excitations:
                 for a, i, b, j in iterate_pair_t2(occ_idx, unocc_idx, num_orbs):
                     self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
-            if do_GpD:
+            if "gpd" in excitations:
                 for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
                     self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
-            if do_T:
+            if "t" in excitations:
                 for a, i, b, j, c, k in iterate_t3(occ_spin_idx, unocc_spin_idx, num_orbs):
                     self.excitation_operator_type.append("triple")
                     self.excitation_indices.append((i, j, k, a, b, c))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
-            if do_Q:
+            if "q" in excitations:
                 for a, i, b, j, c, k, d, l in iterate_t4(occ_spin_idx, unocc_spin_idx, num_orbs):
                     self.excitation_operator_type.append("quadruple")
                     self.excitation_indices.append((i, j, k, l, a, b, c, d))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
-            if do_5:
+            if "5" in excitations:
                 for a, i, b, j, c, k, d, l, e, m in iterate_t5(occ_spin_idx, unocc_spin_idx, num_orbs):
                     self.excitation_operator_type.append("quintuple")
                     self.excitation_indices.append((i, j, k, l, m, a, b, c, d, e))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
-            if do_6:
+            if "6" in excitations:
                 for a, i, b, j, c, k, d, l, e, m, f, n in iterate_t6(occ_spin_idx, unocc_spin_idx, num_orbs):
                     self.excitation_operator_type.append("sextuple")
                     self.excitation_indices.append((i, j, k, l, m, n, a, b, c, d, e, f))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
-            if do_SAD:
+            if "sad" in excitations:
                 for a, i, b, j, _, op_case in iterate_t2_sa(occ_idx, unocc_idx):
+                    self.excitation_operator_type.append(f"sa_double_{op_case}")
+                    self.excitation_indices.append((i, j, a, b))
+                    # Rotosolve not implemented for SA doubles
+                    # self.grad_param_R[f"p{self.n_params:09d}"] = None
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+            if "sagd" in excitations:
+                for a, i, b, j, _, op_case in iterate_t2_sa_generalized(num_orbs):
                     self.excitation_operator_type.append(f"sa_double_{op_case}")
                     self.excitation_indices.append((i, j, a, b))
                     # Rotosolve not implemented for SA doubles
@@ -1033,10 +1033,13 @@ class UpsStructure:
         #. 10.1021/acs.jctc.8b01004 (k-UpCCGSD)
 
         Ansatz Options:
+            excitations [list[str]]: List of fermionic excitations to include.
             * n_layers [int]: Number of layers.
-            * D [bool]: Add double excitations.
-            * pD [bool]: Add pair double excitations.
-            * GpD [bool]: Add generalized pair double excitations.
+
+        Possible excitations:
+            * D: Add double excitations.
+            * pD: Add pair double excitations.
+            * GpD: Add generalized pair double excitations.
 
         Args:
             occ_idx: Strongly occupied spatial orbital indices.
@@ -1049,8 +1052,9 @@ class UpsStructure:
         Returns:
             SDS ordered fUCC ansatz.
         """
+        self.num_active_orbs = num_orbs
         # Options
-        valid_options = ("n_layers", "D", "pD", "GpD")
+        valid_options = ("n_layers", "excitations")
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(
@@ -1058,23 +1062,20 @@ class UpsStructure:
                 )
         if "n_layers" not in ansatz_options.keys():
             raise ValueError("SDSfUCC require the option 'n_layers'")
-        self.num_active_orbs = num_orbs
-        do_D = False
-        do_pD = False
-        do_GpD = False
-        if "D" in ansatz_options.keys():
-            do_D = ansatz_options["D"]
-        if "pD" in ansatz_options.keys():
-            do_pD = ansatz_options["pD"]
-        if "GpD" in ansatz_options.keys():
-            do_GpD = ansatz_options["GpD"]
-        if True not in (do_D, do_pD, do_GpD):
+        if len(ansatz_options["excitations"]) == 0:
             raise ValueError("SDSfUCC requires some excitations got none.")
+        excitations = [x.lower() for x in ansatz_options["excitations"]]
+        valid_excitations = ("d", "pd", "gpd")
+        for excitation in excitations:
+            if excitation not in valid_excitations:
+                raise ValueError(
+                    f"Got unknown excitation, {excitation}. Valid excitations are: {valid_excitations}"
+                )
         n_layers = ansatz_options["n_layers"]
         # Layer loop
         for _ in range(n_layers):
             # Kind of D excitation determines indices for complete SDS block
-            if do_D:
+            if "d" in excitations:
                 for a, i, b, j in iterate_t2(occ_spin_idx, unocc_spin_idx, num_orbs):
                     if is_alpha(i, num_orbs) == is_alpha(a, num_orbs):
                         self.excitation_indices.append((i, a))
@@ -1097,7 +1098,7 @@ class UpsStructure:
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
-            if do_pD:
+            if "pd" in excitations:
                 for a, i, b, j in iterate_pair_t2(occ_idx, unocc_idx, num_orbs):
                     self.excitation_operator_type.append("double")
                     self.excitation_indices.append((spatial_idx(i, num_orbs), spatial_idx(a, num_orbs)))
@@ -1114,7 +1115,7 @@ class UpsStructure:
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
-            if do_GpD:
+            if "gpd" in excitations:
                 for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
                     self.excitation_operator_type.append("sa_single")
                     self.excitation_indices.append((spatial_idx(i, num_orbs), spatial_idx(a, num_orbs)))

@@ -199,6 +199,6 @@ def test_folded_high_rank_operators() -> None:
             active_ci_info,
         )
         assert np.allclose(folded, reference, atol=1e-10), name
-        seen_ranks.update(len(key) for key in op.operators)
+        seen_ranks.update(len(key[0]) + len(key[1]) for key in op.operators)
     # The point of this test is the long strings, so make sure they are actually present.
     assert max(seen_ranks) >= 8, seen_ranks

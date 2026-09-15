@@ -42,7 +42,7 @@ UPS_ANSATZE = {
         OCC_SPIN_IDX,
         UNOCC_SPIN_IDX,
         NUM_ACTIVE_ORBS,
-        {"n_layers": 1, "S": True, "D": True},
+        {"n_layers": 1, "excitations": ["S", "D"]},
     ),
     "fUCC_GS_GD": lambda layout: layout.create_fUCC(
         OCC_IDX,
@@ -50,7 +50,7 @@ UPS_ANSATZE = {
         OCC_SPIN_IDX,
         UNOCC_SPIN_IDX,
         NUM_ACTIVE_ORBS,
-        {"n_layers": 1, "GS": True, "GD": True},
+        {"n_layers": 1, "excitations": ["GS", "GD"]},
     ),
     "fUCC_pD_GpD": lambda layout: layout.create_fUCC(
         OCC_IDX,
@@ -58,7 +58,7 @@ UPS_ANSATZE = {
         OCC_SPIN_IDX,
         UNOCC_SPIN_IDX,
         NUM_ACTIVE_ORBS,
-        {"n_layers": 1, "pD": True, "GpD": True},
+        {"n_layers": 1, "excitations": ["pD", "GpD"]},
     ),
     "SDSfUCCSD": lambda layout: layout.create_SDSfUCC(
         OCC_IDX,
@@ -66,7 +66,7 @@ UPS_ANSATZE = {
         OCC_SPIN_IDX,
         UNOCC_SPIN_IDX,
         NUM_ACTIVE_ORBS,
-        {"n_layers": 1, "D": True},
+        {"n_layers": 1, "excitations": ["D"]},
     ),
     "SDSfUCC_GpD": lambda layout: layout.create_SDSfUCC(
         OCC_IDX,
@@ -74,7 +74,7 @@ UPS_ANSATZE = {
         OCC_SPIN_IDX,
         UNOCC_SPIN_IDX,
         NUM_ACTIVE_ORBS,
-        {"n_layers": 1, "GpD": True},
+        {"n_layers": 1, "excitations": ["GpD"]},
     ),
 }
 

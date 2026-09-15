@@ -27,7 +27,7 @@ UPS_ANSATZE = {
         OCC_SPIN_IDX,
         UNOCC_SPIN_IDX,
         NUM_ACTIVE_ORBS,
-        {"n_layers": 1, "S": True, "D": True},
+        {"n_layers": 1, "excitations": ["S", "D"]},
     ),
     "kSAfUpCCGSD": lambda layout: layout.create_fUCC(
         OCC_IDX,
@@ -35,7 +35,7 @@ UPS_ANSATZE = {
         OCC_SPIN_IDX,
         UNOCC_SPIN_IDX,
         NUM_ACTIVE_ORBS,
-        {"n_layers": 1, "SAGS": True, "GpD": True},
+        {"n_layers": 1, "excitations": ["SAGS", "GpD"]},
     ),
     "fUCC_GS_GD": lambda layout: layout.create_fUCC(
         OCC_IDX,
@@ -43,7 +43,7 @@ UPS_ANSATZE = {
         OCC_SPIN_IDX,
         UNOCC_SPIN_IDX,
         NUM_ACTIVE_ORBS,
-        {"n_layers": 1, "GS": True, "GD": True},
+        {"n_layers": 1, "excitations": ["GS", "GD"]},
     ),
     "fUCC_TQ": lambda layout: layout.create_fUCC(
         OCC_IDX,
@@ -51,7 +51,7 @@ UPS_ANSATZE = {
         OCC_SPIN_IDX,
         UNOCC_SPIN_IDX,
         NUM_ACTIVE_ORBS,
-        {"n_layers": 1, "T": True, "Q": True},
+        {"n_layers": 1, "excitations": ["T", "Q"]},
     ),
     "fUCC_SAS_SAD": lambda layout: layout.create_fUCC(
         OCC_IDX,
@@ -59,7 +59,7 @@ UPS_ANSATZE = {
         OCC_SPIN_IDX,
         UNOCC_SPIN_IDX,
         NUM_ACTIVE_ORBS,
-        {"n_layers": 1, "SAS": True, "SAD": True},
+        {"n_layers": 1, "excitations": ["SAS", "SAD"]},
     ),
     "SDSfUCCSD": lambda layout: layout.create_SDSfUCC(
         OCC_IDX,
@@ -67,7 +67,7 @@ UPS_ANSATZE = {
         OCC_SPIN_IDX,
         UNOCC_SPIN_IDX,
         NUM_ACTIVE_ORBS,
-        {"n_layers": 1, "D": True},
+        {"n_layers": 1, "excitations": ["D"]},
     ),
     "SDSfUCC_GpD": lambda layout: layout.create_SDSfUCC(
         OCC_IDX,
@@ -75,7 +75,7 @@ UPS_ANSATZE = {
         OCC_SPIN_IDX,
         UNOCC_SPIN_IDX,
         NUM_ACTIVE_ORBS,
-        {"n_layers": 1, "GpD": True},
+        {"n_layers": 1, "excitations": ["GpD"]},
     ),
 }
 
@@ -129,23 +129,27 @@ def test_ups_excitations_conserve_spin(name: str) -> None:
         assert spin_change(exc_indices, NUM_ACTIVE_ORBS) == (0, 0), f"{name} {exc_type} {exc_indices}"
 
 
-@pytest.mark.parametrize("excitations", ["s", "d", "sd", "t", "q", "sdtq"])
-def test_ucc_excitations_conserve_spin(excitations: str) -> None:
+@pytest.mark.parametrize(
+    "excitations",
+    [["S"], ["D"], ["S", "D"], ["SAS", "SAD"], ["T"], ["Q"], ["S", "D", "T", "Q"], ["pD", "GpD"]],
+)
+def test_ucc_excitations_conserve_spin(excitations: list[str]) -> None:
     """Test that a UCC ansatz only emits alpha and beta conserving excitations.
 
     Args:
         excitations: Unitary coupled cluster excitation orders.
     """
-    layout = UccStructure(NUM_ACTIVE_ORBS)
-    if "s" in excitations:
-        layout.add_sa_singles(OCC_IDX, UNOCC_IDX)
-    if "d" in excitations:
-        layout.add_sa_doubles(OCC_IDX, UNOCC_IDX)
-    if "t" in excitations:
-        layout.add_triples(OCC_SPIN_IDX, UNOCC_SPIN_IDX)
-    if "q" in excitations:
-        layout.add_quadruples(OCC_SPIN_IDX, UNOCC_SPIN_IDX)
+    layout = UccStructure()
+    layout.add_excitations(
+        excitations,
+        OCC_IDX,
+        UNOCC_IDX,
+        OCC_SPIN_IDX,
+        UNOCC_SPIN_IDX,
+        NUM_ACTIVE_ORBS,
+    )
     assert layout.n_params > 0
+    assert layout.num_active_orbs == NUM_ACTIVE_ORBS
     for exc_type, exc_indices in zip(layout.excitation_operator_type, layout.excitation_indices):
         if exc_type in SPATIAL_EXC_TYPES:
             continue

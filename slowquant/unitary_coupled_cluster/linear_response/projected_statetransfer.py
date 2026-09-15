@@ -15,6 +15,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     propagate_state,
 )
 from slowquant.unitary_coupled_cluster.operators import (
+    commutator,
     hamiltonian_2i_2a,
     one_elec_op_0i_0a,
 )
@@ -65,7 +66,7 @@ class LinearResponse(LinearResponseBaseClass):
         for i, op in enumerate(self.G_ops):
             G_ket = propagate_state(
                 [op],
-                self.wf.csf_coeffs,
+                self.wf.ref_coeffs,
                 *self.index_info,
             )
             # <0| H U G |CSF>
@@ -89,32 +90,33 @@ class LinearResponse(LinearResponseBaseClass):
         for j, qJ in enumerate(self.q_ops):
             for i, qI in enumerate(self.q_ops[j:], j):
                 # Make A
+                # <0| [qId, H*qJ] |0> = <0| qId H qJ |0>, commutator implementation is faster.
                 val = expectation_value(
                     self.wf.ci_coeffs,
-                    [qI.dagger * H_2i_2a * qJ],
+                    [commutator(qI.dagger, H_2i_2a * qJ)],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
-                val -= (
-                    expectation_value(
-                        self.wf.ci_coeffs, [qI.dagger * qJ], self.wf.ci_coeffs, *self.index_info
-                    )
-                    * self.wf.energy_elec
+                # - <0| [qId, qJ] |0> * E = - <0| qId qJ |0> * E, commutator implementation is faster.
+                tmp = expectation_value(
+                    self.wf.ci_coeffs,
+                    [commutator(qI.dagger, qJ)],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
                 )
+                val -= tmp * self.wf.energy_elec
                 self.A[i, j] = self.A[j, i] = val
                 # Make Sigma
-                self.Sigma[i, j] = self.Sigma[j, i] = expectation_value(
-                    self.wf.ci_coeffs,
-                    [qI.dagger * qJ],
-                    self.wf.ci_coeffs,
-                    *self.index_info,
-                )
+                # <0| [qId, qJ] |0> = <0| qId qJ |0>, commutator implementation is faster.
+                self.Sigma[i, j] = self.Sigma[j, i] = tmp
         for j, qJ in enumerate(self.q_ops):
-            UdHq_ket = propagate_state(["Ud", self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info)
+            UdHq_ket = propagate_state(
+                ["Ud", commutator(self.H_1i_1a, qJ)], self.wf.ci_coeffs, *self.index_info
+            )
             for i, GI in enumerate(self.G_ops):
-                G_ket = propagate_state([GI], self.wf.csf_coeffs, *self.index_info)
+                G_ket = propagate_state([GI], self.wf.ref_coeffs, *self.index_info)
                 # Make A
-                # <CSF| Gd Ud H q |0>
+                # <CSF| Gd Ud [H, q] |0> = <CSF| Gd Ud H q |0>, commutator implementation is faster
                 val = expectation_value(
                     G_ket,
                     [],
@@ -125,14 +127,14 @@ class LinearResponse(LinearResponseBaseClass):
         for j, GJ in enumerate(self.G_ops):
             UdHUGJ_ket = propagate_state(
                 ["Ud", self.H_0i_0a, "U", GJ],
-                self.wf.csf_coeffs,
+                self.wf.ref_coeffs,
                 *self.index_info,
             )
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
                 # <CSF| GId Ud H U GJ |CSF>
                 val = expectation_value(
-                    self.wf.csf_coeffs,
+                    self.wf.ref_coeffs,
                     [GI.dagger],
                     UdHUGJ_ket,
                     *self.index_info,
@@ -221,7 +223,7 @@ class LinearResponse(LinearResponseBaseClass):
             for i, G in enumerate(self.G_ops):
                 G_ket = propagate_state(
                     [G],
-                    self.wf.csf_coeffs,
+                    self.wf.ref_coeffs,
                     *self.index_info,
                 )
                 # -Z * <0| mux U G | CSF>

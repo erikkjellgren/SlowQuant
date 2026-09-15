@@ -21,6 +21,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     propagate_state,
 )
 from slowquant.unitary_coupled_cluster.operators import (
+    commutator,
     one_elec_op_0i_0a,
 )
 from slowquant.unitary_coupled_cluster.spin_ordering import det_interleaved_to_blocked
@@ -68,15 +69,14 @@ class LinearResponse(LinearResponseBaseClass):
         else:
             raise ValueError(f"Got incompatible wave function type, {type(self.wf)}")
         num_det = len(ci_info.idx2det)
-        self.csf_coeffs = np.zeros(num_det)
-        hf_det = int(
-            det_interleaved_to_blocked(
-                "1" * self.wf.int_gen.num_elec + "0" * (self.wf.num_spin_orbs - self.wf.int_gen.num_elec)
-            ),
-            2,
+        self.ref_coeffs = np.zeros(num_det)
+        # Assembled in the human readable interleaved ordering, where the three spaces are
+        # contiguous, then converted to the blocked ordering the CI space uses.
+        ref_det = (
+            "1" * self.wf.num_inactive_spin_orbs + self.wf._ref_det + "0" * self.wf.num_virtual_spin_orbs
         )
-        self.csf_coeffs[ci_info.det2idx[hf_det]] = 1
-        self.ci_coeffs = propagate_state(["U"], self.csf_coeffs, *self.index_info_extended)
+        self.ref_coeffs[ci_info.det2idx[int(det_interleaved_to_blocked(ref_det), 2)]] = 1
+        self.ci_coeffs = propagate_state(["U"], self.ref_coeffs, *self.index_info_extended)
         idx_shift = len(self.q_ops)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
@@ -98,7 +98,7 @@ class LinearResponse(LinearResponseBaseClass):
         for i, op in enumerate(self.G_ops):
             G_ket = propagate_state(
                 [op],
-                self.csf_coeffs,
+                self.ref_coeffs,
                 *self.index_info_extended,
             )
             # <0| H U G |CSF>
@@ -149,13 +149,13 @@ class LinearResponse(LinearResponseBaseClass):
             )
         for j, qJ in enumerate(self.q_ops):
             UdHq_ket = propagate_state(
-                ["Ud", self.H_1i_1a, qJ],
+                ["Ud", commutator(self.H_1i_1a, qJ)],
                 self.ci_coeffs,
                 *self.index_info_extended,
                 do_unsafe=True,  # type: ignore
             )
             UdqdH_ket = propagate_state(
-                ["Ud", qJ.dagger, self.H_1i_1a],
+                ["Ud", commutator(qJ.dagger, self.H_1i_1a)],
                 self.ci_coeffs,
                 *self.index_info_extended,
                 do_unsafe=True,  # type: ignore
@@ -163,11 +163,11 @@ class LinearResponse(LinearResponseBaseClass):
             for i, GI in enumerate(self.G_ops):
                 G_ket = propagate_state(
                     [GI],
-                    self.csf_coeffs,
+                    self.ref_coeffs,
                     *self.index_info_extended,
                 )
                 # Make A
-                # <CSF| Gd Ud H q |0>
+                # <CSF| Gd Ud [H, q] |0>
                 val = expectation_value(
                     G_ket,
                     [],
@@ -188,7 +188,7 @@ class LinearResponse(LinearResponseBaseClass):
                 )
                 self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
                 # Make B
-                # - 1/2<CSF| Gd Ud qd H |0>
+                # - 1/2<CSF| Gd Ud [qd, H] |0>
                 val = (
                     -1
                     / 2
@@ -215,7 +215,7 @@ class LinearResponse(LinearResponseBaseClass):
         for j, GJ in enumerate(self.G_ops):
             UdHUGJ_ket = propagate_state(
                 ["Ud", self.H_0i_0a, "U", GJ],
-                self.csf_coeffs,
+                self.ref_coeffs,
                 *self.index_info_extended,
             )
             GJUdH_ket = propagate_state(
@@ -231,7 +231,7 @@ class LinearResponse(LinearResponseBaseClass):
             for i, GI in enumerate(self.G_ops[j:], j):
                 GI_ket = propagate_state(
                     [GI],
-                    self.csf_coeffs,
+                    self.ref_coeffs,
                     *self.index_info_extended,
                 )
                 # Make A
@@ -260,7 +260,7 @@ class LinearResponse(LinearResponseBaseClass):
                     * expectation_value(
                         UdH00_ket,
                         [GI.dagger, GJ],
-                        self.csf_coeffs,
+                        self.ref_coeffs,
                         *self.index_info_extended,
                     )
                 )
@@ -355,7 +355,7 @@ class LinearResponse(LinearResponseBaseClass):
             for i, G in enumerate(self.G_ops):
                 G_ket = propagate_state(
                     [G],
-                    self.csf_coeffs,
+                    self.ref_coeffs,
                     *self.index_info_extended,
                 )
                 # -Z * <0| mux U G | CSF>

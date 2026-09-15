@@ -209,9 +209,12 @@ def test_a_op_matches_spin_orb_idx() -> None:
         for p in range(num_orbs):
             for spin in ("alpha", "beta"):
                 for dagger in (True, False):
-                    ((idx, op_dagger),) = next(iter(a_op(p, spin, dagger, num_orbs).operators))
+                    dagger_string, nondagger_string = next(iter(a_op(p, spin, dagger, num_orbs).operators))
+                    # A creation operator is stored in the first tuple of the key, an
+                    # annihilation operator in the second.
+                    (idx,) = dagger_string if dagger else nondagger_string
                     assert idx == spin_orb_idx(p, spin, num_orbs), f"{p} {spin} {num_orbs}"
-                    assert op_dagger is dagger
+                    assert len(nondagger_string if dagger else dagger_string) == 0
 
 
 def test_a_op_rejects_unknown_spin() -> None:

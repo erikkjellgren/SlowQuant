@@ -9,7 +9,7 @@ Two parallel implementations of the same physics, kept parameter-compatible:
 ## Commands
 
 ```bash
-pytest tests/                      # full suite, 137 tests, ~12 min
+pytest tests/                      # full suite, 146 tests, ~13 min
 pytest tests/test_unitary_product_state.py -x    # state-vector only
 pre-commit run --all-files         # ruff check + ruff format + mypy
 ```
@@ -32,6 +32,12 @@ PYTHONPATH=/home/kjellgren/gitreps/SlowQuant_claude python script.py
 
 - **Never multiply folded operators.** `FermionicOperator.get_folded_operator` is valid only as
   the last step. Build the product first, fold last.
+- **A fermionic operator is stored normal ordered and sorted.** A key of
+  `FermionicOperator.operators` is `(creation_indices, annihilation_indices)`, each a tuple of
+  spin-orbital indices sorted **descending**. Two spellings of the same string must produce the
+  same key or they stop combining in the dict and the operator silently gains terms, so anything
+  building a key by hand has to sort it the same way. `get_folded_operator` also reads the
+  descending order as application order (rightmost operator first).
 - **Spin-orbital ordering is α/β-blocked, matching Qiskit Nature:** the spin orbital of
   (spatial `p`, spin σ) is `p` for α and `p + N` for β, where `N` is the number of spatial
   orbitals *of the space the index lives in*. Determinants are ints with `2N` bits, index 0 at
