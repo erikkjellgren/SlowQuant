@@ -41,6 +41,11 @@ from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperat
 
 # Spin sub-string of an operator that acts as the identity on that spin.
 IDENTITY_SUB_STRING: tuple[tuple[int, ...], tuple[int, ...]] = ((), ())
+# Smallest inner size n_beta*w at which the sigma3 contraction reaches matrix multiplication
+# speed. Below it the contraction is a strided vector update and pairing the surviving
+# strings of each term is cheaper. Measured on Hamiltonians and excitation generators from
+# CAS(4,4) to CAS(12,12), which sit two orders of magnitude apart on this scale.
+CONTRACTION_MIN_MATMUL_SIZE = 128
 
 
 class SpinFactorizedOperator:
@@ -723,19 +728,25 @@ def apply_sigma3_terms(
 def prefer_contraction_over_pairs(factorized: SpinFactorizedOperator, ci_info: CI_Info) -> bool:
     r"""Decide whether the terms acting on both spins are dense enough to contract.
 
-    The contraction runs over every (alpha sub-string, beta sub-string) pair, so its cost is
+    The contraction walks the output alpha strings and, for each, multiplies the beta
+    sub-string blocks of the CI matrix by the alpha excitations that reach that string,
 
     .. math::
-        N_\alpha N_\beta n_\beta w
+        \sigma\left(I_\alpha,I_\beta\right) = \sum_{k_\alpha}\sum_{k_\beta}
+            A_{k_\alpha k_\beta}\,C\left(k_\alpha,k_\beta\left(I_\beta\right)\right)
 
-    with :math:`n_\beta` the number of distinct beta sub-strings and :math:`w` the number of
-    alpha excitations reaching one alpha string. Pairing the surviving strings of each term
-    instead costs :math:`\sum_t n^\alpha_t n^\beta_t`. The contraction touches more elements
-    but runs at matrix multiplication speed, so it is taken while the excess stays bounded.
+    a matrix multiplication whose inner dimensions are the number of distinct beta sub-strings
+    :math:`n_\beta` and the number of alpha excitations reaching one alpha string :math:`w`.
+    Pairing the surviving strings of each term instead touches only the elements that survive,
+    but pays a scattered update for every one of them.
 
-    This asks how dense the operator is, not how large the CI space is. A Hamiltonian fills its
-    sub-string matrix at every active space size and a single excitation generator fills almost
-    none of it at any, so the answer does not change as the active space grows.
+    The contraction always touches more elements than the pairing, so it pays off only when
+    :math:`n_\beta w` is large enough for the multiplication to run at matrix multiplication
+    speed. Below that it degenerates into a strided vector update and the extra elements are
+    paid in full. A Hamiltonian fills its sub-string matrix and clears the bar at every active
+    space size past the smallest, while a single excitation generator reaches :math:`n_\beta w`
+    of a handful at any size. So this asks how dense the operator is, not how large the CI space
+    is.
 
     The width is estimated from the average rather than built, so that the layout is only
     constructed when it is going to be used. Both branches are correct, so an occasional
@@ -757,18 +768,11 @@ def prefer_contraction_over_pairs(factorized: SpinFactorizedOperator, ci_info: C
     num_alpha_entries = int(
         np.sum(factorized.mixed_alpha_stop[alpha_first] - factorized.mixed_alpha_start[alpha_first])
     )
-    num_pair_products = int(
-        np.sum(
-            (factorized.mixed_alpha_stop - factorized.mixed_alpha_start)
-            * (factorized.mixed_beta_stop - factorized.mixed_beta_start)
-        )
-    )
     num_beta_subs = len(
         np.unique(factorized.mixed_beta_start * (len(factorized.beta_src) + 1) + factorized.mixed_beta_stop)
     )
     width = max(1, -(-num_alpha_entries // max(ci_info.num_alpha_strings, 1)))
-    dense_work = ci_info.num_alpha_strings * ci_info.num_beta_strings * num_beta_subs * width
-    return dense_work <= 8 * max(num_pair_products, 1)
+    return num_beta_subs * width >= CONTRACTION_MIN_MATMUL_SIZE
 
 
 def use_dense_spin_matrix(num_strings: int, num_other_strings: int, num_excitations: int) -> bool:
