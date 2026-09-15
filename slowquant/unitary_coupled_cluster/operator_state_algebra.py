@@ -437,6 +437,208 @@ def embed_spin_indices(exc_indices: Sequence[int], ci_info: CI_Info, num_active_
     return embedded
 
 
+@nb.jit(nopython=True, cache=True)
+def rotate_determinant_pairs(
+    states: np.ndarray,
+    src: np.ndarray,
+    dst: np.ndarray,
+    sign: np.ndarray,
+    cos_theta: float,
+    sin_theta: float,
+) -> None:
+    r"""Rotate paired determinant amplitudes in place.
+
+    .. math::
+        \begin{pmatrix}c_p\\c_q\end{pmatrix} \leftarrow
+        \begin{pmatrix}\cos\theta & -\Gamma\sin\theta\\
+                       \Gamma\sin\theta & \cos\theta\end{pmatrix}
+        \begin{pmatrix}c_p\\c_q\end{pmatrix}
+
+    The pairs are disjoint, so this needs no output vector.
+
+    Args:
+        states: States as (number of states, number of determinants), updated in place.
+        src: First determinant of each pair.
+        dst: Second determinant of each pair.
+        sign: Phase :math:`\Gamma` of each pair.
+        cos_theta: Cosine of the rotation angle.
+        sin_theta: Sine of the rotation angle.
+    """
+    for pair in range(len(src)):
+        p = src[pair]
+        q = dst[pair]
+        signed_sin = sign[pair] * sin_theta
+        for state_idx in range(states.shape[0]):
+            amplitude_p = states[state_idx, p]
+            amplitude_q = states[state_idx, q]
+            states[state_idx, p] = cos_theta * amplitude_p - signed_sin * amplitude_q
+            states[state_idx, q] = signed_sin * amplitude_p + cos_theta * amplitude_q
+
+
+def build_rotation_layout(
+    op: FermionicOperator, ci_info: CI_Info
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    r"""Find the determinant pairs that the exponential of a generator rotates.
+
+    An excitation generator :math:`\hat{T} = \hat{T}_{\text{exc}} - \hat{T}_{\text{exc}}^\dagger`
+    squares to minus a projector,
+
+    .. math::
+        \hat{T}^2 = -\left[\hat{n}_i\left(1-\hat{n}_a\right)
+                         + \hat{n}_a\left(1-\hat{n}_i\right)\right] \equiv -\hat{P}
+
+    so that :math:`\hat{T}^3 = -\hat{T}` and the series for the exponential closes,
+
+    .. math::
+        \exp\left(\theta\hat{T}\right) = 1 + \sin\theta\,\hat{T}
+                                       + \left(1-\cos\theta\right)\hat{T}^2
+
+    Because :math:`\hat{P}` is diagonal, the determinant basis splits into the determinants the
+    generator annihilates, which the unitary leaves alone, and pairs
+    :math:`\hat{T}\left|p\right> = \Gamma\left|q\right>`,
+    :math:`\hat{T}\left|q\right> = -\Gamma\left|p\right>` spanning a two dimensional block. On
+    each block the three terms above sum to one Givens rotation by :math:`\Gamma\theta`, which
+    can therefore be applied in a single sweep instead of building
+    :math:`\hat{T}\left|0\right>` and :math:`\hat{T}^2\left|0\right>` as separate vectors.
+
+    The pairing is read off the generator rather than derived per excitation type: applying it
+    to a vector of ones gives :math:`\Gamma` at every reachable determinant, and applying it to
+    :math:`v_k = k+1` gives :math:`\Gamma\left(p+1\right)` there, which names the partner. The
+    two are then checked against each other, so a generator that is not a signed pairing, such
+    as a spin-adapted double, reports None and is left to the caller.
+
+    Args:
+        op: Excitation generator, already embedded in the CI space.
+        ci_info: Information about the CI space.
+
+    Returns:
+        First and second determinant of each pair with its phase, or None if the generator does
+        not act as a signed pairing of determinants.
+    """
+    num_dets = len(ci_info.idx2det)
+    ramp = np.arange(1.0, num_dets + 1.0)
+    try:
+        phases = propagate_state([op], np.ones(num_dets), ci_info, do_folding=False)
+        reached = propagate_state([op], ramp, ci_info, do_folding=False)
+    except KeyError:
+        # The generator takes some determinant out of the CI space. The general kernel skips
+        # determinants the state is zero on, so it survives that as long as the state stays
+        # away from them, and a rotation built here could not. Leave it to the caller.
+        return None
+    dst = np.flatnonzero(phases)
+    if len(dst) == 0 or not np.allclose(np.abs(phases[dst]), 1.0):
+        return None
+    src = np.rint(reached[dst] / phases[dst] - 1.0).astype(int)
+    if np.any(src < 0) or np.any(src >= num_dets):
+        return None
+    # Antisymmetry means every pair is reached from both of its ends, so half of them are kept.
+    forward = src < dst
+    src, dst, sign = src[forward], dst[forward], phases[dst][forward]
+    # The pairing has to reproduce the generator exactly, or the exponential below is not the
+    # one the rest of the code computes. The ramp has a distinct value on every determinant,
+    # so a single comparison covers the whole CI space.
+    check = np.zeros(num_dets)
+    check[dst] = sign * ramp[src]
+    check[src] = -sign * ramp[dst]
+    if not np.allclose(check, reached):
+        return None
+    # Kept narrow because the index arrays are streamed alongside the state.
+    return src.astype(np.int32), dst.astype(np.int32), sign.astype(np.int8)
+
+
+def get_rotation_layout(
+    op: FermionicOperator, ci_info: CI_Info, cache_key: tuple[str, tuple[int, ...]]
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    """Get the rotation layout of a generator, building it the first time it is asked for.
+
+    The layout depends only on the generator and the CI space, so it is reused across every
+    parameter value the optimizer visits.
+
+    Args:
+        op: Excitation generator, already embedded in the CI space.
+        ci_info: Information about the CI space.
+        cache_key: Excitation type and indices naming this generator.
+
+    Returns:
+        Rotation layout, or None if the generator does not act as a signed pairing.
+    """
+    if cache_key not in ci_info.rotation_layouts:
+        ci_info.rotation_layouts[cache_key] = build_rotation_layout(op, ci_info)
+    return ci_info.rotation_layouts[cache_key]
+
+
+def apply_generator_exponential(
+    state: np.ndarray,
+    op: FermionicOperator,
+    theta: float,
+    ci_info: CI_Info,
+    cache_key: tuple[str, tuple[int, ...]],
+) -> np.ndarray:
+    r"""Apply the exponential of an excitation generator to a state.
+
+    .. math::
+        \left|\tilde{0}\right> = \exp\left(\theta\hat{T}\right)\left|0\right>
+
+    A generator that pairs determinants is applied as a Givens rotation, see
+    build_rotation_layout. Anything else, a spin-adapted double in particular, falls back to
+    summing the three terms of the closed form.
+
+    Args:
+        state: State.
+        op: Excitation generator, already embedded in the CI space.
+        theta: Ansatz parameter value.
+        ci_info: Information about the CI space.
+        cache_key: Excitation type and indices naming this generator.
+
+    Returns:
+        New state.
+    """
+    layout = get_rotation_layout(op, ci_info, cache_key)
+    if layout is None:
+        return (
+            state
+            + np.sin(theta) * propagate_state([op], state, ci_info, do_folding=False)
+            + (1 - np.cos(theta)) * propagate_state([op, op], state, ci_info, do_folding=False)
+        )
+    out = np.copy(state)
+    rotate_determinant_pairs(out.reshape(1, -1), *layout, np.cos(theta), np.sin(theta))
+    return out
+
+
+def apply_generator_exponential_SA(
+    states: np.ndarray,
+    op: FermionicOperator,
+    theta: float,
+    ci_info: CI_Info,
+    cache_key: tuple[str, tuple[int, ...]],
+) -> np.ndarray:
+    r"""Apply the exponential of an excitation generator to every state of a state average.
+
+    .. math::
+        \left|\tilde{\nu}\right> = \exp\left(\theta\hat{T}\right)\left|\nu\right>
+
+    Args:
+        states: States as (number of states, number of determinants).
+        op: Excitation generator, already embedded in the CI space.
+        theta: Ansatz parameter value.
+        ci_info: Information about the CI space.
+        cache_key: Excitation type and indices naming this generator.
+
+    Returns:
+        New states.
+    """
+    layout = get_rotation_layout(op, ci_info, cache_key)
+    if layout is None:
+        return (
+            states
+            + np.sin(theta) * propagate_state_SA([op], states, ci_info, do_folding=False)
+            + (1 - np.cos(theta)) * propagate_state_SA([op, op], states, ci_info, do_folding=False)
+        )
+    out = np.copy(states)
+    rotate_determinant_pairs(out, *layout, np.cos(theta), np.sin(theta))
+    return out
+
+
 def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bool = False) -> np.ndarray:
     """Build matrix representation of operator.
 
@@ -1023,39 +1225,19 @@ def construct_ups_state(
             Ta = G1(alpha_idx(i, ci_info.num_active_orbs), alpha_idx(a, ci_info.num_active_orbs), True)
             Tb = G1(beta_idx(i, ci_info.num_active_orbs), beta_idx(a, ci_info.num_active_orbs), True)
             # Analytical application on state vector
-            out = (
-                out
-                + np.sin(A * theta)
-                * propagate_state(
-                    [Ta],
-                    out,
-                    ci_info,
-                    do_folding=False,
-                )
-                + (1 - np.cos(A * theta))
-                * propagate_state(
-                    [Ta, Ta],
-                    out,
-                    ci_info,
-                    do_folding=False,
-                )
+            out = apply_generator_exponential(
+                out,
+                Ta,
+                A * theta,
+                ci_info,
+                ("sa_single_alpha", tuple(exc_indices)),
             )
-            out = (
-                out
-                + np.sin(A * theta)
-                * propagate_state(
-                    [Tb],
-                    out,
-                    ci_info,
-                    do_folding=False,
-                )
-                + (1 - np.cos(A * theta))
-                * propagate_state(
-                    [Tb, Tb],
-                    out,
-                    ci_info,
-                    do_folding=False,
-                )
+            out = apply_generator_exponential(
+                out,
+                Tb,
+                A * theta,
+                ci_info,
+                ("sa_single_beta", tuple(exc_indices)),
             )
         elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
             # Create T matrix
@@ -1089,23 +1271,7 @@ def construct_ups_state(
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
             # Analytical application on state vector
-            out = (
-                out
-                + np.sin(theta)
-                * propagate_state(
-                    [T],
-                    out,
-                    ci_info,
-                    do_folding=False,
-                )
-                + (1 - np.cos(theta))
-                * propagate_state(
-                    [T, T],
-                    out,
-                    ci_info,
-                    do_folding=False,
-                )
-            )
+            out = apply_generator_exponential(out, T, theta, ci_info, (exc_type, tuple(exc_indices)))
         elif exc_type in ("sa_double_2", "sa_double_3"):
             if exc_type == "sa_double_2":
                 (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
@@ -1480,39 +1646,19 @@ def construct_ups_state_SA(
             Ta = G1(alpha_idx(i, ci_info.num_active_orbs), alpha_idx(a, ci_info.num_active_orbs), True)
             Tb = G1(beta_idx(i, ci_info.num_active_orbs), beta_idx(a, ci_info.num_active_orbs), True)
             # Analytical application on state vector
-            out = (
-                out
-                + np.sin(A * theta)
-                * propagate_state_SA(
-                    [Ta],
-                    out,
-                    ci_info,
-                    do_folding=False,
-                )
-                + (1 - np.cos(A * theta))
-                * propagate_state_SA(
-                    [Ta, Ta],
-                    out,
-                    ci_info,
-                    do_folding=False,
-                )
+            out = apply_generator_exponential_SA(
+                out,
+                Ta,
+                A * theta,
+                ci_info,
+                ("sa_single_alpha", tuple(exc_indices)),
             )
-            out = (
-                out
-                + np.sin(A * theta)
-                * propagate_state_SA(
-                    [Tb],
-                    out,
-                    ci_info,
-                    do_folding=False,
-                )
-                + (1 - np.cos(A * theta))
-                * propagate_state_SA(
-                    [Tb, Tb],
-                    out,
-                    ci_info,
-                    do_folding=False,
-                )
+            out = apply_generator_exponential_SA(
+                out,
+                Tb,
+                A * theta,
+                ci_info,
+                ("sa_single_beta", tuple(exc_indices)),
             )
         elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
             # Create T matrix
@@ -1546,23 +1692,7 @@ def construct_ups_state_SA(
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
             # Analytical application on state vector
-            out = (
-                out
-                + np.sin(theta)
-                * propagate_state_SA(
-                    [T],
-                    out,
-                    ci_info,
-                    do_folding=False,
-                )
-                + (1 - np.cos(theta))
-                * propagate_state_SA(
-                    [T, T],
-                    out,
-                    ci_info,
-                    do_folding=False,
-                )
-            )
+            out = apply_generator_exponential_SA(out, T, theta, ci_info, (exc_type, tuple(exc_indices)))
         elif exc_type in ("sa_double_2", "sa_double_3"):
             if exc_type == "sa_double_2":
                 (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
@@ -1927,40 +2057,14 @@ def propagate_unitary(
         Ta = G1(alpha_idx(i, ci_info.num_active_orbs), alpha_idx(a, ci_info.num_active_orbs), True)
         Tb = G1(beta_idx(i, ci_info.num_active_orbs), beta_idx(a, ci_info.num_active_orbs), True)
         # Analytical application on state vector
-        out = (
-            state
-            + np.sin(A * theta)
-            * propagate_state(
-                [Ta],
-                state,
-                ci_info,
-                do_folding=False,
-            )
-            + (1 - np.cos(A * theta))
-            * propagate_state(
-                [Ta, Ta],
-                state,
-                ci_info,
-                do_folding=False,
-            )
+        out = apply_generator_exponential(
+            state,
+            Ta,
+            A * theta,
+            ci_info,
+            ("sa_single_alpha", tuple(exc_indices)),
         )
-        out = (
-            out
-            + np.sin(A * theta)
-            * propagate_state(
-                [Tb],
-                out,
-                ci_info,
-                do_folding=False,
-            )
-            + (1 - np.cos(A * theta))
-            * propagate_state(
-                [Tb, Tb],
-                out,
-                ci_info,
-                do_folding=False,
-            )
-        )
+        out = apply_generator_exponential(out, Tb, A * theta, ci_info, ("sa_single_beta", tuple(exc_indices)))
     elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
         # Create T matrix
         if exc_type == "single":
@@ -1991,23 +2095,7 @@ def propagate_unitary(
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Analytical application on state vector
-        out = (
-            state
-            + np.sin(theta)
-            * propagate_state(
-                [T],
-                state,
-                ci_info,
-                do_folding=False,
-            )
-            + (1 - np.cos(theta))
-            * propagate_state(
-                [T, T],
-                state,
-                ci_info,
-                do_folding=False,
-            )
-        )
+        out = apply_generator_exponential(state, T, theta, ci_info, (exc_type, tuple(exc_indices)))
     elif exc_type in ("sa_double_2", "sa_double_3"):
         if exc_type == "sa_double_2":
             (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
@@ -2375,39 +2463,19 @@ def propagate_unitary_SA(
         Ta = G1(alpha_idx(i, ci_info.num_active_orbs), alpha_idx(a, ci_info.num_active_orbs), True)
         Tb = G1(beta_idx(i, ci_info.num_active_orbs), beta_idx(a, ci_info.num_active_orbs), True)
         # Analytical application on state vector
-        out = (
-            state
-            + np.sin(A * theta)
-            * propagate_state_SA(
-                [Ta],
-                state,
-                ci_info,
-                do_folding=False,
-            )
-            + (1 - np.cos(A * theta))
-            * propagate_state_SA(
-                [Ta, Ta],
-                state,
-                ci_info,
-                do_folding=False,
-            )
+        out = apply_generator_exponential_SA(
+            state,
+            Ta,
+            A * theta,
+            ci_info,
+            ("sa_single_alpha", tuple(exc_indices)),
         )
-        out = (
-            out
-            + np.sin(A * theta)
-            * propagate_state_SA(
-                [Tb],
-                out,
-                ci_info,
-                do_folding=False,
-            )
-            + (1 - np.cos(A * theta))
-            * propagate_state_SA(
-                [Tb, Tb],
-                out,
-                ci_info,
-                do_folding=False,
-            )
+        out = apply_generator_exponential_SA(
+            out,
+            Tb,
+            A * theta,
+            ci_info,
+            ("sa_single_beta", tuple(exc_indices)),
         )
     elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
         # Create T matrix
@@ -2439,23 +2507,7 @@ def propagate_unitary_SA(
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Analytical application on state vector
-        out = (
-            state
-            + np.sin(theta)
-            * propagate_state_SA(
-                [T],
-                state,
-                ci_info,
-                do_folding=False,
-            )
-            + (1 - np.cos(theta))
-            * propagate_state_SA(
-                [T, T],
-                state,
-                ci_info,
-                do_folding=False,
-            )
-        )
+        out = apply_generator_exponential_SA(state, T, theta, ci_info, (exc_type, tuple(exc_indices)))
     elif exc_type in ("sa_double_2", "sa_double_3"):
         if exc_type == "sa_double_2":
             (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)

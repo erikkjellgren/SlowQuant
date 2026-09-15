@@ -43,6 +43,7 @@ class CI_Info:
         "num_beta_strings",
         "num_inactive_orbs",
         "num_virtual_orbs",
+        "rotation_layouts",
         "space_extension_offset",
         "spin_arena",
         "spin_arena_length",
@@ -135,6 +136,13 @@ class CI_Info:
             True: None,
             False: None,
         }
+        # Determinant pairs rotated by each ansatz generator, see
+        # operator_state_algebra.build_rotation_layout. Keyed by excitation type and indices,
+        # holding None for a generator that is not a pairing. Depends only on the CI space, so
+        # it survives every change of the ansatz parameters.
+        self.rotation_layouts: dict[
+            tuple[str, tuple[int, ...]], tuple[np.ndarray, np.ndarray, np.ndarray] | None
+        ] = {}
 
     @property
     def is_spin_product(self) -> bool:
