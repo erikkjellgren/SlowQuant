@@ -740,29 +740,52 @@ def use_dense_spin_matrix(num_strings: int, num_other_strings: int, num_excitati
     )
 
 
-def propagate_state_factorized(
-    op: FermionicOperator, state: np.ndarray, ci_info: CI_Info, tmp_state: np.ndarray
-) -> np.ndarray | None:
-    """Apply a folded operator to a state using the spin-factorized algebra.
+class PreparedOperator:
+    __slots__ = ("alpha_matrix", "beta_matrix", "ci_info", "factorized", "sigma3_layout")
+
+    def __init__(
+        self,
+        factorized: SpinFactorizedOperator,
+        ci_info: CI_Info,
+        alpha_matrix: np.ndarray | None,
+        beta_matrix: np.ndarray | None,
+        sigma3_layout: tuple[np.ndarray, ...] | None,
+    ) -> None:
+        """Hold everything about an operator that does not depend on the state it acts on.
+
+        A state-averaged wave function applies the same operator to every one of its states, so
+        the dense matrices and the contraction layout are built once here and reused.
+
+        Args:
+            factorized: Spin-factorized operator.
+            ci_info: Information about the CI space.
+            alpha_matrix: Matrix of the alpha only terms, or None to scatter them instead.
+            beta_matrix: Matrix of the beta only terms, or None to scatter them instead.
+            sigma3_layout: Layout of the mixed terms, or None to pair their strings instead.
+        """
+        self.factorized = factorized
+        self.ci_info = ci_info
+        self.alpha_matrix = alpha_matrix
+        self.beta_matrix = beta_matrix
+        self.sigma3_layout = sigma3_layout
+
+
+def prepare_factorized_operator(op: FermionicOperator, ci_info: CI_Info) -> PreparedOperator | None:
+    """Do all the work on an operator that does not depend on the state it will act on.
 
     Args:
         op: Folded fermionic operator.
-        state: Original state.
         ci_info: Information about the CI space.
-        tmp_state: New state, assumed to be zeroed.
 
     Returns:
-        New state, or None if the operator cannot be factorized over this CI space.
+        Prepared operator, or None if it cannot be factorized over this CI space.
     """
     factorized = factorize_operator(op, ci_info)
     if factorized is None:
         return None
     num_alpha_strings = ci_info.num_alpha_strings
     num_beta_strings = ci_info.num_beta_strings
-    # The state is stored as I = I_alpha*N_beta + I_beta, so it is already a matrix over the two
-    # spin string spaces and needs no copy to be seen as one.
-    state_matrix = np.ascontiguousarray(state).reshape(num_alpha_strings, num_beta_strings)
-    tmp_matrix = tmp_state.reshape(num_alpha_strings, num_beta_strings)
+    matrices: list[np.ndarray | None] = []
     for is_alpha, starts, stops, factors in (
         (
             True,
@@ -772,16 +795,90 @@ def propagate_state_factorized(
         ),
         (False, factorized.pure_beta_start, factorized.pure_beta_stop, factorized.pure_beta_factor),
     ):
-        if len(factors) == 0:
-            continue
         num_strings = num_alpha_strings if is_alpha else num_beta_strings
         num_other_strings = num_beta_strings if is_alpha else num_alpha_strings
+        if len(factors) == 0 or not use_dense_spin_matrix(
+            num_strings, num_other_strings, int(np.sum(stops - starts))
+        ):
+            matrices.append(None)
+            continue
         src, dst, sign = (
             (factorized.alpha_src, factorized.alpha_dst, factorized.alpha_sign)
             if is_alpha
             else (factorized.beta_src, factorized.beta_dst, factorized.beta_sign)
         )
-        if not use_dense_spin_matrix(num_strings, num_other_strings, int(np.sum(stops - starts))):
+        matrices.append(
+            build_pure_spin_matrix(
+                np.zeros((num_strings, num_strings)), src, dst, sign, starts, stops, factors
+            )
+        )
+    sigma3_layout = None
+    if len(factorized.mixed_factor) != 0:
+        layout = build_sigma3_layout(factorized, num_alpha_strings)
+        num_pair_products = int(
+            np.sum(
+                (factorized.mixed_alpha_stop - factorized.mixed_alpha_start)
+                * (factorized.mixed_beta_stop - factorized.mixed_beta_start)
+            )
+        )
+        if use_sigma3(
+            num_alpha_strings,
+            num_beta_strings,
+            layout[0].shape[1],
+            layout[1].shape[1],
+            num_pair_products,
+        ):
+            sigma3_layout = layout
+    return PreparedOperator(factorized, ci_info, matrices[0], matrices[1], sigma3_layout)
+
+
+def apply_prepared_operator(
+    prepared: PreparedOperator, state: np.ndarray, tmp_state: np.ndarray
+) -> np.ndarray:
+    """Apply a prepared operator to one state.
+
+    Args:
+        prepared: Prepared operator.
+        state: Original state.
+        tmp_state: New state, assumed to be zeroed.
+
+    Returns:
+        New state.
+    """
+    factorized = prepared.factorized
+    num_alpha_strings = prepared.ci_info.num_alpha_strings
+    num_beta_strings = prepared.ci_info.num_beta_strings
+    # The state is stored as I = I_alpha*N_beta + I_beta, so it is already a matrix over the two
+    # spin string spaces and needs no copy to be seen as one.
+    state_matrix = np.ascontiguousarray(state).reshape(num_alpha_strings, num_beta_strings)
+    tmp_matrix = tmp_state.reshape(num_alpha_strings, num_beta_strings)
+    for is_alpha, matrix, starts, stops, factors in (
+        (
+            True,
+            prepared.alpha_matrix,
+            factorized.pure_alpha_start,
+            factorized.pure_alpha_stop,
+            factorized.pure_alpha_factor,
+        ),
+        (
+            False,
+            prepared.beta_matrix,
+            factorized.pure_beta_start,
+            factorized.pure_beta_stop,
+            factorized.pure_beta_factor,
+        ),
+    ):
+        if matrix is not None:
+            if is_alpha:
+                tmp_matrix += matrix @ state_matrix
+            else:
+                tmp_matrix += state_matrix @ matrix.T
+        elif len(factors) != 0:
+            src, dst, sign = (
+                (factorized.alpha_src, factorized.alpha_dst, factorized.alpha_sign)
+                if is_alpha
+                else (factorized.beta_src, factorized.beta_dst, factorized.beta_sign)
+            )
             apply_pure_spin_terms(
                 state,
                 tmp_state,
@@ -795,46 +892,10 @@ def propagate_state_factorized(
                 stops,
                 factors,
             )
-            continue
-        spin_matrix = build_pure_spin_matrix(
-            np.zeros((num_strings, num_strings)), src, dst, sign, starts, stops, factors
-        )
-        if is_alpha:
-            tmp_matrix += spin_matrix @ state_matrix
-        else:
-            tmp_matrix += state_matrix @ spin_matrix.T
     if len(factorized.mixed_factor) == 0:
         return tmp_state
-    layout = build_sigma3_layout(factorized, num_alpha_strings)
-    coefficients, coupling_sub, coupling_src, coupling_sign = layout[:4]
-    beta_offsets, beta_src, beta_dst, beta_sign = layout[4:]
-    num_pair_products = int(
-        np.sum(
-            (factorized.mixed_alpha_stop - factorized.mixed_alpha_start)
-            * (factorized.mixed_beta_stop - factorized.mixed_beta_start)
-        )
-    )
-    if use_sigma3(
-        num_alpha_strings,
-        num_beta_strings,
-        coefficients.shape[1],
-        coupling_sub.shape[1],
-        num_pair_products,
-    ):
-        apply_sigma3_terms(
-            state,
-            tmp_state,
-            num_alpha_strings,
-            num_beta_strings,
-            coefficients,
-            coupling_sub,
-            coupling_src,
-            coupling_sign,
-            beta_offsets,
-            beta_src,
-            beta_dst,
-            beta_sign,
-        )
+    if prepared.sigma3_layout is not None:
+        apply_sigma3_terms(state, tmp_state, num_alpha_strings, num_beta_strings, *prepared.sigma3_layout)
         return tmp_state
     apply_mixed_terms(
         state,
@@ -853,3 +914,48 @@ def propagate_state_factorized(
         factorized.mixed_factor,
     )
     return tmp_state
+
+
+def propagate_state_factorized(
+    op: FermionicOperator, state: np.ndarray, ci_info: CI_Info, tmp_state: np.ndarray
+) -> np.ndarray | None:
+    """Apply a folded operator to a state using the spin-factorized algebra.
+
+    Args:
+        op: Folded fermionic operator.
+        state: Original state.
+        ci_info: Information about the CI space.
+        tmp_state: New state, assumed to be zeroed.
+
+    Returns:
+        New state, or None if the operator cannot be factorized over this CI space.
+    """
+    prepared = prepare_factorized_operator(op, ci_info)
+    if prepared is None:
+        return None
+    return apply_prepared_operator(prepared, state, tmp_state)
+
+
+def propagate_state_SA_factorized(
+    op: FermionicOperator, states: np.ndarray, ci_info: CI_Info, tmp_states: np.ndarray
+) -> np.ndarray | None:
+    """Apply a folded operator to every state of a state-averaged wave function.
+
+    The operator is the same for every state, so everything that does not depend on the state
+    is done once and only the application is repeated.
+
+    Args:
+        op: Folded fermionic operator.
+        states: Original states, one per row.
+        ci_info: Information about the CI space.
+        tmp_states: New states, assumed to be zeroed.
+
+    Returns:
+        New states, or None if the operator cannot be factorized over this CI space.
+    """
+    prepared = prepare_factorized_operator(op, ci_info)
+    if prepared is None:
+        return None
+    for state, tmp_state in zip(states, tmp_states):
+        apply_prepared_operator(prepared, state, tmp_state)
+    return tmp_states

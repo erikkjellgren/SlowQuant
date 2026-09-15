@@ -18,6 +18,7 @@ from slowquant.unitary_coupled_cluster.spin_factorized_algebra import (
     build_sigma3_layout,
     factorize_operator,
     propagate_state_factorized,
+    propagate_state_SA_factorized,
     split_spin_string,
     use_sigma3,
 )
@@ -261,3 +262,33 @@ def test_sigma3_is_actually_selected_somewhere() -> None:
         layout[1].shape[1],
         num_pair_products,
     )
+
+
+def test_state_averaged_matches_unfactorized() -> None:
+    """Test the state-averaged path against the general state-averaged kernel.
+
+    A state-averaged wave function applies the same operator to every one of its states, so the
+    factorization is done once and only the application is repeated. The general kernel is
+    reached by making the factorized one decline.
+    """
+    for num_active_orbs, num_alpha, num_beta in CI_SPACES_TESTED:
+        ci_info = get_indexing(0, num_active_orbs, 0, num_alpha, num_beta)
+        h_mo, g_mo = random_hamiltonian(num_active_orbs, seed=num_active_orbs)
+        operators = [
+            hamiltonian_0i_0a(h_mo, g_mo, 0, num_active_orbs, 0),
+            Epq(0, min(1, num_active_orbs - 1), num_active_orbs),
+            G2_sa(0, 0, num_active_orbs - 1, num_active_orbs - 1, 3, True, num_orbs=num_active_orbs),
+        ]
+        states = np.random.default_rng(num_active_orbs).random((3, len(ci_info.idx2det)))
+        for operator in operators:
+            folded = operator.get_folded_operator(0, num_active_orbs, 0)
+            factorized = propagate_state_SA_factorized(folded, states, ci_info, np.zeros_like(states))
+            assert factorized is not None
+            # Each state must match what the single state path gives for that state alone.
+            for state, row in zip(states, factorized):
+                reference = propagate_state_factorized(folded, state, ci_info, np.zeros_like(state))
+                assert reference is not None
+                assert np.allclose(row, reference, atol=1e-12)
+            # And the whole thing must match the general determinant kernel.
+            matrix = build_operator_matrix(folded, ci_info)
+            assert np.allclose(factorized, states @ matrix.T, atol=1e-12)

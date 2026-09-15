@@ -19,6 +19,7 @@ from slowquant.unitary_coupled_cluster.operators import (
 )
 from slowquant.unitary_coupled_cluster.spin_factorized_algebra import (
     propagate_state_factorized,
+    propagate_state_SA_factorized,
 )
 from slowquant.unitary_coupled_cluster.spin_ordering import alpha_idx, beta_idx
 from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
@@ -708,6 +709,13 @@ def propagate_state_SA(
                 op_folded = op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs)
             else:
                 op_folded = op
+            # A spin conserving operator factorizes over a CI space that is a product of an
+            # alpha and a beta string space, which is much cheaper to apply. Anything else,
+            # notably the extended space, falls through to the general kernels below.
+            factorized_state = propagate_state_SA_factorized(op_folded, new_state, ci_info, tmp_state)
+            if factorized_state is not None:
+                new_state = np.copy(factorized_state)
+                continue
             # loop over all strings of annihilation operators in FermionicOperator sum
             if is_parallel:
                 for fermi_label in op_folded.operators.keys():
