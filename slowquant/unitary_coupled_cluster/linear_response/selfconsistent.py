@@ -21,6 +21,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     propagate_state,
 )
 from slowquant.unitary_coupled_cluster.operators import (
+    commutator,
     one_elec_op_0i_0a,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
@@ -145,13 +146,13 @@ class LinearResponse(LinearResponseBaseClass):
             )
         for j, qJ in enumerate(self.q_ops):
             UdHq_ket = propagate_state(
-                ["Ud", self.H_1i_1a, qJ],
+                ["Ud", commutator(self.H_1i_1a, qJ)],
                 self.ci_coeffs,
                 *self.index_info_extended,
                 do_unsafe=True,  # type: ignore
             )
             UdqdH_ket = propagate_state(
-                ["Ud", qJ.dagger, self.H_1i_1a],
+                ["Ud", commutator(qJ.dagger, self.H_1i_1a)],
                 self.ci_coeffs,
                 *self.index_info_extended,
                 do_unsafe=True,  # type: ignore
@@ -163,7 +164,7 @@ class LinearResponse(LinearResponseBaseClass):
                     *self.index_info_extended,
                 )
                 # Make A
-                # <CSF| Gd Ud H q |0>
+                # <CSF| Gd Ud [H, q] |0>
                 val = expectation_value(
                     G_ket,
                     [],
@@ -184,7 +185,7 @@ class LinearResponse(LinearResponseBaseClass):
                 )
                 self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
                 # Make B
-                # - 1/2<CSF| Gd Ud qd H |0>
+                # - 1/2<CSF| Gd Ud [qd, H] |0>
                 val = (
                     -1
                     / 2
