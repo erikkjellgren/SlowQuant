@@ -31,6 +31,8 @@ space, i.e. CI_Info.is_spin_product, which excludes get_indexing_extended.
 
 from __future__ import annotations
 
+import functools
+
 import numba as nb
 import numpy as np
 
@@ -49,11 +51,9 @@ IDENTITY_SUB_STRING: tuple[tuple[int, ...], tuple[int, ...]] = ((), ())
 class SpinFactorizedOperator:
     __slots__ = (
         "alpha_dst",
-        "alpha_is_identity",
         "alpha_sign",
         "alpha_src",
         "beta_dst",
-        "beta_is_identity",
         "beta_sign",
         "beta_src",
         "term_alpha_start",
@@ -83,8 +83,9 @@ class SpinFactorizedOperator:
     ) -> None:
         """Initialize the spin-factorized form of a fermionic operator.
 
-        The alpha and beta arrays hold the excitation maps of every spin sub-string the operator
-        uses, laid out back to back. Each term of the operator is a slice into each of them.
+        The alpha and beta arrays are the shared per-spin arenas of the CI space, holding the
+        excitation map of every spin sub-string built so far. Each term of the operator is a
+        slice into each of them, so no per-operator copy of a map is ever made.
 
         Args:
             alpha_src: Alpha string indices an alpha sub-string maps from.
@@ -93,7 +94,7 @@ class SpinFactorizedOperator:
             beta_src: Beta string indices a beta sub-string maps from.
             beta_dst: Beta string indices a beta sub-string maps to.
             beta_sign: Phase of the beta sub-string application.
-            term_alpha_start: Start of the term's slice into the alpha arrays.
+            term_alpha_start: Start of the term's slice into the alpha arena.
             term_alpha_stop: End of the term's slice into the alpha arrays.
             term_beta_start: Start of the term's slice into the beta arrays.
             term_beta_stop: End of the term's slice into the beta arrays.
@@ -116,6 +117,9 @@ class SpinFactorizedOperator:
         self.term_is_pure_beta = term_is_pure_beta
 
 
+# The split of a string depends only on the string itself, and an operator is typically
+# rebuilt with the same strings and new factors on every evaluation, so it is worth memoizing.
+@functools.lru_cache(maxsize=2**18)
 def split_spin_string(
     op_key: tuple[tuple[int, ...], tuple[int, ...]], num_active_orbs: int
 ) -> tuple[tuple[tuple[int, ...], tuple[int, ...]], tuple[tuple[int, ...], tuple[int, ...]], int] | None:
@@ -232,13 +236,14 @@ def get_spin_string_lookup(ci_info: CI_Info, is_alpha: bool) -> np.ndarray:
     return lookup
 
 
-def get_spin_excitation_map(
+def get_spin_sub_string_slice(
     ci_info: CI_Info, sub_string: tuple[tuple[int, ...], tuple[int, ...]], is_alpha: bool
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Get the excitation map of one spin sub-string, building it on first use.
+) -> tuple[int, int]:
+    """Get the slice of the spin arena holding the excitation map of one spin sub-string.
 
     The map depends only on the spin string space and the sub-string, never on the factor in
-    front of it, so it is cached on the CI space and reused by every later operator.
+    front of it, so it is built once and appended to the arena of that spin. Every later
+    operator over the same CI space reuses it.
 
     Args:
         ci_info: Information about the CI space.
@@ -246,7 +251,7 @@ def get_spin_excitation_map(
         is_alpha: The sub-string acts on the alpha strings, otherwise on the beta ones.
 
     Returns:
-        Spin string indices mapped from, spin string indices mapped to, and the phases.
+        Start and end of the sub-string's slice of the spin arena.
     """
     cache_key = (is_alpha, sub_string[0], sub_string[1])
     if cache_key in ci_info.spin_op_cache:
@@ -273,8 +278,43 @@ def get_spin_excitation_map(
         num_active_orbs,
         parity_check,
     )
-    ci_info.spin_op_cache[cache_key] = spin_map
-    return spin_map
+    start = ci_info.spin_arena_length[is_alpha]
+    ci_info.spin_arena[is_alpha].append(spin_map)
+    ci_info.spin_arena_length[is_alpha] = start + len(spin_map[0])
+    # The arena grew, so the packed form is stale.
+    ci_info.spin_arena_packed[is_alpha] = None
+    arena_slice = (start, start + len(spin_map[0]))
+    ci_info.spin_op_cache[cache_key] = arena_slice
+    return arena_slice
+
+
+def get_spin_arena(ci_info: CI_Info, is_alpha: bool) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Get the excitation maps of every spin sub-string built so far, laid out back to back.
+
+    Args:
+        ci_info: Information about the CI space.
+        is_alpha: Get the alpha arena, otherwise the beta one.
+
+    Returns:
+        Spin string indices mapped from, spin string indices mapped to, and the phases.
+    """
+    packed = ci_info.spin_arena_packed[is_alpha]
+    if packed is None:
+        arena = ci_info.spin_arena[is_alpha]
+        if len(arena) == 0:
+            packed = (
+                np.zeros(0, dtype=np.int64),
+                np.zeros(0, dtype=np.int64),
+                np.zeros(0, dtype=np.float64),
+            )
+        else:
+            packed = (
+                np.concatenate([entry[0] for entry in arena]),
+                np.concatenate([entry[1] for entry in arena]),
+                np.concatenate([entry[2] for entry in arena]),
+            )
+        ci_info.spin_arena_packed[is_alpha] = packed
+    return packed
 
 
 def factorize_operator(op: FermionicOperator, ci_info: CI_Info) -> SpinFactorizedOperator | None:
@@ -290,62 +330,41 @@ def factorize_operator(op: FermionicOperator, ci_info: CI_Info) -> SpinFactorize
     if not ci_info.is_spin_product or ci_info.num_active_orbs > MAX_DENSE_LOOKUP_ORBS:
         return None
     num_active_orbs = ci_info.num_active_orbs
-    alpha_maps: list[tuple[np.ndarray, np.ndarray, np.ndarray]] = []
-    beta_maps: list[tuple[np.ndarray, np.ndarray, np.ndarray]] = []
-    alpha_slice: dict[tuple[tuple[int, ...], tuple[int, ...]], tuple[int, int]] = {}
-    beta_slice: dict[tuple[tuple[int, ...], tuple[int, ...]], tuple[int, int]] = {}
-    alpha_len = 0
-    beta_len = 0
-    term_alpha_start = []
-    term_alpha_stop = []
-    term_beta_start = []
-    term_beta_stop = []
-    term_factor = []
-    term_is_pure_alpha = []
-    term_is_pure_beta = []
-    for op_key, fac in op.operators.items():
+    num_terms = len(op.operators)
+    term_alpha_start = np.empty(num_terms, dtype=np.int64)
+    term_alpha_stop = np.empty(num_terms, dtype=np.int64)
+    term_beta_start = np.empty(num_terms, dtype=np.int64)
+    term_beta_stop = np.empty(num_terms, dtype=np.int64)
+    term_factor = np.empty(num_terms, dtype=np.float64)
+    term_is_pure_alpha = np.empty(num_terms, dtype=np.bool_)
+    term_is_pure_beta = np.empty(num_terms, dtype=np.bool_)
+    for term, (op_key, fac) in enumerate(op.operators.items()):
         split = split_spin_string(op_key, num_active_orbs)
         if split is None:
             # A single non spin conserving string makes the whole operator fall back.
             return None
         alpha_sub, beta_sub, sign = split
-        if alpha_sub not in alpha_slice:
-            spin_map = get_spin_excitation_map(ci_info, alpha_sub, True)
-            alpha_maps.append(spin_map)
-            alpha_slice[alpha_sub] = (alpha_len, alpha_len + len(spin_map[0]))
-            alpha_len += len(spin_map[0])
-        if beta_sub not in beta_slice:
-            spin_map = get_spin_excitation_map(ci_info, beta_sub, False)
-            beta_maps.append(spin_map)
-            beta_slice[beta_sub] = (beta_len, beta_len + len(spin_map[0]))
-            beta_len += len(spin_map[0])
-        term_alpha_start.append(alpha_slice[alpha_sub][0])
-        term_alpha_stop.append(alpha_slice[alpha_sub][1])
-        term_beta_start.append(beta_slice[beta_sub][0])
-        term_beta_stop.append(beta_slice[beta_sub][1])
-        term_factor.append(fac * sign)
-        term_is_pure_alpha.append(beta_sub == IDENTITY_SUB_STRING)
-        term_is_pure_beta.append(alpha_sub == IDENTITY_SUB_STRING)
-
-    def concatenate(maps: list[tuple[np.ndarray, np.ndarray, np.ndarray]], entry: int) -> np.ndarray:
-        if len(maps) == 0:
-            return np.zeros(0, dtype=np.int64 if entry < 2 else np.float64)
-        return np.concatenate([spin_map[entry] for spin_map in maps])
-
+        term_alpha_start[term], term_alpha_stop[term] = get_spin_sub_string_slice(ci_info, alpha_sub, True)
+        term_beta_start[term], term_beta_stop[term] = get_spin_sub_string_slice(ci_info, beta_sub, False)
+        term_factor[term] = fac * sign
+        term_is_pure_alpha[term] = beta_sub == IDENTITY_SUB_STRING
+        term_is_pure_beta[term] = alpha_sub == IDENTITY_SUB_STRING
+    alpha_src, alpha_dst, alpha_sign = get_spin_arena(ci_info, True)
+    beta_src, beta_dst, beta_sign = get_spin_arena(ci_info, False)
     return SpinFactorizedOperator(
-        concatenate(alpha_maps, 0),
-        concatenate(alpha_maps, 1),
-        concatenate(alpha_maps, 2),
-        concatenate(beta_maps, 0),
-        concatenate(beta_maps, 1),
-        concatenate(beta_maps, 2),
-        np.array(term_alpha_start, dtype=np.int64),
-        np.array(term_alpha_stop, dtype=np.int64),
-        np.array(term_beta_start, dtype=np.int64),
-        np.array(term_beta_stop, dtype=np.int64),
-        np.array(term_factor, dtype=np.float64),
-        np.array(term_is_pure_alpha, dtype=np.bool_),
-        np.array(term_is_pure_beta, dtype=np.bool_),
+        alpha_src,
+        alpha_dst,
+        alpha_sign,
+        beta_src,
+        beta_dst,
+        beta_sign,
+        term_alpha_start,
+        term_alpha_stop,
+        term_beta_start,
+        term_beta_stop,
+        term_factor,
+        term_is_pure_alpha,
+        term_is_pure_beta,
     )
 
 

@@ -44,6 +44,9 @@ class CI_Info:
         "num_inactive_orbs",
         "num_virtual_orbs",
         "space_extension_offset",
+        "spin_arena",
+        "spin_arena_length",
+        "spin_arena_packed",
         "spin_op_cache",
     )
 
@@ -70,9 +73,9 @@ class CI_Info:
         .. math::
             I = I_\alpha N_\beta + I_\beta
 
-        These are not used by the operator-state algebra yet. They are stored because the product
-        structure is what a future factorized algebra would be built on. For an expansion that is
-        not a spin product the maps are empty and num_alpha_strings and num_beta_strings are zero.
+        The product structure is what spin_factorized_algebra is built on. For an expansion that
+        is not a spin product the maps are empty, num_alpha_strings and num_beta_strings are zero,
+        and is_spin_product is False, which routes the algebra back to the general kernels.
 
         Args:
             num_inactive_orbs: Number of inactive spatial orbitals.
@@ -112,9 +115,19 @@ class CI_Info:
         # Built on first use by spin_factorized_algebra, and only for a spin product.
         self.alpha_str_lookup: np.ndarray | None = None
         self.beta_str_lookup: np.ndarray | None = None
-        self.spin_op_cache: dict[
-            tuple[bool, tuple[int, ...], tuple[int, ...]], tuple[np.ndarray, np.ndarray, np.ndarray]
-        ] = {}
+        # Every spin sub-string seen so far, per spin, laid out back to back. spin_op_cache maps
+        # a sub-string to its slice of that layout, and spin_arena_packed holds the concatenated
+        # form, rebuilt only when a new sub-string is added.
+        self.spin_op_cache: dict[tuple[bool, tuple[int, ...], tuple[int, ...]], tuple[int, int]] = {}
+        self.spin_arena: dict[bool, list[tuple[np.ndarray, np.ndarray, np.ndarray]]] = {
+            True: [],
+            False: [],
+        }
+        self.spin_arena_length: dict[bool, int] = {True: 0, False: 0}
+        self.spin_arena_packed: dict[bool, tuple[np.ndarray, np.ndarray, np.ndarray] | None] = {
+            True: None,
+            False: None,
+        }
 
     @property
     def is_spin_product(self) -> bool:
