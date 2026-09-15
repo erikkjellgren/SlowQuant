@@ -32,6 +32,7 @@ class CI_Info:
         "alpha_str2idx_nb",
         "beta_str2idx",
         "beta_str2idx_nb",
+        "block_layouts",
         "det2idx",
         "idx2alpha_str",
         "idx2beta_str",
@@ -143,6 +144,9 @@ class CI_Info:
         self.rotation_layouts: dict[
             tuple[str, tuple[int, ...]], tuple[np.ndarray, np.ndarray, np.ndarray] | None
         ] = {}
+        # The same for generators that connect more than two determinants at a time, see
+        # operator_state_algebra.build_generator_blocks.
+        self.block_layouts: dict[tuple[str, tuple[int, ...]], tuple[np.ndarray, ...] | None] = {}
 
     @property
     def is_spin_product(self) -> bool:

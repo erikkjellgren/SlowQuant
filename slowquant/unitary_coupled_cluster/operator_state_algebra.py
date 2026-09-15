@@ -475,6 +475,304 @@ def rotate_determinant_pairs(
             states[state_idx, q] = signed_sin * amplitude_p + cos_theta * amplitude_q
 
 
+MAX_EXPONENTIAL_BLOCK = 64
+
+# Frequencies and the weight of each power of the generator in the closed form of a
+# spin-adapted double, as the branches that used to carry a copy each spelled them. Odd
+# powers are weighted by sin(S*theta) and even ones by cos(S*theta)-1. Only reached when
+# the generator cannot be blocked, see build_generator_blocks.
+SPIN_ADAPTED_DOUBLE_SERIES: dict[str, tuple[tuple[float, ...], tuple[tuple[float, ...], ...]]] = {
+    "sa_double_2": (
+        (1, math.sqrt(2) / 2),
+        (
+            (-1, 2 * math.sqrt(2)),
+            (1, -4),
+            (-2, 2 * math.sqrt(2)),
+            (2, -4),
+        ),
+    ),
+    "sa_double_3": (
+        (1, math.sqrt(2) / 2),
+        (
+            (-1, 2 * math.sqrt(2)),
+            (1, -4),
+            (-2, 2 * math.sqrt(2)),
+            (2, -4),
+        ),
+    ),
+    "sa_double_4": (
+        (1, math.sqrt(2), math.sqrt(2) / 2, 1 / 2),
+        (
+            (2 / 3, -math.sqrt(2) / 42, -8 * math.sqrt(2) / 3, 128 / 21),
+            (-2 / 3, 1 / 42, 16 / 3, -256 / 21),
+            (13 / 3, -math.sqrt(2) / 6, -44 * math.sqrt(2) / 3, 64 / 3),
+            (-13 / 3, 1 / 6, 88 / 3, -128 / 3),
+            (22 / 3, -math.sqrt(2) / 3, -52 * math.sqrt(2) / 3, 64 / 3),
+            (-22 / 3, 1 / 3, 104 / 3, -128 / 3),
+            (8 / 3, -4 * math.sqrt(2) / 21, -16 * math.sqrt(2) / 3, 128 / 21),
+            (-8 / 3, 4 / 21, 32 / 3, -256 / 21),
+        ),
+    ),
+    "sa_double_5": (
+        (math.sqrt(2), math.sqrt(2) / 2, math.sqrt(3) / 3, math.sqrt(3) / 2, math.sqrt(3) / 6),
+        (
+            (
+                math.sqrt(2) / 1150,
+                8 * math.sqrt(2) / 5,
+                -54 * math.sqrt(3) / 25,
+                -16 * math.sqrt(3) / 75,
+                432 * math.sqrt(3) / 115,
+            ),
+            (-1 / 1150, -16 / 5, 162 / 25, 32 / 75, -2592 / 115),
+            (
+                11 * math.sqrt(2) / 690,
+                404 * math.sqrt(2) / 15,
+                -171 * math.sqrt(3) / 5,
+                -56 * math.sqrt(3) / 15,
+                2952 * math.sqrt(3) / 115,
+            ),
+            (-11 / 690, -808 / 15, 513 / 5, 112 / 15, -17712 / 115),
+            (
+                133 * math.sqrt(2) / 1725,
+                308 * math.sqrt(2) / 3,
+                -2718 * math.sqrt(3) / 25,
+                -1192 * math.sqrt(3) / 75,
+                1368 * math.sqrt(3) / 23,
+            ),
+            (-133 / 1725, -616 / 3, 8154 / 25, 2384 / 75, -8208 / 23),
+            (
+                16 * math.sqrt(2) / 115,
+                608 * math.sqrt(2) / 5,
+                -576 * math.sqrt(3) / 5,
+                -112 * math.sqrt(3) / 5,
+                6192 * math.sqrt(3) / 115,
+            ),
+            (-16 / 115, -1216 / 5, 1728 / 5, 224 / 5, -37152 / 115),
+            (
+                48 * math.sqrt(2) / 575,
+                192 * math.sqrt(2) / 5,
+                -864 * math.sqrt(3) / 25,
+                -192 * math.sqrt(3) / 25,
+                1728 * math.sqrt(3) / 115,
+            ),
+            (-48 / 575, -384 / 5, 2592 / 25, 384 / 25, -10368 / 115),
+        ),
+    ),
+}
+
+
+@nb.jit(nopython=True, cache=True)
+def label_connected_determinants(src: np.ndarray, dst: np.ndarray, num_dets: int) -> np.ndarray:
+    """Label each determinant with the connected group of the generator it belongs to.
+
+    Args:
+        src: Determinant the generator acts on.
+        dst: Determinant it is taken to.
+        num_dets: Number of determinants.
+
+    Returns:
+        Group label of every determinant.
+    """
+    parent = np.arange(num_dets)
+    for entry in range(len(src)):
+        root_a = src[entry]
+        root_b = dst[entry]
+        while parent[root_a] != root_a:
+            parent[root_a] = parent[parent[root_a]]
+            root_a = parent[root_a]
+        while parent[root_b] != root_b:
+            parent[root_b] = parent[parent[root_b]]
+            root_b = parent[root_b]
+        if root_a != root_b:
+            parent[root_a] = root_b
+    for det in range(num_dets):
+        root = det
+        while parent[root] != root:
+            root = parent[root]
+        parent[det] = root
+    return parent
+
+
+@nb.jit(nopython=True, cache=True)
+def rotate_determinant_blocks(
+    states: np.ndarray,
+    dets: np.ndarray,
+    starts: np.ndarray,
+    shape: np.ndarray,
+    rotations: np.ndarray,
+) -> None:
+    r"""Apply a small dense rotation to each group of determinants, in place.
+
+    .. math::
+        c_{d_r} \leftarrow \sum_s R^{(b)}_{rs} c_{d_s}
+
+    The groups are disjoint, so this needs no output vector.
+
+    Args:
+        states: States as (number of states, number of determinants), updated in place.
+        dets: Determinants of every group, one group after another.
+        starts: Where each group begins in dets, with the end appended.
+        shape: Which rotation each group uses.
+        rotations: Rotations as (number of distinct groups, size, size).
+    """
+    buffer = np.empty(rotations.shape[1])
+    for group in range(len(starts) - 1):
+        start = starts[group]
+        size = starts[group + 1] - start
+        rotation = rotations[shape[group]]
+        for state_idx in range(states.shape[0]):
+            state = states[state_idx]
+            for row in range(size):
+                buffer[row] = state[dets[start + row]]
+            for row in range(size):
+                total = 0.0
+                for col in range(size):
+                    total += rotation[row, col] * buffer[col]
+                state[dets[start + row]] = total
+
+
+def build_generator_blocks(op: FermionicOperator, ci_info: CI_Info) -> tuple[np.ndarray, ...] | None:
+    r"""Block diagonalize an excitation generator over the determinants it connects.
+
+    An anti-Hermitian generator is real and antisymmetric, so the determinants it connects fall
+    into groups it cannot mix, and on each group it is a small antisymmetric matrix. The
+    exponential is then block diagonal too,
+
+    .. math::
+        \exp\left(\theta\hat{T}\right) = \bigoplus_b \exp\left(\theta T^{(b)}\right)
+
+    with the identity on every determinant the generator annihilates. A single excitation gives
+    groups of two and the exponential of each is a Givens rotation; a spin-adapted double gives
+    groups of up to eight, of which only a handful are distinct however large the active space
+    is, because a group is fixed by the occupation of the few orbitals the generator touches.
+
+    Each fermionic string of the generator is a signed map of determinants on its own, so
+    applying it to :math:`v_k = k+1`, which is positive and all different, names the determinant
+    each one came from and the sign it picked up. The groups and their matrices follow from
+    those maps.
+
+    Args:
+        op: Excitation generator, already embedded in the CI space.
+        ci_info: Information about the CI space.
+
+    Returns:
+        Determinants of every group, where each group starts, which distinct matrix it uses, and
+        those matrices. None if the generator leaves the CI space or connects too much of it to
+        be worth blocking.
+    """
+    num_dets = len(ci_info.idx2det)
+    ramp = np.arange(1.0, num_dets + 1.0)
+    rows, cols, values = [], [], []
+    try:
+        for string, factor in op.operators.items():
+            # Unit weight, so that the sign of the result is the sign the string picked up.
+            reached = propagate_state([FermionicOperator({string: 1.0})], ramp, ci_info, do_folding=False)
+            taken_to = np.flatnonzero(reached)
+            sign = np.sign(reached[taken_to])
+            rows.append(taken_to)
+            cols.append(np.rint(np.abs(reached[taken_to]) - 1.0).astype(int))
+            values.append(factor * sign)
+    except KeyError:
+        # The generator takes some determinant out of the CI space. The general kernel skips
+        # determinants the state is zero on, so it survives that as long as the state stays
+        # away from them, and a blocked exponential could not. Leave it to the caller.
+        return None
+    if not rows:
+        return None
+    row = np.concatenate(rows)
+    col = np.concatenate(cols)
+    value = np.concatenate(values)
+    if np.any(col < 0) or np.any(col >= num_dets):
+        return None
+
+    label = label_connected_determinants(col, row, num_dets)
+    # A mask rather than a unique, because the entries run to several times the CI space.
+    reached = np.zeros(num_dets, dtype=bool)
+    reached[row] = True
+    reached[col] = True
+    touched = np.flatnonzero(reached)
+    if len(touched) == 0:
+        return None
+    # Determinants of a group sit next to each other once sorted by group, and within a group
+    # they keep determinant order, which is the same order in every group of the same shape.
+    order = np.argsort(label[touched], kind="stable")
+    dets = touched[order]
+    group_label = label[dets]
+    starts = np.flatnonzero(np.concatenate(([True], group_label[1:] != group_label[:-1])))
+    starts = np.concatenate((starts, [len(dets)]))
+    sizes = np.diff(starts)
+    block_size = int(sizes.max())
+    if block_size > MAX_EXPONENTIAL_BLOCK:
+        return None
+
+    # Where each determinant sits, and in which group, so the entries can be placed at once.
+    group_of = np.empty(num_dets, dtype=int)
+    place_of = np.empty(num_dets, dtype=int)
+    group_of[dets] = np.repeat(np.arange(len(sizes)), sizes)
+    place_of[dets] = np.arange(len(dets)) - np.repeat(starts[:-1], sizes)
+    blocks = np.zeros((len(sizes), block_size, block_size))
+    np.add.at(blocks, (group_of[col], place_of[row], place_of[col]), value)
+
+    # Only a handful of the groups are distinct, however large the active space is, so they are
+    # matched on their contents. Two that differ in the last bit only cost an extra exponential.
+    shape = np.empty(len(sizes), dtype=np.int32)
+    seen: dict[bytes, int] = {}
+    distinct: list[np.ndarray] = []
+    for group in range(len(sizes)):
+        key = blocks[group].tobytes()
+        found = seen.get(key)
+        if found is None:
+            found = len(distinct)
+            seen[key] = found
+            distinct.append(blocks[group])
+        shape[group] = found
+    groups = np.array(distinct)
+    if not np.allclose(groups, -np.transpose(groups, (0, 2, 1))):
+        # An anti-Hermitian generator has to give antisymmetric groups. If it did not, the maps
+        # above did not describe it and the exponential below would be a different operator.
+        # Only the distinct ones need checking, and there are never many of those.
+        return None
+    return dets.astype(np.int32), starts.astype(np.int32), shape, groups
+
+
+def diagonalize_generator_blocks(blocks: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    r"""Diagonalize the generator blocks once, so their exponential is cheap at every angle.
+
+    A real antisymmetric :math:`T` makes :math:`i T` Hermitian, so :math:`iT = V\lambda V^\dagger`
+    and
+
+    .. math::
+        \exp\left(\theta T\right) = V e^{-i\theta\lambda}V^\dagger
+
+    which is real and costs two small matrix products to assemble once the parameter is known.
+
+    Args:
+        blocks: Generator blocks as (number of distinct groups, size, size).
+
+    Returns:
+        Eigenvectors and eigenvalues of each block.
+    """
+    eigenvalues, eigenvectors = np.linalg.eigh(1j * blocks)
+    return eigenvectors, eigenvalues
+
+
+def exponentiate_generator_blocks(
+    eigenvectors: np.ndarray, eigenvalues: np.ndarray, theta: float
+) -> np.ndarray:
+    r"""Assemble :math:`\exp(\theta T^{(b)})` for every distinct block.
+
+    Args:
+        eigenvectors: Eigenvectors of each block.
+        eigenvalues: Eigenvalues of each block.
+        theta: Ansatz parameter value.
+
+    Returns:
+        Rotation of each distinct block.
+    """
+    phases = np.exp(-1j * theta * eigenvalues)[:, np.newaxis, :]
+    return np.real((eigenvectors * phases) @ np.conjugate(np.transpose(eigenvectors, (0, 2, 1))))
+
+
 def build_rotation_layout(
     op: FermionicOperator, ci_info: CI_Info
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
@@ -567,6 +865,169 @@ def get_rotation_layout(
     return ci_info.rotation_layouts[cache_key]
 
 
+def get_block_layout(
+    op: FermionicOperator, ci_info: CI_Info, cache_key: tuple[str, tuple[int, ...]]
+) -> tuple[np.ndarray, ...] | None:
+    """Get the blocked form of a generator, building and diagonalizing it the first time.
+
+    The blocks depend only on the generator and the CI space, so they are reused across every
+    parameter value the optimizer visits and only their exponential is rebuilt.
+
+    Args:
+        op: Excitation generator, already embedded in the CI space.
+        ci_info: Information about the CI space.
+        cache_key: Excitation type and indices naming this generator.
+
+    Returns:
+        Determinants of every group, where each group starts, which distinct block it uses, and
+        the eigenvectors and eigenvalues of those blocks. None if the generator cannot be
+        blocked.
+    """
+    if cache_key not in ci_info.block_layouts:
+        built = build_generator_blocks(op, ci_info)
+        if built is None:
+            ci_info.block_layouts[cache_key] = None
+        else:
+            dets, starts, shape, blocks = built
+            eigenvectors, eigenvalues = diagonalize_generator_blocks(blocks)
+            ci_info.block_layouts[cache_key] = (dets, starts, shape, eigenvectors, eigenvalues)
+    return ci_info.block_layouts[cache_key]
+
+
+def apply_blocked_exponential(
+    states: np.ndarray,
+    op: FermionicOperator,
+    theta: float,
+    ci_info: CI_Info,
+    cache_key: tuple[str, tuple[int, ...]],
+) -> np.ndarray | None:
+    r"""Apply the exponential of a generator through its blocks, if it has them.
+
+    .. math::
+        \left|\tilde{\nu}\right> = \exp\left(\theta\hat{T}\right)\left|\nu\right>
+
+    Args:
+        states: States as (number of states, number of determinants).
+        op: Excitation generator, already embedded in the CI space.
+        theta: Ansatz parameter value.
+        ci_info: Information about the CI space.
+        cache_key: Excitation type and indices naming this generator.
+
+    Returns:
+        New states, or None if the generator cannot be blocked.
+    """
+    layout = get_block_layout(op, ci_info, cache_key)
+    if layout is None:
+        return None
+    dets, starts, shape, eigenvectors, eigenvalues = layout
+    out = np.copy(states)
+    rotate_determinant_blocks(
+        out, dets, starts, shape, exponentiate_generator_blocks(eigenvectors, eigenvalues, theta)
+    )
+    return out
+
+
+def spin_adapted_double_weight(
+    order: int, weights: tuple[float, ...], frequencies: tuple[float, ...], theta: float
+) -> float:
+    r"""Weight of one power of the generator in the closed form of a spin-adapted double.
+
+    .. math::
+        c_m = \sum_f k^{(m)}_f \sin\left(S_f\theta\right) \quad m \text{ odd}, \qquad
+        c_m = \sum_f k^{(m)}_f \left(\cos\left(S_f\theta\right)-1\right) \quad m \text{ even}
+
+    Args:
+        order: Power of the generator this weight belongs to, counted from one.
+        weights: Weight of this power at each frequency.
+        frequencies: Frequencies of the generator.
+        theta: Ansatz parameter value.
+
+    Returns:
+        Weight of this power.
+    """
+    if order % 2:
+        return float(sum(k * np.sin(f * theta) for k, f in zip(weights, frequencies)))
+    return float(sum(k * (np.cos(f * theta) - 1) for k, f in zip(weights, frequencies)))
+
+
+def apply_spin_adapted_double(
+    state: np.ndarray,
+    op: FermionicOperator,
+    exc_type: str,
+    theta: float,
+    ci_info: CI_Info,
+    cache_key: tuple[str, tuple[int, ...]],
+) -> np.ndarray:
+    r"""Apply the exponential of a spin-adapted double excitation generator to a state.
+
+    .. math::
+        \left|\tilde{0}\right> = \exp\left(\theta\hat{T}\right)\left|0\right>
+
+    Unlike a plain excitation these generators carry several frequencies, so their exponential
+    is not a rotation of determinant pairs. It is still block diagonal, over groups of at most
+    eight determinants, and taking it that way costs one sweep instead of one application of the
+    generator per power. When the groups cannot be built the closed form is summed instead,
+    which is what the code did everywhere before.
+
+    Args:
+        state: State.
+        op: Excitation generator, already embedded in the CI space.
+        exc_type: Which spin-adapted double this is.
+        theta: Ansatz parameter value.
+        ci_info: Information about the CI space.
+        cache_key: Excitation type and indices naming this generator.
+
+    Returns:
+        New state.
+    """
+    blocked = apply_blocked_exponential(state.reshape(1, -1), op, theta, ci_info, cache_key)
+    if blocked is not None:
+        return blocked.reshape(state.shape)
+    frequencies, weights = SPIN_ADAPTED_DOUBLE_SERIES[exc_type]
+    out = np.copy(state)
+    power = state
+    for order, weight in enumerate(weights, start=1):
+        power = propagate_state([op], power, ci_info, do_folding=False)
+        out += spin_adapted_double_weight(order, weight, frequencies, theta) * power
+    return out
+
+
+def apply_spin_adapted_double_SA(
+    states: np.ndarray,
+    op: FermionicOperator,
+    exc_type: str,
+    theta: float,
+    ci_info: CI_Info,
+    cache_key: tuple[str, tuple[int, ...]],
+) -> np.ndarray:
+    r"""Apply the exponential of a spin-adapted double to every state of a state average.
+
+    .. math::
+        \left|\tilde{\nu}\right> = \exp\left(\theta\hat{T}\right)\left|\nu\right>
+
+    Args:
+        states: States as (number of states, number of determinants).
+        op: Excitation generator, already embedded in the CI space.
+        exc_type: Which spin-adapted double this is.
+        theta: Ansatz parameter value.
+        ci_info: Information about the CI space.
+        cache_key: Excitation type and indices naming this generator.
+
+    Returns:
+        New states.
+    """
+    blocked = apply_blocked_exponential(states, op, theta, ci_info, cache_key)
+    if blocked is not None:
+        return blocked
+    frequencies, weights = SPIN_ADAPTED_DOUBLE_SERIES[exc_type]
+    out = np.copy(states)
+    power = states
+    for order, weight in enumerate(weights, start=1):
+        power = propagate_state_SA([op], power, ci_info, do_folding=False)
+        out += spin_adapted_double_weight(order, weight, frequencies, theta) * power
+    return out
+
+
 def apply_generator_exponential(
     state: np.ndarray,
     op: FermionicOperator,
@@ -594,15 +1055,18 @@ def apply_generator_exponential(
         New state.
     """
     layout = get_rotation_layout(op, ci_info, cache_key)
-    if layout is None:
-        return (
-            state
-            + np.sin(theta) * propagate_state([op], state, ci_info, do_folding=False)
-            + (1 - np.cos(theta)) * propagate_state([op, op], state, ci_info, do_folding=False)
-        )
-    out = np.copy(state)
-    rotate_determinant_pairs(out.reshape(1, -1), *layout, np.cos(theta), np.sin(theta))
-    return out
+    if layout is not None:
+        out = np.copy(state)
+        rotate_determinant_pairs(out.reshape(1, -1), *layout, np.cos(theta), np.sin(theta))
+        return out
+    blocked = apply_blocked_exponential(state.reshape(1, -1), op, theta, ci_info, cache_key)
+    if blocked is not None:
+        return blocked.reshape(state.shape)
+    return (
+        state
+        + np.sin(theta) * propagate_state([op], state, ci_info, do_folding=False)
+        + (1 - np.cos(theta)) * propagate_state([op, op], state, ci_info, do_folding=False)
+    )
 
 
 def apply_generator_exponential_SA(
@@ -628,15 +1092,18 @@ def apply_generator_exponential_SA(
         New states.
     """
     layout = get_rotation_layout(op, ci_info, cache_key)
-    if layout is None:
-        return (
-            states
-            + np.sin(theta) * propagate_state_SA([op], states, ci_info, do_folding=False)
-            + (1 - np.cos(theta)) * propagate_state_SA([op, op], states, ci_info, do_folding=False)
-        )
-    out = np.copy(states)
-    rotate_determinant_pairs(out, *layout, np.cos(theta), np.sin(theta))
-    return out
+    if layout is not None:
+        out = np.copy(states)
+        rotate_determinant_pairs(out, *layout, np.cos(theta), np.sin(theta))
+        return out
+    blocked = apply_blocked_exponential(states, op, theta, ci_info, cache_key)
+    if blocked is not None:
+        return blocked
+    return (
+        states
+        + np.sin(theta) * propagate_state_SA([op], states, ci_info, do_folding=False)
+        + (1 - np.cos(theta)) * propagate_state_SA([op, op], states, ci_info, do_folding=False)
+    )
 
 
 def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bool = False) -> np.ndarray:
@@ -1273,329 +1740,17 @@ def construct_ups_state(
             # Analytical application on state vector
             out = apply_generator_exponential(out, T, theta, ci_info, (exc_type, tuple(exc_indices)))
         elif exc_type in ("sa_double_2", "sa_double_3"):
-            if exc_type == "sa_double_2":
-                (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
-                T = G2_sa(i, j, a, b, 2, True, num_orbs=ci_info.num_active_orbs)
-            elif exc_type == "sa_double_3":
-                (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
-                T = G2_sa(i, j, a, b, 3, True, num_orbs=ci_info.num_active_orbs)
-            else:
-                raise ValueError(f"Got unknown excitation type: {exc_type}")
-            S = (1, math.sqrt(2) / 2)
-            k1 = (-1, 2 * math.sqrt(2))
-            k3 = (-2, 2 * math.sqrt(2))
-            k2 = (1, -4)
-            k4 = (2, -4)
-            tmp = propagate_state(
-                [T],
-                out,
-                ci_info,
-                do_folding=False,
-            )
-            out += (k1[0] * np.sin(S[0] * theta) + k1[1] * np.sin(S[1] * theta)) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (k2[0] * (np.cos(S[0] * theta) - 1) + k2[1] * (np.cos(S[1] * theta) - 1)) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (k3[0] * np.sin(S[0] * theta) + k3[1] * np.sin(S[1] * theta)) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (k4[0] * (np.cos(S[0] * theta) - 1) + k4[1] * (np.cos(S[1] * theta) - 1)) * tmp
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
+            out = apply_spin_adapted_double(out, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)))
         elif exc_type in ("sa_double_4",):
             (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
-            T = G2_sa(i, j, a, b, 4, True, num_orbs=ci_info.num_active_orbs)
-            S = (1, math.sqrt(2), math.sqrt(2) / 2, 1 / 2)  # type: ignore
-            k1 = (2 / 3, -math.sqrt(2) / 42, -8 * math.sqrt(2) / 3, 128 / 21)  # type: ignore
-            k3 = (13 / 3, -math.sqrt(2) / 6, -44 * math.sqrt(2) / 3, 64 / 3)  # type: ignore
-            k5 = (22 / 3, -math.sqrt(2) / 3, -52 * math.sqrt(2) / 3, 64 / 3)  # type: ignore
-            k7 = (8 / 3, -4 * math.sqrt(2) / 21, -16 * math.sqrt(2) / 3, 128 / 21)  # type: ignore
-            k2 = (-2 / 3, 1 / 42, 16 / 3, -256 / 21)  # type: ignore
-            k4 = (-13 / 3, 1 / 6, 88 / 3, -128 / 3)  # type: ignore
-            k6 = (-22 / 3, 1 / 3, 104 / 3, -128 / 3)  # type: ignore
-            k8 = (-8 / 3, 4 / 21, 32 / 3, -256 / 21)  # type: ignore
-            tmp = propagate_state(
-                [T],
-                out,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k1[0] * np.sin(S[0] * theta)  # type: ignore
-                + k1[1] * np.sin(S[1] * theta)  # type: ignore
-                + k1[2] * np.sin(S[2] * theta)  # type: ignore
-                + k1[3] * np.sin(S[3] * theta)  # type: ignore
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k2[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-                + k2[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-                + k2[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-                + k2[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k3[0] * np.sin(S[0] * theta)  # type: ignore
-                + k3[1] * np.sin(S[1] * theta)  # type: ignore
-                + k3[2] * np.sin(S[2] * theta)  # type: ignore
-                + k3[3] * np.sin(S[3] * theta)  # type: ignore
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k4[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-                + k4[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-                + k4[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-                + k4[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k5[0] * np.sin(S[0] * theta)  # type: ignore
-                + k5[1] * np.sin(S[1] * theta)  # type: ignore
-                + k5[2] * np.sin(S[2] * theta)  # type: ignore
-                + k5[3] * np.sin(S[3] * theta)  # type: ignore
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k6[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-                + k6[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-                + k6[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-                + k6[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k7[0] * np.sin(S[0] * theta)  # type: ignore
-                + k7[1] * np.sin(S[1] * theta)  # type: ignore
-                + k7[2] * np.sin(S[2] * theta)  # type: ignore
-                + k7[3] * np.sin(S[3] * theta)  # type: ignore
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k8[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-                + k8[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-                + k8[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-                + k8[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-            ) * tmp
+            T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
+            out = apply_spin_adapted_double(out, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)))
         elif exc_type in ("sa_double_5",):
             (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
-            T = G2_sa(i, j, a, b, 5, True, num_orbs=ci_info.num_active_orbs)
-            S = (math.sqrt(2), math.sqrt(2) / 2, math.sqrt(3) / 3, math.sqrt(3) / 2, math.sqrt(3) / 6)  # type: ignore
-            k1 = (  # type: ignore
-                math.sqrt(2) / 1150,
-                8 * math.sqrt(2) / 5,
-                -54 * math.sqrt(3) / 25,
-                -16 * math.sqrt(3) / 75,
-                432 * math.sqrt(3) / 115,
-            )
-            k3 = (  # type: ignore
-                11 * math.sqrt(2) / 690,
-                404 * math.sqrt(2) / 15,
-                -171 * math.sqrt(3) / 5,
-                -56 * math.sqrt(3) / 15,
-                2952 * math.sqrt(3) / 115,
-            )
-            k5 = (  # type: ignore
-                133 * math.sqrt(2) / 1725,
-                308 * math.sqrt(2) / 3,
-                -2718 * math.sqrt(3) / 25,
-                -1192 * math.sqrt(3) / 75,
-                1368 * math.sqrt(3) / 23,
-            )
-            k7 = (  # type: ignore
-                16 * math.sqrt(2) / 115,
-                608 * math.sqrt(2) / 5,
-                -576 * math.sqrt(3) / 5,
-                -112 * math.sqrt(3) / 5,
-                6192 * math.sqrt(3) / 115,
-            )
-            k9 = (  # type: ignore
-                48 * math.sqrt(2) / 575,
-                192 * math.sqrt(2) / 5,
-                -864 * math.sqrt(3) / 25,
-                -192 * math.sqrt(3) / 25,
-                1728 * math.sqrt(3) / 115,
-            )
-            k2 = (-1 / 1150, -16 / 5, 162 / 25, 32 / 75, -2592 / 115)  # type: ignore
-            k4 = (-11 / 690, -808 / 15, 513 / 5, 112 / 15, -17712 / 115)  # type: ignore
-            k6 = (-133 / 1725, -616 / 3, 8154 / 25, 2384 / 75, -8208 / 23)  # type: ignore
-            k8 = (-16 / 115, -1216 / 5, 1728 / 5, 224 / 5, -37152 / 115)  # type: ignore
-            k10 = (-48 / 575, -384 / 5, 2592 / 25, 384 / 25, -10368 / 115)  # type: ignore
-            tmp = propagate_state(
-                [T],
-                out,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k1[0] * np.sin(S[0] * theta)  # type: ignore
-                + k1[1] * np.sin(S[1] * theta)  # type: ignore
-                + k1[2] * np.sin(S[2] * theta)  # type: ignore
-                + k1[3] * np.sin(S[3] * theta)  # type: ignore
-                + k1[4] * np.sin(S[4] * theta)  # type: ignore
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k2[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-                + k2[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-                + k2[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-                + k2[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-                + k2[4] * (np.cos(S[4] * theta) - 1)  # type: ignore
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k3[0] * np.sin(S[0] * theta)  # type: ignore
-                + k3[1] * np.sin(S[1] * theta)  # type: ignore
-                + k3[2] * np.sin(S[2] * theta)  # type: ignore
-                + k3[3] * np.sin(S[3] * theta)  # type: ignore
-                + k3[4] * np.sin(S[4] * theta)  # type: ignore
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k4[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-                + k4[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-                + k4[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-                + k4[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-                + k4[4] * (np.cos(S[4] * theta) - 1)  # type: ignore
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k5[0] * np.sin(S[0] * theta)  # type: ignore
-                + k5[1] * np.sin(S[1] * theta)  # type: ignore
-                + k5[2] * np.sin(S[2] * theta)  # type: ignore
-                + k5[3] * np.sin(S[3] * theta)  # type: ignore
-                + k5[4] * np.sin(S[4] * theta)  # type: ignore
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k6[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-                + k6[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-                + k6[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-                + k6[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-                + k6[4] * (np.cos(S[4] * theta) - 1)  # type: ignore
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k7[0] * np.sin(S[0] * theta)  # type: ignore
-                + k7[1] * np.sin(S[1] * theta)  # type: ignore
-                + k7[2] * np.sin(S[2] * theta)  # type: ignore
-                + k7[3] * np.sin(S[3] * theta)  # type: ignore
-                + k7[4] * np.sin(S[4] * theta)  # type: ignore
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k8[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-                + k8[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-                + k8[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-                + k8[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-                + k8[4] * (np.cos(S[4] * theta) - 1)  # type: ignore
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k9[0] * np.sin(S[0] * theta)  # type: ignore
-                + k9[1] * np.sin(S[1] * theta)  # type: ignore
-                + k9[2] * np.sin(S[2] * theta)  # type: ignore
-                + k9[3] * np.sin(S[3] * theta)  # type: ignore
-                + k9[4] * np.sin(S[4] * theta)  # type: ignore
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k10[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-                + k10[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-                + k10[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-                + k10[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-                + k10[4] * (np.cos(S[4] * theta) - 1)  # type: ignore
-            ) * tmp
+            T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
+            out = apply_spin_adapted_double(out, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)))
         else:
             raise ValueError(f"Got unknown excitation type, {exc_type}")
     return out
@@ -1694,329 +1849,23 @@ def construct_ups_state_SA(
             # Analytical application on state vector
             out = apply_generator_exponential_SA(out, T, theta, ci_info, (exc_type, tuple(exc_indices)))
         elif exc_type in ("sa_double_2", "sa_double_3"):
-            if exc_type == "sa_double_2":
-                (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
-                T = G2_sa(i, j, a, b, 2, True, num_orbs=ci_info.num_active_orbs)
-            elif exc_type == "sa_double_3":
-                (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
-                T = G2_sa(i, j, a, b, 3, True, num_orbs=ci_info.num_active_orbs)
-            else:
-                raise ValueError(f"Got unknown excitation type: {exc_type}")
-            S = (1, math.sqrt(2) / 2)
-            k1 = (-1, 2 * math.sqrt(2))
-            k3 = (-2, 2 * math.sqrt(2))
-            k2 = (1, -4)
-            k4 = (2, -4)
-            tmp = propagate_state_SA(
-                [T],
-                out,
-                ci_info,
-                do_folding=False,
+            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+            T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
+            out = apply_spin_adapted_double_SA(
+                out, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices))
             )
-            out += (k1[0] * np.sin(S[0] * theta) + k1[1] * np.sin(S[1] * theta)) * tmp
-            tmp = propagate_state_SA(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (k2[0] * (np.cos(S[0] * theta) - 1) + k2[1] * (np.cos(S[1] * theta) - 1)) * tmp
-            tmp = propagate_state_SA(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (k3[0] * np.sin(S[0] * theta) + k3[1] * np.sin(S[1] * theta)) * tmp
-            tmp = propagate_state_SA(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (k4[0] * (np.cos(S[0] * theta) - 1) + k4[1] * (np.cos(S[1] * theta) - 1)) * tmp
         elif exc_type in ("sa_double_4",):
             (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
-            T = G2_sa(i, j, a, b, 4, True, num_orbs=ci_info.num_active_orbs)
-            S = (1, math.sqrt(2), math.sqrt(2) / 2, 1 / 2)  # type: ignore
-            k1 = (2 / 3, -math.sqrt(2) / 42, -8 * math.sqrt(2) / 3, 128 / 21)  # type: ignore
-            k3 = (13 / 3, -math.sqrt(2) / 6, -44 * math.sqrt(2) / 3, 64 / 3)  # type: ignore
-            k5 = (22 / 3, -math.sqrt(2) / 3, -52 * math.sqrt(2) / 3, 64 / 3)  # type: ignore
-            k7 = (8 / 3, -4 * math.sqrt(2) / 21, -16 * math.sqrt(2) / 3, 128 / 21)  # type: ignore
-            k2 = (-2 / 3, 1 / 42, 16 / 3, -256 / 21)  # type: ignore
-            k4 = (-13 / 3, 1 / 6, 88 / 3, -128 / 3)  # type: ignore
-            k6 = (-22 / 3, 1 / 3, 104 / 3, -128 / 3)  # type: ignore
-            k8 = (-8 / 3, 4 / 21, 32 / 3, -256 / 21)  # type: ignore
-            tmp = propagate_state_SA(
-                [T],
-                out,
-                ci_info,
-                do_folding=False,
+            T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
+            out = apply_spin_adapted_double_SA(
+                out, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices))
             )
-            out += (
-                k1[0] * np.sin(S[0] * theta)  # type: ignore
-                + k1[1] * np.sin(S[1] * theta)  # type: ignore
-                + k1[2] * np.sin(S[2] * theta)  # type: ignore
-                + k1[3] * np.sin(S[3] * theta)  # type: ignore
-            ) * tmp
-            tmp = propagate_state_SA(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k2[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-                + k2[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-                + k2[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-                + k2[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-            ) * tmp
-            tmp = propagate_state_SA(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k3[0] * np.sin(S[0] * theta)  # type: ignore
-                + k3[1] * np.sin(S[1] * theta)  # type: ignore
-                + k3[2] * np.sin(S[2] * theta)  # type: ignore
-                + k3[3] * np.sin(S[3] * theta)  # type: ignore
-            ) * tmp
-            tmp = propagate_state_SA(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k4[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-                + k4[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-                + k4[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-                + k4[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-            ) * tmp
-            tmp = propagate_state_SA(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k5[0] * np.sin(S[0] * theta)  # type: ignore
-                + k5[1] * np.sin(S[1] * theta)  # type: ignore
-                + k5[2] * np.sin(S[2] * theta)  # type: ignore
-                + k5[3] * np.sin(S[3] * theta)  # type: ignore
-            ) * tmp
-            tmp = propagate_state_SA(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k6[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-                + k6[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-                + k6[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-                + k6[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-            ) * tmp
-            tmp = propagate_state_SA(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k7[0] * np.sin(S[0] * theta)  # type: ignore
-                + k7[1] * np.sin(S[1] * theta)  # type: ignore
-                + k7[2] * np.sin(S[2] * theta)  # type: ignore
-                + k7[3] * np.sin(S[3] * theta)  # type: ignore
-            ) * tmp
-            tmp = propagate_state_SA(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k8[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-                + k8[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-                + k8[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-                + k8[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-            ) * tmp
         elif exc_type in ("sa_double_5",):
             (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
-            T = G2_sa(i, j, a, b, 5, True, num_orbs=ci_info.num_active_orbs)
-            S = (math.sqrt(2), math.sqrt(2) / 2, math.sqrt(3) / 3, math.sqrt(3) / 2, math.sqrt(3) / 6)  # type: ignore
-            k1 = (  # type: ignore
-                math.sqrt(2) / 1150,
-                8 * math.sqrt(2) / 5,
-                -54 * math.sqrt(3) / 25,
-                -16 * math.sqrt(3) / 75,
-                432 * math.sqrt(3) / 115,
+            T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
+            out = apply_spin_adapted_double_SA(
+                out, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices))
             )
-            k3 = (  # type: ignore
-                11 * math.sqrt(2) / 690,
-                404 * math.sqrt(2) / 15,
-                -171 * math.sqrt(3) / 5,
-                -56 * math.sqrt(3) / 15,
-                2952 * math.sqrt(3) / 115,
-            )
-            k5 = (  # type: ignore
-                133 * math.sqrt(2) / 1725,
-                308 * math.sqrt(2) / 3,
-                -2718 * math.sqrt(3) / 25,
-                -1192 * math.sqrt(3) / 75,
-                1368 * math.sqrt(3) / 23,
-            )
-            k7 = (  # type: ignore
-                16 * math.sqrt(2) / 115,
-                608 * math.sqrt(2) / 5,
-                -576 * math.sqrt(3) / 5,
-                -112 * math.sqrt(3) / 5,
-                6192 * math.sqrt(3) / 115,
-            )
-            k9 = (  # type: ignore
-                48 * math.sqrt(2) / 575,
-                192 * math.sqrt(2) / 5,
-                -864 * math.sqrt(3) / 25,
-                -192 * math.sqrt(3) / 25,
-                1728 * math.sqrt(3) / 115,
-            )
-            k2 = (-1 / 1150, -16 / 5, 162 / 25, 32 / 75, -2592 / 115)  # type: ignore
-            k4 = (-11 / 690, -808 / 15, 513 / 5, 112 / 15, -17712 / 115)  # type: ignore
-            k6 = (-133 / 1725, -616 / 3, 8154 / 25, 2384 / 75, -8208 / 23)  # type: ignore
-            k8 = (-16 / 115, -1216 / 5, 1728 / 5, 224 / 5, -37152 / 115)  # type: ignore
-            k10 = (-48 / 575, -384 / 5, 2592 / 25, 384 / 25, -10368 / 115)  # type: ignore
-            tmp = propagate_state_SA(
-                [T],
-                out,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k1[0] * np.sin(S[0] * theta)  # type: ignore
-                + k1[1] * np.sin(S[1] * theta)  # type: ignore
-                + k1[2] * np.sin(S[2] * theta)  # type: ignore
-                + k1[3] * np.sin(S[3] * theta)  # type: ignore
-                + k1[4] * np.sin(S[4] * theta)  # type: ignore
-            ) * tmp
-            tmp = propagate_state_SA(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k2[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-                + k2[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-                + k2[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-                + k2[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-                + k2[4] * (np.cos(S[4] * theta) - 1)  # type: ignore
-            ) * tmp
-            tmp = propagate_state_SA(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k3[0] * np.sin(S[0] * theta)  # type: ignore
-                + k3[1] * np.sin(S[1] * theta)  # type: ignore
-                + k3[2] * np.sin(S[2] * theta)  # type: ignore
-                + k3[3] * np.sin(S[3] * theta)  # type: ignore
-                + k3[4] * np.sin(S[4] * theta)  # type: ignore
-            ) * tmp
-            tmp = propagate_state_SA(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k4[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-                + k4[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-                + k4[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-                + k4[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-                + k4[4] * (np.cos(S[4] * theta) - 1)  # type: ignore
-            ) * tmp
-            tmp = propagate_state_SA(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k5[0] * np.sin(S[0] * theta)  # type: ignore
-                + k5[1] * np.sin(S[1] * theta)  # type: ignore
-                + k5[2] * np.sin(S[2] * theta)  # type: ignore
-                + k5[3] * np.sin(S[3] * theta)  # type: ignore
-                + k5[4] * np.sin(S[4] * theta)  # type: ignore
-            ) * tmp
-            tmp = propagate_state_SA(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k6[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-                + k6[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-                + k6[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-                + k6[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-                + k6[4] * (np.cos(S[4] * theta) - 1)  # type: ignore
-            ) * tmp
-            tmp = propagate_state_SA(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k7[0] * np.sin(S[0] * theta)  # type: ignore
-                + k7[1] * np.sin(S[1] * theta)  # type: ignore
-                + k7[2] * np.sin(S[2] * theta)  # type: ignore
-                + k7[3] * np.sin(S[3] * theta)  # type: ignore
-                + k7[4] * np.sin(S[4] * theta)  # type: ignore
-            ) * tmp
-            tmp = propagate_state_SA(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k8[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-                + k8[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-                + k8[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-                + k8[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-                + k8[4] * (np.cos(S[4] * theta) - 1)  # type: ignore
-            ) * tmp
-            tmp = propagate_state_SA(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k9[0] * np.sin(S[0] * theta)  # type: ignore
-                + k9[1] * np.sin(S[1] * theta)  # type: ignore
-                + k9[2] * np.sin(S[2] * theta)  # type: ignore
-                + k9[3] * np.sin(S[3] * theta)  # type: ignore
-                + k9[4] * np.sin(S[4] * theta)  # type: ignore
-            ) * tmp
-            tmp = propagate_state_SA(
-                [T],
-                tmp,
-                ci_info,
-                do_folding=False,
-            )
-            out += (
-                k10[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-                + k10[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-                + k10[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-                + k10[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-                + k10[4] * (np.cos(S[4] * theta) - 1)  # type: ignore
-            ) * tmp
         else:
             raise ValueError(f"Got unknown excitation type, {exc_type}")
     return out
@@ -2097,332 +1946,17 @@ def propagate_unitary(
         # Analytical application on state vector
         out = apply_generator_exponential(state, T, theta, ci_info, (exc_type, tuple(exc_indices)))
     elif exc_type in ("sa_double_2", "sa_double_3"):
-        if exc_type == "sa_double_2":
-            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
-            T = G2_sa(i, j, a, b, 2, True, num_orbs=ci_info.num_active_orbs)
-        elif exc_type == "sa_double_3":
-            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
-            T = G2_sa(i, j, a, b, 3, True, num_orbs=ci_info.num_active_orbs)
-        else:
-            raise ValueError(f"Got unknown excitation type: {exc_type}")
-        S = (1, math.sqrt(2) / 2)
-        k1 = (-1, 2 * math.sqrt(2))
-        k3 = (-2, 2 * math.sqrt(2))
-        k2 = (1, -4)
-        k4 = (2, -4)
-        out = np.copy(state)
-        tmp = propagate_state(
-            [T],
-            state,
-            ci_info,
-            do_folding=False,
-        )
-        out += (k1[0] * np.sin(S[0] * theta) + k1[1] * np.sin(S[1] * theta)) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (k2[0] * (np.cos(S[0] * theta) - 1) + k2[1] * (np.cos(S[1] * theta) - 1)) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (k3[0] * np.sin(S[0] * theta) + k3[1] * np.sin(S[1] * theta)) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (k4[0] * (np.cos(S[0] * theta) - 1) + k4[1] * (np.cos(S[1] * theta) - 1)) * tmp
+        (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+        T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
+        out = apply_spin_adapted_double(state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)))
     elif exc_type in ("sa_double_4",):
         (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
-        T = G2_sa(i, j, a, b, 4, True, num_orbs=ci_info.num_active_orbs)
-        S = (1, math.sqrt(2), math.sqrt(2) / 2, 1 / 2)  # type: ignore
-        k1 = (2 / 3, -math.sqrt(2) / 42, -8 * math.sqrt(2) / 3, 128 / 21)  # type: ignore
-        k3 = (13 / 3, -math.sqrt(2) / 6, -44 * math.sqrt(2) / 3, 64 / 3)  # type: ignore
-        k5 = (22 / 3, -math.sqrt(2) / 3, -52 * math.sqrt(2) / 3, 64 / 3)  # type: ignore
-        k7 = (8 / 3, -4 * math.sqrt(2) / 21, -16 * math.sqrt(2) / 3, 128 / 21)  # type: ignore
-        k2 = (-2 / 3, 1 / 42, 16 / 3, -256 / 21)  # type: ignore
-        k4 = (-13 / 3, 1 / 6, 88 / 3, -128 / 3)  # type: ignore
-        k6 = (-22 / 3, 1 / 3, 104 / 3, -128 / 3)  # type: ignore
-        k8 = (-8 / 3, 4 / 21, 32 / 3, -256 / 21)  # type: ignore
-        out = np.copy(state)
-        tmp = propagate_state(
-            [T],
-            state,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k1[0] * np.sin(S[0] * theta)  # type: ignore
-            + k1[1] * np.sin(S[1] * theta)  # type: ignore
-            + k1[2] * np.sin(S[2] * theta)  # type: ignore
-            + k1[3] * np.sin(S[3] * theta)  # type: ignore
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k2[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-            + k2[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-            + k2[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-            + k2[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k3[0] * np.sin(S[0] * theta)  # type: ignore
-            + k3[1] * np.sin(S[1] * theta)  # type: ignore
-            + k3[2] * np.sin(S[2] * theta)  # type: ignore
-            + k3[3] * np.sin(S[3] * theta)  # type: ignore
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k4[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-            + k4[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-            + k4[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-            + k4[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k5[0] * np.sin(S[0] * theta)  # type: ignore
-            + k5[1] * np.sin(S[1] * theta)  # type: ignore
-            + k5[2] * np.sin(S[2] * theta)  # type: ignore
-            + k5[3] * np.sin(S[3] * theta)  # type: ignore
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k6[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-            + k6[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-            + k6[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-            + k6[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k7[0] * np.sin(S[0] * theta)  # type: ignore
-            + k7[1] * np.sin(S[1] * theta)  # type: ignore
-            + k7[2] * np.sin(S[2] * theta)  # type: ignore
-            + k7[3] * np.sin(S[3] * theta)  # type: ignore
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k8[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-            + k8[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-            + k8[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-            + k8[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-        ) * tmp
+        T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
+        out = apply_spin_adapted_double(state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)))
     elif exc_type in ("sa_double_5",):
         (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
-        T = G2_sa(i, j, a, b, 5, True, num_orbs=ci_info.num_active_orbs)
-        S = (math.sqrt(2), math.sqrt(2) / 2, math.sqrt(3) / 3, math.sqrt(3) / 2, math.sqrt(3) / 6)  # type: ignore
-        k1 = (  # type: ignore
-            math.sqrt(2) / 1150,
-            8 * math.sqrt(2) / 5,
-            -54 * math.sqrt(3) / 25,
-            -16 * math.sqrt(3) / 75,
-            432 * math.sqrt(3) / 115,
-        )
-        k3 = (  # type: ignore
-            11 * math.sqrt(2) / 690,
-            404 * math.sqrt(2) / 15,
-            -171 * math.sqrt(3) / 5,
-            -56 * math.sqrt(3) / 15,
-            2952 * math.sqrt(3) / 115,
-        )
-        k5 = (  # type: ignore
-            133 * math.sqrt(2) / 1725,
-            308 * math.sqrt(2) / 3,
-            -2718 * math.sqrt(3) / 25,
-            -1192 * math.sqrt(3) / 75,
-            1368 * math.sqrt(3) / 23,
-        )
-        k7 = (  # type: ignore
-            16 * math.sqrt(2) / 115,
-            608 * math.sqrt(2) / 5,
-            -576 * math.sqrt(3) / 5,
-            -112 * math.sqrt(3) / 5,
-            6192 * math.sqrt(3) / 115,
-        )
-        k9 = (  # type: ignore
-            48 * math.sqrt(2) / 575,
-            192 * math.sqrt(2) / 5,
-            -864 * math.sqrt(3) / 25,
-            -192 * math.sqrt(3) / 25,
-            1728 * math.sqrt(3) / 115,
-        )
-        k2 = (-1 / 1150, -16 / 5, 162 / 25, 32 / 75, -2592 / 115)  # type: ignore
-        k4 = (-11 / 690, -808 / 15, 513 / 5, 112 / 15, -17712 / 115)  # type: ignore
-        k6 = (-133 / 1725, -616 / 3, 8154 / 25, 2384 / 75, -8208 / 23)  # type: ignore
-        k8 = (-16 / 115, -1216 / 5, 1728 / 5, 224 / 5, -37152 / 115)  # type: ignore
-        k10 = (-48 / 575, -384 / 5, 2592 / 25, 384 / 25, -10368 / 115)  # type: ignore
-        out = np.copy(state)
-        tmp = propagate_state(
-            [T],
-            state,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k1[0] * np.sin(S[0] * theta)  # type: ignore
-            + k1[1] * np.sin(S[1] * theta)  # type: ignore
-            + k1[2] * np.sin(S[2] * theta)  # type: ignore
-            + k1[3] * np.sin(S[3] * theta)  # type: ignore
-            + k1[4] * np.sin(S[4] * theta)  # type: ignore
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k2[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-            + k2[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-            + k2[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-            + k2[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-            + k2[4] * (np.cos(S[4] * theta) - 1)  # type: ignore
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k3[0] * np.sin(S[0] * theta)  # type: ignore
-            + k3[1] * np.sin(S[1] * theta)  # type: ignore
-            + k3[2] * np.sin(S[2] * theta)  # type: ignore
-            + k3[3] * np.sin(S[3] * theta)  # type: ignore
-            + k3[4] * np.sin(S[4] * theta)  # type: ignore
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k4[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-            + k4[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-            + k4[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-            + k4[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-            + k4[4] * (np.cos(S[4] * theta) - 1)  # type: ignore
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k5[0] * np.sin(S[0] * theta)  # type: ignore
-            + k5[1] * np.sin(S[1] * theta)  # type: ignore
-            + k5[2] * np.sin(S[2] * theta)  # type: ignore
-            + k5[3] * np.sin(S[3] * theta)  # type: ignore
-            + k5[4] * np.sin(S[4] * theta)  # type: ignore
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k6[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-            + k6[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-            + k6[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-            + k6[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-            + k6[4] * (np.cos(S[4] * theta) - 1)  # type: ignore
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k7[0] * np.sin(S[0] * theta)  # type: ignore
-            + k7[1] * np.sin(S[1] * theta)  # type: ignore
-            + k7[2] * np.sin(S[2] * theta)  # type: ignore
-            + k7[3] * np.sin(S[3] * theta)  # type: ignore
-            + k7[4] * np.sin(S[4] * theta)  # type: ignore
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k8[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-            + k8[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-            + k8[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-            + k8[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-            + k8[4] * (np.cos(S[4] * theta) - 1)  # type: ignore
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k9[0] * np.sin(S[0] * theta)  # type: ignore
-            + k9[1] * np.sin(S[1] * theta)  # type: ignore
-            + k9[2] * np.sin(S[2] * theta)  # type: ignore
-            + k9[3] * np.sin(S[3] * theta)  # type: ignore
-            + k9[4] * np.sin(S[4] * theta)  # type: ignore
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k10[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-            + k10[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-            + k10[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-            + k10[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-            + k10[4] * (np.cos(S[4] * theta) - 1)  # type: ignore
-        ) * tmp
+        T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
+        out = apply_spin_adapted_double(state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)))
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")
     return out
@@ -2509,332 +2043,17 @@ def propagate_unitary_SA(
         # Analytical application on state vector
         out = apply_generator_exponential_SA(state, T, theta, ci_info, (exc_type, tuple(exc_indices)))
     elif exc_type in ("sa_double_2", "sa_double_3"):
-        if exc_type == "sa_double_2":
-            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
-            T = G2_sa(i, j, a, b, 2, True, num_orbs=ci_info.num_active_orbs)
-        elif exc_type == "sa_double_3":
-            (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
-            T = G2_sa(i, j, a, b, 3, True, num_orbs=ci_info.num_active_orbs)
-        else:
-            raise ValueError(f"Got unknown excitation type: {exc_type}")
-        S = (1, math.sqrt(2) / 2)
-        k1 = (-1, 2 * math.sqrt(2))
-        k3 = (-2, 2 * math.sqrt(2))
-        k2 = (1, -4)
-        k4 = (2, -4)
-        out = np.copy(state)
-        tmp = propagate_state_SA(
-            [T],
-            state,
-            ci_info,
-            do_folding=False,
-        )
-        out += (k1[0] * np.sin(S[0] * theta) + k1[1] * np.sin(S[1] * theta)) * tmp
-        tmp = propagate_state_SA(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (k2[0] * (np.cos(S[0] * theta) - 1) + k2[1] * (np.cos(S[1] * theta) - 1)) * tmp
-        tmp = propagate_state_SA(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (k3[0] * np.sin(S[0] * theta) + k3[1] * np.sin(S[1] * theta)) * tmp
-        tmp = propagate_state_SA(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (k4[0] * (np.cos(S[0] * theta) - 1) + k4[1] * (np.cos(S[1] * theta) - 1)) * tmp
+        (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
+        T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
+        out = apply_spin_adapted_double_SA(state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)))
     elif exc_type in ("sa_double_4",):
         (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
-        T = G2_sa(i, j, a, b, 4, True, num_orbs=ci_info.num_active_orbs)
-        S = (1, math.sqrt(2), math.sqrt(2) / 2, 1 / 2)  # type: ignore
-        k1 = (2 / 3, -math.sqrt(2) / 42, -8 * math.sqrt(2) / 3, 128 / 21)  # type: ignore
-        k3 = (13 / 3, -math.sqrt(2) / 6, -44 * math.sqrt(2) / 3, 64 / 3)  # type: ignore
-        k5 = (22 / 3, -math.sqrt(2) / 3, -52 * math.sqrt(2) / 3, 64 / 3)  # type: ignore
-        k7 = (8 / 3, -4 * math.sqrt(2) / 21, -16 * math.sqrt(2) / 3, 128 / 21)  # type: ignore
-        k2 = (-2 / 3, 1 / 42, 16 / 3, -256 / 21)  # type: ignore
-        k4 = (-13 / 3, 1 / 6, 88 / 3, -128 / 3)  # type: ignore
-        k6 = (-22 / 3, 1 / 3, 104 / 3, -128 / 3)  # type: ignore
-        k8 = (-8 / 3, 4 / 21, 32 / 3, -256 / 21)  # type: ignore
-        out = np.copy(state)
-        tmp = propagate_state_SA(
-            [T],
-            state,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k1[0] * np.sin(S[0] * theta)  # type: ignore
-            + k1[1] * np.sin(S[1] * theta)  # type: ignore
-            + k1[2] * np.sin(S[2] * theta)  # type: ignore
-            + k1[3] * np.sin(S[3] * theta)  # type: ignore
-        ) * tmp
-        tmp = propagate_state_SA(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k2[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-            + k2[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-            + k2[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-            + k2[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-        ) * tmp
-        tmp = propagate_state_SA(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k3[0] * np.sin(S[0] * theta)  # type: ignore
-            + k3[1] * np.sin(S[1] * theta)  # type: ignore
-            + k3[2] * np.sin(S[2] * theta)  # type: ignore
-            + k3[3] * np.sin(S[3] * theta)  # type: ignore
-        ) * tmp
-        tmp = propagate_state_SA(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k4[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-            + k4[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-            + k4[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-            + k4[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-        ) * tmp
-        tmp = propagate_state_SA(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k5[0] * np.sin(S[0] * theta)  # type: ignore
-            + k5[1] * np.sin(S[1] * theta)  # type: ignore
-            + k5[2] * np.sin(S[2] * theta)  # type: ignore
-            + k5[3] * np.sin(S[3] * theta)  # type: ignore
-        ) * tmp
-        tmp = propagate_state_SA(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k6[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-            + k6[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-            + k6[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-            + k6[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-        ) * tmp
-        tmp = propagate_state_SA(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k7[0] * np.sin(S[0] * theta)  # type: ignore
-            + k7[1] * np.sin(S[1] * theta)  # type: ignore
-            + k7[2] * np.sin(S[2] * theta)  # type: ignore
-            + k7[3] * np.sin(S[3] * theta)  # type: ignore
-        ) * tmp
-        tmp = propagate_state_SA(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k8[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-            + k8[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-            + k8[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-            + k8[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-        ) * tmp
+        T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
+        out = apply_spin_adapted_double_SA(state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)))
     elif exc_type in ("sa_double_5",):
         (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
-        T = G2_sa(i, j, a, b, 5, True, num_orbs=ci_info.num_active_orbs)
-        S = (math.sqrt(2), math.sqrt(2) / 2, math.sqrt(3) / 3, math.sqrt(3) / 2, math.sqrt(3) / 6)  # type: ignore
-        k1 = (  # type: ignore
-            math.sqrt(2) / 1150,
-            8 * math.sqrt(2) / 5,
-            -54 * math.sqrt(3) / 25,
-            -16 * math.sqrt(3) / 75,
-            432 * math.sqrt(3) / 115,
-        )
-        k3 = (  # type: ignore
-            11 * math.sqrt(2) / 690,
-            404 * math.sqrt(2) / 15,
-            -171 * math.sqrt(3) / 5,
-            -56 * math.sqrt(3) / 15,
-            2952 * math.sqrt(3) / 115,
-        )
-        k5 = (  # type: ignore
-            133 * math.sqrt(2) / 1725,
-            308 * math.sqrt(2) / 3,
-            -2718 * math.sqrt(3) / 25,
-            -1192 * math.sqrt(3) / 75,
-            1368 * math.sqrt(3) / 23,
-        )
-        k7 = (  # type: ignore
-            16 * math.sqrt(2) / 115,
-            608 * math.sqrt(2) / 5,
-            -576 * math.sqrt(3) / 5,
-            -112 * math.sqrt(3) / 5,
-            6192 * math.sqrt(3) / 115,
-        )
-        k9 = (  # type: ignore
-            48 * math.sqrt(2) / 575,
-            192 * math.sqrt(2) / 5,
-            -864 * math.sqrt(3) / 25,
-            -192 * math.sqrt(3) / 25,
-            1728 * math.sqrt(3) / 115,
-        )
-        k2 = (-1 / 1150, -16 / 5, 162 / 25, 32 / 75, -2592 / 115)  # type: ignore
-        k4 = (-11 / 690, -808 / 15, 513 / 5, 112 / 15, -17712 / 115)  # type: ignore
-        k6 = (-133 / 1725, -616 / 3, 8154 / 25, 2384 / 75, -8208 / 23)  # type: ignore
-        k8 = (-16 / 115, -1216 / 5, 1728 / 5, 224 / 5, -37152 / 115)  # type: ignore
-        k10 = (-48 / 575, -384 / 5, 2592 / 25, 384 / 25, -10368 / 115)  # type: ignore
-        out = np.copy(state)
-        tmp = propagate_state_SA(
-            [T],
-            state,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k1[0] * np.sin(S[0] * theta)  # type: ignore
-            + k1[1] * np.sin(S[1] * theta)  # type: ignore
-            + k1[2] * np.sin(S[2] * theta)  # type: ignore
-            + k1[3] * np.sin(S[3] * theta)  # type: ignore
-            + k1[4] * np.sin(S[4] * theta)  # type: ignore
-        ) * tmp
-        tmp = propagate_state_SA(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k2[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-            + k2[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-            + k2[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-            + k2[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-            + k2[4] * (np.cos(S[4] * theta) - 1)  # type: ignore
-        ) * tmp
-        tmp = propagate_state_SA(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k3[0] * np.sin(S[0] * theta)  # type: ignore
-            + k3[1] * np.sin(S[1] * theta)  # type: ignore
-            + k3[2] * np.sin(S[2] * theta)  # type: ignore
-            + k3[3] * np.sin(S[3] * theta)  # type: ignore
-            + k3[4] * np.sin(S[4] * theta)  # type: ignore
-        ) * tmp
-        tmp = propagate_state_SA(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k4[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-            + k4[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-            + k4[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-            + k4[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-            + k4[4] * (np.cos(S[4] * theta) - 1)  # type: ignore
-        ) * tmp
-        tmp = propagate_state_SA(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k5[0] * np.sin(S[0] * theta)  # type: ignore
-            + k5[1] * np.sin(S[1] * theta)  # type: ignore
-            + k5[2] * np.sin(S[2] * theta)  # type: ignore
-            + k5[3] * np.sin(S[3] * theta)  # type: ignore
-            + k5[4] * np.sin(S[4] * theta)  # type: ignore
-        ) * tmp
-        tmp = propagate_state_SA(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k6[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-            + k6[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-            + k6[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-            + k6[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-            + k6[4] * (np.cos(S[4] * theta) - 1)  # type: ignore
-        ) * tmp
-        tmp = propagate_state_SA(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k7[0] * np.sin(S[0] * theta)  # type: ignore
-            + k7[1] * np.sin(S[1] * theta)  # type: ignore
-            + k7[2] * np.sin(S[2] * theta)  # type: ignore
-            + k7[3] * np.sin(S[3] * theta)  # type: ignore
-            + k7[4] * np.sin(S[4] * theta)  # type: ignore
-        ) * tmp
-        tmp = propagate_state_SA(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k8[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-            + k8[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-            + k8[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-            + k8[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-            + k8[4] * (np.cos(S[4] * theta) - 1)  # type: ignore
-        ) * tmp
-        tmp = propagate_state_SA(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k9[0] * np.sin(S[0] * theta)  # type: ignore
-            + k9[1] * np.sin(S[1] * theta)  # type: ignore
-            + k9[2] * np.sin(S[2] * theta)  # type: ignore
-            + k9[3] * np.sin(S[3] * theta)  # type: ignore
-            + k9[4] * np.sin(S[4] * theta)  # type: ignore
-        ) * tmp
-        tmp = propagate_state_SA(
-            [T],
-            tmp,
-            ci_info,
-            do_folding=False,
-        )
-        out += (
-            k10[0] * (np.cos(S[0] * theta) - 1)  # type: ignore
-            + k10[1] * (np.cos(S[1] * theta) - 1)  # type: ignore
-            + k10[2] * (np.cos(S[2] * theta) - 1)  # type: ignore
-            + k10[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
-            + k10[4] * (np.cos(S[4] * theta) - 1)  # type: ignore
-        ) * tmp
+        T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
+        out = apply_spin_adapted_double_SA(state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)))
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")
     return out
