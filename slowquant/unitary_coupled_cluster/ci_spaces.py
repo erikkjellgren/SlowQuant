@@ -9,8 +9,12 @@ import numpy as np
 class CI_Info:
     __slots__ = (
         "alpha_str2idx",
+        "alpha_str_lookup",
         "beta_str2idx",
+        "beta_str_lookup",
         "det2idx",
+        "idx2alpha_str",
+        "idx2beta_str",
         "idx2det",
         "num_active_elec_alpha",
         "num_active_elec_beta",
@@ -20,6 +24,7 @@ class CI_Info:
         "num_inactive_orbs",
         "num_virtual_orbs",
         "space_extension_offset",
+        "spin_op_cache",
     )
 
     def __init__(
@@ -76,6 +81,37 @@ class CI_Info:
         self.beta_str2idx = {} if beta_str2idx is None else beta_str2idx
         self.num_alpha_strings = len(self.alpha_str2idx)
         self.num_beta_strings = len(self.beta_str2idx)
+        # Array form of the per-spin maps, which is what the Numba kernels of the
+        # spin-factorized algebra can consume. Empty when the space is not a spin product.
+        self.idx2alpha_str = np.zeros(self.num_alpha_strings, dtype=int)
+        for spin_str, spin_idx in self.alpha_str2idx.items():
+            self.idx2alpha_str[spin_idx] = spin_str
+        self.idx2beta_str = np.zeros(self.num_beta_strings, dtype=int)
+        for spin_str, spin_idx in self.beta_str2idx.items():
+            self.idx2beta_str[spin_idx] = spin_str
+        # Built on first use by spin_factorized_algebra, and only for a spin product.
+        self.alpha_str_lookup: np.ndarray | None = None
+        self.beta_str_lookup: np.ndarray | None = None
+        self.spin_op_cache: dict[
+            tuple[bool, tuple[int, ...], tuple[int, ...]], tuple[np.ndarray, np.ndarray, np.ndarray]
+        ] = {}
+
+    @property
+    def is_spin_product(self) -> bool:
+        r"""Check if the determinant expansion is a product of an alpha and a beta string space.
+
+        True for get_indexing and False for get_indexing_extended. Only a spin product can be
+        acted on with the spin-factorized algebra, and only for a spin product does
+
+        .. math::
+            I = I_\alpha N_\beta + I_\beta
+
+        hold.
+
+        Returns:
+            True if the expansion is a spin product.
+        """
+        return self.num_alpha_strings != 0
 
 
 def generate_spin_strings(num_orbs: int, num_elec: int) -> Generator[list[int], None, None]:

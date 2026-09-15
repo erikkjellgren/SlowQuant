@@ -3,7 +3,7 @@ import math
 
 import pytest
 
-from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
+from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing, get_indexing_extended
 from slowquant.unitary_coupled_cluster.operators import a_op
 from slowquant.unitary_coupled_cluster.spin_ordering import (
     alpha_idx,
@@ -185,6 +185,39 @@ def test_ci_space_is_a_spin_product() -> None:
                     idx_alpha = ci_info.alpha_str2idx[det >> num_active_orbs]
                     idx_beta = ci_info.beta_str2idx[det & mask]
                     assert idx_alpha * ci_info.num_beta_strings + idx_beta == idx
+
+
+def test_per_spin_index_arrays_invert_the_dicts() -> None:
+    """Test that the array forms of the per-spin maps agree with the dict forms.
+
+    The spin-factorized algebra consumes the array forms in its Numba kernels, so they have to
+    be exact inverses of the dicts that the rest of the code reads.
+    """
+    for num_active_orbs in (2, 3, 4):
+        for num_active_elec_alpha in range(num_active_orbs + 1):
+            for num_active_elec_beta in range(num_active_orbs + 1):
+                ci_info = get_indexing(0, num_active_orbs, 0, num_active_elec_alpha, num_active_elec_beta)
+                assert ci_info.is_spin_product
+                assert len(ci_info.idx2alpha_str) == ci_info.num_alpha_strings
+                assert len(ci_info.idx2beta_str) == ci_info.num_beta_strings
+                for spin_str, spin_idx in ci_info.alpha_str2idx.items():
+                    assert ci_info.idx2alpha_str[spin_idx] == spin_str
+                for spin_str, spin_idx in ci_info.beta_str2idx.items():
+                    assert ci_info.idx2beta_str[spin_idx] == spin_str
+
+
+def test_extended_ci_space_is_not_a_spin_product() -> None:
+    """Test that the extended space reports itself as not being a spin product.
+
+    The extended space is not a product of an alpha and a beta string space, so it must not be
+    routed to the spin-factorized algebra.
+    """
+    ci_info = get_indexing_extended(1, 2, 1, 1, 1, 1)
+    assert not ci_info.is_spin_product
+    assert ci_info.num_alpha_strings == 0
+    assert ci_info.num_beta_strings == 0
+    assert len(ci_info.idx2alpha_str) == 0
+    assert len(ci_info.idx2beta_str) == 0
 
 
 def test_ci_space_determinants_have_correct_occupations() -> None:
