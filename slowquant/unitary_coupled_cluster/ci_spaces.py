@@ -29,9 +29,9 @@ def bitcount(x: int) -> int:
 class CI_Info:
     __slots__ = (
         "alpha_str2idx",
-        "alpha_str_lookup",
+        "alpha_str2idx_nb",
         "beta_str2idx",
-        "beta_str_lookup",
+        "beta_str2idx_nb",
         "det2idx",
         "idx2alpha_str",
         "idx2beta_str",
@@ -112,12 +112,19 @@ class CI_Info:
         self.idx2beta_str = np.zeros(self.num_beta_strings, dtype=int)
         for spin_str, spin_idx in self.beta_str2idx.items():
             self.idx2beta_str[spin_idx] = spin_str
-        # Built on first use by spin_factorized_algebra, and only for a spin product.
-        self.alpha_str_lookup: np.ndarray | None = None
-        self.beta_str_lookup: np.ndarray | None = None
-        # Every spin sub-string seen so far, per spin, laid out back to back. spin_op_cache maps
-        # a sub-string to its slice of that layout, and spin_arena_packed holds the concatenated
-        # form, rebuilt only when a new sub-string is added.
+        # The same maps again for the Numba kernels, which cannot read a Python dict.
+        self.alpha_str2idx_nb = nbt.Dict.empty(key_type=nb.int64, value_type=nb.int64)
+        for spin_str, spin_idx in self.alpha_str2idx.items():
+            self.alpha_str2idx_nb[spin_str] = spin_idx
+        self.beta_str2idx_nb = nbt.Dict.empty(key_type=nb.int64, value_type=nb.int64)
+        for spin_str, spin_idx in self.beta_str2idx.items():
+            self.beta_str2idx_nb[spin_str] = spin_idx
+        # Excitation maps of the spin sub-strings seen so far, one arena per spin, laid out back
+        # to back. A map says which spin string each one goes to and with what phase, and depends
+        # only on the CI space, so it is built once and reused by every later operator.
+        # spin_op_cache gives a sub-string its slice of the arena, spin_arena_length is where the
+        # next one starts, and spin_arena_packed is the concatenated form, rebuilt only when a
+        # new sub-string is added.
         self.spin_op_cache: dict[tuple[bool, tuple[int, ...], tuple[int, ...]], tuple[int, int]] = {}
         self.spin_arena: dict[bool, list[tuple[np.ndarray, np.ndarray, np.ndarray]]] = {
             True: [],

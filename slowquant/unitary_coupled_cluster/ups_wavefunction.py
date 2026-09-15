@@ -459,7 +459,11 @@ class WaveFunctionUPS:
 
     @property
     def energy_hamiltonian(self) -> FermionicOperator:
-        """Get the energy Hamiltonian over the full orbital space.
+        r"""Get the energy Hamiltonian over the inactive and active orbitals.
+
+        .. math::
+            \hat{H} = \sum_{pq}h_{pq}\hat{E}_{pq}
+                    + \frac{1}{2}\sum_{pqrs}g_{pqrs}\hat{e}_{pqrs}
 
         Building this costs several times more than applying it, and it depends only on the
         integrals, so it is kept until the orbitals move. The kappa setter drops it along with

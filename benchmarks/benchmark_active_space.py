@@ -8,7 +8,7 @@ measurement, and the energies printed are not converged.
 Examples:
     python benchmarks/benchmark_active_space.py
     python benchmarks/benchmark_active_space.py --max-orbs 12 --maxiter 5
-    python benchmarks/benchmark_active_space.py --compare gram
+    python benchmarks/benchmark_active_space.py --compare-general
 """
 
 from __future__ import annotations
@@ -20,7 +20,6 @@ import time
 import warnings
 
 import slowquant.SlowQuant as sq
-import slowquant.unitary_coupled_cluster.ups_wavefunction as ups_module
 from slowquant.unitary_coupled_cluster import spin_factorized_algebra
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
@@ -162,34 +161,29 @@ def main() -> None:
     parser.add_argument("--max-orbs", type=int, default=10)
     parser.add_argument("--repeat", type=int, default=1, help="take the fastest of this many runs per point")
     parser.add_argument(
-        "--compare",
-        choices=("off", "all", "gram", "algebra"),
-        default="off",
+        "--compare-general",
+        action="store_true",
         help=(
-            "also run with something turned off, to show what it buys: 'gram' the Gram density "
-            "matrices, 'algebra' the spin-factorized algebra, 'all' both. Note 'all' is not the "
-            "full pre-branch code, the memoized operator folding applies either way"
+            "also run with the spin-factorized algebra turned off, to show what it buys. Note "
+            "this is not the full pre-branch code: the memoized operator folding, the cached "
+            "Hamiltonian and the density matrices apply either way"
         ),
     )
     args = parser.parse_args()
 
     obj = build_hartree_fock(args.molecule, args.basis)
     original_factorize = spin_factorized_algebra.factorize_operator
-    original_gram = ups_module.can_build_rdm12_as_gram
     # Warm up both code paths. They compile different Numba kernels, so whichever ran first
     # would otherwise carry that compilation into the table and flatter the other one.
     for warm_general in (False, True):
         if warm_general:
-            # Warm the slow side of both switches, whichever the run ends up comparing.
             spin_factorized_algebra.factorize_operator = lambda *a, **k: None
-            ups_module.can_build_rdm12_as_gram = lambda *a, **k: False
         try:
             for num_orbs in (2, 4):
                 time_optimization(obj, num_orbs, num_orbs, args.ansatz, args.layers, 1, True)
                 time_optimization(obj, num_orbs, num_orbs, args.ansatz, args.layers, 1, False)
         finally:
             spin_factorized_algebra.factorize_operator = original_factorize
-            ups_module.can_build_rdm12_as_gram = original_gram
     print(
         f"{args.molecule}/{args.basis}, {args.ansatz} with {args.layers} layer(s), "
         f"BFGS capped at {args.maxiter} iterations"
@@ -198,8 +192,8 @@ def main() -> None:
     header = (
         f"{'active space':>13} {'dets':>9} {'params':>12} {'E':>5} {'grad':>5} {'seconds':>9} {'s/call':>9}"
     )
-    if args.compare != "off":
-        header += f" {'without':>9} {'speedup':>8}"
+    if args.compare_general:
+        header += f" {'general':>9} {'speedup':>8}"
     print(header)
 
     for num_orbs in range(args.min_orbs, args.max_orbs + 1, 2):
@@ -226,11 +220,8 @@ def main() -> None:
                 f"{result['num_energy']:5d} {result['num_gradient']:5d} "
                 f"{result['seconds']:9.2f} {result['seconds'] / max(num_calls, 1):9.4f}"
             )
-            if args.compare != "off":
-                if args.compare in ("all", "algebra"):
-                    spin_factorized_algebra.factorize_operator = lambda *a, **k: None
-                if args.compare in ("all", "gram"):
-                    ups_module.can_build_rdm12_as_gram = lambda *a, **k: False
+            if args.compare_general:
+                spin_factorized_algebra.factorize_operator = lambda *a, **k: None
                 try:
                     general = best_of(
                         args.repeat,
@@ -243,7 +234,6 @@ def main() -> None:
                     )
                 finally:
                     spin_factorized_algebra.factorize_operator = original_factorize
-                    ups_module.can_build_rdm12_as_gram = original_gram
                 row += f" {general['seconds']:9.2f} {general['seconds'] / result['seconds']:7.1f}x"
             print(row, flush=True)
 

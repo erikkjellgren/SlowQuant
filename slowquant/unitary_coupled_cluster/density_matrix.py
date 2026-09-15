@@ -147,10 +147,11 @@ def build_single_excitation_layout(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     r"""Lay out the one-electron excitations of each spin over the string spaces.
 
-    The density matrices are accumulated one output alpha string at a time, so the alpha
-    excitations are grouped by the string they produce and padded to a common width with a zero
-    phase, which contributes nothing. The beta excitations act within a row and are grouped by
-    orbital pair instead.
+    Everything here concerns :math:`\hat{E}_{pq}=\hat{E}^\alpha_{pq}+\hat{E}^\beta_{pq}` acting
+    on the string spaces. The density matrices are accumulated one output alpha string at a
+    time, so the alpha excitations are grouped by the string they produce and padded to a common
+    width with a zero phase, which contributes nothing. The beta excitations leave the alpha
+    string alone and so act within a row, and are grouped by orbital pair instead.
 
     Args:
         ci_info: Information about the CI space.
@@ -273,6 +274,13 @@ def accumulate_rdm12(
 
 def build_rdm12(ci_coeffs: np.ndarray, ci_info: CI_Info) -> tuple[np.ndarray, np.ndarray]:
     r"""Calculate both reduced density matrices from the CI expansion.
+
+    These are the active space density matrices an orbital optimization needs,
+
+    .. math::
+        \Gamma^{[1]}_{pq} = \left<0\left|\hat{E}_{pq}\right|0\right>,\qquad
+        \Gamma^{[2]}_{pqrs} = \left<0\left|\hat{E}_{pq}\hat{E}_{rs}\right|0\right>
+                              - \delta_{qr}\Gamma^{[1]}_{ps}
 
     Several states are averaged over with equal weight, matching expectation_value_SA. They are
     processed one at a time, so the memory needed grows with neither the number of states nor

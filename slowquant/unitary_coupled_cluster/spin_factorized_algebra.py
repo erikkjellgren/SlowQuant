@@ -39,11 +39,6 @@ import numpy as np
 from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info, bitcount
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 
-# A dense array over all 2**num_active_orbs spin strings is the fastest way to get the index of
-# a spin string. It stays small for any active space a state-vector expansion can hold, but is
-# guarded so an unreasonable request falls back to the general algebra instead of allocating.
-MAX_DENSE_LOOKUP_ORBS = 24
-
 # Spin sub-string of an operator that acts as the identity on that spin.
 IDENTITY_SUB_STRING: tuple[tuple[int, ...], tuple[int, ...]] = ((), ())
 
@@ -187,7 +182,7 @@ def split_spin_string(
 @nb.jit(nopython=True)
 def build_spin_excitation_map(
     idx2spin_str: np.ndarray,
-    spin_str_lookup: np.ndarray,
+    spin_str2idx: dict[int, int],
     a_string: np.ndarray,
     create_screen: np.ndarray,
     anni_idx: np.ndarray,
@@ -202,7 +197,7 @@ def build_spin_excitation_map(
 
     Args:
         idx2spin_str: Maps spin string index to spin string.
-        spin_str_lookup: Maps spin string to spin string index.
+        spin_str2idx: Maps spin string to spin string index.
         a_string: Creation and annihilation operator indices.
         create_screen: Creation operator indices without indices in anni_idx.
         anni_idx: Indices for annihilation operators.
@@ -235,32 +230,10 @@ def build_spin_excitation_map(
             spin_str = spin_str ^ (1 << (num_orbs_m1 - orb_idx))
             phase_changes += bitcount(spin_str & parity_check[orb_idx])
         src[num_survivors] = i
-        dst[num_survivors] = spin_str_lookup[spin_str]
+        dst[num_survivors] = spin_str2idx[spin_str]
         sign[num_survivors] = 1.0 - 2.0 * (phase_changes & 1)
         num_survivors += 1
     return src[:num_survivors], dst[:num_survivors], sign[:num_survivors]
-
-
-def get_spin_string_lookup(ci_info: CI_Info, is_alpha: bool) -> np.ndarray:
-    """Get the dense spin string to spin string index map, building it on first use.
-
-    Args:
-        ci_info: Information about the CI space.
-        is_alpha: Get the alpha map, otherwise the beta one.
-
-    Returns:
-        Maps spin string to spin string index, with -1 for a string outside the space.
-    """
-    lookup = ci_info.alpha_str_lookup if is_alpha else ci_info.beta_str_lookup
-    if lookup is None:
-        idx2spin_str = ci_info.idx2alpha_str if is_alpha else ci_info.idx2beta_str
-        lookup = np.full(1 << ci_info.num_active_orbs, -1, dtype=np.int64)
-        lookup[idx2spin_str] = np.arange(len(idx2spin_str), dtype=np.int64)
-        if is_alpha:
-            ci_info.alpha_str_lookup = lookup
-        else:
-            ci_info.beta_str_lookup = lookup
-    return lookup
 
 
 def get_spin_sub_string_slice(
@@ -298,7 +271,7 @@ def get_spin_sub_string_slice(
     a_string = np.array([*annihilation, *creation], dtype=np.int64)
     spin_map = build_spin_excitation_map(
         ci_info.idx2alpha_str if is_alpha else ci_info.idx2beta_str,
-        get_spin_string_lookup(ci_info, is_alpha),
+        ci_info.alpha_str2idx_nb if is_alpha else ci_info.beta_str2idx_nb,
         a_string,
         create_screen,
         anni_idx,
@@ -345,7 +318,19 @@ def get_spin_arena(ci_info: CI_Info, is_alpha: bool) -> tuple[np.ndarray, np.nda
 
 
 def factorize_operator(op: FermionicOperator, ci_info: CI_Info) -> SpinFactorizedOperator | None:
-    """Split every string of an operator into its alpha and beta sub-strings.
+    r"""Split every string of an operator into its alpha and beta sub-strings.
+
+    The determinant basis is a product of an alpha and a beta string space,
+    :math:`\left|I\right> = \left|I_\alpha\right>\otimes\left|I_\beta\right>`, and an
+    :math:`S_z` conserving string factorizes the same way, so the whole operator becomes
+
+    .. math::
+        \hat{O} = \sum_t c_t\hat{A}_t\otimes\hat{B}_t
+
+    The terms are split into those acting on one spin only, which are a matrix on one side of
+    the CI vector, and those acting on both, which couple the two. The sub-string excitation
+    maps live on the CI space and are shared, so this only records which slice of them each
+    term uses, and then build_derived_forms decides how each group will be applied.
 
     Args:
         op: Folded fermionic operator.
@@ -354,7 +339,7 @@ def factorize_operator(op: FermionicOperator, ci_info: CI_Info) -> SpinFactorize
     Returns:
         Spin-factorized operator, or None if it cannot be factorized over this CI space.
     """
-    if not ci_info.is_spin_product or ci_info.num_active_orbs > MAX_DENSE_LOOKUP_ORBS:
+    if not ci_info.is_spin_product:
         return None
     num_active_orbs = ci_info.num_active_orbs
     num_terms = len(op.operators)
@@ -434,9 +419,16 @@ def build_pure_spin_matrix(
 ) -> np.ndarray:
     r"""Sum every term acting on one spin only into a single matrix over that spin's strings.
 
-    All of those terms act on the same side of the state, so their sum is one matrix and the
-    whole group is applied with one matrix multiplication. The sum is also a compression: the
-    terms typically hold far more excitations than the matrix has entries.
+    An operator that touches one spin only leaves the other string untouched, so with the CI
+    vector seen as a matrix :math:`C_{I_\alpha I_\beta}` it acts on one side,
+
+    .. math::
+        \sigma = \boldsymbol{A}\boldsymbol{C}\quad\text{or}\quad
+        \sigma = \boldsymbol{C}\boldsymbol{B}^T
+
+    All such terms share that side, so their sum is a single matrix and the whole group costs
+    one matrix multiplication. Summing them first is also a compression, since a Hamiltonian
+    holds far more excitations than the matrix has entries.
 
     Args:
         matrix: Matrix to accumulate into, over the strings of one spin.
@@ -523,11 +515,12 @@ def apply_pure_spin_terms(
     stops: np.ndarray,
     factors: np.ndarray,
 ) -> np.ndarray:
-    """Apply the terms that act on one spin only, as a sparse scatter.
+    r"""Apply the terms that act on one spin only, as a sparse scatter.
 
-    Used when the dense matrix of that spin would be too wasteful, see use_dense_spin_matrix.
-    An alpha only term moves a whole beta block of the state at once, while a beta only term
-    touches every alpha block at one offset, with a stride.
+    The same one-sided action as build_pure_spin_matrix, but walked excitation by excitation
+    instead of formed into a matrix, for an operator too sparse to fill one. Because the CI
+    vector is stored as :math:`I = I_\alpha N_\beta + I_\beta`, an alpha excitation moves a whole
+    contiguous beta block of it, while a beta excitation touches one entry of every alpha block.
 
     Args:
         state: Original state.
@@ -574,6 +567,10 @@ def build_sigma3_layout(
 
     .. math::
         \hat{O}_\text{mixed} = \sum_{ab}g_{ab}\hat{A}_a\otimes\hat{B}_b
+
+    For a Hamiltonian the sub-strings are the one-electron excitations of each spin and
+    :math:`g_{ab}` is the two-electron integral matrix :math:`g_{pqrs}`, which is the form the
+    sigma vector literature writes this in.
 
     That is what turns the group into a dense contraction, see apply_sigma3_terms. The start of
     a sub-string's slice of the arena identifies it uniquely, so it is used as its name here.
@@ -667,14 +664,23 @@ def apply_sigma3_terms(
 ) -> np.ndarray:
     r"""Apply the terms acting on both spins as a dense contraction, one alpha string at a time.
 
-    For a single output alpha string the sum over terms collapses to three steps. Gather the
-    rows of the state that feed it, contract them against the coefficient matrix over the
-    sub-strings, and scatter the result through the beta excitations.
+    This is the mixed spin part of a CI sigma vector, the term usually written
 
-    The gather and the scatter are cheap, and the contraction between them is a matrix
+    .. math::
+        \sigma_3\left(I_\alpha I_\beta\right) = \sum_{pqrs}g_{pqrs}
+            \sum_{J_\alpha J_\beta}
+            \left<I_\alpha\left|\hat{E}^\alpha_{pq}\right|J_\alpha\right>
+            \left<I_\beta\left|\hat{E}^\beta_{rs}\right|J_\beta\right>
+            C\left(J_\alpha J_\beta\right)
+
+    following Knowles and Handy. Written per output alpha string it is three steps: gather the
+    rows of the CI vector that couple into it, contract those against the coefficient matrix
+    over sub-strings, and scatter the result through the beta excitations.
+
+    The gather and the scatter are cheap and the contraction between them is a matrix
     multiplication, which is what makes this faster than pairing the surviving strings of every
-    term one by one. Only the alpha sub-strings that actually reach this alpha string take part,
-    so the contraction stays narrow.
+    term. Only the alpha sub-strings that actually reach this alpha string take part, so the
+    contraction stays narrow rather than running over all of them.
 
     Args:
         state: Original state.
@@ -714,41 +720,68 @@ def apply_sigma3_terms(
     return tmp_state
 
 
-def use_sigma3(
-    num_alpha_strings: int,
-    num_beta_strings: int,
-    num_beta_subs: int,
-    width: int,
-    num_pair_products: int,
-) -> bool:
-    """Decide whether to apply the terms acting on both spins as a dense contraction.
+def prefer_contraction_over_pairs(factorized: SpinFactorizedOperator, ci_info: CI_Info) -> bool:
+    r"""Decide whether the terms acting on both spins are dense enough to contract.
 
-    The contraction is dense over the sub-strings, so it touches more elements than pairing the
-    surviving strings of each term does. It is still much faster per element, so it is used
-    while the excess stays bounded.
+    The contraction runs over every (alpha sub-string, beta sub-string) pair, so its cost is
+
+    .. math::
+        N_\alpha N_\beta n_\beta w
+
+    with :math:`n_\beta` the number of distinct beta sub-strings and :math:`w` the number of
+    alpha excitations reaching one alpha string. Pairing the surviving strings of each term
+    instead costs :math:`\sum_t n^\alpha_t n^\beta_t`. The contraction touches more elements
+    but runs at matrix multiplication speed, so it is taken while the excess stays bounded.
+
+    This asks how dense the operator is, not how large the CI space is. A Hamiltonian fills its
+    sub-string matrix at every active space size and a single excitation generator fills almost
+    none of it at any, so the answer does not change as the active space grows.
+
+    The width is estimated from the average rather than built, so that the layout is only
+    constructed when it is going to be used. Both branches are correct, so an occasional
+    misjudgement costs a little time and nothing else.
 
     Args:
-        num_alpha_strings: Number of alpha strings.
-        num_beta_strings: Number of beta strings.
-        num_beta_subs: Number of distinct beta sub-strings.
-        width: Number of alpha excitations reaching one alpha string, padded.
-        num_pair_products: Number of string pairs the term by term algorithm would visit.
+        factorized: Spin-factorized operator.
+        ci_info: Information about the CI space.
 
     Returns:
-        True if the group should be applied as a dense contraction.
+        True if the group should be applied as a contraction.
     """
-    dense_work = num_alpha_strings * num_beta_subs * width * num_beta_strings
+    # Many terms share a sub-string, and the excitations of a shared one are walked once, so
+    # this counts distinct sub-strings rather than terms.
+    alpha_first = np.unique(
+        factorized.mixed_alpha_start * (len(factorized.alpha_src) + 1) + factorized.mixed_alpha_stop,
+        return_index=True,
+    )[1]
+    num_alpha_entries = int(
+        np.sum(factorized.mixed_alpha_stop[alpha_first] - factorized.mixed_alpha_start[alpha_first])
+    )
+    num_pair_products = int(
+        np.sum(
+            (factorized.mixed_alpha_stop - factorized.mixed_alpha_start)
+            * (factorized.mixed_beta_stop - factorized.mixed_beta_start)
+        )
+    )
+    num_beta_subs = len(
+        np.unique(factorized.mixed_beta_start * (len(factorized.beta_src) + 1) + factorized.mixed_beta_stop)
+    )
+    width = max(1, -(-num_alpha_entries // max(ci_info.num_alpha_strings, 1)))
+    dense_work = ci_info.num_alpha_strings * ci_info.num_beta_strings * num_beta_subs * width
     return dense_work <= 8 * max(num_pair_products, 1)
 
 
 def use_dense_spin_matrix(num_strings: int, num_other_strings: int, num_excitations: int) -> bool:
-    """Decide whether to apply a one-spin group as a dense matrix instead of a sparse scatter.
+    r"""Decide whether a one-spin group is dense enough to be worth forming as a matrix.
 
-    The matrix is dense over the spin's strings, so it can hold more entries than the terms have
-    excitations. That is still a win, because the matrix multiplication runs an order of
-    magnitude faster per entry than the scatter, but only while the excess stays bounded. The
-    second test keeps the matrix from dwarfing the state vector when the two spin spaces are
-    very different in size.
+    The matrix has :math:`N^2` entries while the terms hold only as many excitations as they
+    hold, so forming one is worth it when the operator fills a reasonable fraction of it. A
+    Hamiltonian does, at every active space size; a single excitation generator fills a couple
+    of diagonals at any size. So this asks how dense the operator is, not how large the CI space
+    is, and the answer does not change as the active space grows.
+
+    The second test keeps the matrix from dwarfing the CI vector itself when the two spin spaces
+    are very different in size, as they are for a high spin state.
 
     Args:
         num_strings: Number of strings of the spin the matrix is over.
@@ -805,21 +838,8 @@ def build_derived_forms(factorized: SpinFactorizedOperator, ci_info: CI_Info) ->
             factorized.beta_matrix = matrix
     if len(factorized.mixed_factor) == 0:
         return
-    layout = build_sigma3_layout(factorized, num_alpha_strings)
-    num_pair_products = int(
-        np.sum(
-            (factorized.mixed_alpha_stop - factorized.mixed_alpha_start)
-            * (factorized.mixed_beta_stop - factorized.mixed_beta_start)
-        )
-    )
-    if use_sigma3(
-        num_alpha_strings,
-        num_beta_strings,
-        layout[0].shape[1],
-        layout[1].shape[1],
-        num_pair_products,
-    ):
-        factorized.sigma3_layout = layout
+    if prefer_contraction_over_pairs(factorized, ci_info):
+        factorized.sigma3_layout = build_sigma3_layout(factorized, num_alpha_strings)
 
 
 def apply_factorized_operator(

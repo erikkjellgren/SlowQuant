@@ -266,9 +266,18 @@ def fold_fermionic_string(
 ) -> tuple[tuple[tuple[int, ...], tuple[int, ...]], int] | None:
     r"""Fold one fermionic string into the active space.
 
-    See FermionicOperator.get_folded_operator for what the folding means. The inactive orbitals
-    are filled in both bra and ket and the virtual ones are empty, so the only thing left of a
-    string is its active part and a phase.
+    The inactive orbitals are doubly occupied and the virtual ones empty in both bra and ket, so
+    of the three spaces in
+
+    .. math::
+        \hat{O} = \hat{O}_I\otimes\hat{O}_A\otimes\hat{O}_V
+
+    only the active part survives as an operator. Any virtual index kills the string, an
+    inactive index must be put back where it was found, and what is left is the active string
+    with the phase from moving its operators past the occupied inactive ones. The active indices
+    are remapped so that the first active orbital is index zero.
+
+    See FermionicOperator.get_folded_operator for the expectation value this makes possible.
 
     Args:
         op_key: Fermionic string, tuple of creation and annihilation spin-orbital indices.
