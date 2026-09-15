@@ -50,8 +50,20 @@ PYTHONPATH=/home/kjellgren/gitreps/SlowQuant_claude python script.py
 - **The CI space is a product of an α and a β string space.** `get_indexing` enumerates α in the
   outer loop and β in the inner one, so a determinant's index is
   `idx_alpha*num_beta_strings + idx_beta`, and `CI_Info` carries the per-spin maps. This is load
-  bearing for any future factorized operator-state algebra — **do not reorder those loops.**
-  It does not hold for `get_indexing_extended`, which is not a spin product.
+  bearing for `spin_factorized_algebra` — **do not reorder those loops.** It does not hold for
+  `get_indexing_extended`, which is not a spin product and reports `is_spin_product == False`.
+- **`propagate_state` has two kernels and they must agree bit for bit.** An Sz-conserving string
+  factorizes as `±O_α ⊗ O_β`, and over a spin product `spin_factorized_algebra` applies it per
+  spin, ~14× faster at CAS(10,10). A string that changes the electron count of a spin, or a CI
+  space that is not a spin product, falls back to the general kernel. The three phases that make
+  the factorization exact are: an α operator sees only α orbitals below it; the α electron count
+  every β operator picks up cancels because a string holds an even number of them; what is left
+  is `(-1)^(kα·kβ)` from reordering the blocks. Get any of those wrong and only the *sign* of
+  some terms changes — `tests/test_spin_factorized_algebra.py` compares the two kernels directly,
+  including open-shell spaces where a sign error actually shows up.
+- **The per-spin excitation maps are cached on `CI_Info` and assume it is immutable.** `spin_arena`,
+  `spin_op_cache` and the dense string lookups are built on first use and never invalidated, so a
+  `CI_Info` must not be mutated after determinants have been acted on.
 - **`Epq`, `epqrs`, `G1_sa`, `G2_sa` take spatial indices; `G1`–`G6` take spin-orbital indices.**
   Mixing them up is silent.
 - **Orbital-count names are fixed and meaningful** — the name states which space an index lives in:
