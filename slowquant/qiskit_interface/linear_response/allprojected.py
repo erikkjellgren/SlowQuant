@@ -10,9 +10,11 @@ from slowquant.qiskit_interface.linear_response.lr_baseclass import (
 )
 from slowquant.qiskit_interface.util import Clique
 from slowquant.unitary_coupled_cluster.density_matrix import (
+    get_orbital_gradient_response,
     get_orbital_response_property_gradient,
 )
 from slowquant.unitary_coupled_cluster.operators import (
+    commutator,
     hamiltonian_2i_2a,
     one_elec_op_0i_0a,
 )
@@ -52,14 +54,15 @@ class quantumLR(quantumLRBaseClass):
 
         # Check gradients
         if do_gradients:
-            grad = np.zeros(2 * self.num_q)
-            for i, op in enumerate(self.q_ops):
-                grad[i] = self.wf.QI.quantum_expectation_value(
-                    (self.H_1i_1a * op).get_folded_operator(*self.orbs)
-                )
-                grad[i + self.num_q] = self.wf.QI.quantum_expectation_value(
-                    (op.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
-                )
+            grad = get_orbital_gradient_response(  # proj-q and naive-q lead to same working equations
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.kappa_no_activeactive_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.rdm1,
+                self.wf.rdm2,
+            )
             if len(grad) != 0:
                 print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
                 if np.max(np.abs(grad)) > 10**-3:
@@ -78,10 +81,10 @@ class quantumLR(quantumLRBaseClass):
             for i, qI in enumerate(self.q_ops[j:], j):
                 # Make A
                 val = self.wf.QI.quantum_expectation_value(
-                    (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs)
+                    (commutator(qI.dagger, self.H_2i_2a * qJ)).get_folded_operator(*self.orbs)
                 )
                 qq_exp = self.wf.QI.quantum_expectation_value(
-                    (qI.dagger * qJ).get_folded_operator(*self.orbs)
+                    (commutator(qI.dagger, qJ)).get_folded_operator(*self.orbs)
                 )
                 val -= qq_exp * self.wf.energy_elec
                 self.A[i, j] = self.A[j, i] = val
@@ -93,7 +96,7 @@ class quantumLR(quantumLRBaseClass):
             for i, GI in enumerate(self.G_ops):
                 # Make A
                 self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = self.wf.QI.quantum_expectation_value(
-                    (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
+                    (GI.dagger * commutator(self.H_1i_1a, qJ)).get_folded_operator(*self.orbs)
                 )
 
         # Calculate Matrices
