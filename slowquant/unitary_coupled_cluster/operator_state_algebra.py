@@ -5,7 +5,7 @@ import numba as nb
 import numpy as np
 import scipy.sparse as ss
 
-from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info
+from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info, bitcount
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.operators import (
     G1,
@@ -29,26 +29,6 @@ def _init() -> None:
 
 
 _init()
-
-
-@nb.jit(nopython=True, inline="always")
-def bitcount(x: int) -> int:
-    """Count number of ones in binary representation of an integer.
-
-    Implementaion of Brian Kernighan algorithm,
-    https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetKernighan
-
-    Args:
-        x: Integer.
-
-    Returns:
-        Number of ones in the binary.
-    """
-    b = 0
-    while x > 0:
-        x &= x - 1
-        b += 1
-    return b
 
 
 @nb.jit(nopython=True)

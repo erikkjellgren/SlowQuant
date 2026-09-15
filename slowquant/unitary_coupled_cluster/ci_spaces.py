@@ -6,6 +6,26 @@ import numba.typed as nbt
 import numpy as np
 
 
+@nb.jit(nopython=True, inline="always")
+def bitcount(x: int) -> int:
+    """Count number of ones in binary representation of an integer.
+
+    Implementaion of Brian Kernighan algorithm,
+    https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetKernighan
+
+    Args:
+        x: Integer.
+
+    Returns:
+        Number of ones in the binary.
+    """
+    b = 0
+    while x > 0:
+        x &= x - 1
+        b += 1
+    return b
+
+
 class CI_Info:
     __slots__ = (
         "alpha_str2idx",
