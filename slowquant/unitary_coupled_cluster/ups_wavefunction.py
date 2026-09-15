@@ -16,6 +16,8 @@ from slowquant.molecularintegrals.integralfunctions import (
 from slowquant.SlowQuant import SlowQuant
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
 from slowquant.unitary_coupled_cluster.density_matrix import (
+    build_rdm12_as_gram,
+    can_build_rdm12_as_gram,
     get_electronic_energy,
     get_orbital_gradient,
 )
@@ -462,6 +464,15 @@ class WaveFunctionUPS:
             One-electron reduced density matrix.
         """
         if self._rdm1 is None:
+            if can_build_rdm12_as_gram(self.num_active_orbs, len(self.ci_coeffs)):
+                self._rdm1, self._rdm2 = build_rdm12_as_gram(
+                    self.ci_coeffs,
+                    self.ci_info,
+                    self.num_inactive_orbs,
+                    self.num_active_orbs,
+                    self.num_orbs,
+                )
+                return self._rdm1
             self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs), dtype=float)
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_ = p - self.num_inactive_orbs
@@ -485,6 +496,15 @@ class WaveFunctionUPS:
             Two-electron reduced density matrix.
         """
         if self._rdm2 is None:
+            if can_build_rdm12_as_gram(self.num_active_orbs, len(self.ci_coeffs)):
+                self._rdm1, self._rdm2 = build_rdm12_as_gram(
+                    self.ci_coeffs,
+                    self.ci_info,
+                    self.num_inactive_orbs,
+                    self.num_active_orbs,
+                    self.num_orbs,
+                )
+                return self._rdm2
             self._rdm2 = np.zeros(
                 (
                     self.num_active_orbs,

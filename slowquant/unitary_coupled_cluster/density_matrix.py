@@ -1,6 +1,10 @@
 import numba as nb
 import numpy as np
 
+from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info
+from slowquant.unitary_coupled_cluster.operator_state_algebra import propagate_state
+from slowquant.unitary_coupled_cluster.operators import Epq
+
 
 @nb.jit(nopython=True)
 def RDM1(p: int, q: int, num_inactive_orbs: int, num_active_orbs: int, rdm1: np.ndarray) -> float:
@@ -134,6 +138,79 @@ def RDM2(
         return val
     # Everything else
     return 0
+
+
+# The Gram form holds one excited state per pair of active orbitals at a time. Past this many
+# bytes it falls back to evaluating the density matrix element by element.
+MAX_EXCITED_STATES_BYTES = 2 * 1024**3
+
+
+def can_build_rdm12_as_gram(num_active_orbs: int, num_dets: int) -> bool:
+    """Check whether the Gram form of the density matrices fits in its memory budget.
+
+    Args:
+        num_active_orbs: Number of active spatial orbitals.
+        num_dets: Number of determinants in the CI space.
+
+    Returns:
+        True if the Gram form should be used.
+    """
+    return num_active_orbs**2 * num_dets * 8 <= MAX_EXCITED_STATES_BYTES
+
+
+def build_rdm12_as_gram(
+    ci_coeffs: np.ndarray,
+    ci_info: CI_Info,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_orbs: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    r"""Calculate both reduced density matrices from a Gram matrix of one-electron excited states.
+
+    The singlet excitation operator is self-adjoint under exchange of its indices,
+    :math:`\hat{E}_{pq}^\dagger=\hat{E}_{qp}`, so every two-electron element is an inner
+    product of two states that have each had one such operator applied,
+
+    .. math::
+        \left<0\left|\hat{E}_{pq}\hat{E}_{rs}\right|0\right>
+        = \left<\hat{E}_{qp}0\right.\left|\hat{E}_{rs}0\right>
+
+    Building those states once for every pair of active orbitals turns the whole two-electron
+    density matrix into a single matrix product, rather than one operator product and one state
+    propagation per element.
+
+    Several states are averaged over with equal weight, matching expectation_value_SA. They are
+    processed one at a time, so the memory needed does not grow with the number of states.
+
+    Args:
+        ci_coeffs: State, or one state per row for a state-averaged wave function.
+        ci_info: Information about the CI space.
+        num_inactive_orbs: Number of inactive spatial orbitals.
+        num_active_orbs: Number of active spatial orbitals.
+        num_orbs: Number of spatial orbitals.
+
+    Returns:
+        One- and two-electron reduced density matrices.
+    """
+    states = np.atleast_2d(ci_coeffs)
+    weight = 1.0 / len(states)
+    num_pairs = num_active_orbs**2
+    rdm1 = np.zeros((num_active_orbs, num_active_orbs))
+    gram = np.zeros((num_pairs, num_pairs))
+    excited = np.empty((num_pairs, states.shape[1]))
+    for state in states:
+        for p in range(num_active_orbs):
+            for q in range(num_active_orbs):
+                excited[p * num_active_orbs + q] = propagate_state(
+                    [Epq(p + num_inactive_orbs, q + num_inactive_orbs, num_orbs)], state, ci_info
+                )
+        rdm1 += weight * (excited @ state).reshape(num_active_orbs, num_active_orbs)
+        gram += weight * (excited @ excited.T)
+    # gram is indexed by the two pairs, and <0|E_pq E_rs|0> is the entry for (q,p) and (r,s).
+    rdm2 = gram.reshape((num_active_orbs,) * 4).transpose(1, 0, 2, 3).copy()
+    for q in range(num_active_orbs):
+        rdm2[:, q, q, :] -= rdm1
+    return rdm1, rdm2
 
 
 @nb.jit(nopython=True)
