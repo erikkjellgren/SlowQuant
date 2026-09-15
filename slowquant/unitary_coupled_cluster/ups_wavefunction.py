@@ -311,7 +311,7 @@ class WaveFunctionUPS:
                 self.ansatz_options["excitations"].append("GpD")
             elif ansatz.lower() == "fuccpd":
                 self.ansatz_options["excitations"].append("pD")
-            elif ansatz.lower() == "safuccspd":
+            elif ansatz.lower() == "safuccsd":
                 self.ansatz_options["excitations"].append("SAS")
                 self.ansatz_options["excitations"].append("SAD")
             self.ups_layout.create_fUCC(
