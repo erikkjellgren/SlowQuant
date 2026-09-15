@@ -174,21 +174,21 @@ def main() -> None:
     args = parser.parse_args()
 
     obj = build_hartree_fock(args.molecule, args.basis)
-    original_prepare = spin_factorized_algebra.prepare_factorized_operator
+    original_factorize = spin_factorized_algebra.factorize_operator
     original_gram = ups_module.can_build_rdm12_as_gram
     # Warm up both code paths. They compile different Numba kernels, so whichever ran first
     # would otherwise carry that compilation into the table and flatter the other one.
     for warm_general in (False, True):
         if warm_general:
             # Warm the slow side of both switches, whichever the run ends up comparing.
-            spin_factorized_algebra.prepare_factorized_operator = lambda *a, **k: None
+            spin_factorized_algebra.factorize_operator = lambda *a, **k: None
             ups_module.can_build_rdm12_as_gram = lambda *a, **k: False
         try:
             for num_orbs in (2, 4):
                 time_optimization(obj, num_orbs, num_orbs, args.ansatz, args.layers, 1, True)
                 time_optimization(obj, num_orbs, num_orbs, args.ansatz, args.layers, 1, False)
         finally:
-            spin_factorized_algebra.prepare_factorized_operator = original_prepare
+            spin_factorized_algebra.factorize_operator = original_factorize
             ups_module.can_build_rdm12_as_gram = original_gram
     print(
         f"{args.molecule}/{args.basis}, {args.ansatz} with {args.layers} layer(s), "
@@ -228,7 +228,7 @@ def main() -> None:
             )
             if args.compare != "off":
                 if args.compare in ("all", "algebra"):
-                    spin_factorized_algebra.prepare_factorized_operator = lambda *a, **k: None
+                    spin_factorized_algebra.factorize_operator = lambda *a, **k: None
                 if args.compare in ("all", "gram"):
                     ups_module.can_build_rdm12_as_gram = lambda *a, **k: False
                 try:
@@ -242,7 +242,7 @@ def main() -> None:
                         orbital_optimization,
                     )
                 finally:
-                    spin_factorized_algebra.prepare_factorized_operator = original_prepare
+                    spin_factorized_algebra.factorize_operator = original_factorize
                     ups_module.can_build_rdm12_as_gram = original_gram
                 row += f" {general['seconds']:9.2f} {general['seconds'] / result['seconds']:7.1f}x"
             print(row, flush=True)
