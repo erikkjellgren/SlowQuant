@@ -28,6 +28,12 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
 )
 from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
+from slowquant.unitary_coupled_cluster.spin_ordering import (
+    alpha_idx,
+    beta_idx,
+    det_interleaved_to_blocked,
+    spin_indices,
+)
 from slowquant.unitary_coupled_cluster.util import UccStructure
 
 
@@ -142,31 +148,33 @@ class WaveFunctionUCC:
                     ref_det += "1"
                 else:
                     ref_det += "0"
-        # Construct spin orbital indices
-        self.inactive_spin_idx = [x for x in range(self.num_inactive_spin_orbs)]
-        self.active_spin_idx = [x + self.num_inactive_spin_orbs for x in range(self.num_active_spin_orbs)]
-        self.virtual_spin_idx = [
-            x + self.num_inactive_spin_orbs + self.num_active_spin_orbs
-            for x in range(self.num_virtual_spin_orbs)
-        ]
-        self.active_occ_spin_idx = []
-        self.active_unocc_spin_idx = []
-        for i, orb_idx in enumerate(self.active_spin_idx):
-            if ref_det[i] == "1":
-                self.active_occ_spin_idx.append(orb_idx)
-            else:
-                self.active_unocc_spin_idx.append(orb_idx)
-        self.active_spin_idx_shifted = [x - self.num_inactive_spin_orbs for x in self.active_spin_idx]
-        self.active_occ_spin_idx_shifted = [x - self.num_inactive_spin_orbs for x in self.active_occ_spin_idx]
-        self.active_unocc_spin_idx_shifted = [
-            x - self.num_inactive_spin_orbs for x in self.active_unocc_spin_idx
-        ]
-        # Construct spatial idx
+        # Construct spin orbital indices, the alpha block followed by the beta block
         self.inactive_idx = [x for x in range(self.num_inactive_orbs)]
         self.active_idx = [x + self.num_inactive_orbs for x in range(self.num_active_orbs)]
         self.virtual_idx = [
             x + self.num_inactive_orbs + self.num_active_orbs for x in range(self.num_virtual_orbs)
         ]
+        self.inactive_spin_idx = spin_indices(self.inactive_idx, self.num_orbs)
+        self.active_spin_idx = spin_indices(self.active_idx, self.num_orbs)
+        self.virtual_spin_idx = spin_indices(self.virtual_idx, self.num_orbs)
+        self.active_idx_shifted = [x - self.num_inactive_orbs for x in self.active_idx]
+        self.active_spin_idx_shifted = spin_indices(self.active_idx_shifted, self.num_active_orbs)
+        # The reference determinant is interleaved, so active spatial orbital i is ref_det[2*i]
+        # for alpha and ref_det[2*i + 1] for beta. The shifted lists index the active space on
+        # its own, where a blocked index is not a constant offset away from the full-space one.
+        self.active_occ_spin_idx = []
+        self.active_unocc_spin_idx = []
+        self.active_occ_spin_idx_shifted = []
+        self.active_unocc_spin_idx_shifted = []
+        for spin_offset, to_spin_idx in ((0, alpha_idx), (1, beta_idx)):
+            for i, orb_idx in enumerate(self.active_idx):
+                if ref_det[2 * i + spin_offset] == "1":
+                    self.active_occ_spin_idx.append(to_spin_idx(orb_idx, self.num_orbs))
+                    self.active_occ_spin_idx_shifted.append(to_spin_idx(i, self.num_active_orbs))
+                else:
+                    self.active_unocc_spin_idx.append(to_spin_idx(orb_idx, self.num_orbs))
+                    self.active_unocc_spin_idx_shifted.append(to_spin_idx(i, self.num_active_orbs))
+        # Construct spatial idx
         self.active_occ_idx = []
         self.active_unocc_idx = []
         for i, orb_idx in enumerate(self.active_idx):
@@ -185,7 +193,6 @@ class WaveFunctionUCC:
                 raise ValueError(
                     f"Got unknown option for resolve_unpaired_idx, {resolve_unpaired_idx}, expected 'both', 'occ' or 'unocc'."
                 )
-        self.active_idx_shifted = [x - self.num_inactive_orbs for x in self.active_idx]
         self.active_occ_idx_shifted = [x - self.num_inactive_orbs for x in self.active_occ_idx]
         self.active_unocc_idx_shifted = [x - self.num_inactive_orbs for x in self.active_unocc_idx]
         # Find non-redundant kappas
@@ -237,7 +244,8 @@ class WaveFunctionUCC:
         self.num_det = len(self.ci_info.idx2det)
         self.ref_coeffs = np.zeros(self.num_det, dtype=float)
         print("Reference (active) determinant:", ref_det)
-        self.ref_coeffs[self.ci_info.det2idx[int(ref_det, 2)]] = 1
+        # The reference determinant is given interleaved, the CI space is blocked.
+        self.ref_coeffs[self.ci_info.det2idx[int(det_interleaved_to_blocked(ref_det), 2)]] = 1
         self._ci_coeffs = np.copy(self.ref_coeffs)
         # Construct UCC Structure
         self.ucc_layout = UccStructure()
@@ -376,7 +384,7 @@ class WaveFunctionUCC:
                     q_ = q - self.num_inactive_orbs
                     val = expectation_value(
                         self.ci_coeffs,
-                        [Epq(p, q)],
+                        [Epq(p, q, self.num_orbs)],
                         self.ci_coeffs,
                         self.ci_info,
                     )
@@ -419,7 +427,7 @@ class WaveFunctionUCC:
                             s_ = s - self.num_inactive_orbs
                             val = expectation_value(
                                 self.ci_coeffs,
-                                [Epq(p, q) * Epq(r, s)],
+                                [Epq(p, q, self.num_orbs) * Epq(r, s, self.num_orbs)],
                                 self.ci_coeffs,
                                 self.ci_info,
                             )
@@ -466,7 +474,11 @@ class WaveFunctionUCC:
                                     u_ = u - self.num_inactive_orbs
                                     val = expectation_value(
                                         self.ci_coeffs,
-                                        [Epq(p, q), Epq(r, s), Epq(t, u)],
+                                        [
+                                            Epq(p, q, self.num_orbs),
+                                            Epq(r, s, self.num_orbs),
+                                            Epq(t, u, self.num_orbs),
+                                        ],
                                         self.ci_coeffs,
                                         self.ci_info,
                                     )
@@ -533,7 +545,12 @@ class WaveFunctionUCC:
                                             n_ = n - self.num_inactive_orbs
                                             val = expectation_value(
                                                 self.ci_coeffs,
-                                                [Epq(p, q), Epq(r, s), Epq(t, u), Epq(m, n)],
+                                                [
+                                                    Epq(p, q, self.num_orbs),
+                                                    Epq(r, s, self.num_orbs),
+                                                    Epq(t, u, self.num_orbs),
+                                                    Epq(m, n, self.num_orbs),
+                                                ],
                                                 self.ci_coeffs,
                                                 self.ci_info,
                                             )
@@ -642,6 +659,7 @@ class WaveFunctionUCC:
                         self.g_mo,
                         self.num_inactive_orbs,
                         self.num_active_orbs,
+                        self.num_virtual_orbs,
                     )
                 ],
                 self.ci_coeffs,
@@ -916,6 +934,7 @@ class WaveFunctionUCC:
                         self.g_mo,
                         self.num_inactive_orbs,
                         self.num_active_orbs,
+                        self.num_virtual_orbs,
                     )
                 ],
                 self.ci_coeffs,
@@ -968,6 +987,7 @@ class WaveFunctionUCC:
                 self.g_mo,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
+                self.num_virtual_orbs,
             )
             # Numerical finite difference gradient
             eps = np.finfo(np.float64).eps ** (
@@ -983,7 +1003,7 @@ class WaveFunctionUCC:
             E = self.ci_coeffs @ Hket
             theta_params = np.zeros_like(self.thetas)
             Tmat = build_operator_matrix(
-                get_ucc_T(self.thetas, self.ucc_layout),
+                get_ucc_T(self.thetas, self.ucc_layout, self.ci_info),
                 self.ci_info,
             )
             for i in range(len(theta_params)):
@@ -991,7 +1011,7 @@ class WaveFunctionUCC:
                 step_size = eps * sign_step * max(1, abs(theta_params[i]))
                 theta_params[i] += step_size
                 Tmat_plus = build_operator_matrix(
-                    get_ucc_T(theta_params, self.ucc_layout),
+                    get_ucc_T(theta_params, self.ucc_layout, self.ci_info),
                     self.ci_info,
                 )
                 bra = ss.linalg.expm_multiply(Tmat + Tmat_plus, self.ref_coeffs, traceA=0.0)

@@ -6,25 +6,26 @@ import re
 from collections import defaultdict
 from collections.abc import Generator
 
+from slowquant.unitary_coupled_cluster.spin_ordering import alpha_idx, beta_idx
 
-def operator_to_qiskit_key(
-    operator_string: tuple[tuple[int, ...], tuple[int, ...]], remapping: dict[int, int]
-) -> str:
+
+def operator_to_qiskit_key(operator_string: tuple[tuple[int, ...], tuple[int, ...]]) -> str:
     """Make key string to index a fermionic operator in a dict structure.
+
+    SlowQuant and Qiskit Nature use the same alpha/beta-blocked ordering of the spin orbitals,
+    so the indices carry over unchanged.
 
     Args:
         operator_string: Fermionic operators.
-        remapping: Map that takes indices from alpha,beta,alpha,beta
-                   to alpha,alpha,beta,beta ordering.
 
     Returns:
         Dictionary key.
     """
     op_key = ""
     for a in operator_string[0]:
-        op_key += f" +_{remapping[a]}"
+        op_key += f" +_{a}"
     for a in operator_string[1]:
-        op_key += f" -_{remapping[a]}"
+        op_key += f" -_{a}"
     return op_key[1:]
 
 
@@ -570,26 +571,17 @@ class FermionicOperator:
             operator[op_key] = fac
         return operator
 
-    def get_qiskit_form(self, num_orbs: int) -> dict[str, float]:
+    def get_qiskit_form(self) -> dict[str, float]:
         """Get fermionic operator on qiskit form.
 
-        Args:
-            num_orbs: Number of spatial orbitals.
+        Both use alpha/beta-blocked spin-orbital ordering, so only the key format changes.
 
         Returns:
             Fermionic operators on qiskit form.
         """
         qiskit_form = {}
-        remapping = {}
-        #  Map indices from alpha,beta,alpha,beta to alpha,alpha,beta,beta.
-        for i in range(2 * num_orbs):
-            if i < num_orbs:
-                remapping[2 * i] = i
-            else:
-                remapping[2 * i + 1 - 2 * num_orbs] = i
         for op_key in self.operators.keys():
-            qiskit_str = operator_to_qiskit_key(op_key, remapping)
-            qiskit_form[qiskit_str] = self.operators[op_key]
+            qiskit_form[operator_to_qiskit_key(op_key)] = self.operators[op_key]
         return qiskit_form
 
     def get_folded_operator(
@@ -625,66 +617,76 @@ class FermionicOperator:
            Folded fermionic operator.
         """
         operators: dict[tuple[tuple[int, ...], tuple[int, ...]], float] = {}
-        inactive_idx = []
-        active_idx = []
-        virtual_idx = []
-        # Get indices of spaces
-        for i in range(2 * num_inactive_orbs + 2 * num_active_orbs + 2 * num_virtual_orbs):
-            if i < 2 * num_inactive_orbs:
-                inactive_idx.append(i)
-            elif i < 2 * num_inactive_orbs + 2 * num_active_orbs:
-                active_idx.append(i)
-            else:
-                virtual_idx.append(i)
+        num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
+        # Occupation mask of the inactive spin orbitals, which are filled in both bra and ket.
+        # Spin-orbital index i is bit i here, this mask is local to the folding.
+        inactive_filled = 0
+        for p in range(num_inactive_orbs):
+            inactive_filled |= 1 << alpha_idx(p, num_orbs)
+            inactive_filled |= 1 << beta_idx(p, num_orbs)
 
         # Loop over string of annihilation operators
-        for op_key, fac in self.operators.items():
-            virtual = []
-            virtual_dagger = []
-            inactive = []
-            inactive_dagger = []
-            active = []
-            active_dagger = []
-            phase = 1
-            # Loop over individual annihilation operator and sort into spaces
-            # Loop over daggers
-            for anni in op_key[0]:
-                if anni in inactive_idx:
-                    inactive_dagger.append(anni)
-                elif anni in active_idx:
-                    active_dagger.append(anni - 2 * num_inactive_orbs)
-                elif anni in virtual_idx:
-                    virtual_dagger.append(anni)
-            # Loop over non-daggers
-            for anni in op_key[1]:
-                if anni in inactive_idx:
-                    inactive.append(anni)
-                elif anni in active_idx:
-                    active.append(anni - 2 * num_inactive_orbs)
-                elif anni in virtual_idx:
-                    virtual.append(anni)
-            # Any virtual indices will make the operator evaluate to zero.
-            if len(virtual) != 0 or len(virtual_dagger) != 0:
+        for (dagger_string, nondagger_string), coeff in self.operators.items():
+            phase_changes = 0
+            inactive_occ = inactive_filled
+            # Net number of active alpha electrons added so far by the operators applied.
+            active_alpha_change = 0
+            active_dagger: list[int] = []
+            active_nondagger: list[int] = []
+            is_zero = False
+            # Apply the operators right to left, as they act on the ket. The string is normal
+            # ordered, so the non-dagger block goes first and the dagger block after it. Within
+            # a block the indices are sorted descending, so reversed() is application order.
+            for dagger, block, active_block in (
+                (False, nondagger_string, active_nondagger),
+                (True, dagger_string, active_dagger),
+            ):
+                for orb_idx in reversed(block):
+                    spatial_idx = orb_idx % num_orbs
+                    if spatial_idx >= num_inactive_orbs + num_active_orbs:
+                        # Any virtual index makes the operator evaluate to zero, the virtual
+                        # orbitals are empty in both bra and ket.
+                        is_zero = True
+                        break
+                    # Phase from the inactive orbitals the operator has to be moved past. The
+                    # active orbitals below it are left to the folded operator itself, which
+                    # sees them in the active-space determinant and counts the same number.
+                    phase_changes += (inactive_occ & ((1 << orb_idx) - 1)).bit_count()
+                    if spatial_idx < num_inactive_orbs:
+                        if orb_idx >= num_orbs:
+                            # Every alpha orbital lies below an inactive beta one, so this
+                            # operator also has to be moved past the active alpha electrons.
+                            # Their number at the start of the string is a constant of the CI
+                            # space and drops out, the inactive operators pair up so an even
+                            # number of them are beta. What is left is how the operators
+                            # applied so far changed that number.
+                            phase_changes += active_alpha_change
+                        orb_bit = 1 << orb_idx
+                        if dagger == bool(inactive_occ & orb_bit):
+                            # Creating an occupied or annihilating an empty inactive orbital.
+                            is_zero = True
+                            break
+                        inactive_occ ^= orb_bit
+                    elif orb_idx < num_orbs:
+                        # Active alpha, remapped to the first block of the active space.
+                        active_block.append(spatial_idx - num_inactive_orbs)
+                        active_alpha_change += 1 if dagger else -1
+                    else:
+                        # Active beta, remapped to the second block of the active space.
+                        active_block.append(num_active_orbs + spatial_idx - num_inactive_orbs)
+                if is_zero:
+                    break
+            # The inactive orbitals must be left as they were found.
+            if is_zero or inactive_occ != inactive_filled:
                 continue
-            active_op = (tuple(active_dagger), tuple(active))
-            bra_side = inactive_dagger
-            ket_side = inactive
-            # The inactive bra and ket side must end up giving identical state vectors.
-            if bra_side != ket_side:
-                continue
-            if len(inactive_dagger) % 2 == 1 and len(active_dagger) % 2 == 1:
-                phase *= -1
-            # Calculate sign coming from flipping the order of the ket side.
-            # It has to be "flipped" to match the order on the bra side.
-            ket_flip_fac = 1
-            for i in range(1, len(ket_side) + 1):
-                if i % 2 == 0:
-                    ket_flip_fac *= -1
-            phase *= ket_flip_fac
+            fac = 1 - 2 * (phase_changes & 1)
+            # Back to written order. The active remapping is monotonic, so each block keeps the
+            # descending order the unfolded string had.
+            active_op = (tuple(active_dagger[::-1]), tuple(active_nondagger[::-1]))
             if active_op in operators.keys():
-                operators[active_op] += fac * phase
+                operators[active_op] += fac * coeff
             else:
-                operators[active_op] = fac * phase
+                operators[active_op] = fac * coeff
         return FermionicOperator(operators)
 
     def get_info(self) -> tuple[list[list[int]], list[list[int]], list[float]]:

@@ -641,7 +641,9 @@ def test_custom() -> None:
 
     qc = qWF.QI.circuit.copy()
     qc_param = qWF.QI.parameters
-    qc_H = hamiltonian_0i_0a(qWF.h_mo, qWF.g_mo, qWF.num_inactive_orbs, qWF.num_active_orbs)
+    qc_H = hamiltonian_0i_0a(
+        qWF.h_mo, qWF.g_mo, qWF.num_inactive_orbs, qWF.num_active_orbs, qWF.num_virtual_orbs
+    )
     qc_H = qc_H.get_folded_operator(qWF.num_inactive_orbs, qWF.num_active_orbs, qWF.num_virtual_orbs)
 
     # Define the Sampler
@@ -904,7 +906,13 @@ def test_state_average_layout() -> None:
 
 
 def test_state_average_M() -> None:
-    """Test Energy calculation with SA in the presence of complicated layout and M_Ansatz0."""
+    """Test Energy calculation with SA in the presence of complicated layout and M_Ansatz0.
+
+    The energies asserted after switching to the noisy sampler depend on the qubit to orbital
+    assignment, since the layout below pins specific physical qubits. That assignment changed with
+    the move to alpha/beta-blocked spin-orbital ordering, so those references were re-recorded.
+    The ideal simulator comparisons above them are the physics check and were not touched.
+    """
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """H  0.0           0.0  0.0;
@@ -977,11 +985,17 @@ def test_state_average_M() -> None:
     )
     QWF.thetas = WF.thetas
 
-    assert abs(QWF._calc_energy_elec() + 1.3749928877432358) < 10**-6  # type: ignore
+    assert abs(QWF._calc_energy_elec() + 1.375065166062325) < 10**-6  # type: ignore
 
 
 def test_state_average_Mplus() -> None:
-    """Test Energy calculation with SA in the presence of complicated layout and with M_Ansatz0+."""
+    """Test Energy calculation with SA in the presence of complicated layout and with M_Ansatz0+.
+
+    The energies asserted after switching to the noisy sampler depend on the qubit to orbital
+    assignment, since the layout below pins specific physical qubits. That assignment changed with
+    the move to alpha/beta-blocked spin-orbital ordering, so those references were re-recorded.
+    The ideal simulator comparisons above them are the physics check and were not touched.
+    """
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """Li  0.0           0.0  0.0;
@@ -1057,24 +1071,30 @@ def test_state_average_Mplus() -> None:
 
     # No EM
     QI._reset_cliques()
-    assert abs(QWF._calc_energy_elec() + 9.374249021996663) < 10**-6  # type: ignore  # CSFs option 1
+    assert abs(QWF._calc_energy_elec() + 9.373719435962862) < 10**-6  # type: ignore  # CSFs option 1
 
     # EM with M_Ansatz0
     QI.update_mitigation_flags(do_M_mitigation=True, do_M_ansatz0=True)
 
-    assert abs(QWF._calc_energy_elec() + 9.398404469079898) < 10**-6  # type: ignore  # CSFs option 4
+    assert abs(QWF._calc_energy_elec() + 9.383547758905763) < 10**-6  # type: ignore  # CSFs option 4
 
     # EM with M_Ansatz0+
     QI.update_mitigation_flags(do_M_ansatz0_plus=True)
-    assert abs(QWF._calc_energy_elec() + 9.426250418342013) < 10**-6  # type: ignore  # CSFs option 1
+    assert abs(QWF._calc_energy_elec() + 9.44151897514196) < 10**-6  # type: ignore  # CSFs option 1
 
     # EM with M_Ansatz0 and postselection
     QI.update_mitigation_flags(do_postselection=True, do_M_ansatz0_plus=False)
-    assert abs(QWF._calc_energy_elec() + 9.637857456768002) < 10**-6  # type: ignore  # CSFs option 4
+    assert abs(QWF._calc_energy_elec() + 9.639593713379377) < 10**-6  # type: ignore  # CSFs option 4
 
 
 def test_no_saving() -> None:
-    """Test Energy calculation with SA for the no saving options."""
+    """Test Energy calculation with SA for the no saving options.
+
+    The energies asserted after switching to the noisy sampler depend on the qubit to orbital
+    assignment, since the layout below pins specific physical qubits. That assignment changed with
+    the move to alpha/beta-blocked spin-orbital ordering, so those references were re-recorded.
+    The ideal simulator comparisons above them are the physics check and were not touched.
+    """
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """Li  0.0           0.0  0.0;
@@ -1153,7 +1173,7 @@ def test_no_saving() -> None:
     )
 
     QI.update_mitigation_flags(do_postselection=False, do_M_ansatz0=True)
-    assert abs(QWF._calc_energy_elec() + 9.398404469079898) < 10**-6  # type: ignore
+    assert abs(QWF._calc_energy_elec() + 9.383547758905763) < 10**-6  # type: ignore
 
 
 def test_variance_nocm() -> None:

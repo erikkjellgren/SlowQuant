@@ -21,6 +21,7 @@ from slowquant.unitary_coupled_cluster.operators import (
     one_elec_op_0i_0a,
     one_elec_op_1i_1a,
 )
+from slowquant.unitary_coupled_cluster.spin_ordering import det_interleaved_to_blocked
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
@@ -66,14 +67,16 @@ class LinearResponse(LinearResponseBaseClass):
             raise ValueError(f"Got incompatible wave function type, {type(self.wf)}")
         num_det = len(ci_info.idx2det)
         self.ref_coeffs = np.zeros(num_det)
+        # Assembled in the human readable interleaved ordering, where the three spaces are
+        # contiguous, then converted to the blocked ordering the CI space uses.
         ref_det = (
             "1" * self.wf.num_inactive_spin_orbs + self.wf._ref_det + "0" * self.wf.num_virtual_spin_orbs
         )
-        self.ref_coeffs[ci_info.det2idx[int(ref_det, 2)]] = 1
+        self.ref_coeffs[ci_info.det2idx[int(det_interleaved_to_blocked(ref_det), 2)]] = 1
         self.ci_coeffs = propagate_state(["U"], self.ref_coeffs, *self.index_info_extended)
         self.q_ops: list[FermionicOperator] = []
         for i, a in self.wf.kappa_hf_like_idx:
-            op = 2 ** (-1 / 2) * Epq(a, i)
+            op = 2 ** (-1 / 2) * Epq(a, i, self.wf.num_orbs)
             self.q_ops.append(op)
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
@@ -292,16 +295,19 @@ class LinearResponse(LinearResponseBaseClass):
             mux,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
         muy_op_G = one_elec_op_0i_0a(
             muy,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
         muz_op_G = one_elec_op_0i_0a(
             muz,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
         mux_op_q = one_elec_op_1i_1a(
             mux, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs

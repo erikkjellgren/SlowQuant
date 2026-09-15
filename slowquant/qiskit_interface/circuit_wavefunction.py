@@ -27,6 +27,11 @@ from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperat
 from slowquant.unitary_coupled_cluster.integral_manager import IntegralManager
 from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
+from slowquant.unitary_coupled_cluster.spin_ordering import (
+    alpha_idx,
+    beta_idx,
+    spin_indices,
+)
 
 
 class WaveFunctionCircuit:
@@ -173,31 +178,33 @@ class WaveFunctionCircuit:
                     ref_det += "1"
                 else:
                     ref_det += "0"
-        # Construct spin orbital indices
-        self.inactive_spin_idx = [x for x in range(self.num_inactive_spin_orbs)]
-        self.active_spin_idx = [x + self.num_inactive_spin_orbs for x in range(self.num_active_spin_orbs)]
-        self.virtual_spin_idx = [
-            x + self.num_inactive_spin_orbs + self.num_active_spin_orbs
-            for x in range(self.num_virtual_spin_orbs)
-        ]
-        self.active_occ_spin_idx = []
-        self.active_unocc_spin_idx = []
-        for i, orb_idx in enumerate(self.active_spin_idx):
-            if ref_det[i] == "1":
-                self.active_occ_spin_idx.append(orb_idx)
-            else:
-                self.active_unocc_spin_idx.append(orb_idx)
-        self.active_spin_idx_shifted = [x - self.num_inactive_spin_orbs for x in self.active_spin_idx]
-        self.active_occ_spin_idx_shifted = [x - self.num_inactive_spin_orbs for x in self.active_occ_spin_idx]
-        self.active_unocc_spin_idx_shifted = [
-            x - self.num_inactive_spin_orbs for x in self.active_unocc_spin_idx
-        ]
         # Construct spatial idx
         self.inactive_idx = [x for x in range(self.num_inactive_orbs)]
         self.active_idx = [x + self.num_inactive_orbs for x in range(self.num_active_orbs)]
         self.virtual_idx = [
             x + self.num_inactive_orbs + self.num_active_orbs for x in range(self.num_virtual_orbs)
         ]
+        # Construct spin orbital indices, the alpha block of a space followed by its beta block
+        self.inactive_spin_idx = spin_indices(self.inactive_idx, self.num_orbs)
+        self.active_spin_idx = spin_indices(self.active_idx, self.num_orbs)
+        self.virtual_spin_idx = spin_indices(self.virtual_idx, self.num_orbs)
+        self.active_idx_shifted = [x - self.num_inactive_orbs for x in self.active_idx]
+        self.active_spin_idx_shifted = spin_indices(self.active_idx_shifted, self.num_active_orbs)
+        # The reference determinant is interleaved, so active spatial orbital i is ref_det[2*i]
+        # for alpha and ref_det[2*i + 1] for beta. The shifted lists index the active space on
+        # its own, where a blocked index is not a constant offset away from the full-space one.
+        self.active_occ_spin_idx = []
+        self.active_unocc_spin_idx = []
+        self.active_occ_spin_idx_shifted = []
+        self.active_unocc_spin_idx_shifted = []
+        for spin_offset, to_spin_idx in ((0, alpha_idx), (1, beta_idx)):
+            for i, orb_idx in enumerate(self.active_idx):
+                if ref_det[2 * i + spin_offset] == "1":
+                    self.active_occ_spin_idx.append(to_spin_idx(orb_idx, self.num_orbs))
+                    self.active_occ_spin_idx_shifted.append(to_spin_idx(i, self.num_active_orbs))
+                else:
+                    self.active_unocc_spin_idx.append(to_spin_idx(orb_idx, self.num_orbs))
+                    self.active_unocc_spin_idx_shifted.append(to_spin_idx(i, self.num_active_orbs))
         self.active_occ_idx = []
         self.active_unocc_idx = []
         for i, orb_idx in enumerate(self.active_idx):
@@ -216,7 +223,6 @@ class WaveFunctionCircuit:
                 raise ValueError(
                     f"Got unknown option for resolve_unpaired_idx, {resolve_unpaired_idx}, expected 'both', 'occ' or 'unocc'."
                 )
-        self.active_idx_shifted = [x - self.num_inactive_orbs for x in self.active_idx]
         self.active_occ_idx_shifted = [x - self.num_inactive_orbs for x in self.active_occ_idx]
         self.active_unocc_idx_shifted = [x - self.num_inactive_orbs for x in self.active_unocc_idx]
         # Find non-redundant kappas
@@ -432,7 +438,7 @@ class WaveFunctionCircuit:
                 p_ = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
                     q_ = q - self.num_inactive_orbs
-                    rdm1_op = Epq(p, q).get_folded_operator(
+                    rdm1_op = Epq(p, q, self.num_orbs).get_folded_operator(
                         self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                     )
                     val = self.QI.quantum_expectation_value(rdm1_op)
@@ -473,7 +479,9 @@ class WaveFunctionCircuit:
                             s_lim = p + 1
                         for s in range(self.num_inactive_orbs, s_lim):
                             s_ = s - self.num_inactive_orbs
-                            pdm2_op = (Epq(p, q) * Epq(r, s)).get_folded_operator(
+                            pdm2_op = (
+                                Epq(p, q, self.num_orbs) * Epq(r, s, self.num_orbs)
+                            ).get_folded_operator(
                                 self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                             )
                             val = self.QI.quantum_expectation_value(pdm2_op)
@@ -518,7 +526,11 @@ class WaveFunctionCircuit:
                                 t_ = t - self.num_inactive_orbs
                                 for u in range(self.num_inactive_orbs, p + 1):
                                     u_ = u - self.num_inactive_orbs
-                                    pdm3_op = (Epq(p, q) * Epq(r, s) * Epq(t, u)).get_folded_operator(
+                                    pdm3_op = (
+                                        Epq(p, q, self.num_orbs)
+                                        * Epq(r, s, self.num_orbs)
+                                        * Epq(t, u, self.num_orbs)
+                                    ).get_folded_operator(
                                         self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                                     )
                                     val = self.QI.quantum_expectation_value(pdm3_op)
@@ -584,7 +596,10 @@ class WaveFunctionCircuit:
                                         for n in range(self.num_inactive_orbs, p + 1):
                                             n_ = n - self.num_inactive_orbs
                                             pdm4_op = (
-                                                Epq(p, q) * Epq(r, s) * Epq(t, u) * Epq(m, n)
+                                                Epq(p, q, self.num_orbs)
+                                                * Epq(r, s, self.num_orbs)
+                                                * Epq(t, u, self.num_orbs)
+                                                * Epq(m, n, self.num_orbs)
                                             ).get_folded_operator(
                                                 self.num_inactive_orbs,
                                                 self.num_active_orbs,
@@ -694,7 +709,7 @@ class WaveFunctionCircuit:
             self._rdm1 = None
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 for q in range(self.num_inactive_orbs, p + 1):
-                    rdm1_op = Epq(p, q).get_folded_operator(
+                    rdm1_op = Epq(p, q, self.num_orbs).get_folded_operator(
                         self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                     )
                     mapped_op = self.QI.op_to_qbit(rdm1_op)
@@ -716,7 +731,9 @@ class WaveFunctionCircuit:
                         else:
                             s_lim = p + 1
                         for s in range(self.num_inactive_orbs, s_lim):
-                            pdm2_op = (Epq(p, q) * Epq(r, s)).get_folded_operator(
+                            pdm2_op = (
+                                Epq(p, q, self.num_orbs) * Epq(r, s, self.num_orbs)
+                            ).get_folded_operator(
                                 self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                             )
                             mapped_op = self.QI.op_to_qbit(pdm2_op)
@@ -729,7 +746,11 @@ class WaveFunctionCircuit:
                         for s in range(self.num_inactive_orbs, p + 1):
                             for t in range(self.num_inactive_orbs, r + 1):
                                 for u in range(self.num_inactive_orbs, p + 1):
-                                    pdm3_op = (Epq(p, q) * Epq(r, s) * Epq(t, u)).get_folded_operator(
+                                    pdm3_op = (
+                                        Epq(p, q, self.num_orbs)
+                                        * Epq(r, s, self.num_orbs)
+                                        * Epq(t, u, self.num_orbs)
+                                    ).get_folded_operator(
                                         self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                                     )
                                     mapped_op = self.QI.op_to_qbit(pdm3_op)
@@ -745,7 +766,10 @@ class WaveFunctionCircuit:
                                     for m in range(self.num_inactive_orbs, t + 1):
                                         for n in range(self.num_inactive_orbs, p + 1):
                                             pdm4_op = (
-                                                Epq(p, q) * Epq(r, s) * Epq(t, u) * Epq(m, n)
+                                                Epq(p, q, self.num_orbs)
+                                                * Epq(r, s, self.num_orbs)
+                                                * Epq(t, u, self.num_orbs)
+                                                * Epq(m, n, self.num_orbs)
                                             ).get_folded_operator(
                                                 self.num_inactive_orbs,
                                                 self.num_active_orbs,
@@ -788,11 +812,13 @@ class WaveFunctionCircuit:
         Returns:
             FermionicOperator.
         """
-        H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+        H = hamiltonian_0i_0a(
+            self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+        )
         H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
 
         if qiskit_form:
-            return H.get_qiskit_form(self.num_orbs)
+            return H.get_qiskit_form()
         return H
 
     def _calc_energy_elec(self) -> float:
@@ -801,7 +827,9 @@ class WaveFunctionCircuit:
         Returns:
             Electronic energy.
         """
-        H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+        H = hamiltonian_0i_0a(
+            self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+        )
         H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
         energy_elec = self.QI.quantum_expectation_value(H)
         return energy_elec
@@ -916,7 +944,11 @@ class WaveFunctionCircuit:
                     (
                         lambda: self.QI.quantum_variance(
                             hamiltonian_0i_0a(
-                                self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
+                                self.h_mo,
+                                self.g_mo,
+                                self.num_inactive_orbs,
+                                self.num_active_orbs,
+                                self.num_virtual_orbs,
                             ).get_folded_operator(
                                 self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                             )
@@ -961,7 +993,11 @@ class WaveFunctionCircuit:
                     (
                         lambda: self.QI.quantum_variance(
                             hamiltonian_0i_0a(
-                                self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
+                                self.h_mo,
+                                self.g_mo,
+                                self.num_inactive_orbs,
+                                self.num_active_orbs,
+                                self.num_virtual_orbs,
                             ).get_folded_operator(
                                 self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                             )
@@ -1038,7 +1074,11 @@ class WaveFunctionCircuit:
                 (
                     lambda: self.QI.quantum_variance(
                         hamiltonian_0i_0a(
-                            self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
+                            self.h_mo,
+                            self.g_mo,
+                            self.num_inactive_orbs,
+                            self.num_active_orbs,
+                            self.num_virtual_orbs,
                         ).get_folded_operator(
                             self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                         )
@@ -1082,7 +1122,9 @@ class WaveFunctionCircuit:
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
             # Build operator
-            H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+            H = hamiltonian_0i_0a(
+                self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+            )
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             return self.QI.quantum_expectation_value(H)
         # RDM is more expensive than evaluation of the Hamiltonian.
@@ -1123,7 +1165,9 @@ class WaveFunctionCircuit:
                 self.rdm2,
             )
         if theta_optimization:
-            H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+            H = hamiltonian_0i_0a(
+                self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+            )
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             for i in range(len(parameters[num_kappa:])):
                 R = self.QI.grad_param_R[self.QI.param_names[i]]

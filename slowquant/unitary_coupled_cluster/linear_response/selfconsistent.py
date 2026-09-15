@@ -24,6 +24,7 @@ from slowquant.unitary_coupled_cluster.operators import (
     commutator,
     one_elec_op_0i_0a,
 )
+from slowquant.unitary_coupled_cluster.spin_ordering import det_interleaved_to_blocked
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
@@ -69,10 +70,12 @@ class LinearResponse(LinearResponseBaseClass):
             raise ValueError(f"Got incompatible wave function type, {type(self.wf)}")
         num_det = len(ci_info.idx2det)
         self.ref_coeffs = np.zeros(num_det)
+        # Assembled in the human readable interleaved ordering, where the three spaces are
+        # contiguous, then converted to the blocked ordering the CI space uses.
         ref_det = (
             "1" * self.wf.num_inactive_spin_orbs + self.wf._ref_det + "0" * self.wf.num_virtual_spin_orbs
         )
-        self.ref_coeffs[ci_info.det2idx[int(ref_det, 2)]] = 1
+        self.ref_coeffs[ci_info.det2idx[int(det_interleaved_to_blocked(ref_det), 2)]] = 1
         self.ci_coeffs = propagate_state(["U"], self.ref_coeffs, *self.index_info_extended)
         idx_shift = len(self.q_ops)
         print("Gs", len(self.G_ops))
@@ -290,16 +293,19 @@ class LinearResponse(LinearResponseBaseClass):
             mux,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
         muy_op = one_elec_op_0i_0a(
             muy,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
         muz_op = one_elec_op_0i_0a(
             muz,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
         Udmuxd_ket = propagate_state(["Ud", mux_op.dagger], self.ci_coeffs, *self.index_info_extended)
         Udmuyd_ket = propagate_state(["Ud", muy_op.dagger], self.ci_coeffs, *self.index_info_extended)

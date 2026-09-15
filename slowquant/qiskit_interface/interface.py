@@ -31,13 +31,13 @@ from slowquant.qiskit_interface.util import (
     get_bitstring_sign,
     get_determinant_reference,
     get_determinant_superposition_reference,
-    get_reordering_sign,
     layout_conserving_compose,
     pauliop_to_dict,
     postselection,
     to_CBS_measurement,
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
+from slowquant.unitary_coupled_cluster.spin_ordering import det_interleaved_to_blocked
 from slowquant.unitary_coupled_cluster.util import UpsStructure
 
 
@@ -170,7 +170,11 @@ class QuantumInterface:
                 self.ansatz.num_qubits
             )  # empty state as custom circuit is passed
         elif ref_det is not None:
-            self.state_circuit = get_determinant_reference(ref_det, self.num_orbs, self.mapper)
+            # The reference determinant is given in the human readable interleaved ordering,
+            # the qubits follow the blocked one.
+            self.state_circuit = get_determinant_reference(
+                det_interleaved_to_blocked(ref_det), self.num_orbs, self.mapper
+            )
         else:
             self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
         self.num_qubits = self.state_circuit.num_qubits
@@ -631,7 +635,7 @@ class QuantumInterface:
         Returns:
             Qubit representation of operator.
         """
-        mapped_op = self.mapper.map(FermionicOp(op.get_qiskit_form(self.num_orbs), self.num_spin_orbs))
+        mapped_op = self.mapper.map(FermionicOp(op.get_qiskit_form(), self.num_spin_orbs))
         if not isinstance(mapped_op, SparsePauliOp):
             raise TypeError(f"The qubit form of the operator is not SparsePauliOp got, {type(mapped_op)}")
         return mapped_op
@@ -786,14 +790,12 @@ class QuantumInterface:
             connection_order = np.arange(self.num_qubits)
         val = 0.0
 
-        # Create list of all combinations with their weight consisting of coefficient and reordering sign
+        # Create list of all combinations with their weight. The determinants are already in the
+        # blocked ordering, so no reordering sign is needed.
         all_combinations = [
             (
                 tuple(sorted((bra_csf[1][i], ket_csf[1][j]), reverse=reverse_csfs_order)),
-                bra_csf[0][i]
-                * ket_csf[0][j]
-                * get_reordering_sign(bra_csf[1][i])
-                * get_reordering_sign(ket_csf[1][j]),
+                bra_csf[0][i] * ket_csf[0][j],
             )
             for i, j in itertools.product(range(len(bra_csf[1])), range(len(ket_csf[1])))
         ]

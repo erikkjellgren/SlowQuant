@@ -1,3 +1,11 @@
+r"""Fermionic operator constructors.
+
+Spin-orbital indices follow the alpha/beta-blocked ordering defined in spin_ordering, so
+they only mean something together with the number of spatial orbitals of the space they
+live in. That is why the constructors taking spatial indices also take that count: pass
+num_orbs for a full-space operator and num_active_orbs for an active-space one.
+"""
+
 import numpy as np
 
 from slowquant.unitary_coupled_cluster.fermionic_operator import (
@@ -6,22 +14,27 @@ from slowquant.unitary_coupled_cluster.fermionic_operator import (
 )
 
 
-def a_op(spinless_idx: int, spin: str, dagger: bool) -> FermionicOperator:
+def a_op(spinless_idx: int, spin: str, dagger: bool, num_orbs: int) -> FermionicOperator:
     """Construct annihilation/creation operator.
 
     Args:
         spinless_idx: Spatial orbital index.
         spin: Alpha or beta spin.
         dagger: If creation operator.
+        num_orbs: Number of spatial orbitals in the space the index lives in.
 
     Returns:
         Annihilation/creation operator.
     """
-    if spin not in ("alpha", "beta"):
+    # Hot path, called once per term when building a Hamiltonian, so the blocked index is
+    # written out rather than taken from spin_ordering.spin_orb_idx. The two are pinned to each
+    # other by tests/test_spin_ordering.py.
+    if spin == "alpha":
+        idx = spinless_idx
+    elif spin == "beta":
+        idx = spinless_idx + num_orbs
+    else:
         raise ValueError(f'spin must be "alpha" or "beta" got {spin}')
-    idx = 2 * spinless_idx
-    if spin == "beta":
-        idx += 1
     if dagger:
         return FermionicOperator({((idx,), ()): 1})
     return FermionicOperator({((), (idx,)): 1})
@@ -42,7 +55,7 @@ def a_op_spin(spin_idx: int, dagger: bool) -> FermionicOperator:
     return FermionicOperator({((), (spin_idx,)): 1})
 
 
-def Epq(p: int, q: int) -> FermionicOperator:
+def Epq(p: int, q: int, num_orbs: int) -> FermionicOperator:
     r"""Construct the singlet one-electron excitation operator.
 
     .. math::
@@ -51,19 +64,20 @@ def Epq(p: int, q: int) -> FermionicOperator:
     Args:
         p: Spatial orbital index.
         q: Spatial orbital index.
+        num_orbs: Number of spatial orbitals in the space the index lives in.
 
     Returns:
         Singlet one-electron excitation operator.
     """
-    E = a_op(p, "alpha", dagger=True)
-    E *= a_op(q, "alpha", dagger=False)
-    tmp = a_op(p, "beta", dagger=True)
-    tmp *= a_op(q, "beta", dagger=False)
+    E = a_op(p, "alpha", dagger=True, num_orbs=num_orbs)
+    E *= a_op(q, "alpha", dagger=False, num_orbs=num_orbs)
+    tmp = a_op(p, "beta", dagger=True, num_orbs=num_orbs)
+    tmp *= a_op(q, "beta", dagger=False, num_orbs=num_orbs)
     E += tmp
     return E
 
 
-def epqrs(p: int, q: int, r: int, s: int) -> FermionicOperator:
+def epqrs(p: int, q: int, r: int, s: int, num_orbs: int) -> FermionicOperator:
     r"""Construct the singlet two-electron excitation operator.
 
     .. math::
@@ -74,18 +88,19 @@ def epqrs(p: int, q: int, r: int, s: int) -> FermionicOperator:
         q: Spatial orbital index.
         r: Spatial orbital index.
         s: Spatial orbital index.
+        num_orbs: Number of spatial orbitals in the space the index lives in.
 
     Returns:
         Singlet two-electron excitation operator.
     """
-    op = Epq(p, q)
-    op *= Epq(r, s)
+    op = Epq(p, q, num_orbs)
+    op *= Epq(r, s, num_orbs)
     if q == r:
-        op -= Epq(p, s)
+        op -= Epq(p, s, num_orbs)
     return op
 
 
-def Eminuspq(p: int, q: int) -> FermionicOperator:
+def Eminuspq(p: int, q: int, num_orbs: int) -> FermionicOperator:
     r"""Construct Hermitian singlet one-electron excitation operator.
 
     .. math::
@@ -94,12 +109,13 @@ def Eminuspq(p: int, q: int) -> FermionicOperator:
     Args:
         p: Spatial orbital index.
         q: Spatial orbital index.
+        num_orbs: Number of spatial orbitals in the space the index lives in.
 
     Returns:
         Singlet one-electron excitation operator.
     """
-    op = Epq(p, q)
-    op -= Epq(q, p)
+    op = Epq(p, q, num_orbs)
+    op -= Epq(q, p, num_orbs)
     return op
 
 
@@ -364,7 +380,7 @@ def G6(
     return op
 
 
-def G1_sa(i: int, a: int, return_anti_hermitian: bool = False) -> FermionicOperator:
+def G1_sa(i: int, a: int, return_anti_hermitian: bool = False, *, num_orbs: int) -> FermionicOperator:
     r"""Construct singlet one-electron spin-adapted excitation operator.
 
     .. math::
@@ -374,18 +390,19 @@ def G1_sa(i: int, a: int, return_anti_hermitian: bool = False) -> FermionicOpera
         i: Spatial orbital index.
         a: Spatial orbital index.
         return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger.
+        num_orbs: Number of spatial orbitals in the space the index lives in.
 
     Returns:
         Singlet one-electron spin-adapted excitation operator.
     """
-    op = 2 ** (-1 / 2) * Epq(a, i)
+    op = 2 ** (-1 / 2) * Epq(a, i, num_orbs)
     if return_anti_hermitian:
         op -= op.dagger
     return op
 
 
 def G2_sa(
-    i: int, j: int, a: int, b: int, case: int, return_anti_hermitian: bool = False
+    i: int, j: int, a: int, b: int, case: int, return_anti_hermitian: bool = False, *, num_orbs: int
 ) -> FermionicOperator:
     r"""Construct singlet two-electron spin-adapted excitation operator.
 
@@ -428,6 +445,7 @@ def G2_sa(
         b: Spatial orbital index.
         case: Case identifier for the operator.
         return_anti_hermitian: Return anti-Hermitian version of operator, i.e. op - op^\dagger.
+        num_orbs: Number of spatial orbitals in the space the index lives in.
 
     Returns:
         Singlet two-electron spin-adapted excitation operator.
@@ -438,9 +456,18 @@ def G2_sa(
             fac *= 2
         if i == j:
             fac *= 2
-        op = 1 / 2 * (fac) ** (-1 / 2) * (Epq(a, i) * Epq(b, j) + Epq(a, j) * Epq(b, i))
+        op = (
+            1
+            / 2
+            * (fac) ** (-1 / 2)
+            * (Epq(a, i, num_orbs) * Epq(b, j, num_orbs) + Epq(a, j, num_orbs) * Epq(b, i, num_orbs))
+        )
     elif case == 5:
-        op = 1 / (2 * 3 ** (1 / 2)) * (Epq(a, i) * Epq(b, j) - Epq(a, j) * Epq(b, i))
+        op = (
+            1
+            / (2 * 3 ** (1 / 2))
+            * (Epq(a, i, num_orbs) * Epq(b, j, num_orbs) - Epq(a, j, num_orbs) * Epq(b, i, num_orbs))
+        )
     else:
         raise ValueError("Got unknown case for spin-adapted doubles, {case}")
     if return_anti_hermitian:
@@ -467,14 +494,14 @@ def hamiltonian_full_space(h_mo: np.ndarray, g_mo: np.ndarray, num_orbs: int) ->
         for q in range(num_orbs):
             if abs(h_mo[p, q]) < 10**-14:
                 continue
-            H_operator += h_mo[p, q] * Epq(p, q)
+            H_operator += h_mo[p, q] * Epq(p, q, num_orbs)
     for p in range(num_orbs):
         for q in range(num_orbs):
             for r in range(num_orbs):
                 for s in range(num_orbs):
                     if abs(g_mo[p, q, r, s]) < 10**-14:
                         continue
-                    H_operator += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s)
+                    H_operator += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s, num_orbs)
     return H_operator
 
 
@@ -483,6 +510,7 @@ def hamiltonian_0i_0a(
     g_mo: np.ndarray,
     num_inactive_orbs: int,
     num_active_orbs: int,
+    num_virtual_orbs: int,
 ) -> FermionicOperator:
     """Get energy Hamiltonian operator.
 
@@ -491,46 +519,48 @@ def hamiltonian_0i_0a(
         g_mo: Two-electron Hamiltonian integrals in MO.
         num_inactive_orbs: Number of inactive orbitals in spatial basis.
         num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
 
     Returns:
         Energy Hamiltonian fermionic operator.
     """
+    num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
     hamiltonian_operator = FermionicOperator({})
     # Inactive one-electron
     for i in range(num_inactive_orbs):
         if abs(h_mo[i, i]) > 10**-14:
-            hamiltonian_operator += h_mo[i, i] * Epq(i, i)
+            hamiltonian_operator += h_mo[i, i] * Epq(i, i, num_orbs)
     # Active one-electron
     for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
         for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
             if abs(h_mo[p, q]) > 10**-14:
-                hamiltonian_operator += h_mo[p, q] * Epq(p, q)
+                hamiltonian_operator += h_mo[p, q] * Epq(p, q, num_orbs)
     # Inactive two-electron
     for i in range(num_inactive_orbs):
         for j in range(num_inactive_orbs):
             if abs(g_mo[i, i, j, j]) > 10**-14:
-                hamiltonian_operator += 1 / 2 * g_mo[i, i, j, j] * epqrs(i, i, j, j)
+                hamiltonian_operator += 1 / 2 * g_mo[i, i, j, j] * epqrs(i, i, j, j, num_orbs)
             if i != j and abs(g_mo[j, i, i, j]) > 10**-14:
-                hamiltonian_operator += 1 / 2 * g_mo[j, i, i, j] * epqrs(j, i, i, j)
+                hamiltonian_operator += 1 / 2 * g_mo[j, i, i, j] * epqrs(j, i, i, j, num_orbs)
     # Inactive-Active two-electron
     for i in range(num_inactive_orbs):
         for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
             for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
                 if abs(g_mo[i, i, p, q]) > 10**-14:
-                    hamiltonian_operator += 1 / 2 * g_mo[i, i, p, q] * epqrs(i, i, p, q)
+                    hamiltonian_operator += 1 / 2 * g_mo[i, i, p, q] * epqrs(i, i, p, q, num_orbs)
                 if abs(g_mo[p, q, i, i]) > 10**-14:
-                    hamiltonian_operator += 1 / 2 * g_mo[p, q, i, i] * epqrs(p, q, i, i)
+                    hamiltonian_operator += 1 / 2 * g_mo[p, q, i, i] * epqrs(p, q, i, i, num_orbs)
                 if abs(g_mo[p, i, i, q]) > 10**-14:
-                    hamiltonian_operator += 1 / 2 * g_mo[p, i, i, q] * epqrs(p, i, i, q)
+                    hamiltonian_operator += 1 / 2 * g_mo[p, i, i, q] * epqrs(p, i, i, q, num_orbs)
                 if abs(g_mo[i, p, q, i]) > 10**-14:
-                    hamiltonian_operator += 1 / 2 * g_mo[i, p, q, i] * epqrs(i, p, q, i)
+                    hamiltonian_operator += 1 / 2 * g_mo[i, p, q, i] * epqrs(i, p, q, i, num_orbs)
     # Active two-electron
     for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
         for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
             for r in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
                 for s in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
                     if abs(g_mo[p, q, r, s]) > 10**-14:
-                        hamiltonian_operator += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s)
+                        hamiltonian_operator += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s, num_orbs)
     return hamiltonian_operator
 
 
@@ -563,7 +593,7 @@ def hamiltonian_1i_1a(
             if p < num_inactive_orbs and q < num_inactive_orbs and p != q:
                 continue
             if abs(h_mo[p, q]) > 10**-14:
-                hamiltonian_operator += h_mo[p, q] * Epq(p, q)
+                hamiltonian_operator += h_mo[p, q] * Epq(p, q, num_orbs)
     for p in range(num_orbs):
         for q in range(num_orbs):
             for r in range(num_orbs):
@@ -599,7 +629,7 @@ def hamiltonian_1i_1a(
                     if num_act > 1:
                         continue
                     if abs(g_mo[p, q, r, s]) > 10**-14:
-                        hamiltonian_operator += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s)
+                        hamiltonian_operator += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s, num_orbs)
     return hamiltonian_operator
 
 
@@ -628,7 +658,7 @@ def hamiltonian_2i_2a(
     for p in range(num_orbs):
         for q in range(num_orbs):
             if abs(h_mo[p, q]) > 10**-14:
-                hamiltonian_operator += h_mo[p, q] * Epq(p, q)
+                hamiltonian_operator += h_mo[p, q] * Epq(p, q, num_orbs)
     for p in range(num_orbs):
         for q in range(num_orbs):
             for r in range(num_orbs):
@@ -664,7 +694,7 @@ def hamiltonian_2i_2a(
                     if num_act > 2:
                         continue
                     if abs(g_mo[p, q, r, s]) > 10**-14:
-                        hamiltonian_operator += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s)
+                        hamiltonian_operator += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s, num_orbs)
     return hamiltonian_operator
 
 
@@ -685,31 +715,35 @@ def one_elec_op_full_space(ints_mo: np.ndarray, num_orbs: int) -> FermionicOpera
     for p in range(num_orbs):
         for q in range(num_orbs):
             if abs(ints_mo[p, q]) > 10**-14:
-                one_elec_op += ints_mo[p, q] * Epq(p, q)
+                one_elec_op += ints_mo[p, q] * Epq(p, q, num_orbs)
     return one_elec_op
 
 
-def one_elec_op_0i_0a(ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int) -> FermionicOperator:
+def one_elec_op_0i_0a(
+    ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int
+) -> FermionicOperator:
     """Create one-electron operator that makes no changes in the inactive and virtual orbitals.
 
     Args:
         ints_mo: One-electron integrals for operator in MO basis.
         num_inactive_orbs: Number of inactive orbitals in spatial basis.
         num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
 
     Returns:
         One-electron operator for active-space.
     """
+    num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
     one_elec_op = FermionicOperator({})
     # Inactive one-electron
     for i in range(num_inactive_orbs):
         if abs(ints_mo[i, i]) > 10**-14:
-            one_elec_op += ints_mo[i, i] * Epq(i, i)
+            one_elec_op += ints_mo[i, i] * Epq(i, i, num_orbs)
     # Active one-electron
     for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
         for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
             if abs(ints_mo[p, q]) > 10**-14:
-                one_elec_op += ints_mo[p, q] * Epq(p, q)
+                one_elec_op += ints_mo[p, q] * Epq(p, q, num_orbs)
     return one_elec_op
 
 
@@ -737,5 +771,5 @@ def one_elec_op_1i_1a(
             if p < num_inactive_orbs and q < num_inactive_orbs and p != q:
                 continue
             if abs(ints_mo[p, q]) > 10**-14:
-                one_elec_op += ints_mo[p, q] * Epq(p, q)
+                one_elec_op += ints_mo[p, q] * Epq(p, q, num_orbs)
     return one_elec_op

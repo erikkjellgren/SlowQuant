@@ -1,6 +1,13 @@
 from collections.abc import Generator, Sequence
 from typing import Any
 
+from slowquant.unitary_coupled_cluster.spin_ordering import (
+    alpha_idx,
+    beta_idx,
+    is_alpha,
+    spatial_idx,
+)
+
 
 def iterate_t1_sa(
     active_occ_idx: Sequence[int],
@@ -113,12 +120,14 @@ def iterate_t2_sa_generalized(
 def iterate_t1(
     active_occ_spin_idx: Sequence[int],
     active_unocc_spin_idx: Sequence[int],
+    num_orbs: int,
 ) -> Generator[tuple[int, int], None, None]:
     """Iterate over T1 spin-conserving operators.
 
     Args:
         active_occ_spin_idx: Spin indices of strongly occupied orbitals.
         active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
+        num_orbs: Number of spatial orbitals in the space the indices live in.
 
     Returns:
         T1 operator iteration.
@@ -127,11 +136,11 @@ def iterate_t1(
         for i in active_occ_spin_idx:
             num_alpha = 0
             num_beta = 0
-            if a % 2 == 0:
+            if a < num_orbs:
                 num_alpha += 1
             else:
                 num_beta += 1
-            if i % 2 == 0:
+            if i < num_orbs:
                 num_alpha -= 1
             else:
                 num_beta -= 1
@@ -151,15 +160,16 @@ def iterate_t1_generalized(
     Returns:
         T1 operator iteration.
     """
+    num_orbs = num_spin_orbs // 2
     for i in range(num_spin_orbs):
         for a in range(i + 1, num_spin_orbs):
             num_alpha = 0
             num_beta = 0
-            if a % 2 == 0:
+            if a < num_orbs:
                 num_alpha += 1
             else:
                 num_beta += 1
-            if i % 2 == 0:
+            if i < num_orbs:
                 num_alpha -= 1
             else:
                 num_beta -= 1
@@ -171,12 +181,14 @@ def iterate_t1_generalized(
 def iterate_t2(
     active_occ_spin_idx: Sequence[int],
     active_unocc_spin_idx: Sequence[int],
+    num_orbs: int,
 ) -> Generator[tuple[int, int, int, int], None, None]:
     """Iterate over T2 spin-conserving operators.
 
     Args:
         active_occ_spin_idx: Spin indices of strongly occupied orbitals.
         active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
+        num_orbs: Number of spatial orbitals in the space the indices live in.
 
     Returns:
         T2 operator iteration.
@@ -187,19 +199,19 @@ def iterate_t2(
                 for j in active_occ_spin_idx[idx_i + 1 :]:
                     num_alpha = 0
                     num_beta = 0
-                    if a % 2 == 0:
+                    if a < num_orbs:
                         num_alpha += 1
                     else:
                         num_beta += 1
-                    if b % 2 == 0:
+                    if b < num_orbs:
                         num_alpha += 1
                     else:
                         num_beta += 1
-                    if i % 2 == 0:
+                    if i < num_orbs:
                         num_alpha -= 1
                     else:
                         num_beta -= 1
-                    if j % 2 == 0:
+                    if j < num_orbs:
                         num_alpha -= 1
                     else:
                         num_beta -= 1
@@ -219,25 +231,26 @@ def iterate_t2_generalized(
     Returns:
         T2 operator iteration.
     """
+    num_orbs = num_spin_orbs // 2
     for i in range(num_spin_orbs):
         for j in range(i, num_spin_orbs):
             for a in range(max(i, j) + 1, num_spin_orbs):
                 for b in range(a, num_spin_orbs):
                     num_alpha = 0
                     num_beta = 0
-                    if a % 2 == 0:
+                    if a < num_orbs:
                         num_alpha += 1
                     else:
                         num_beta += 1
-                    if b % 2 == 0:
+                    if b < num_orbs:
                         num_alpha += 1
                     else:
                         num_beta += 1
-                    if i % 2 == 0:
+                    if i < num_orbs:
                         num_alpha -= 1
                     else:
                         num_beta -= 1
-                    if j % 2 == 0:
+                    if j < num_orbs:
                         num_alpha -= 1
                     else:
                         num_beta -= 1
@@ -249,12 +262,14 @@ def iterate_t2_generalized(
 def iterate_t3(
     active_occ_spin_idx: Sequence[int],
     active_unocc_spin_idx: Sequence[int],
+    num_orbs: int,
 ) -> Generator[tuple[int, int, int, int, int, int], None, None]:
     """Iterate over T3 spin-conserving operators.
 
     Args:
         active_occ_spin_idx: Spin indices of strongly occupied orbitals.
         active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
+        num_orbs: Number of spatial orbitals in the space the indices live in.
 
     Returns:
         T3 operator iteration.
@@ -267,27 +282,27 @@ def iterate_t3(
                         for k in active_occ_spin_idx[idx_j + 1 :]:
                             num_alpha = 0
                             num_beta = 0
-                            if a % 2 == 0:
+                            if a < num_orbs:
                                 num_alpha += 1
                             else:
                                 num_beta += 1
-                            if b % 2 == 0:
+                            if b < num_orbs:
                                 num_alpha += 1
                             else:
                                 num_beta += 1
-                            if c % 2 == 0:
+                            if c < num_orbs:
                                 num_alpha += 1
                             else:
                                 num_beta += 1
-                            if i % 2 == 0:
+                            if i < num_orbs:
                                 num_alpha -= 1
                             else:
                                 num_beta -= 1
-                            if j % 2 == 0:
+                            if j < num_orbs:
                                 num_alpha -= 1
                             else:
                                 num_beta -= 1
-                            if k % 2 == 0:
+                            if k < num_orbs:
                                 num_alpha -= 1
                             else:
                                 num_beta -= 1
@@ -299,12 +314,14 @@ def iterate_t3(
 def iterate_t4(
     active_occ_spin_idx: Sequence[int],
     active_unocc_spin_idx: Sequence[int],
+    num_orbs: int,
 ) -> Generator[tuple[int, int, int, int, int, int, int, int], None, None]:
     """Iterate over T4 spin-conserving operators.
 
     Args:
         active_occ_spin_idx: Spin indices of strongly occupied orbitals.
         active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
+        num_orbs: Number of spatial orbitals in the space the indices live in.
 
     Returns:
         T4 operator iteration.
@@ -319,35 +336,35 @@ def iterate_t4(
                                 for l in active_occ_spin_idx[idx_k + 1 :]:
                                     num_alpha = 0
                                     num_beta = 0
-                                    if a % 2 == 0:
+                                    if a < num_orbs:
                                         num_alpha += 1
                                     else:
                                         num_beta += 1
-                                    if b % 2 == 0:
+                                    if b < num_orbs:
                                         num_alpha += 1
                                     else:
                                         num_beta += 1
-                                    if c % 2 == 0:
+                                    if c < num_orbs:
                                         num_alpha += 1
                                     else:
                                         num_beta += 1
-                                    if d % 2 == 0:
+                                    if d < num_orbs:
                                         num_alpha += 1
                                     else:
                                         num_beta += 1
-                                    if i % 2 == 0:
+                                    if i < num_orbs:
                                         num_alpha -= 1
                                     else:
                                         num_beta -= 1
-                                    if j % 2 == 0:
+                                    if j < num_orbs:
                                         num_alpha -= 1
                                     else:
                                         num_beta -= 1
-                                    if k % 2 == 0:
+                                    if k < num_orbs:
                                         num_alpha -= 1
                                     else:
                                         num_beta -= 1
-                                    if l % 2 == 0:
+                                    if l < num_orbs:
                                         num_alpha -= 1
                                     else:
                                         num_beta -= 1
@@ -359,12 +376,14 @@ def iterate_t4(
 def iterate_t5(
     active_occ_spin_idx: Sequence[int],
     active_unocc_spin_idx: Sequence[int],
+    num_orbs: int,
 ) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int], None, None]:
     """Iterate over T5 spin-conserving operators.
 
     Args:
         active_occ_spin_idx: Spin indices of strongly occupied orbitals.
         active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
+        num_orbs: Number of spatial orbitals in the space the indices live in.
 
     Returns:
         T5 operator iteration.
@@ -381,43 +400,43 @@ def iterate_t5(
                                         for m in active_occ_spin_idx[idx_l + 1 :]:
                                             num_alpha = 0
                                             num_beta = 0
-                                            if a % 2 == 0:
+                                            if a < num_orbs:
                                                 num_alpha += 1
                                             else:
                                                 num_beta += 1
-                                            if b % 2 == 0:
+                                            if b < num_orbs:
                                                 num_alpha += 1
                                             else:
                                                 num_beta += 1
-                                            if c % 2 == 0:
+                                            if c < num_orbs:
                                                 num_alpha += 1
                                             else:
                                                 num_beta += 1
-                                            if d % 2 == 0:
+                                            if d < num_orbs:
                                                 num_alpha += 1
                                             else:
                                                 num_beta += 1
-                                            if e % 2 == 0:
+                                            if e < num_orbs:
                                                 num_alpha += 1
                                             else:
                                                 num_beta += 1
-                                            if i % 2 == 0:
+                                            if i < num_orbs:
                                                 num_alpha -= 1
                                             else:
                                                 num_beta -= 1
-                                            if j % 2 == 0:
+                                            if j < num_orbs:
                                                 num_alpha -= 1
                                             else:
                                                 num_beta -= 1
-                                            if k % 2 == 0:
+                                            if k < num_orbs:
                                                 num_alpha -= 1
                                             else:
                                                 num_beta -= 1
-                                            if l % 2 == 0:
+                                            if l < num_orbs:
                                                 num_alpha -= 1
                                             else:
                                                 num_beta -= 1
-                                            if m % 2 == 0:
+                                            if m < num_orbs:
                                                 num_alpha -= 1
                                             else:
                                                 num_beta -= 1
@@ -429,12 +448,14 @@ def iterate_t5(
 def iterate_t6(
     active_occ_spin_idx: Sequence[int],
     active_unocc_spin_idx: Sequence[int],
+    num_orbs: int,
 ) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int, int, int], None, None]:
     """Iterate over T6 spin-conserving operators.
 
     Args:
         active_occ_spin_idx: Spin indices of strongly occupied orbitals.
         active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
+        num_orbs: Number of spatial orbitals in the space the indices live in.
 
     Returns:
         T6 operator iteration.
@@ -457,51 +478,51 @@ def iterate_t6(
                                                 for n in active_occ_spin_idx[idx_m + 1 :]:
                                                     num_alpha = 0
                                                     num_beta = 0
-                                                    if a % 2 == 0:
+                                                    if a < num_orbs:
                                                         num_alpha += 1
                                                     else:
                                                         num_beta += 1
-                                                    if b % 2 == 0:
+                                                    if b < num_orbs:
                                                         num_alpha += 1
                                                     else:
                                                         num_beta += 1
-                                                    if c % 2 == 0:
+                                                    if c < num_orbs:
                                                         num_alpha += 1
                                                     else:
                                                         num_beta += 1
-                                                    if d % 2 == 0:
+                                                    if d < num_orbs:
                                                         num_alpha += 1
                                                     else:
                                                         num_beta += 1
-                                                    if e % 2 == 0:
+                                                    if e < num_orbs:
                                                         num_alpha += 1
                                                     else:
                                                         num_beta += 1
-                                                    if f % 2 == 0:
+                                                    if f < num_orbs:
                                                         num_alpha += 1
                                                     else:
                                                         num_beta += 1
-                                                    if i % 2 == 0:
+                                                    if i < num_orbs:
                                                         num_alpha -= 1
                                                     else:
                                                         num_beta -= 1
-                                                    if j % 2 == 0:
+                                                    if j < num_orbs:
                                                         num_alpha -= 1
                                                     else:
                                                         num_beta -= 1
-                                                    if k % 2 == 0:
+                                                    if k < num_orbs:
                                                         num_alpha -= 1
                                                     else:
                                                         num_beta -= 1
-                                                    if l % 2 == 0:
+                                                    if l < num_orbs:
                                                         num_alpha -= 1
                                                     else:
                                                         num_beta -= 1
-                                                    if m % 2 == 0:
+                                                    if m < num_orbs:
                                                         num_alpha -= 1
                                                     else:
                                                         num_beta -= 1
-                                                    if n % 2 == 0:
+                                                    if n < num_orbs:
                                                         num_alpha -= 1
                                                     else:
                                                         num_beta -= 1
@@ -513,19 +534,26 @@ def iterate_t6(
 def iterate_pair_t2(
     active_occ_idx: Sequence[int],
     active_unocc_idx: Sequence[int],
+    num_orbs: int,
 ) -> Generator[tuple[int, int, int, int], None, None]:
     """Iterate over pair T2 operators.
 
     Args:
         active_occ_idx: Indices of strongly occupied orbitals.
         active_unocc_idx: Indices of weakly occupied orbitals.
+        num_orbs: Number of spatial orbitals in the space the indices live in.
 
     Returns:
         Pair T2 operator iteration.
     """
     for i in active_occ_idx:
         for a in active_unocc_idx:
-            yield 2 * a, 2 * i, 2 * a + 1, 2 * i + 1
+            yield (
+                alpha_idx(a, num_orbs),
+                alpha_idx(i, num_orbs),
+                beta_idx(a, num_orbs),
+                beta_idx(i, num_orbs),
+            )
 
 
 def iterate_pair_t2_generalized(
@@ -541,17 +569,24 @@ def iterate_pair_t2_generalized(
     """
     for i in range(num_orbs):
         for a in range(i + 1, num_orbs):
-            yield 2 * a, 2 * i, 2 * a + 1, 2 * i + 1
+            yield (
+                alpha_idx(a, num_orbs),
+                alpha_idx(i, num_orbs),
+                beta_idx(a, num_orbs),
+                beta_idx(i, num_orbs),
+            )
 
 
 class UccStructure:
-    __slots__ = ("excitation_indices", "excitation_operator_type", "n_params")
+    __slots__ = ("excitation_indices", "excitation_operator_type", "n_params", "num_active_orbs")
 
     def __init__(self) -> None:
         """Intialize the unitary coupled cluster ansatz structure."""
         self.excitation_indices: list[tuple[int, ...]] = []
         self.excitation_operator_type: list[str] = []
         self.n_params = 0
+        # Set by the builder, the excitation indices are only meaningful with it.
+        self.num_active_orbs: int = 0
 
     def add_excitations(
         self,
@@ -573,6 +608,7 @@ class UccStructure:
             num_orbs: Number of spatial orbitals.
         """
         excitations = [x.lower() for x in excitations]
+        self.num_active_orbs = num_orbs
         valid_excitations = (
             "s",
             "gs",
@@ -595,7 +631,7 @@ class UccStructure:
                     f"Got unknown excitation, {excitation}. Valid excitations are: {valid_excitations}"
                 )
         if "s" in excitations:
-            for a, i in iterate_t1(occ_spin_idx, unocc_spin_idx):
+            for a, i in iterate_t1(occ_spin_idx, unocc_spin_idx, num_orbs):
                 self.excitation_operator_type.append("single")
                 self.excitation_indices.append((i, a))
                 self.n_params += 1
@@ -615,7 +651,7 @@ class UccStructure:
                 self.excitation_indices.append((i, a))
                 self.n_params += 1
         if "d" in excitations:
-            for a, i, b, j in iterate_t2(occ_spin_idx, unocc_spin_idx):
+            for a, i, b, j in iterate_t2(occ_spin_idx, unocc_spin_idx, num_orbs):
                 self.excitation_operator_type.append("double")
                 self.excitation_indices.append((i, j, a, b))
                 self.n_params += 1
@@ -625,7 +661,7 @@ class UccStructure:
                 self.excitation_indices.append((i, j, a, b))
                 self.n_params += 1
         if "pd" in excitations:
-            for a, i, b, j in iterate_pair_t2(occ_idx, unocc_idx):
+            for a, i, b, j in iterate_pair_t2(occ_idx, unocc_idx, num_orbs):
                 self.excitation_operator_type.append("double")
                 self.excitation_indices.append((i, j, a, b))
                 self.n_params += 1
@@ -635,22 +671,22 @@ class UccStructure:
                 self.excitation_indices.append((i, j, a, b))
                 self.n_params += 1
         if "t" in excitations:
-            for a, i, b, j, c, k in iterate_t3(occ_spin_idx, unocc_spin_idx):
+            for a, i, b, j, c, k in iterate_t3(occ_spin_idx, unocc_spin_idx, num_orbs):
                 self.excitation_operator_type.append("triple")
                 self.excitation_indices.append((i, j, k, a, b, c))
                 self.n_params += 1
         if "q" in excitations:
-            for a, i, b, j, c, k, d, l in iterate_t4(occ_spin_idx, unocc_spin_idx):
+            for a, i, b, j, c, k, d, l in iterate_t4(occ_spin_idx, unocc_spin_idx, num_orbs):
                 self.excitation_operator_type.append("quadruple")
                 self.excitation_indices.append((i, j, k, l, a, b, c, d))
                 self.n_params += 1
         if "5" in excitations:
-            for a, i, b, j, c, k, d, l, e, m in iterate_t5(occ_spin_idx, unocc_spin_idx):
+            for a, i, b, j, c, k, d, l, e, m in iterate_t5(occ_spin_idx, unocc_spin_idx, num_orbs):
                 self.excitation_operator_type.append("quintuple")
                 self.excitation_indices.append((i, j, k, l, m, a, b, c, d, e))
                 self.n_params += 1
         if "6" in excitations:
-            for a, i, b, j, c, k, d, l, e, m, f, n in iterate_t6(occ_spin_idx, unocc_spin_idx):
+            for a, i, b, j, c, k, d, l, e, m, f, n in iterate_t6(occ_spin_idx, unocc_spin_idx, num_orbs):
                 self.excitation_operator_type.append("sextuple")
                 self.excitation_indices.append((i, j, k, l, m, n, a, b, c, d, e, f))
                 self.n_params += 1
@@ -667,13 +703,22 @@ class UccStructure:
 
 
 class UpsStructure:
-    __slots__ = ("excitation_indices", "excitation_operator_type", "grad_param_R", "n_params", "param_names")
+    __slots__ = (
+        "excitation_indices",
+        "excitation_operator_type",
+        "grad_param_R",
+        "n_params",
+        "num_active_orbs",
+        "param_names",
+    )
 
     def __init__(self) -> None:
         """Initialize the unitary product state ansatz structure."""
         self.excitation_indices: list[tuple[int, ...]] = []
         self.excitation_operator_type: list[str] = []
         self.n_params: int = 0
+        # Set by the builder, the excitation indices are only meaningful with it.
+        self.num_active_orbs: int = 0
         self.grad_param_R: dict[str, int] = {}
         self.param_names: list[str] = []
 
@@ -699,6 +744,7 @@ class UpsStructure:
         Returns:
             tUPS ansatz.
         """
+        self.num_active_orbs = num_active_orbs
         # Options
         valid_options = ("n_layers", "do_qnp", "skip_last_singles", "do_tups")
         for option in ansatz_options:
@@ -734,7 +780,14 @@ class UpsStructure:
                     self.n_params += 1
                 # Double
                 self.excitation_operator_type.append("double")
-                self.excitation_indices.append((2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3))
+                self.excitation_indices.append(
+                    (
+                        alpha_idx(p, num_active_orbs),
+                        beta_idx(p, num_active_orbs),
+                        alpha_idx(p + 1, num_active_orbs),
+                        beta_idx(p + 1, num_active_orbs),
+                    )
+                )
                 self.grad_param_R[f"p{self.n_params:09d}"] = 2
                 self.param_names.append(f"p{self.n_params:09d}")
                 self.n_params += 1
@@ -761,7 +814,14 @@ class UpsStructure:
                     self.n_params += 1
                 # Double
                 self.excitation_operator_type.append("double")
-                self.excitation_indices.append((2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3))
+                self.excitation_indices.append(
+                    (
+                        alpha_idx(p, num_active_orbs),
+                        beta_idx(p, num_active_orbs),
+                        alpha_idx(p + 1, num_active_orbs),
+                        beta_idx(p + 1, num_active_orbs),
+                    )
+                )
                 self.grad_param_R[f"p{self.n_params:09d}"] = 2
                 self.param_names.append(f"p{self.n_params:09d}")
                 self.n_params += 1
@@ -815,6 +875,7 @@ class UpsStructure:
         Returns:
             Factorized UCC ansatz.
         """
+        self.num_active_orbs = num_orbs
         # Options
         valid_options = ("n_layers", "excitations")
         for option in ansatz_options:
@@ -850,7 +911,7 @@ class UpsStructure:
         # Layer loop
         for _ in range(n_layers):
             if "s" in excitations:
-                for a, i in iterate_t1(occ_spin_idx, unocc_spin_idx):
+                for a, i in iterate_t1(occ_spin_idx, unocc_spin_idx, num_orbs):
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((i, a))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
@@ -878,7 +939,7 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if "d" in excitations:
-                for a, i, b, j in iterate_t2(occ_spin_idx, unocc_spin_idx):
+                for a, i, b, j in iterate_t2(occ_spin_idx, unocc_spin_idx, num_orbs):
                     self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
@@ -892,7 +953,7 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if "pd" in excitations:
-                for a, i, b, j in iterate_pair_t2(occ_idx, unocc_idx):
+                for a, i, b, j in iterate_pair_t2(occ_idx, unocc_idx, num_orbs):
                     self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
@@ -906,28 +967,28 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if "t" in excitations:
-                for a, i, b, j, c, k in iterate_t3(occ_spin_idx, unocc_spin_idx):
+                for a, i, b, j, c, k in iterate_t3(occ_spin_idx, unocc_spin_idx, num_orbs):
                     self.excitation_operator_type.append("triple")
                     self.excitation_indices.append((i, j, k, a, b, c))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if "q" in excitations:
-                for a, i, b, j, c, k, d, l in iterate_t4(occ_spin_idx, unocc_spin_idx):
+                for a, i, b, j, c, k, d, l in iterate_t4(occ_spin_idx, unocc_spin_idx, num_orbs):
                     self.excitation_operator_type.append("quadruple")
                     self.excitation_indices.append((i, j, k, l, a, b, c, d))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if "5" in excitations:
-                for a, i, b, j, c, k, d, l, e, m in iterate_t5(occ_spin_idx, unocc_spin_idx):
+                for a, i, b, j, c, k, d, l, e, m in iterate_t5(occ_spin_idx, unocc_spin_idx, num_orbs):
                     self.excitation_operator_type.append("quintuple")
                     self.excitation_indices.append((i, j, k, l, m, a, b, c, d, e))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if "6" in excitations:
-                for a, i, b, j, c, k, d, l, e, m, f, n in iterate_t6(occ_spin_idx, unocc_spin_idx):
+                for a, i, b, j, c, k, d, l, e, m, f, n in iterate_t6(occ_spin_idx, unocc_spin_idx, num_orbs):
                     self.excitation_operator_type.append("sextuple")
                     self.excitation_indices.append((i, j, k, l, m, n, a, b, c, d, e, f))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
@@ -991,6 +1052,7 @@ class UpsStructure:
         Returns:
             SDS ordered fUCC ansatz.
         """
+        self.num_active_orbs = num_orbs
         # Options
         valid_options = ("n_layers", "excitations")
         for option in ansatz_options:
@@ -1014,8 +1076,8 @@ class UpsStructure:
         for _ in range(n_layers):
             # Kind of D excitation determines indices for complete SDS block
             if "d" in excitations:
-                for a, i, b, j in iterate_t2(occ_spin_idx, unocc_spin_idx):
-                    if i % 2 == a % 2:
+                for a, i, b, j in iterate_t2(occ_spin_idx, unocc_spin_idx, num_orbs):
+                    if is_alpha(i, num_orbs) == is_alpha(a, num_orbs):
                         self.excitation_indices.append((i, a))
                     else:
                         self.excitation_indices.append((i, b))
@@ -1028,7 +1090,7 @@ class UpsStructure:
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
-                    if i % 2 == a % 2:
+                    if is_alpha(i, num_orbs) == is_alpha(a, num_orbs):
                         self.excitation_indices.append((j, b))
                     else:
                         self.excitation_indices.append((j, a))
@@ -1037,9 +1099,9 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if "pd" in excitations:
-                for a, i, b, j in iterate_pair_t2(occ_idx, unocc_idx):
+                for a, i, b, j in iterate_pair_t2(occ_idx, unocc_idx, num_orbs):
                     self.excitation_operator_type.append("double")
-                    self.excitation_indices.append((i // 2, a // 2))
+                    self.excitation_indices.append((spatial_idx(i, num_orbs), spatial_idx(a, num_orbs)))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
@@ -1049,14 +1111,14 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
                     self.excitation_operator_type.append("sa_single")
-                    self.excitation_indices.append((i // 2, a // 2))
+                    self.excitation_indices.append((spatial_idx(i, num_orbs), spatial_idx(a, num_orbs)))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if "gpd" in excitations:
                 for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
                     self.excitation_operator_type.append("sa_single")
-                    self.excitation_indices.append((i // 2, a // 2))
+                    self.excitation_indices.append((spatial_idx(i, num_orbs), spatial_idx(a, num_orbs)))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
@@ -1066,7 +1128,7 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
                     self.excitation_operator_type.append("sa_single")
-                    self.excitation_indices.append((i // 2, a // 2))
+                    self.excitation_indices.append((spatial_idx(i, num_orbs), spatial_idx(a, num_orbs)))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1

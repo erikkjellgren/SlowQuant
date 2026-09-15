@@ -40,7 +40,9 @@ class quantumLRBaseClass:
                 print("WARNING: Linear response is not tested for open-shell reference determinants.")
                 break
         # Create operators
-        self.H_0i_0a = hamiltonian_0i_0a(wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
+        self.H_0i_0a = hamiltonian_0i_0a(
+            wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs
+        )
         self.H_1i_1a = hamiltonian_1i_1a(
             wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs
         )
@@ -51,31 +53,39 @@ class quantumLRBaseClass:
 
         if "s" in excitations:
             for a, i, _ in iterate_t1_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
-                self.G_ops.append(G1_sa(i, a))
+                self.G_ops.append(G1_sa(i, a, num_orbs=self.wf.num_orbs))
         if "d" in excitations:
             for a, i, b, j, _, op_type in iterate_t2_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
-                self.G_ops.append(G2_sa(i, j, a, b, op_type))
+                self.G_ops.append(G2_sa(i, j, a, b, op_type, num_orbs=self.wf.num_orbs))
         if "t" in excitations:
-            for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
+            for a, i, b, j, c, k in iterate_t3(
+                self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx, self.wf.num_orbs
+            ):
                 self.G_ops.append(G3(i, j, k, a, b, c))
         if "q" in excitations:
             for a, i, b, j, c, k, d, l in iterate_t4(
-                self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx
+                self.wf.active_occ_spin_idx,
+                self.wf.active_unocc_spin_idx,
+                self.wf.num_orbs,
             ):
                 self.G_ops.append(G4(i, j, k, l, a, b, c, d))
         if "5" in excitations:
             for a, i, b, j, c, k, d, l, e, m in iterate_t5(
-                self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx
+                self.wf.active_occ_spin_idx,
+                self.wf.active_unocc_spin_idx,
+                self.wf.num_orbs,
             ):
                 self.G_ops.append(G5(i, j, k, l, m, a, b, c, d, e))
         if "6" in excitations:
             for a, i, b, j, c, k, d, l, e, m, f, n in iterate_t6(
-                self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx
+                self.wf.active_occ_spin_idx,
+                self.wf.active_unocc_spin_idx,
+                self.wf.num_orbs,
             ):
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
         # q
         for p, q in wf.kappa_no_activeactive_idx:
-            self.q_ops.append(G1_sa(p, q))
+            self.q_ops.append(G1_sa(p, q, num_orbs=self.wf.num_orbs))
 
         num_parameters = len(self.q_ops) + len(self.G_ops)
         self.num_params = num_parameters

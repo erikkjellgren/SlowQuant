@@ -67,30 +67,38 @@ class LinearResponseBaseClass:
 
         if "s" in excitations:
             for a, i, _ in iterate_t1_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
-                self.G_ops.append(G1_sa(i, a))
+                self.G_ops.append(G1_sa(i, a, num_orbs=self.wf.num_orbs))
         if "d" in excitations:
             for a, i, b, j, _, op_type in iterate_t2_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
-                self.G_ops.append(G2_sa(i, j, a, b, op_type))
+                self.G_ops.append(G2_sa(i, j, a, b, op_type, num_orbs=self.wf.num_orbs))
         if "t" in excitations:
-            for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
+            for a, i, b, j, c, k in iterate_t3(
+                self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx, self.wf.num_orbs
+            ):
                 self.G_ops.append(G3(i, j, k, a, b, c))
         if "q" in excitations:
             for a, i, b, j, c, k, d, l in iterate_t4(
-                self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx
+                self.wf.active_occ_spin_idx,
+                self.wf.active_unocc_spin_idx,
+                self.wf.num_orbs,
             ):
                 self.G_ops.append(G4(i, j, k, l, a, b, c, d))
         if "5" in excitations:
             for a, i, b, j, c, k, d, l, e, m in iterate_t5(
-                self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx
+                self.wf.active_occ_spin_idx,
+                self.wf.active_unocc_spin_idx,
+                self.wf.num_orbs,
             ):
                 self.G_ops.append(G5(i, j, k, l, m, a, b, c, d, e))
         if "6" in excitations:
             for a, i, b, j, c, k, d, l, e, m, f, n in iterate_t6(
-                self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx
+                self.wf.active_occ_spin_idx,
+                self.wf.active_unocc_spin_idx,
+                self.wf.num_orbs,
             ):
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
         for p, q in self.wf.kappa_no_activeactive_idx:
-            self.q_ops.append(G1_sa(p, q))
+            self.q_ops.append(G1_sa(p, q, num_orbs=self.wf.num_orbs))
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters))
@@ -109,6 +117,7 @@ class LinearResponseBaseClass:
             self.wf.g_mo,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
 
     def calc_excitation_energies(self) -> None:
