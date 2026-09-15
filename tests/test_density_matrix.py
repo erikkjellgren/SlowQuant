@@ -1,20 +1,17 @@
-"""Test the Gram form of the reduced density matrices against the element-by-element form.
+"""Test the reduced density matrices against their definition.
 
-The Gram form builds one singlet excited state per pair of active orbitals and gets the whole
-two-electron density matrix from their inner products. It is selected by a memory heuristic, so
-the element-by-element form is reached here by overriding that heuristic.
+They are accumulated one alpha string at a time from the CI expansion, which shares its
+machinery with the operator algebra, so the reference here is built the slow and obvious way
+instead: one expectation value per element, straight from the definition.
 """
 
 import numpy as np
 import pytest
 
 import slowquant.SlowQuant as sq
-import slowquant.unitary_coupled_cluster.sa_ups_wavefunction as sa_ups_module
-import slowquant.unitary_coupled_cluster.ups_wavefunction as ups_module
-from slowquant.unitary_coupled_cluster.density_matrix import (
-    build_rdm12_as_gram,
-    can_build_rdm12_as_gram,
-)
+from slowquant.unitary_coupled_cluster.density_matrix import build_rdm12
+from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
+from slowquant.unitary_coupled_cluster.operators import Epq
 from slowquant.unitary_coupled_cluster.sa_ups_wavefunction import WaveFunctionSAUPS
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
@@ -61,11 +58,45 @@ def build_wave_function(molecule, basis, active_space, ansatz, ansatz_options):
     return wf
 
 
+def reference_rdm12(wf):
+    """Build both density matrices one element at a time, straight from the definition.
+
+    Args:
+        wf: Wave function.
+
+    Returns:
+        One- and two-electron reduced density matrices.
+    """
+    num_active_orbs = wf.num_active_orbs
+    offset = wf.num_inactive_orbs
+    rdm1 = np.zeros((num_active_orbs, num_active_orbs))
+    rdm2 = np.zeros((num_active_orbs,) * 4)
+    for p in range(num_active_orbs):
+        for q in range(num_active_orbs):
+            rdm1[p, q] = expectation_value(
+                wf.ci_coeffs, [Epq(p + offset, q + offset, wf.num_orbs)], wf.ci_coeffs, wf.ci_info
+            )
+    for p in range(num_active_orbs):
+        for q in range(num_active_orbs):
+            for r in range(num_active_orbs):
+                for s in range(num_active_orbs):
+                    value = expectation_value(
+                        wf.ci_coeffs,
+                        [Epq(p + offset, q + offset, wf.num_orbs) * Epq(r + offset, s + offset, wf.num_orbs)],
+                        wf.ci_coeffs,
+                        wf.ci_info,
+                    )
+                    if q == r:
+                        value -= rdm1[p, s]
+                    rdm2[p, q, r, s] = value
+    return rdm1, rdm2
+
+
 @pytest.mark.parametrize("molecule, basis, active_space, ansatz, ansatz_options", CASES)
-def test_gram_density_matrices_match_element_by_element(
+def test_density_matrices_match_their_definition(
     molecule: str, basis: str, active_space: tuple, ansatz: str, ansatz_options: dict | None
 ) -> None:
-    """Test that both forms of the density matrices agree.
+    """Test both density matrices against one expectation value per element.
 
     Args:
         molecule: Molecule specification.
@@ -74,29 +105,20 @@ def test_gram_density_matrices_match_element_by_element(
         ansatz: Name of ansatz.
         ansatz_options: Ansatz options.
     """
-    original = ups_module.can_build_rdm12_as_gram
-    try:
-        ups_module.can_build_rdm12_as_gram = lambda *_: False
-        reference = build_wave_function(molecule, basis, active_space, ansatz, ansatz_options)
-        rdm1_reference = np.array(reference.rdm1)
-        rdm2_reference = np.array(reference.rdm2)
-    finally:
-        ups_module.can_build_rdm12_as_gram = original
     wf = build_wave_function(molecule, basis, active_space, ansatz, ansatz_options)
-    assert can_build_rdm12_as_gram(wf.num_active_orbs, len(wf.ci_coeffs))
+    rdm1_reference, rdm2_reference = reference_rdm12(wf)
     assert np.allclose(wf.rdm1, rdm1_reference, atol=1e-12)
     assert np.allclose(wf.rdm2, rdm2_reference, atol=1e-12)
 
 
-def test_gram_density_matrices_average_over_states() -> None:
+def test_density_matrices_average_over_states() -> None:
     """Test that several states are averaged with equal weight, as expectation_value_SA does."""
     wf = build_wave_function(WATER, "STO-3G", (4, 4), "fUCCSD", None)
     other = np.random.default_rng(11).random(len(wf.ci_coeffs))
     other /= np.linalg.norm(other)
-    arguments = (wf.ci_info, wf.num_inactive_orbs, wf.num_active_orbs, wf.num_orbs)
-    rdm1_first, rdm2_first = build_rdm12_as_gram(wf.ci_coeffs, *arguments)
-    rdm1_second, rdm2_second = build_rdm12_as_gram(other, *arguments)
-    rdm1_both, rdm2_both = build_rdm12_as_gram(np.vstack((wf.ci_coeffs, other)), *arguments)
+    rdm1_first, rdm2_first = build_rdm12(wf.ci_coeffs, wf.ci_info)
+    rdm1_second, rdm2_second = build_rdm12(other, wf.ci_info)
+    rdm1_both, rdm2_both = build_rdm12(np.vstack((wf.ci_coeffs, other)), wf.ci_info)
     assert np.allclose(rdm1_both, 0.5 * (rdm1_first + rdm1_second), atol=1e-12)
     assert np.allclose(rdm2_both, 0.5 * (rdm2_first + rdm2_second), atol=1e-12)
 
@@ -119,13 +141,10 @@ SA_CASES = (
 
 
 @pytest.mark.parametrize("molecule, basis, active_space, states", SA_CASES)
-def test_gram_density_matrices_match_for_state_averaged(
+def test_state_averaged_density_matrices_match_their_definition(
     molecule: str, basis: str, active_space: tuple, states: tuple
 ) -> None:
-    """Test both forms of the density matrices for a state-averaged wave function.
-
-    The states are averaged with equal weight, which is what expectation_value_SA does, so the
-    element-by-element form is the reference here as well.
+    """Test both density matrices of a state-averaged wave function against their definition.
 
     Args:
         molecule: Molecule specification.
@@ -138,28 +157,18 @@ def test_gram_density_matrices_match_for_state_averaged(
     obj.set_basis_set(basis)
     obj.init_hartree_fock()
     obj.hartree_fock.run_restricted_hartree_fock()
-
-    def build():
-        wf = WaveFunctionSAUPS(
-            active_space,
-            obj.hartree_fock.mo_coeff,
-            obj,
-            states,
-            "tUPS",
-            ansatz_options={"n_layers": 1, "skip_last_singles": True},
-        )
-        wf.thetas = list(0.15 * (np.random.default_rng(5).random(len(wf.thetas)) - 0.5))
-        return wf
-
-    original = sa_ups_module.can_build_rdm12_as_gram
-    try:
-        sa_ups_module.can_build_rdm12_as_gram = lambda *_: False
-        reference = build()
-        rdm1_reference = np.array(reference.rdm1)
-        rdm2_reference = np.array(reference.rdm2)
-    finally:
-        sa_ups_module.can_build_rdm12_as_gram = original
-    wf = build()
+    wf = WaveFunctionSAUPS(
+        active_space,
+        obj.hartree_fock.mo_coeff,
+        obj,
+        states,
+        "tUPS",
+        ansatz_options={"n_layers": 1, "skip_last_singles": True},
+    )
+    wf.thetas = list(0.15 * (np.random.default_rng(5).random(len(wf.thetas)) - 0.5))
     assert len(wf.ci_coeffs) > 1
-    assert np.allclose(wf.rdm1, rdm1_reference, atol=1e-12)
-    assert np.allclose(wf.rdm2, rdm2_reference, atol=1e-12)
+    # Averaged over the states with equal weight, which is what expectation_value_SA does.
+    rdm1 = np.mean([build_rdm12(state, wf.ci_info)[0] for state in wf.ci_coeffs], axis=0)
+    rdm2 = np.mean([build_rdm12(state, wf.ci_info)[1] for state in wf.ci_coeffs], axis=0)
+    assert np.allclose(wf.rdm1, rdm1, atol=1e-12)
+    assert np.allclose(wf.rdm2, rdm2, atol=1e-12)

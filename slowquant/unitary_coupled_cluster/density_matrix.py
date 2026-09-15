@@ -2,8 +2,10 @@ import numba as nb
 import numpy as np
 
 from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info
-from slowquant.unitary_coupled_cluster.operator_state_algebra import propagate_state
-from slowquant.unitary_coupled_cluster.operators import Epq
+from slowquant.unitary_coupled_cluster.spin_factorized_algebra import (
+    get_spin_arena,
+    get_spin_sub_string_slice,
+)
 
 
 @nb.jit(nopython=True)
@@ -140,73 +142,162 @@ def RDM2(
     return 0
 
 
-# The Gram form holds one excited state per pair of active orbitals at a time. Past this many
-# bytes it falls back to evaluating the density matrix element by element.
-MAX_EXCITED_STATES_BYTES = 2 * 1024**3
+def build_single_excitation_layout(
+    ci_info: CI_Info,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    r"""Lay out the one-electron excitations of each spin over the string spaces.
 
-
-def can_build_rdm12_as_gram(num_active_orbs: int, num_dets: int) -> bool:
-    """Check whether the Gram form of the density matrices fits in its memory budget.
+    The density matrices are accumulated one output alpha string at a time, so the alpha
+    excitations are grouped by the string they produce and padded to a common width with a zero
+    phase, which contributes nothing. The beta excitations act within a row and are grouped by
+    orbital pair instead.
 
     Args:
-        num_active_orbs: Number of active spatial orbitals.
-        num_dets: Number of determinants in the CI space.
+        ci_info: Information about the CI space.
 
     Returns:
-        True if the Gram form should be used.
+        Alpha orbital pair, source string and phase per target string, then the beta offsets,
+        sources, targets and phases per orbital pair.
     """
-    return num_active_orbs**2 * num_dets * 8 <= MAX_EXCITED_STATES_BYTES
+    num_active_orbs = ci_info.num_active_orbs
+    num_alpha_strings = ci_info.num_alpha_strings
+    pair_of_entry = []
+    entry_index = []
+    beta_offsets = np.zeros(num_active_orbs**2 + 1, dtype=np.int64)
+    beta_entries = []
+    for p in range(num_active_orbs):
+        for q in range(num_active_orbs):
+            pair = p * num_active_orbs + q
+            sub_string = ((p,), (q,))
+            lo, hi = get_spin_sub_string_slice(ci_info, sub_string, True)
+            pair_of_entry.append(np.full(hi - lo, pair, dtype=np.int64))
+            entry_index.append(np.arange(lo, hi, dtype=np.int64))
+            lo, hi = get_spin_sub_string_slice(ci_info, sub_string, False)
+            beta_entries.append(np.arange(lo, hi, dtype=np.int64))
+            beta_offsets[pair + 1] = beta_offsets[pair] + (hi - lo)
+    # The arenas grow as sub-strings are requested, so they are read once all of them exist.
+    alpha_src_arena, alpha_dst_arena, alpha_sign_arena = get_spin_arena(ci_info, True)
+    beta_src_arena, beta_dst_arena, beta_sign_arena = get_spin_arena(ci_info, False)
+    # Alpha excitations are needed by the string they produce, so they are sorted on the target.
+    owner = np.concatenate(pair_of_entry)
+    entries = np.concatenate(entry_index)
+    target = alpha_dst_arena[entries]
+    order = np.argsort(target, kind="stable")
+    target = target[order]
+    counts = np.bincount(target, minlength=num_alpha_strings)
+    width = int(counts.max()) if len(counts) > 0 else 0
+    group_start = np.zeros(num_alpha_strings + 1, dtype=np.int64)
+    group_start[1:] = np.cumsum(counts)
+    slot = np.arange(len(target), dtype=np.int64) - np.repeat(group_start[:-1], counts)
+    alpha_pair = np.zeros((num_alpha_strings, max(width, 1)), dtype=np.int64)
+    alpha_source = np.zeros((num_alpha_strings, max(width, 1)), dtype=np.int64)
+    alpha_sign = np.zeros((num_alpha_strings, max(width, 1)))
+    alpha_pair[target, slot] = owner[order]
+    alpha_source[target, slot] = alpha_src_arena[entries][order]
+    alpha_sign[target, slot] = alpha_sign_arena[entries][order]
+
+    beta_index = np.concatenate(beta_entries)
+    return (
+        alpha_pair,
+        alpha_source,
+        alpha_sign,
+        beta_offsets,
+        beta_src_arena[beta_index],
+        beta_dst_arena[beta_index],
+        beta_sign_arena[beta_index],
+    )
 
 
-def build_rdm12_as_gram(
-    ci_coeffs: np.ndarray,
-    ci_info: CI_Info,
-    num_inactive_orbs: int,
-    num_active_orbs: int,
-    num_orbs: int,
-) -> tuple[np.ndarray, np.ndarray]:
-    r"""Calculate both reduced density matrices from a Gram matrix of one-electron excited states.
+@nb.jit(nopython=True)
+def accumulate_rdm12(
+    state_matrix: np.ndarray,
+    weight: float,
+    alpha_pair: np.ndarray,
+    alpha_source: np.ndarray,
+    alpha_sign: np.ndarray,
+    beta_offsets: np.ndarray,
+    beta_src: np.ndarray,
+    beta_dst: np.ndarray,
+    beta_sign: np.ndarray,
+    rdm1: np.ndarray,
+    gram: np.ndarray,
+) -> None:
+    r"""Add one state's contribution to the density matrices, one alpha string at a time.
 
-    The singlet excitation operator is self-adjoint under exchange of its indices,
-    :math:`\hat{E}_{pq}^\dagger=\hat{E}_{qp}`, so every two-electron element is an inner
-    product of two states that have each had one such operator applied,
+    The singlet excitation operator is self-adjoint under exchange of its indices, so every
+    two-electron element is an inner product of two states that have each had one such operator
+    applied,
 
     .. math::
         \left<0\left|\hat{E}_{pq}\hat{E}_{rs}\right|0\right>
         = \left<\hat{E}_{qp}0\right.\left|\hat{E}_{rs}0\right>
 
-    Building those states once for every pair of active orbitals turns the whole two-electron
-    density matrix into a single matrix product, rather than one operator product and one state
-    propagation per element.
+    That inner product runs over determinants, so it splits over the output alpha string. For a
+    single one it is enough to hold the excited states restricted to that row, which is a buffer
+    over orbital pairs and beta strings rather than over the whole expansion. The alpha
+    excitations gather the rows that feed this one, the beta excitations act inside it.
+
+    Args:
+        state_matrix: State, as a matrix over the alpha and beta string spaces.
+        weight: Weight of this state in the average.
+        alpha_pair: Orbital pair of each alpha excitation into a target string.
+        alpha_source: Alpha string each excitation into a target string comes from.
+        alpha_sign: Phase of each alpha excitation into a target string.
+        beta_offsets: Start of each orbital pair's beta excitations.
+        beta_src: Beta string indices a beta excitation maps from.
+        beta_dst: Beta string indices a beta excitation maps to.
+        beta_sign: Phase of each beta excitation.
+        rdm1: One-electron density matrix, flattened over orbital pairs, accumulated into.
+        gram: Inner products over orbital pairs, accumulated into.
+    """
+    num_alpha_strings, width = alpha_pair.shape
+    num_pairs = len(beta_offsets) - 1
+    num_beta_strings = state_matrix.shape[1]
+    excited = np.zeros((num_pairs, num_beta_strings))
+    for dst_alpha in range(num_alpha_strings):
+        excited[:, :] = 0.0
+        for slot in range(width):
+            sign = alpha_sign[dst_alpha, slot]
+            if sign == 0.0:
+                continue
+            pair = alpha_pair[dst_alpha, slot]
+            source = alpha_source[dst_alpha, slot]
+            for i in range(num_beta_strings):
+                excited[pair, i] += sign * state_matrix[source, i]
+        for pair in range(num_pairs):
+            for k in range(beta_offsets[pair], beta_offsets[pair + 1]):
+                excited[pair, beta_dst[k]] += beta_sign[k] * state_matrix[dst_alpha, beta_src[k]]
+        gram += weight * np.dot(excited, excited.T)
+        rdm1 += weight * np.dot(excited, state_matrix[dst_alpha])
+
+
+def build_rdm12(ci_coeffs: np.ndarray, ci_info: CI_Info) -> tuple[np.ndarray, np.ndarray]:
+    r"""Calculate both reduced density matrices from the CI expansion.
 
     Several states are averaged over with equal weight, matching expectation_value_SA. They are
-    processed one at a time, so the memory needed does not grow with the number of states.
+    processed one at a time, so the memory needed grows with neither the number of states nor
+    the size of the expansion, see accumulate_rdm12.
 
     Args:
         ci_coeffs: State, or one state per row for a state-averaged wave function.
         ci_info: Information about the CI space.
-        num_inactive_orbs: Number of inactive spatial orbitals.
-        num_active_orbs: Number of active spatial orbitals.
-        num_orbs: Number of spatial orbitals.
 
     Returns:
         One- and two-electron reduced density matrices.
     """
+    num_active_orbs = ci_info.num_active_orbs
+    num_alpha_strings = ci_info.num_alpha_strings
+    num_beta_strings = ci_info.num_beta_strings
     states = np.atleast_2d(ci_coeffs)
     weight = 1.0 / len(states)
-    num_pairs = num_active_orbs**2
-    rdm1 = np.zeros((num_active_orbs, num_active_orbs))
-    gram = np.zeros((num_pairs, num_pairs))
-    excited = np.empty((num_pairs, states.shape[1]))
+    layout = build_single_excitation_layout(ci_info)
+    rdm1 = np.zeros(num_active_orbs**2)
+    gram = np.zeros((num_active_orbs**2, num_active_orbs**2))
     for state in states:
-        for p in range(num_active_orbs):
-            for q in range(num_active_orbs):
-                excited[p * num_active_orbs + q] = propagate_state(
-                    [Epq(p + num_inactive_orbs, q + num_inactive_orbs, num_orbs)], state, ci_info
-                )
-        rdm1 += weight * (excited @ state).reshape(num_active_orbs, num_active_orbs)
-        gram += weight * (excited @ excited.T)
-    # gram is indexed by the two pairs, and <0|E_pq E_rs|0> is the entry for (q,p) and (r,s).
+        state_matrix = np.ascontiguousarray(state).reshape(num_alpha_strings, num_beta_strings)
+        accumulate_rdm12(state_matrix, weight, *layout, rdm1, gram)
+    rdm1 = rdm1.reshape(num_active_orbs, num_active_orbs)
+    # gram is indexed by the two orbital pairs, and <0|E_pq E_rs|0> is the entry for (q,p), (r,s).
     rdm2 = gram.reshape((num_active_orbs,) * 4).transpose(1, 0, 2, 3).copy()
     for q in range(num_active_orbs):
         rdm2[:, q, q, :] -= rdm1

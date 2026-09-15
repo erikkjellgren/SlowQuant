@@ -16,8 +16,7 @@ from slowquant.molecularintegrals.integralfunctions import (
 from slowquant.SlowQuant import SlowQuant
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
 from slowquant.unitary_coupled_cluster.density_matrix import (
-    build_rdm12_as_gram,
-    can_build_rdm12_as_gram,
+    build_rdm12,
     get_electronic_energy,
     get_orbital_gradient,
 )
@@ -490,28 +489,7 @@ class WaveFunctionUPS:
             One-electron reduced density matrix.
         """
         if self._rdm1 is None:
-            if can_build_rdm12_as_gram(self.num_active_orbs, len(self.ci_info.idx2det)):
-                self._rdm1, self._rdm2 = build_rdm12_as_gram(
-                    self.ci_coeffs,
-                    self.ci_info,
-                    self.num_inactive_orbs,
-                    self.num_active_orbs,
-                    self.num_orbs,
-                )
-                return self._rdm1
-            self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs), dtype=float)
-            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                p_ = p - self.num_inactive_orbs
-                for q in range(self.num_inactive_orbs, p + 1):
-                    q_ = q - self.num_inactive_orbs
-                    val = expectation_value(
-                        self.ci_coeffs,
-                        [Epq(p, q, self.num_orbs)],
-                        self.ci_coeffs,
-                        self.ci_info,
-                    )
-                    self._rdm1[p_, q_] = val  # type: ignore
-                    self._rdm1[q_, p_] = val  # type: ignore
+            self._rdm1, self._rdm2 = build_rdm12(self.ci_coeffs, self.ci_info)
         return self._rdm1
 
     @property
@@ -522,52 +500,7 @@ class WaveFunctionUPS:
             Two-electron reduced density matrix.
         """
         if self._rdm2 is None:
-            if can_build_rdm12_as_gram(self.num_active_orbs, len(self.ci_info.idx2det)):
-                self._rdm1, self._rdm2 = build_rdm12_as_gram(
-                    self.ci_coeffs,
-                    self.ci_info,
-                    self.num_inactive_orbs,
-                    self.num_active_orbs,
-                    self.num_orbs,
-                )
-                return self._rdm2
-            self._rdm2 = np.zeros(
-                (
-                    self.num_active_orbs,
-                    self.num_active_orbs,
-                    self.num_active_orbs,
-                    self.num_active_orbs,
-                ),
-                dtype=float,
-            )
-            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                p_ = p - self.num_inactive_orbs
-                for q in range(self.num_inactive_orbs, p + 1):
-                    q_ = q - self.num_inactive_orbs
-                    for r in range(self.num_inactive_orbs, p + 1):
-                        r_ = r - self.num_inactive_orbs
-                        if p == q:
-                            s_lim = r + 1
-                        elif p == r:
-                            s_lim = q + 1
-                        elif q < r:
-                            s_lim = p
-                        else:
-                            s_lim = p + 1
-                        for s in range(self.num_inactive_orbs, s_lim):
-                            s_ = s - self.num_inactive_orbs
-                            val = expectation_value(
-                                self.ci_coeffs,
-                                [Epq(p, q, self.num_orbs) * Epq(r, s, self.num_orbs)],
-                                self.ci_coeffs,
-                                self.ci_info,
-                            )
-                            if q == r:
-                                val -= self.rdm1[p_, s_]
-                            self._rdm2[p_, q_, r_, s_] = val  # type: ignore
-                            self._rdm2[r_, s_, p_, q_] = val  # type: ignore
-                            self._rdm2[q_, p_, s_, r_] = val  # type: ignore
-                            self._rdm2[s_, r_, q_, p_] = val  # type: ignore
+            self._rdm1, self._rdm2 = build_rdm12(self.ci_coeffs, self.ci_info)
         return self._rdm2
 
     @property
