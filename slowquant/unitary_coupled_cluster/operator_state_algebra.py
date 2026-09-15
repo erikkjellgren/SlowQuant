@@ -526,8 +526,11 @@ def propagate_state(
         is_parallel = False
     else:
         is_parallel = True
-    new_state = np.copy(state)
+    # Every kernel reads the incoming state and writes the outgoing one, so the two are
+    # swapped rather than copied. The incoming state belongs to the caller and is only read.
+    new_state = state
     tmp_state = np.zeros_like(state, dtype=float)
+    tmp_state_is_zero = True
     # Create bitstrings for parity check. Contains occupied determinant up to orbital index.
     parity_check = np.zeros(2 * num_active_orbs + 1, dtype=int)
     num = 0
@@ -566,7 +569,8 @@ def propagate_state(
                 raise TypeError(f"Got unknown wave function structure type, {type(wf_struct)}")
         # FermionicOperator in operators
         else:
-            tmp_state[:] = 0.0
+            if not tmp_state_is_zero:
+                tmp_state[:] = 0.0
             # Fold operator to only get active contributions
             if do_folding:
                 op_folded = op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs)
@@ -577,7 +581,12 @@ def propagate_state(
             # notably the extended space, falls through to the general kernels below.
             factorized_state = propagate_state_factorized(op_folded, new_state, ci_info, tmp_state)
             if factorized_state is not None:
-                new_state = np.copy(factorized_state)
+                new_state, tmp_state = tmp_state, new_state
+                tmp_state_is_zero = False
+                if tmp_state is state:
+                    # The caller's state must never be handed to a kernel to write into.
+                    tmp_state = np.zeros_like(state, dtype=float)
+                    tmp_state_is_zero = True
                 continue
             # loop over all strings of annihilation operators in FermionicOperator sum
             if is_parallel:
@@ -626,7 +635,12 @@ def propagate_state(
                         tmp_state,
                         op_folded.operators[fermi_label],
                     )
-            new_state = np.copy(tmp_state)
+            new_state, tmp_state = tmp_state, new_state
+            tmp_state_is_zero = False
+            if tmp_state is state:
+                # The caller's state must never be handed to a kernel to write into.
+                tmp_state = np.zeros_like(state, dtype=float)
+                tmp_state_is_zero = True
     return new_state
 
 
@@ -673,8 +687,11 @@ def propagate_state_SA(
         is_parallel = False
     else:
         is_parallel = True
-    new_state = np.copy(state)
+    # Every kernel reads the incoming state and writes the outgoing one, so the two are
+    # swapped rather than copied. The incoming state belongs to the caller and is only read.
+    new_state = state
     tmp_state = np.zeros_like(state, dtype=float)
+    tmp_state_is_zero = True
     # Create bitstrings for parity check. Contains occupied determinant up to orbital index.
     parity_check = np.zeros(2 * num_active_orbs + 1, dtype=int)
     num = 0
@@ -703,7 +720,8 @@ def propagate_state_SA(
                 raise TypeError(f"Got unknown wave function structure type, {type(wf_struct)}")
         # FermionicOperator in operators
         else:
-            tmp_state[:, :] = 0.0
+            if not tmp_state_is_zero:
+                tmp_state[:, :] = 0.0
             # Fold operator to only get active contributions
             if do_folding:
                 op_folded = op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs)
@@ -714,7 +732,12 @@ def propagate_state_SA(
             # notably the extended space, falls through to the general kernels below.
             factorized_state = propagate_state_SA_factorized(op_folded, new_state, ci_info, tmp_state)
             if factorized_state is not None:
-                new_state = np.copy(factorized_state)
+                new_state, tmp_state = tmp_state, new_state
+                tmp_state_is_zero = False
+                if tmp_state is state:
+                    # The caller's state must never be handed to a kernel to write into.
+                    tmp_state = np.zeros_like(state, dtype=float)
+                    tmp_state_is_zero = True
                 continue
             # loop over all strings of annihilation operators in FermionicOperator sum
             if is_parallel:
@@ -763,7 +786,12 @@ def propagate_state_SA(
                         tmp_state,
                         op_folded.operators[fermi_label],
                     )
-            new_state = np.copy(tmp_state)
+            new_state, tmp_state = tmp_state, new_state
+            tmp_state_is_zero = False
+            if tmp_state is state:
+                # The caller's state must never be handed to a kernel to write into.
+                tmp_state = np.zeros_like(state, dtype=float)
+                tmp_state_is_zero = True
     return new_state
 
 
