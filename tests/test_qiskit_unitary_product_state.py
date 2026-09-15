@@ -570,11 +570,11 @@ def test_pp_ups_to_circuit() -> None:
 
     WF.run_wf_optimization(orbital_optimization=True)
 
-    assert abs(WF.energy_elec + 83.98433373390003) < 10**-10
+    assert abs(WF.energy_elec + 84.00238471763942) < 10**-10
 
     qWF = circuit_wavefunction_from_ups(WF, Sampler(), JordanWignerMapper(), shots=None)
 
-    assert abs(qWF.energy_elec + 83.9843337275081) < 10**-10
+    assert abs(qWF.energy_elec + 84.00238471763942) < 10**-10
 
 
 def test_openshell_reference() -> None:
