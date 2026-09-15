@@ -356,14 +356,26 @@ def factorize_operator(op: FermionicOperator, ci_info: CI_Info) -> SpinFactorize
     factor = np.empty(num_terms, dtype=np.float64)
     is_pure_alpha = np.empty(num_terms, dtype=np.bool_)
     is_pure_beta = np.empty(num_terms, dtype=np.bool_)
+    # This loop runs once per string of the operator, so the two cache lookups are done
+    # against the dict directly rather than through get_spin_sub_string_slice, which would
+    # otherwise be two Python calls per string.
+    sub_string_cache = ci_info.spin_op_cache
     for term, (op_key, fac) in enumerate(op.operators.items()):
         split = split_spin_string(op_key, num_active_orbs)
         if split is None:
             # A single non spin conserving string makes the whole operator fall back.
             return None
         alpha_sub, beta_sub, sign = split
-        alpha_start[term], alpha_stop[term] = get_spin_sub_string_slice(ci_info, alpha_sub, True)
-        beta_start[term], beta_stop[term] = get_spin_sub_string_slice(ci_info, beta_sub, False)
+        alpha_slice = sub_string_cache.get((True, alpha_sub[0], alpha_sub[1]))
+        if alpha_slice is None:
+            alpha_slice = get_spin_sub_string_slice(ci_info, alpha_sub, True)
+        beta_slice = sub_string_cache.get((False, beta_sub[0], beta_sub[1]))
+        if beta_slice is None:
+            beta_slice = get_spin_sub_string_slice(ci_info, beta_sub, False)
+        alpha_start[term] = alpha_slice[0]
+        alpha_stop[term] = alpha_slice[1]
+        beta_start[term] = beta_slice[0]
+        beta_stop[term] = beta_slice[1]
         factor[term] = fac * sign
         is_pure_alpha[term] = beta_sub == IDENTITY_SUB_STRING
         is_pure_beta[term] = alpha_sub == IDENTITY_SUB_STRING

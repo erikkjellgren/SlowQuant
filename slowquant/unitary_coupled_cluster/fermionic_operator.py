@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import functools
 import itertools
 import re
 from collections import defaultdict
@@ -252,6 +253,96 @@ def do_product_extended_normal_ordering_rankreduction(
             phase_changes += pc
             phase = 1 - 2 * (phase_changes & 1)
             yield (tuple(dagger_list), tuple(nondagger_list)), phase
+
+
+# An operator is typically rebuilt with the same strings and only new factors on every
+# evaluation, and how a string folds does not depend on its factor, so it is worth memoizing.
+@functools.lru_cache(maxsize=2**18)
+def fold_fermionic_string(
+    op_key: tuple[tuple[int, ...], tuple[int, ...]],
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+) -> tuple[tuple[tuple[int, ...], tuple[int, ...]], int] | None:
+    r"""Fold one fermionic string into the active space.
+
+    See FermionicOperator.get_folded_operator for what the folding means. The inactive orbitals
+    are filled in both bra and ket and the virtual ones are empty, so the only thing left of a
+    string is its active part and a phase.
+
+    Args:
+        op_key: Fermionic string, tuple of creation and annihilation spin-orbital indices.
+        num_inactive_orbs: Number of spatial inactive orbitals.
+        num_active_orbs: Number of spatial active orbitals.
+        num_virtual_orbs: Number of spatial virtual orbitals.
+
+    Returns:
+        Active string and its phase, or None if the string folds to zero.
+    """
+    dagger_string, nondagger_string = op_key
+    num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
+    # Occupation mask of the inactive spin orbitals, which are filled in both bra and ket.
+    # Spin-orbital index i is bit i here, this mask is local to the folding.
+    inactive_filled = 0
+    for p in range(num_inactive_orbs):
+        inactive_filled |= 1 << alpha_idx(p, num_orbs)
+        inactive_filled |= 1 << beta_idx(p, num_orbs)
+    phase_changes = 0
+    inactive_occ = inactive_filled
+    # Net number of active alpha electrons added so far by the operators applied.
+    active_alpha_change = 0
+    active_dagger: list[int] = []
+    active_nondagger: list[int] = []
+    is_zero = False
+    # Apply the operators right to left, as they act on the ket. The string is normal
+    # ordered, so the non-dagger block goes first and the dagger block after it. Within
+    # a block the indices are sorted descending, so reversed() is application order.
+    for dagger, block, active_block in (
+        (False, nondagger_string, active_nondagger),
+        (True, dagger_string, active_dagger),
+    ):
+        for orb_idx in reversed(block):
+            spatial_idx = orb_idx % num_orbs
+            if spatial_idx >= num_inactive_orbs + num_active_orbs:
+                # Any virtual index makes the operator evaluate to zero, the virtual
+                # orbitals are empty in both bra and ket.
+                is_zero = True
+                break
+            # Phase from the inactive orbitals the operator has to be moved past. The
+            # active orbitals below it are left to the folded operator itself, which
+            # sees them in the active-space determinant and counts the same number.
+            phase_changes += (inactive_occ & ((1 << orb_idx) - 1)).bit_count()
+            if spatial_idx < num_inactive_orbs:
+                if orb_idx >= num_orbs:
+                    # Every alpha orbital lies below an inactive beta one, so this
+                    # operator also has to be moved past the active alpha electrons.
+                    # Their number at the start of the string is a constant of the CI
+                    # space and drops out, the inactive operators pair up so an even
+                    # number of them are beta. What is left is how the operators
+                    # applied so far changed that number.
+                    phase_changes += active_alpha_change
+                orb_bit = 1 << orb_idx
+                if dagger == bool(inactive_occ & orb_bit):
+                    # Creating an occupied or annihilating an empty inactive orbital.
+                    is_zero = True
+                    break
+                inactive_occ ^= orb_bit
+            elif orb_idx < num_orbs:
+                # Active alpha, remapped to the first block of the active space.
+                active_block.append(spatial_idx - num_inactive_orbs)
+                active_alpha_change += 1 if dagger else -1
+            else:
+                # Active beta, remapped to the second block of the active space.
+                active_block.append(num_active_orbs + spatial_idx - num_inactive_orbs)
+        if is_zero:
+            break
+    # The inactive orbitals must be left as they were found.
+    if is_zero or inactive_occ != inactive_filled:
+        return None
+    sign = 1 - 2 * (phase_changes & 1)
+    # Back to written order. The active remapping is monotonic, so each block keeps the
+    # descending order the unfolded string had.
+    return (tuple(active_dagger[::-1]), tuple(active_nondagger[::-1])), sign
 
 
 def commutator_multiply(A: FermionicOperator, B: FermionicOperator) -> FermionicOperator:
@@ -617,76 +708,15 @@ class FermionicOperator:
            Folded fermionic operator.
         """
         operators: dict[tuple[tuple[int, ...], tuple[int, ...]], float] = {}
-        num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
-        # Occupation mask of the inactive spin orbitals, which are filled in both bra and ket.
-        # Spin-orbital index i is bit i here, this mask is local to the folding.
-        inactive_filled = 0
-        for p in range(num_inactive_orbs):
-            inactive_filled |= 1 << alpha_idx(p, num_orbs)
-            inactive_filled |= 1 << beta_idx(p, num_orbs)
-
-        # Loop over string of annihilation operators
-        for (dagger_string, nondagger_string), coeff in self.operators.items():
-            phase_changes = 0
-            inactive_occ = inactive_filled
-            # Net number of active alpha electrons added so far by the operators applied.
-            active_alpha_change = 0
-            active_dagger: list[int] = []
-            active_nondagger: list[int] = []
-            is_zero = False
-            # Apply the operators right to left, as they act on the ket. The string is normal
-            # ordered, so the non-dagger block goes first and the dagger block after it. Within
-            # a block the indices are sorted descending, so reversed() is application order.
-            for dagger, block, active_block in (
-                (False, nondagger_string, active_nondagger),
-                (True, dagger_string, active_dagger),
-            ):
-                for orb_idx in reversed(block):
-                    spatial_idx = orb_idx % num_orbs
-                    if spatial_idx >= num_inactive_orbs + num_active_orbs:
-                        # Any virtual index makes the operator evaluate to zero, the virtual
-                        # orbitals are empty in both bra and ket.
-                        is_zero = True
-                        break
-                    # Phase from the inactive orbitals the operator has to be moved past. The
-                    # active orbitals below it are left to the folded operator itself, which
-                    # sees them in the active-space determinant and counts the same number.
-                    phase_changes += (inactive_occ & ((1 << orb_idx) - 1)).bit_count()
-                    if spatial_idx < num_inactive_orbs:
-                        if orb_idx >= num_orbs:
-                            # Every alpha orbital lies below an inactive beta one, so this
-                            # operator also has to be moved past the active alpha electrons.
-                            # Their number at the start of the string is a constant of the CI
-                            # space and drops out, the inactive operators pair up so an even
-                            # number of them are beta. What is left is how the operators
-                            # applied so far changed that number.
-                            phase_changes += active_alpha_change
-                        orb_bit = 1 << orb_idx
-                        if dagger == bool(inactive_occ & orb_bit):
-                            # Creating an occupied or annihilating an empty inactive orbital.
-                            is_zero = True
-                            break
-                        inactive_occ ^= orb_bit
-                    elif orb_idx < num_orbs:
-                        # Active alpha, remapped to the first block of the active space.
-                        active_block.append(spatial_idx - num_inactive_orbs)
-                        active_alpha_change += 1 if dagger else -1
-                    else:
-                        # Active beta, remapped to the second block of the active space.
-                        active_block.append(num_active_orbs + spatial_idx - num_inactive_orbs)
-                if is_zero:
-                    break
-            # The inactive orbitals must be left as they were found.
-            if is_zero or inactive_occ != inactive_filled:
+        for op_key, coeff in self.operators.items():
+            folded = fold_fermionic_string(op_key, num_inactive_orbs, num_active_orbs, num_virtual_orbs)
+            if folded is None:
                 continue
-            fac = 1 - 2 * (phase_changes & 1)
-            # Back to written order. The active remapping is monotonic, so each block keeps the
-            # descending order the unfolded string had.
-            active_op = (tuple(active_dagger[::-1]), tuple(active_nondagger[::-1]))
-            if active_op in operators.keys():
-                operators[active_op] += fac * coeff
+            active_op, sign = folded
+            if active_op in operators:
+                operators[active_op] += sign * coeff
             else:
-                operators[active_op] = fac * coeff
+                operators[active_op] = sign * coeff
         return FermionicOperator(operators)
 
     def get_info(self) -> tuple[list[list[int]], list[list[int]], list[float]]:
