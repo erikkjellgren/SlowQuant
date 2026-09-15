@@ -56,13 +56,17 @@ class SpinFactorizedOperator:
         "beta_dst",
         "beta_sign",
         "beta_src",
-        "term_alpha_start",
-        "term_alpha_stop",
-        "term_beta_start",
-        "term_beta_stop",
-        "term_factor",
-        "term_is_pure_alpha",
-        "term_is_pure_beta",
+        "mixed_alpha_start",
+        "mixed_alpha_stop",
+        "mixed_beta_start",
+        "mixed_beta_stop",
+        "mixed_factor",
+        "pure_alpha_factor",
+        "pure_alpha_start",
+        "pure_alpha_stop",
+        "pure_beta_factor",
+        "pure_beta_start",
+        "pure_beta_stop",
     )
 
     def __init__(
@@ -73,19 +77,27 @@ class SpinFactorizedOperator:
         beta_src: np.ndarray,
         beta_dst: np.ndarray,
         beta_sign: np.ndarray,
-        term_alpha_start: np.ndarray,
-        term_alpha_stop: np.ndarray,
-        term_beta_start: np.ndarray,
-        term_beta_stop: np.ndarray,
-        term_factor: np.ndarray,
-        term_is_pure_alpha: np.ndarray,
-        term_is_pure_beta: np.ndarray,
+        pure_alpha_start: np.ndarray,
+        pure_alpha_stop: np.ndarray,
+        pure_alpha_factor: np.ndarray,
+        pure_beta_start: np.ndarray,
+        pure_beta_stop: np.ndarray,
+        pure_beta_factor: np.ndarray,
+        mixed_alpha_start: np.ndarray,
+        mixed_alpha_stop: np.ndarray,
+        mixed_beta_start: np.ndarray,
+        mixed_beta_stop: np.ndarray,
+        mixed_factor: np.ndarray,
     ) -> None:
         """Initialize the spin-factorized form of a fermionic operator.
 
         The alpha and beta arrays are the shared per-spin arenas of the CI space, holding the
         excitation map of every spin sub-string built so far. Each term of the operator is a
         slice into each of them, so no per-operator copy of a map is ever made.
+
+        The terms are split by which spins they act on, because the three cases are applied by
+        different algorithms. A term acting on one spin only is a matrix acting on one side of
+        the state, while a term acting on both couples the two.
 
         Args:
             alpha_src: Alpha string indices an alpha sub-string maps from.
@@ -94,13 +106,17 @@ class SpinFactorizedOperator:
             beta_src: Beta string indices a beta sub-string maps from.
             beta_dst: Beta string indices a beta sub-string maps to.
             beta_sign: Phase of the beta sub-string application.
-            term_alpha_start: Start of the term's slice into the alpha arena.
-            term_alpha_stop: End of the term's slice into the alpha arrays.
-            term_beta_start: Start of the term's slice into the beta arrays.
-            term_beta_stop: End of the term's slice into the beta arrays.
-            term_factor: Factor in front of the term, including the block reordering phase.
-            term_is_pure_alpha: True if the term acts as the identity on the beta string.
-            term_is_pure_beta: True if the term acts as the identity on the alpha string.
+            pure_alpha_start: Start of an alpha only term's slice into the alpha arena.
+            pure_alpha_stop: End of an alpha only term's slice into the alpha arena.
+            pure_alpha_factor: Factor in front of an alpha only term.
+            pure_beta_start: Start of a beta only term's slice into the beta arena.
+            pure_beta_stop: End of a beta only term's slice into the beta arena.
+            pure_beta_factor: Factor in front of a beta only term.
+            mixed_alpha_start: Start of a mixed term's slice into the alpha arena.
+            mixed_alpha_stop: End of a mixed term's slice into the alpha arena.
+            mixed_beta_start: Start of a mixed term's slice into the beta arena.
+            mixed_beta_stop: End of a mixed term's slice into the beta arena.
+            mixed_factor: Factor in front of a mixed term.
         """
         self.alpha_src = alpha_src
         self.alpha_dst = alpha_dst
@@ -108,17 +124,19 @@ class SpinFactorizedOperator:
         self.beta_src = beta_src
         self.beta_dst = beta_dst
         self.beta_sign = beta_sign
-        self.term_alpha_start = term_alpha_start
-        self.term_alpha_stop = term_alpha_stop
-        self.term_beta_start = term_beta_start
-        self.term_beta_stop = term_beta_stop
-        self.term_factor = term_factor
-        self.term_is_pure_alpha = term_is_pure_alpha
-        self.term_is_pure_beta = term_is_pure_beta
+        self.pure_alpha_start = pure_alpha_start
+        self.pure_alpha_stop = pure_alpha_stop
+        self.pure_alpha_factor = pure_alpha_factor
+        self.pure_beta_start = pure_beta_start
+        self.pure_beta_stop = pure_beta_stop
+        self.pure_beta_factor = pure_beta_factor
+        self.mixed_alpha_start = mixed_alpha_start
+        self.mixed_alpha_stop = mixed_alpha_stop
+        self.mixed_beta_start = mixed_beta_start
+        self.mixed_beta_stop = mixed_beta_stop
+        self.mixed_factor = mixed_factor
 
 
-# The split of a string depends only on the string itself, and an operator is typically
-# rebuilt with the same strings and new factors on every evaluation, so it is worth memoizing.
 @functools.lru_cache(maxsize=2**18)
 def split_spin_string(
     op_key: tuple[tuple[int, ...], tuple[int, ...]], num_active_orbs: int
@@ -331,24 +349,33 @@ def factorize_operator(op: FermionicOperator, ci_info: CI_Info) -> SpinFactorize
         return None
     num_active_orbs = ci_info.num_active_orbs
     num_terms = len(op.operators)
-    term_alpha_start = np.empty(num_terms, dtype=np.int64)
-    term_alpha_stop = np.empty(num_terms, dtype=np.int64)
-    term_beta_start = np.empty(num_terms, dtype=np.int64)
-    term_beta_stop = np.empty(num_terms, dtype=np.int64)
-    term_factor = np.empty(num_terms, dtype=np.float64)
-    term_is_pure_alpha = np.empty(num_terms, dtype=np.bool_)
-    term_is_pure_beta = np.empty(num_terms, dtype=np.bool_)
+    alpha_start = np.empty(num_terms, dtype=np.int64)
+    alpha_stop = np.empty(num_terms, dtype=np.int64)
+    beta_start = np.empty(num_terms, dtype=np.int64)
+    beta_stop = np.empty(num_terms, dtype=np.int64)
+    factor = np.empty(num_terms, dtype=np.float64)
+    is_pure_alpha = np.empty(num_terms, dtype=np.bool_)
+    is_pure_beta = np.empty(num_terms, dtype=np.bool_)
     for term, (op_key, fac) in enumerate(op.operators.items()):
         split = split_spin_string(op_key, num_active_orbs)
         if split is None:
             # A single non spin conserving string makes the whole operator fall back.
             return None
         alpha_sub, beta_sub, sign = split
-        term_alpha_start[term], term_alpha_stop[term] = get_spin_sub_string_slice(ci_info, alpha_sub, True)
-        term_beta_start[term], term_beta_stop[term] = get_spin_sub_string_slice(ci_info, beta_sub, False)
-        term_factor[term] = fac * sign
-        term_is_pure_alpha[term] = beta_sub == IDENTITY_SUB_STRING
-        term_is_pure_beta[term] = alpha_sub == IDENTITY_SUB_STRING
+        alpha_start[term], alpha_stop[term] = get_spin_sub_string_slice(ci_info, alpha_sub, True)
+        beta_start[term], beta_stop[term] = get_spin_sub_string_slice(ci_info, beta_sub, False)
+        factor[term] = fac * sign
+        is_pure_alpha[term] = beta_sub == IDENTITY_SUB_STRING
+        is_pure_beta[term] = alpha_sub == IDENTITY_SUB_STRING
+    # A term acting on one spin only is applied as a matrix on that side of the state, a term
+    # acting on both couples the two, so the three groups are kept apart.
+    pure_alpha = np.flatnonzero(is_pure_alpha & ~is_pure_beta)
+    pure_beta = np.flatnonzero(is_pure_beta & ~is_pure_alpha)
+    mixed = np.flatnonzero(~is_pure_alpha & ~is_pure_beta)
+    # A term that is the identity on both spins is a plain scaling of the state. It is put with
+    # the alpha only terms, whose map is then the identity map, which handles it correctly.
+    identity = np.flatnonzero(is_pure_alpha & is_pure_beta)
+    pure_alpha = np.concatenate((pure_alpha, identity))
     alpha_src, alpha_dst, alpha_sign = get_spin_arena(ci_info, True)
     beta_src, beta_dst, beta_sign = get_spin_arena(ci_info, False)
     return SpinFactorizedOperator(
@@ -358,21 +385,59 @@ def factorize_operator(op: FermionicOperator, ci_info: CI_Info) -> SpinFactorize
         beta_src,
         beta_dst,
         beta_sign,
-        term_alpha_start,
-        term_alpha_stop,
-        term_beta_start,
-        term_beta_stop,
-        term_factor,
-        term_is_pure_alpha,
-        term_is_pure_beta,
+        alpha_start[pure_alpha],
+        alpha_stop[pure_alpha],
+        factor[pure_alpha],
+        beta_start[pure_beta],
+        beta_stop[pure_beta],
+        factor[pure_beta],
+        alpha_start[mixed],
+        alpha_stop[mixed],
+        beta_start[mixed],
+        beta_stop[mixed],
+        factor[mixed],
     )
 
 
 @nb.jit(nopython=True)
-def apply_factorized_operator(
+def build_pure_spin_matrix(
+    matrix: np.ndarray,
+    src: np.ndarray,
+    dst: np.ndarray,
+    sign: np.ndarray,
+    starts: np.ndarray,
+    stops: np.ndarray,
+    factors: np.ndarray,
+) -> np.ndarray:
+    r"""Sum every term acting on one spin only into a single matrix over that spin's strings.
+
+    All of those terms act on the same side of the state, so their sum is one matrix and the
+    whole group is applied with one matrix multiplication. The sum is also a compression: the
+    terms typically hold far more excitations than the matrix has entries.
+
+    Args:
+        matrix: Matrix to accumulate into, over the strings of one spin.
+        src: Spin string indices a sub-string maps from.
+        dst: Spin string indices a sub-string maps to.
+        sign: Phase of the sub-string application.
+        starts: Start of each term's slice into the arena.
+        stops: End of each term's slice into the arena.
+        factors: Factor in front of each term.
+
+    Returns:
+        Matrix over the strings of one spin.
+    """
+    for term in range(len(factors)):
+        fac = factors[term]
+        for k in range(starts[term], stops[term]):
+            matrix[dst[k], src[k]] += fac * sign[k]
+    return matrix
+
+
+@nb.jit(nopython=True)
+def apply_mixed_terms(
     state: np.ndarray,
     tmp_state: np.ndarray,
-    num_alpha_strings: int,
     num_beta_strings: int,
     alpha_src: np.ndarray,
     alpha_dst: np.ndarray,
@@ -380,30 +445,20 @@ def apply_factorized_operator(
     beta_src: np.ndarray,
     beta_dst: np.ndarray,
     beta_sign: np.ndarray,
-    term_alpha_start: np.ndarray,
-    term_alpha_stop: np.ndarray,
-    term_beta_start: np.ndarray,
-    term_beta_stop: np.ndarray,
-    term_factor: np.ndarray,
-    term_is_pure_alpha: np.ndarray,
-    term_is_pure_beta: np.ndarray,
+    alpha_start: np.ndarray,
+    alpha_stop: np.ndarray,
+    beta_start: np.ndarray,
+    beta_stop: np.ndarray,
+    factors: np.ndarray,
 ) -> np.ndarray:
-    r"""Apply a spin-factorized operator to a state for a single state wave function.
+    r"""Apply the terms that act on both spins, pairing the surviving strings of each.
 
     The determinant index is :math:`I = I_\alpha N_\beta + I_\beta`, so a term only has to walk
-    the surviving alpha and beta strings and can combine them by arithmetic. There are three
-    cases, depending on which spin the term acts on,
-
-    #. Only alpha, so a whole beta block of the state moves at once.
-
-    #. Only beta, so every alpha block is touched at one offset, with a stride.
-
-    #. Both, so the surviving alpha and beta strings are combined pairwise.
+    the surviving alpha and beta strings and can combine them by arithmetic.
 
     Args:
         state: Original state.
         tmp_state: New state.
-        num_alpha_strings: Number of alpha strings.
         num_beta_strings: Number of beta strings.
         alpha_src: Alpha string indices an alpha sub-string maps from.
         alpha_dst: Alpha string indices an alpha sub-string maps to.
@@ -411,41 +466,278 @@ def apply_factorized_operator(
         beta_src: Beta string indices a beta sub-string maps from.
         beta_dst: Beta string indices a beta sub-string maps to.
         beta_sign: Phase of the beta sub-string application.
-        term_alpha_start: Start of the term's slice into the alpha arrays.
-        term_alpha_stop: End of the term's slice into the alpha arrays.
-        term_beta_start: Start of the term's slice into the beta arrays.
-        term_beta_stop: End of the term's slice into the beta arrays.
-        term_factor: Factor in front of the term.
-        term_is_pure_alpha: True if the term acts as the identity on the beta string.
-        term_is_pure_beta: True if the term acts as the identity on the alpha string.
+        alpha_start: Start of each term's slice into the alpha arena.
+        alpha_stop: End of each term's slice into the alpha arena.
+        beta_start: Start of each term's slice into the beta arena.
+        beta_stop: End of each term's slice into the beta arena.
+        factors: Factor in front of each term.
 
     Returns:
         New state.
     """
-    for term in range(len(term_factor)):
-        factor = term_factor[term]
-        if term_is_pure_alpha[term]:
-            for idx_a in range(term_alpha_start[term], term_alpha_stop[term]):
-                src = alpha_src[idx_a] * num_beta_strings
-                dst = alpha_dst[idx_a] * num_beta_strings
-                fac = factor * alpha_sign[idx_a]
-                for i in range(num_beta_strings):
-                    tmp_state[dst + i] += fac * state[src + i]
-        elif term_is_pure_beta[term]:
-            for idx_b in range(term_beta_start[term], term_beta_stop[term]):
-                src = beta_src[idx_b]
-                dst = beta_dst[idx_b]
-                fac = factor * beta_sign[idx_b]
-                for i in range(num_alpha_strings):
-                    tmp_state[i * num_beta_strings + dst] += fac * state[i * num_beta_strings + src]
-        else:
-            for idx_a in range(term_alpha_start[term], term_alpha_stop[term]):
-                src = alpha_src[idx_a] * num_beta_strings
-                dst = alpha_dst[idx_a] * num_beta_strings
-                fac = factor * alpha_sign[idx_a]
-                for idx_b in range(term_beta_start[term], term_beta_stop[term]):
-                    tmp_state[dst + beta_dst[idx_b]] += fac * beta_sign[idx_b] * state[src + beta_src[idx_b]]
+    for term in range(len(factors)):
+        factor = factors[term]
+        for idx_a in range(alpha_start[term], alpha_stop[term]):
+            src = alpha_src[idx_a] * num_beta_strings
+            dst = alpha_dst[idx_a] * num_beta_strings
+            fac = factor * alpha_sign[idx_a]
+            for idx_b in range(beta_start[term], beta_stop[term]):
+                tmp_state[dst + beta_dst[idx_b]] += fac * beta_sign[idx_b] * state[src + beta_src[idx_b]]
     return tmp_state
+
+
+@nb.jit(nopython=True)
+def apply_pure_spin_terms(
+    state: np.ndarray,
+    tmp_state: np.ndarray,
+    num_alpha_strings: int,
+    num_beta_strings: int,
+    is_alpha: bool,
+    src: np.ndarray,
+    dst: np.ndarray,
+    sign: np.ndarray,
+    starts: np.ndarray,
+    stops: np.ndarray,
+    factors: np.ndarray,
+) -> np.ndarray:
+    """Apply the terms that act on one spin only, as a sparse scatter.
+
+    Used when the dense matrix of that spin would be too wasteful, see use_dense_spin_matrix.
+    An alpha only term moves a whole beta block of the state at once, while a beta only term
+    touches every alpha block at one offset, with a stride.
+
+    Args:
+        state: Original state.
+        tmp_state: New state.
+        num_alpha_strings: Number of alpha strings.
+        num_beta_strings: Number of beta strings.
+        is_alpha: The terms act on the alpha strings, otherwise on the beta ones.
+        src: Spin string indices a sub-string maps from.
+        dst: Spin string indices a sub-string maps to.
+        sign: Phase of the sub-string application.
+        starts: Start of each term's slice into the arena.
+        stops: End of each term's slice into the arena.
+        factors: Factor in front of each term.
+
+    Returns:
+        New state.
+    """
+    for term in range(len(factors)):
+        factor = factors[term]
+        for k in range(starts[term], stops[term]):
+            fac = factor * sign[k]
+            if is_alpha:
+                src_offset = src[k] * num_beta_strings
+                dst_offset = dst[k] * num_beta_strings
+                for i in range(num_beta_strings):
+                    tmp_state[dst_offset + i] += fac * state[src_offset + i]
+            else:
+                src_offset = src[k]
+                dst_offset = dst[k]
+                for i in range(num_alpha_strings):
+                    tmp_state[i * num_beta_strings + dst_offset] += (
+                        fac * state[i * num_beta_strings + src_offset]
+                    )
+    return tmp_state
+
+
+def build_sigma3_layout(
+    factorized: SpinFactorizedOperator, num_alpha_strings: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    r"""Rewrite the terms acting on both spins as a contraction over their sub-strings.
+
+    Those terms are a sum of products, and only a few distinct sub-strings appear in them, so
+    the whole group is a coefficient matrix over (alpha sub-string, beta sub-string) pairs,
+
+    .. math::
+        \hat{O}_\text{mixed} = \sum_{ab}g_{ab}\hat{A}_a\otimes\hat{B}_b
+
+    That is what turns the group into a dense contraction, see apply_sigma3_terms. The start of
+    a sub-string's slice of the arena identifies it uniquely, so it is used as its name here.
+
+    The alpha excitations are regrouped by the alpha string they produce rather than by the
+    sub-string they belong to, because the contraction is done one output alpha string at a
+    time. The groups are padded to a common width with a zero phase, which contributes nothing.
+
+    Args:
+        factorized: Spin-factorized operator.
+        num_alpha_strings: Number of alpha strings.
+
+    Returns:
+        Coefficient matrix, alpha sub-string index, alpha source string, alpha phase, and the
+        beta offsets, sources, targets and phases.
+    """
+    # A sub-string whose every excitation is killed owns an empty slice, and an empty slice
+    # starts where the next one does, so a sub-string is named by both ends of its slice. Empty
+    # sub-strings then share one name, which is harmless because they contribute nothing.
+    alpha_key = factorized.mixed_alpha_start * (len(factorized.alpha_src) + 1) + (factorized.mixed_alpha_stop)
+    beta_key = factorized.mixed_beta_start * (len(factorized.beta_src) + 1) + (factorized.mixed_beta_stop)
+    _, alpha_first, alpha_id = np.unique(alpha_key, return_index=True, return_inverse=True)
+    _, beta_first, beta_id = np.unique(beta_key, return_index=True, return_inverse=True)
+    alpha_name = factorized.mixed_alpha_start[alpha_first]
+    beta_name = factorized.mixed_beta_start[beta_first]
+    num_alpha_subs = len(alpha_name)
+    num_beta_subs = len(beta_name)
+    # Terms sharing a pair of sub-strings differ only by their factor, so they add up.
+    coefficients = np.bincount(
+        alpha_id * num_beta_subs + beta_id,
+        weights=factorized.mixed_factor,
+        minlength=num_alpha_subs * num_beta_subs,
+    ).reshape(num_alpha_subs, num_beta_subs)
+    alpha_stop = factorized.mixed_alpha_stop[alpha_first]
+    beta_stop = factorized.mixed_beta_stop[beta_first]
+
+    alpha_entries = np.concatenate(
+        [np.arange(lo, hi) for lo, hi in zip(alpha_name, alpha_stop)]
+        if num_alpha_subs > 0
+        else [np.zeros(0, dtype=np.int64)]
+    )
+    owner = np.repeat(np.arange(num_alpha_subs), alpha_stop - alpha_name)
+    target = factorized.alpha_dst[alpha_entries]
+    order = np.argsort(target, kind="stable")
+    target = target[order]
+    counts = np.bincount(target, minlength=num_alpha_strings)
+    width = int(counts.max()) if len(counts) > 0 else 0
+    group_start = np.zeros(num_alpha_strings + 1, dtype=np.int64)
+    group_start[1:] = np.cumsum(counts)
+    slot = np.arange(len(target), dtype=np.int64) - np.repeat(group_start[:-1], counts)
+    coupling_sub = np.zeros((num_alpha_strings, max(width, 1)), dtype=np.int64)
+    coupling_src = np.zeros((num_alpha_strings, max(width, 1)), dtype=np.int64)
+    coupling_sign = np.zeros((num_alpha_strings, max(width, 1)))
+    coupling_sub[target, slot] = owner[order]
+    coupling_src[target, slot] = factorized.alpha_src[alpha_entries][order]
+    coupling_sign[target, slot] = factorized.alpha_sign[alpha_entries][order]
+
+    beta_entries = np.concatenate(
+        [np.arange(lo, hi) for lo, hi in zip(beta_name, beta_stop)]
+        if num_beta_subs > 0
+        else [np.zeros(0, dtype=np.int64)]
+    )
+    beta_offsets = np.zeros(num_beta_subs + 1, dtype=np.int64)
+    beta_offsets[1:] = np.cumsum(beta_stop - beta_name)
+    return (
+        coefficients,
+        coupling_sub,
+        coupling_src,
+        coupling_sign,
+        beta_offsets,
+        factorized.beta_src[beta_entries],
+        factorized.beta_dst[beta_entries],
+        factorized.beta_sign[beta_entries],
+    )
+
+
+@nb.jit(nopython=True)
+def apply_sigma3_terms(
+    state: np.ndarray,
+    tmp_state: np.ndarray,
+    num_alpha_strings: int,
+    num_beta_strings: int,
+    coefficients: np.ndarray,
+    coupling_sub: np.ndarray,
+    coupling_src: np.ndarray,
+    coupling_sign: np.ndarray,
+    beta_offsets: np.ndarray,
+    beta_src: np.ndarray,
+    beta_dst: np.ndarray,
+    beta_sign: np.ndarray,
+) -> np.ndarray:
+    r"""Apply the terms acting on both spins as a dense contraction, one alpha string at a time.
+
+    For a single output alpha string the sum over terms collapses to three steps. Gather the
+    rows of the state that feed it, contract them against the coefficient matrix over the
+    sub-strings, and scatter the result through the beta excitations.
+
+    The gather and the scatter are cheap, and the contraction between them is a matrix
+    multiplication, which is what makes this faster than pairing the surviving strings of every
+    term one by one. Only the alpha sub-strings that actually reach this alpha string take part,
+    so the contraction stays narrow.
+
+    Args:
+        state: Original state.
+        tmp_state: New state.
+        num_alpha_strings: Number of alpha strings.
+        num_beta_strings: Number of beta strings.
+        coefficients: Factor of each (alpha sub-string, beta sub-string) pair.
+        coupling_sub: Alpha sub-string index of each excitation into an alpha string.
+        coupling_src: Alpha string each excitation into an alpha string comes from.
+        coupling_sign: Phase of each excitation into an alpha string.
+        beta_offsets: Start of each beta sub-string's excitations.
+        beta_src: Beta string indices a beta sub-string maps from.
+        beta_dst: Beta string indices a beta sub-string maps to.
+        beta_sign: Phase of the beta sub-string application.
+
+    Returns:
+        New state.
+    """
+    num_beta_subs = coefficients.shape[1]
+    width = coupling_sub.shape[1]
+    gathered = np.zeros((width, num_beta_strings))
+    coefficients_t = np.zeros((num_beta_subs, width))
+    for dst_alpha in range(num_alpha_strings):
+        for slot in range(width):
+            sign = coupling_sign[dst_alpha, slot]
+            src = coupling_src[dst_alpha, slot] * num_beta_strings
+            for i in range(num_beta_strings):
+                gathered[slot, i] = sign * state[src + i]
+            sub = coupling_sub[dst_alpha, slot]
+            for idx_b in range(num_beta_subs):
+                coefficients_t[idx_b, slot] = coefficients[sub, idx_b]
+        combined = np.dot(coefficients_t, gathered)
+        base = dst_alpha * num_beta_strings
+        for idx_b in range(num_beta_subs):
+            for k in range(beta_offsets[idx_b], beta_offsets[idx_b + 1]):
+                tmp_state[base + beta_dst[k]] += beta_sign[k] * combined[idx_b, beta_src[k]]
+    return tmp_state
+
+
+def use_sigma3(
+    num_alpha_strings: int,
+    num_beta_strings: int,
+    num_beta_subs: int,
+    width: int,
+    num_pair_products: int,
+) -> bool:
+    """Decide whether to apply the terms acting on both spins as a dense contraction.
+
+    The contraction is dense over the sub-strings, so it touches more elements than pairing the
+    surviving strings of each term does. It is still much faster per element, so it is used
+    while the excess stays bounded.
+
+    Args:
+        num_alpha_strings: Number of alpha strings.
+        num_beta_strings: Number of beta strings.
+        num_beta_subs: Number of distinct beta sub-strings.
+        width: Number of alpha excitations reaching one alpha string, padded.
+        num_pair_products: Number of string pairs the term by term algorithm would visit.
+
+    Returns:
+        True if the group should be applied as a dense contraction.
+    """
+    dense_work = num_alpha_strings * num_beta_subs * width * num_beta_strings
+    return dense_work <= 8 * max(num_pair_products, 1)
+
+
+def use_dense_spin_matrix(num_strings: int, num_other_strings: int, num_excitations: int) -> bool:
+    """Decide whether to apply a one-spin group as a dense matrix instead of a sparse scatter.
+
+    The matrix is dense over the spin's strings, so it can hold more entries than the terms have
+    excitations. That is still a win, because the matrix multiplication runs an order of
+    magnitude faster per entry than the scatter, but only while the excess stays bounded. The
+    second test keeps the matrix from dwarfing the state vector when the two spin spaces are
+    very different in size.
+
+    Args:
+        num_strings: Number of strings of the spin the matrix is over.
+        num_other_strings: Number of strings of the other spin.
+        num_excitations: Number of excitations the terms of this spin hold in total.
+
+    Returns:
+        True if the group should be applied as a dense matrix.
+    """
+    return num_strings * num_strings <= 8 * max(num_excitations, 1) and num_strings <= 8 * max(
+        num_other_strings, 1
+    )
 
 
 def propagate_state_factorized(
@@ -465,22 +757,99 @@ def propagate_state_factorized(
     factorized = factorize_operator(op, ci_info)
     if factorized is None:
         return None
-    return apply_factorized_operator(
+    num_alpha_strings = ci_info.num_alpha_strings
+    num_beta_strings = ci_info.num_beta_strings
+    # The state is stored as I = I_alpha*N_beta + I_beta, so it is already a matrix over the two
+    # spin string spaces and needs no copy to be seen as one.
+    state_matrix = np.ascontiguousarray(state).reshape(num_alpha_strings, num_beta_strings)
+    tmp_matrix = tmp_state.reshape(num_alpha_strings, num_beta_strings)
+    for is_alpha, starts, stops, factors in (
+        (
+            True,
+            factorized.pure_alpha_start,
+            factorized.pure_alpha_stop,
+            factorized.pure_alpha_factor,
+        ),
+        (False, factorized.pure_beta_start, factorized.pure_beta_stop, factorized.pure_beta_factor),
+    ):
+        if len(factors) == 0:
+            continue
+        num_strings = num_alpha_strings if is_alpha else num_beta_strings
+        num_other_strings = num_beta_strings if is_alpha else num_alpha_strings
+        src, dst, sign = (
+            (factorized.alpha_src, factorized.alpha_dst, factorized.alpha_sign)
+            if is_alpha
+            else (factorized.beta_src, factorized.beta_dst, factorized.beta_sign)
+        )
+        if not use_dense_spin_matrix(num_strings, num_other_strings, int(np.sum(stops - starts))):
+            apply_pure_spin_terms(
+                state,
+                tmp_state,
+                num_alpha_strings,
+                num_beta_strings,
+                is_alpha,
+                src,
+                dst,
+                sign,
+                starts,
+                stops,
+                factors,
+            )
+            continue
+        spin_matrix = build_pure_spin_matrix(
+            np.zeros((num_strings, num_strings)), src, dst, sign, starts, stops, factors
+        )
+        if is_alpha:
+            tmp_matrix += spin_matrix @ state_matrix
+        else:
+            tmp_matrix += state_matrix @ spin_matrix.T
+    if len(factorized.mixed_factor) == 0:
+        return tmp_state
+    layout = build_sigma3_layout(factorized, num_alpha_strings)
+    coefficients, coupling_sub, coupling_src, coupling_sign = layout[:4]
+    beta_offsets, beta_src, beta_dst, beta_sign = layout[4:]
+    num_pair_products = int(
+        np.sum(
+            (factorized.mixed_alpha_stop - factorized.mixed_alpha_start)
+            * (factorized.mixed_beta_stop - factorized.mixed_beta_start)
+        )
+    )
+    if use_sigma3(
+        num_alpha_strings,
+        num_beta_strings,
+        coefficients.shape[1],
+        coupling_sub.shape[1],
+        num_pair_products,
+    ):
+        apply_sigma3_terms(
+            state,
+            tmp_state,
+            num_alpha_strings,
+            num_beta_strings,
+            coefficients,
+            coupling_sub,
+            coupling_src,
+            coupling_sign,
+            beta_offsets,
+            beta_src,
+            beta_dst,
+            beta_sign,
+        )
+        return tmp_state
+    apply_mixed_terms(
         state,
         tmp_state,
-        ci_info.num_alpha_strings,
-        ci_info.num_beta_strings,
+        num_beta_strings,
         factorized.alpha_src,
         factorized.alpha_dst,
         factorized.alpha_sign,
         factorized.beta_src,
         factorized.beta_dst,
         factorized.beta_sign,
-        factorized.term_alpha_start,
-        factorized.term_alpha_stop,
-        factorized.term_beta_start,
-        factorized.term_beta_stop,
-        factorized.term_factor,
-        factorized.term_is_pure_alpha,
-        factorized.term_is_pure_beta,
+        factorized.mixed_alpha_start,
+        factorized.mixed_alpha_stop,
+        factorized.mixed_beta_start,
+        factorized.mixed_beta_stop,
+        factorized.mixed_factor,
     )
+    return tmp_state

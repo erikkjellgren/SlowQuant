@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing, get_indexing_extended
-from slowquant.unitary_coupled_cluster.operator_state_algebra import propagate_state
+from slowquant.unitary_coupled_cluster.operator_state_algebra import build_operator_matrix
 from slowquant.unitary_coupled_cluster.operators import (
     G1,
     G2,
@@ -13,9 +13,13 @@ from slowquant.unitary_coupled_cluster.operators import (
     hamiltonian_0i_0a,
 )
 from slowquant.unitary_coupled_cluster.spin_factorized_algebra import (
+    apply_mixed_terms,
+    apply_sigma3_terms,
+    build_sigma3_layout,
     factorize_operator,
     propagate_state_factorized,
     split_spin_string,
+    use_sigma3,
 )
 from slowquant.unitary_coupled_cluster.spin_ordering import alpha_idx, beta_idx
 
@@ -45,13 +49,17 @@ def random_hamiltonian(num_active_orbs: int, seed: int) -> tuple[np.ndarray, np.
 def assert_matches_unfactorized(op, ci_info, seed: int = 0) -> None:
     """Assert the factorized algebra reproduces the general kernel for one operator.
 
+    The reference is built with build_operator_matrix, which goes through the general
+    determinant kernel. Going through propagate_state instead would be no test at all, since
+    that is the caller the factorized algebra is wired into.
+
     Args:
         op: Folded fermionic operator.
         ci_info: Information about the CI space.
         seed: Seed of the random number generator.
     """
     state = np.random.default_rng(seed).random(len(ci_info.idx2det))
-    reference = propagate_state([op], state, ci_info, do_folding=False)
+    reference = build_operator_matrix(op, ci_info) @ state
     tmp_state = np.zeros_like(state)
     factorized = propagate_state_factorized(op, state, ci_info, tmp_state)
     assert factorized is not None
@@ -122,8 +130,9 @@ def test_repeated_application_matches_unfactorized() -> None:
         0, num_active_orbs, 0
     )
     state = np.random.default_rng(3).random(len(ci_info.idx2det))
+    matrix = build_operator_matrix(hamiltonian, ci_info)
     for _ in range(3):
-        reference = propagate_state([hamiltonian], state, ci_info, do_folding=False)
+        reference = matrix @ state
         tmp_state = np.zeros_like(state)
         state = propagate_state_factorized(hamiltonian, state, ci_info, tmp_state)
         assert np.allclose(state, reference, atol=1e-12)
@@ -184,3 +193,71 @@ def test_state_norm_is_preserved_by_hermitian_operator(
         assert column is not None
         matrix[:, i] = column
     assert np.allclose(matrix, matrix.T, atol=1e-12)
+
+
+def test_sigma3_matches_term_by_term_mixed_application() -> None:
+    """Test the dense contraction against pairing the surviving strings of each mixed term.
+
+    The two are selected by a heuristic, so both have to be exercised deliberately. This also
+    covers spaces where a spin sub-string has no surviving excitation at all, which shares an
+    arena slice with the next one and so must not be mistaken for it.
+    """
+    for num_active_orbs, num_alpha, num_beta in (*CI_SPACES_TESTED, (6, 3, 3), (7, 4, 3)):
+        ci_info = get_indexing(0, num_active_orbs, 0, num_alpha, num_beta)
+        h_mo, g_mo = random_hamiltonian(num_active_orbs, seed=num_active_orbs + num_alpha)
+        hamiltonian = hamiltonian_0i_0a(h_mo, g_mo, 0, num_active_orbs, 0).get_folded_operator(
+            0, num_active_orbs, 0
+        )
+        factorized = factorize_operator(hamiltonian, ci_info)
+        assert factorized is not None
+        if len(factorized.mixed_factor) == 0:
+            continue
+        state = np.random.default_rng(num_active_orbs).random(len(ci_info.idx2det))
+        term_by_term = apply_mixed_terms(
+            state,
+            np.zeros_like(state),
+            ci_info.num_beta_strings,
+            factorized.alpha_src,
+            factorized.alpha_dst,
+            factorized.alpha_sign,
+            factorized.beta_src,
+            factorized.beta_dst,
+            factorized.beta_sign,
+            factorized.mixed_alpha_start,
+            factorized.mixed_alpha_stop,
+            factorized.mixed_beta_start,
+            factorized.mixed_beta_stop,
+            factorized.mixed_factor,
+        )
+        layout = build_sigma3_layout(factorized, ci_info.num_alpha_strings)
+        contracted = apply_sigma3_terms(
+            state,
+            np.zeros_like(state),
+            ci_info.num_alpha_strings,
+            ci_info.num_beta_strings,
+            *layout,
+        )
+        assert np.allclose(contracted, term_by_term, atol=1e-12)
+
+
+def test_sigma3_is_actually_selected_somewhere() -> None:
+    """Test that the dense contraction is reached, so the test above is not vacuous."""
+    ci_info = get_indexing(0, 6, 0, 3, 3)
+    h_mo, g_mo = random_hamiltonian(6, seed=1)
+    hamiltonian = hamiltonian_0i_0a(h_mo, g_mo, 0, 6, 0).get_folded_operator(0, 6, 0)
+    factorized = factorize_operator(hamiltonian, ci_info)
+    assert factorized is not None
+    layout = build_sigma3_layout(factorized, ci_info.num_alpha_strings)
+    num_pair_products = int(
+        np.sum(
+            (factorized.mixed_alpha_stop - factorized.mixed_alpha_start)
+            * (factorized.mixed_beta_stop - factorized.mixed_beta_start)
+        )
+    )
+    assert use_sigma3(
+        ci_info.num_alpha_strings,
+        ci_info.num_beta_strings,
+        layout[0].shape[1],
+        layout[1].shape[1],
+        num_pair_products,
+    )
