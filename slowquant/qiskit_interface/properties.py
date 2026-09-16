@@ -8,6 +8,7 @@ from slowquant.qiskit_interface.circuit_wavefunction import WaveFunctionCircuit
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
+    two_electron_integral_transform,
 )
 from slowquant.unitary_coupled_cluster.operators import one_elec_op_0i_0a
 from slowquant.qiskit_interface.linear_response import naive
@@ -73,8 +74,164 @@ class properties():
             )
         return self._LR_triplet
 
+    def get_polarisability(self, freq=0) -> np.ndarray:
+        """Calculate the frequency dependent polarisability tensor.
+
+        Returns:
+            Polarisability tensor (in au).
+        """
+        prop_grad = self.LR_singlet.get_property_gradient(
+            one_electron_integral_transform(
+                self.wf.c_mo,
+                self.wf.int_gen.electric_dipole,
+            )
+        )
+        
+        if freq == 0:
+            response = scipy.linalg.solve(self.LR_singlet.hessian, prop_grad)
+        else:
+            response = scipy.linalg.solve(self.LR_singlet.hessian - freq * self.LR_singlet.metric, prop_grad)
+        
+        alpha = np.einsum('ix,iy->xy', prop_grad, response)
+
+        print(f'Polarisabilities:\n \t xx: {alpha[0,0]:.4f} \t yy: {alpha[1,1]:.4f} \t zz: {alpha[2,2]:.4f}')
+
+        return alpha
+
+    def get_nuclear_shielding_tensor(self) -> tuple[np.ndarray, np.ndarray]:
+        """Calculate the shielding tensor of each nuclei.
+
+        Returns:
+            Diamagnetic and paramagnetic shielding tensor for each nuclei (in ppm).
+        """
+        atoms = self.wf.int_gen.atom_coordinates
+        dia_shield = np.zeros((len(atoms), 3, 3))
+        para_shield = np.zeros((len(atoms), 3, 3))
+
+        for i in range(len(atoms)):
+            dia_i = []
+            origin = atoms[i,:]
+
+            # Diamagnetic term
+            dia_ao = self.wf.int_gen.diamagnetic_shielding(common_orig=origin, atom_coord=origin)
+            dia_mo = one_electron_integral_transform(self.wf.c_mo, dia_ao)
+
+            for comp in dia_mo:
+                dia_op = one_elec_op_0i_0a(comp, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
+                dia_i.append(
+                    self.wf.QI.quantum_expectation_value(
+                        dia_op.get_folded_operator(
+                            self.wf.num_inactive_orbs, 
+                            self.wf.num_active_orbs, 
+                            self.wf.num_virtual_orbs
+                        )
+                    )
+                )
+            
+            dia_shield[i,:,:] = np.array(dia_i).reshape((3,3))
+            
+            # PSO
+            property_gradient = self.LR_singlet.get_property_gradient(
+                one_electron_integral_transform(
+                    self.wf.c_mo,
+                    self.wf.int_gen.orbital_paramagnetic(origin),
+                )
+            )
+            response_vector = scipy.linalg.solve(self.LR_singlet.hessian, property_gradient)
+
+            # Anguar Momentum
+            property_gradient = self.LR_singlet.get_property_gradient(
+                one_electron_integral_transform(
+                    self.wf.c_mo,
+                    self.wf.int_gen.angular_momentum(origin),
+                )
+            )
+            # Paramagnetic shielding tensor
+            para_shield[i,:,:] -= np.einsum('ix,iy->xy', response_vector, property_gradient)
+
+
+        dia_shield *= nist.ALPHA**2 * 1e6
+        para_shield *= nist.ALPHA**2 * 1e6
+
+        print('Shielding (in ppm):')
+        for i in range(len(atoms)):
+            print(f'{i}: \tTotal={np.trace(dia_shield[i,:,:] + para_shield[i,:,:]) / 3:.4f} \tDia={np.trace(dia_shield[i,:,:]) / 3:.4f} \tPara={np.trace(para_shield[i,:,:]) / 3:.4f}')
+
+        return dia_shield, para_shield
+
+    def get_nuclear_shielding_tensor_giao(self) -> tuple[np.ndarray, np.ndarray]:
+        """Calculate the shielding tensor of each nuclei using london orbitals.
+
+        Returns:
+            Diamagnetic and paramagnetic shielding tensor for each nuclei (in ppm).
+        """
+        atoms = self.wf.int_gen.atom_coordinates
+        dia_shield = np.zeros((len(atoms), 3, 3))
+        para_shield = np.zeros((len(atoms), 3, 3))
+
+        for i in range(len(atoms)):
+            dia_i = []
+            origin = atoms[i,:]
+
+            # Diamagnetic term
+            # Unmodified MOs
+            dia_mo = one_electron_integral_transform(self.wf.c_mo, self.wf.int_gen.diamagnetic_shielding_giao(atom_coord=origin))
+            S1_mo  = one_electron_integral_transform(self.wf.c_mo, self.wf.int_gen.overlap_giao)
+            pso_mo = one_electron_integral_transform(self.wf.c_mo, self.wf.int_gen.orbital_paramagnetic(origin))
+
+            # Orthonomalized MOs
+            dia_mo += 1/2 * np.einsum('vmo,won->vwmn', S1_mo, pso_mo).reshape(dia_mo.shape)
+            dia_mo += 1/2 * np.einsum('von,wmo->vwmn', S1_mo, pso_mo).reshape(dia_mo.shape)
+
+            for comp in dia_mo:
+                dia_op = one_elec_op_0i_0a(comp, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
+                dia_i.append(
+                    self.wf.QI.quantum_expectation_value(
+                        dia_op.get_folded_operator(
+                            self.wf.num_inactive_orbs, 
+                            self.wf.num_active_orbs, 
+                            self.wf.num_virtual_orbs
+                        )
+                    )
+                )
+            
+            dia_shield[i,:,:] = np.array(dia_i).reshape((3,3))
+            
+            # PSO
+            property_gradient = self.LR_singlet.get_property_gradient(pso_mo)
+            response_vector = scipy.linalg.solve(self.LR_singlet.hessian, property_gradient)
+
+            # Anguar Momentum
+            # Unmodified MOs
+            h1mo = one_electron_integral_transform(self.wf.c_mo, self.wf.int_gen.angular_momentum_giao)
+            g1mo = two_electron_integral_transform(self.wf.c_mo, self.wf.int_gen.electron_electron_repulsion_giao)
+
+            # Orthonomalized MOs
+            h1mo -= 1/2 * np.einsum('vmo,on->vmn', S1_mo, self.wf.h_mo)
+            h1mo -= 1/2 * np.einsum('von,mo->vmn', S1_mo, self.wf.h_mo)
+            g1mo -= 1/2 * np.einsum('vmo,onpq->vmnpq', S1_mo, self.wf.g_mo)
+            g1mo -= 1/2 * np.einsum('von,mopq->vmnpq', S1_mo, self.wf.g_mo)
+            g1mo -= 1/2 * np.einsum('vpo,mnoq->vmnpq', S1_mo, self.wf.g_mo)
+            g1mo -= 1/2 * np.einsum('voq,mnpo->vmnpq', S1_mo, self.wf.g_mo)
+
+            property_gradient = self.LR_singlet.get_property_gradient(
+                int1e = h1mo,
+                int2e = g1mo,
+            )
+            # Paramagnetic shielding tensor
+            para_shield[i,:,:] -= np.einsum('ix,iy->xy', response_vector, property_gradient)
+
+
+        dia_shield *= nist.ALPHA**2 * 1e6
+        para_shield *= nist.ALPHA**2 * 1e6
+
+        print('Shielding (in ppm):')
+        for i in range(len(atoms)):
+            print(f'{i}: \tTotal={np.trace(dia_shield[i,:,:] + para_shield[i,:,:]) / 3:.4f} \tDia={np.trace(dia_shield[i,:,:]) / 3:.4f} \tPara={np.trace(para_shield[i,:,:]) / 3:.4f}')
+
+        return dia_shield, para_shield
     
-    def get_spin_spin_coupling_constant(self) -> np.ndarray:
+    def get_spin_spin_coupling_constant(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Calculate the spin-spin coupling constant tensor of each nuclei.
 
         Returns:
@@ -93,11 +250,12 @@ class properties():
 
             for comp in dso_mo:
                 dso_op = one_elec_op_0i_0a(comp, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-                dso_k.append(self.wf.QI.quantum_expectation_value(
-                    dso_op.get_folded_operator(
-                        self.wf.num_inactive_orbs, 
-                        self.wf.num_active_orbs, 
-                        self.wf.num_virtual_orbs)
+                dso_k.append(
+                    self.wf.QI.quantum_expectation_value(
+                        dso_op.get_folded_operator(
+                            self.wf.num_inactive_orbs, 
+                            self.wf.num_active_orbs, 
+                            self.wf.num_virtual_orbs)
                     )
                 )
             

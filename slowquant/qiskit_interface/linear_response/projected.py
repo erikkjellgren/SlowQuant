@@ -15,10 +15,13 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_triplet_orbital_response_hessian_block,
     get_orbital_response_metric_sigma,
     get_orbital_response_property_gradient_response,
+    get_orbital_response_property_gradient_1e,
+    get_orbital_response_property_gradient_2e,
 )
 from slowquant.unitary_coupled_cluster.operators import (
     hamiltonian_2i_2a,
     one_elec_op_0i_0a,
+    hamiltonian_0i_0a,
 )
 
 
@@ -594,3 +597,66 @@ class quantumLR(quantumLRBaseClass):
             transition_dipoles[state_number, 1] = q_part_y + g_part_y
             transition_dipoles[state_number, 2] = q_part_z + g_part_z
         return transition_dipoles
+
+    def get_property_gradient(self, int1e: np.ndarray, int2e: np.ndarray | None = None) -> np.ndarray:
+        """Calculate property gradient.
+
+        Args:
+            int1e: one-electron property integrals in MO basis.
+            int2e: two-electron property integrals in MO basis.
+
+        Returns:
+            Property gradient.
+        """
+
+        if np.allclose(int1e, int1e.transpose(0, -1, -2)):
+            # real integral
+            fac = -1
+        elif np.allclose(int1e, -1 * int1e.transpose(0, -1, -2)):
+            # imaginary integral
+            fac = 1
+        else:
+            raise ValueError("Wrong symmetry: int1e must be symmetric or antisymmetric")
+        
+        if int2e is not None:
+            if len(int1e) != len(int2e):
+                raise ValueError(f"Mismatched arrays: int1e and int2e must have the same length, got {len(int1e)} and {len(int2e)}")
+            if self.triplet:
+                raise ValueError("Not implemented: triplet response and int2e cannot be used simutaniously.")
+            if not np.allclose(int2e, -1 * fac * int2e.transpose(0,2,1,4,3)):
+                raise ValueError("Mismatched symmetry: int1e and int2e must either both be symmetric or antisymmetric")
+
+        idx_shift_q = len(self.q_ops)
+        V = np.zeros((len(self.q_ops + self.G_ops), len(int1e)))
+
+        if len(self.q_ops) != 0:
+            # Orbital response part
+            V[:idx_shift_q, :] = get_orbital_response_property_gradient_1e(
+                int1e,
+                self.wf.kappa_no_activeactive_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.rdm1,
+            )
+
+            if int2e is not None:
+                V[:idx_shift_q, :] += get_orbital_response_property_gradient_2e(
+                        int2e,
+                        self.wf.kappa_no_activeactive_idx,
+                        self.wf.num_inactive_orbs,
+                        self.wf.num_active_orbs,
+                        self.wf.rdm1,
+                        self.wf.rdm2,
+                    )
+
+        # Excitation response part
+        for comp, op_int1e in enumerate(int1e):
+            if int2e is None:
+                op = one_elec_op_0i_0a(op_int1e, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.triplet)
+            else:
+                op = hamiltonian_0i_0a(op_int1e, int2e[comp], self.wf.num_inactive_orbs, self.wf.num_active_orbs)
+            for idx, G in enumerate(self.G_ops):
+                V[idx + idx_shift_q, comp] = self.wf.QI.quantum_expectation_value((op).get_folded_operator(*self.orbs)) * self._G_exp[idx]
+                V[idx + idx_shift_q, comp] -= self.wf.QI.quantum_expectation_value((op * G).get_folded_operator(*self.orbs))
+        
+        return np.vstack((V, fac * V))

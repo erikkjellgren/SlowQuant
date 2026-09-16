@@ -169,7 +169,7 @@ class properties():
         return dia_shield, para_shield
 
     def get_nuclear_shielding_tensor_giao(self) -> tuple[np.ndarray, np.ndarray]:
-        """Calculate the shielding tensor of each nuclei.
+        """Calculate the shielding tensor of each nuclei using london orbitals.
 
         Returns:
             Diamagnetic and paramagnetic shielding tensor for each nuclei (in ppm).
