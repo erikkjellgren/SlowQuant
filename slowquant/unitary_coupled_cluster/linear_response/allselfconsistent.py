@@ -302,9 +302,9 @@ class LinearResponse(LinearResponseBaseClass):
         for comp, op_int1e in enumerate(int1e):
             # Orbital response part
             if int2e is None:
-                op = one_elec_op_1i_1a(op_int1e, self.wf.num_inactive_orbs, self.wf.num_active_orbs, triplet=self.triplet)
+                op = one_elec_op_1i_1a(op_int1e, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs, self.triplet)
             else:
-                op = hamiltonian_1i_1a(op_int1e, int2e[comp], self.wf.num_inactive_orbs, self.wf.num_active_orbs)
+                op = hamiltonian_1i_1a(op_int1e, int2e[comp], self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs)
             Udop_ket = propagate_state(["Ud", op], self.wf.ci_coeffs, *self.index_info)
             Udopd_ket = propagate_state(["Ud", op.dagger], self.wf.ci_coeffs, *self.index_info)
             for idx, q in enumerate(self.q_ops):

@@ -104,6 +104,9 @@ class properties():
         Returns:
             Diamagnetic and paramagnetic shielding tensor for each nuclei (in ppm).
         """
+
+        print("Gauge-origin on the corresponding atom")
+
         atoms = self.wf.int_gen.atom_coordinates
         dia_shield = np.zeros((len(atoms), 3, 3))
         para_shield = np.zeros((len(atoms), 3, 3))
@@ -165,6 +168,9 @@ class properties():
         Returns:
             Diamagnetic and paramagnetic shielding tensor for each nuclei (in ppm).
         """
+
+        print("Using London Orbitals")
+
         atoms = self.wf.int_gen.atom_coordinates
         dia_shield = np.zeros((len(atoms), 3, 3))
         para_shield = np.zeros((len(atoms), 3, 3))

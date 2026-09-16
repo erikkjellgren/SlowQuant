@@ -357,7 +357,8 @@ class LinearResponse(LinearResponseBaseClass):
                     * expectation_value(
                         self.wf.ci_coeffs,
                         [],
-                        G_ket
+                        G_ket,
+                        *self.index_info
                     )
                 )
                 # - < 0 | op G | 0 >
