@@ -106,6 +106,7 @@ class properties():
         """
 
         print("Gauge-origin on the corresponding atom")
+        print("Size of dia- and paramagnetic contributions dependent on placement of molecule in coordinate system")
 
         atoms = self.wf.int_gen.atom_coordinates
         dia_shield = np.zeros((len(atoms), 3, 3))
@@ -169,7 +170,7 @@ class properties():
             Diamagnetic and paramagnetic shielding tensor for each nuclei (in ppm).
         """
 
-        print("Using London Orbitals")
+        print("Using Gauge Invariant Atomic Orbitals")
 
         atoms = self.wf.int_gen.atom_coordinates
         dia_shield = np.zeros((len(atoms), 3, 3))

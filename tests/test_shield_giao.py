@@ -6,9 +6,9 @@ from slowquant.unitary_coupled_cluster.linear_response import naive, projected, 
 from slowquant.unitary_coupled_cluster.properties import properties
 
 
-def test_shield_H2_sto3g():
+def test_shield_giao_H2_sto3g():
     """
-    Test of NMR shielding constants for with H2(2,2)/STO-3G with naive, project, statetransfer and selfconsistent LR
+    Test of NMR shielding constants with giao for with H2(2,2)/STO-3G with naive, project, statetransfer and selfconsistent LR
     """
     geometry = """H  0.0   0.0  0.7;
             H  0.0  0.0  -0.7;"""
@@ -31,22 +31,22 @@ def test_shield_H2_sto3g():
 
     print("\nNaive")
     prop_naive = properties(WF, property_options={"excitations": "SD", "lr_formulation": naive})
-    dia_naive, para_naive = prop_naive.get_nuclear_shielding_tensor()
+    dia_naive, para_naive = prop_naive.get_nuclear_shielding_tensor_giao()
     shield_naive = np.trace(dia_naive + para_naive, axis1=1, axis2=2) / 3
 
     print("\nProjected")
     prop_proj = properties(WF, property_options={"excitations": "SD", "lr_formulation": projected})
-    dia_proj, para_proj = prop_proj.get_nuclear_shielding_tensor()
+    dia_proj, para_proj = prop_proj.get_nuclear_shielding_tensor_giao()
     shield_proj = np.trace(dia_proj + para_proj, axis1=1, axis2=2) / 3
 
     print("\nStatetransfer")
     prop_st = properties(WF, property_options={"excitations": "SD", "lr_formulation": statetransfer})
-    dia_st, para_st = prop_st.get_nuclear_shielding_tensor()
+    dia_st, para_st = prop_st.get_nuclear_shielding_tensor_giao()
     shield_st = np.trace(dia_st + para_st, axis1=1, axis2=2) / 3
 
     print("\nSelfconsistent")
     prop_sc = properties(WF, property_options={"excitations": "SD", "lr_formulation": selfconsistent})
-    dia_sc, para_sc = prop_sc.get_nuclear_shielding_tensor()
+    dia_sc, para_sc = prop_sc.get_nuclear_shielding_tensor_giao()
     shield_sc = np.trace(dia_sc + para_sc, axis1=1, axis2=2) / 3
 
     shield = np.array([shield_naive, shield_proj, shield_st, shield_sc])
@@ -54,13 +54,13 @@ def test_shield_H2_sto3g():
     thresh = 10**-4
 
     # Check shielding constant - reference dalton mcscf
-    assert np.all(abs(shield[:,0] - 32.9334) < thresh)
-    assert np.all(abs(shield[:,1] - 32.9334) < thresh)
+    assert np.all(abs(shield[:,0] - 27.5399) < thresh)
+    assert np.all(abs(shield[:,1] - 27.5399) < thresh)
 
 
-def test_shield_LiH_sto3g():
+def test_shield_giao_LiH_sto3g():
     """
-    Test of NMR shielding constants for LiH(2,2)/STO-3G with naive, project, statetransfer and selfconsistent LR
+    Test of NMR shielding constants with giao for LiH(2,2)/STO-3G with naive, project, statetransfer and selfconsistent LR
     """
     geometry = """H  0.0   0.0  0.7;
             Li  0.0  0.0  -0.7;"""
@@ -83,22 +83,22 @@ def test_shield_LiH_sto3g():
 
     print("\nNaive")
     prop_naive = properties(WF, property_options={"excitations": "SD", "lr_formulation": naive})
-    dia_naive, para_naive = prop_naive.get_nuclear_shielding_tensor()
+    dia_naive, para_naive = prop_naive.get_nuclear_shielding_tensor_giao()
     shield_naive = np.trace(dia_naive + para_naive, axis1=1, axis2=2) / 3
 
     print("\nProjected")
     prop_proj = properties(WF, property_options={"excitations": "SD", "lr_formulation": projected})
-    dia_proj, para_proj = prop_proj.get_nuclear_shielding_tensor()
+    dia_proj, para_proj = prop_proj.get_nuclear_shielding_tensor_giao()
     shield_proj = np.trace(dia_proj + para_proj, axis1=1, axis2=2) / 3
 
     print("\nStatetransfer")
     prop_st = properties(WF, property_options={"excitations": "SD", "lr_formulation": statetransfer})
-    dia_st, para_st = prop_st.get_nuclear_shielding_tensor()
+    dia_st, para_st = prop_st.get_nuclear_shielding_tensor_giao()
     shield_st = np.trace(dia_st + para_st, axis1=1, axis2=2) / 3
 
     print("\nSelfconsistent")
     prop_sc = properties(WF, property_options={"excitations": "SD", "lr_formulation": selfconsistent})
-    dia_sc, para_sc = prop_sc.get_nuclear_shielding_tensor()
+    dia_sc, para_sc = prop_sc.get_nuclear_shielding_tensor_giao()
     shield_sc = np.trace(dia_sc + para_sc, axis1=1, axis2=2) / 3
 
     shield = np.array([shield_naive, shield_proj, shield_st, shield_sc])
@@ -106,5 +106,5 @@ def test_shield_LiH_sto3g():
     thresh = 10**-3
 
     # Check shielding constant - reference dalton mcscf
-    assert np.all(abs(shield[:,0] - 38.7983) < thresh)
-    assert np.all(abs(shield[:,1] - 72.9730) < thresh)
+    assert np.all(abs(shield[:,0] - 12.4078) < thresh)
+    assert np.all(abs(shield[:,1] - 69.0138) < thresh)
