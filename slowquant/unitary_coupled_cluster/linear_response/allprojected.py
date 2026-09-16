@@ -1,11 +1,9 @@
 import numpy as np
 
-from slowquant.molecularintegrals.integralfunctions import (
-    one_electron_integral_transform,
-)
 from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient_response,
     get_orbital_response_property_gradient_1e,
+    get_orbital_response_property_gradient_2e,
 )
 from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
     LinearResponseBaseClass,
@@ -16,8 +14,8 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
 )
 from slowquant.unitary_coupled_cluster.operators import (
     hamiltonian_2i_2a,
-    Epq,
-    Tpq,
+    hamiltonian_0i_0a,
+    one_elec_op_0i_0a,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
@@ -288,91 +286,86 @@ class LinearResponse(LinearResponseBaseClass):
                 )
                 self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = val
 
-    def get_property_gradient(self, property_integrals: np.ndarray | tuple[np.ndarray]) -> np.ndarray:
+    def get_property_gradient(self, int1e: np.ndarray, int2e: np.ndarray | None = None) -> np.ndarray:
         """Calculate property gradient.
 
         Args:
-            property_integrals: Integrals in AO basis.
+            int1e: one-electron property integrals in MO basis.
+            int2e: two-electron property integrals in MO basis.
 
         Returns:
             Property gradient.
-        """
-        size_mo = self.wf.num_inactive_orbs + self.wf.num_active_orbs + self.wf.num_virtual_orbs
-        num_mo = len(property_integrals)
-        mo = np.zeros((num_mo, size_mo, size_mo))
-        for i, ao in enumerate(property_integrals):
-            mo[i, :, :] += one_electron_integral_transform(self.wf.c_mo, ao)
+        """ 
+
+        if np.allclose(int1e, int1e.transpose(0, -1, -2)):
+            # real integral
+            fac = -1
+        elif np.allclose(int1e, -1 * int1e.transpose(0, -1, -2)):
+            # imaginary integral
+            fac = 1
+        else:
+            raise ValueError("Wrong symmetry: int1e must be symmetric or antisymmetric")
+
+        if int2e is not None:
+            if len(int1e) != len(int2e):
+                raise ValueError(f"Mismatched arrays: int1e and int2e must have the same length, got {len(int1e)} and {len(int2e)}")
+            if self.triplet:
+                raise ValueError("Not implemented: triplet response and int2e cannot be used simutaniously.")
+            if not np.allclose(int2e, -1 * fac * int2e.transpose(0,2,1,4,3)):
+                raise ValueError("Mismatched symmetry: int1e and int2e must either both be symmetric or antisymmetric")
 
         idx_shift_q = len(self.q_ops)
-        V = np.zeros((len(self.q_ops + self.G_ops), num_mo))
-        
+        V = np.zeros((len(self.q_ops + self.G_ops), len(int1e)))
+
         if len(self.q_ops) != 0:
             # Orbital response part
             V[:idx_shift_q, :] = get_orbital_response_property_gradient_1e(
-                mo,
+                int1e,
                 self.wf.kappa_no_activeactive_idx,
                 self.wf.num_inactive_orbs,
                 self.wf.num_active_orbs,
                 self.wf.rdm1,
             )
 
-        if not self.triplet:
-            E = Epq
-        else:
-            E = Tpq
+            if int2e is not None:
+                V[:idx_shift_q, :] += get_orbital_response_property_gradient_2e(
+                        int2e,
+                        self.wf.kappa_no_activeactive_idx,
+                        self.wf.num_inactive_orbs,
+                        self.wf.num_active_orbs,
+                        self.wf.rdm1,
+                        self.wf.rdm2,
+                    )
 
-        for idx, G in enumerate(self.G_ops):
-            G_ket = propagate_state([G], self.wf.ci_coeffs, *self.index_info)
-            # Inactive part
-            for i in range(self.wf.num_inactive_orbs):
-                E_ket = propagate_state([E(i, i)], self.wf.ci_coeffs, *self.index_info) 
-                # < 0 | E | 0 > * < 0 | G | 0 >
-                val = (
+        for comp, op_int1e in enumerate(int1e):
+            if int2e is None:
+                op = one_elec_op_0i_0a(op_int1e, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.triplet)
+            else:
+                op = hamiltonian_0i_0a(op_int1e, int2e[comp], self.wf.num_inactive_orbs, self.wf.num_active_orbs)
+            op_ket = propagate_state([op], self.wf.ci_coeffs, *self.index_info)
+            opd_ket = propagate_state([op.dagger], self.wf.ci_coeffs, *self.index_info)
+            for idx, G in enumerate(self.G_ops):
+                G_ket = propagate_state([G], self.wf.ci_coeffs, *self.index_info)
+                # < 0 | op | 0 > * < 0 | G | 0 >
+                V[idx + idx_shift_q, comp] += (
                     expectation_value(
-                        self.wf.ci_coeffs, 
-                        [], 
-                        E_ket, 
-                        *self.index_info
-                    ) 
-                    * expectation_value(
-                        self.wf.ci_coeffs, 
-                        [], G_ket, 
-                        *self.index_info
-                    ))
-                # - < 0 | E G | 0 >
-                val -= expectation_value(
-                    E_ket, # E_ket = Ed_ket for E(i,i)
-                    [], 
-                    G_ket, 
-                    *self.index_info
-                ) 
-                V[idx + idx_shift_q, :] += mo[:, i, i] * val
-            # Active part
-            for v in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):
-                for w in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):
-                    Ed_ket = propagate_state([E(w, v)], self.wf.ci_coeffs, *self.index_info)
-                    # < 0 | E | 0 > * < 0 | G | 0 >
-                    val = (
-                        expectation_value(
-                            Ed_ket, 
-                            [], 
-                            self.wf.ci_coeffs, 
-                            *self.index_info
-                        ) 
-                        * expectation_value(
-                            self.wf.ci_coeffs, 
-                            [], 
-                            G_ket, 
-                            *self.index_info
-                        ))
-                    # - < 0 | E G | 0 >
-                    val -= expectation_value(
-                        Ed_ket, 
-                        [], 
-                        G_ket, 
+                        self.wf.ci_coeffs,
+                        [],
+                        op_ket,
                         *self.index_info
                     )
-                    V[idx + idx_shift_q, :] += mo[:, v, w] * val
-        if np.allclose(mo, mo.transpose(0, -1, -2)): # check if integrals are real or imaginary
-            return np.vstack((V, -1 * V))
-        return np.vstack((V, V))
+                    * expectation_value(
+                        self.wf.ci_coeffs,
+                        [],
+                        G_ket
+                    )
+                )
+                # - < 0 | op G | 0 >
+                V[idx + idx_shift_q, comp] -= expectation_value(
+                    opd_ket,
+                    [],
+                    G_ket,
+                    *self.index_info
+                )
+
+        return np.vstack((V, fac * V))

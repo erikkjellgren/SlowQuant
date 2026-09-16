@@ -259,7 +259,6 @@ class IntegralManager:
         if isinstance(self.int_obj, SlowQuant):
             raise ValueError("Angular momentum integrals in GIAOs not implemented for integral object, {type(self.int_obj)}. Use integral object, {pyscf.gto.mole.Mole}")
         elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
-            #print(self.int_obj.intor("int1e_giao_irjxp", 3)[0] / 2, self.int_obj.intor("int1e_igkin", 3)[0], self.int_obj.intor("int1e_ignuc", 3)[0])
             angular_momentum_giao = self.int_obj.intor("int1e_giao_irjxp", 3) / 2 + self.int_obj.intor("int1e_igkin", 3) + self.int_obj.intor("int1e_ignuc", 3)
         else:
             raise ValueError("Got unknown integral object, {type(self.int_obj)}")
@@ -289,7 +288,7 @@ class IntegralManager:
             raise ValueError("First derivative of the electron-electron repulsion integrals in GIAOs not implemented for integral object, {type(self.int_obj)}. Use integral object, {pyscf.gto.mole.Mole}")
         elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
             electron_electron_repulsion_giao = self.int_obj.intor("int2e_ig1", 3)
-            electron_electron_repulsion_giao = electron_electron_repulsion_giao + electron_electron_repulsion_giao.transpose(0,3,4,1,2)
+            electron_electron_repulsion_giao += electron_electron_repulsion_giao.transpose(0,3,4,1,2)
         else:
             raise ValueError("Got unknown integral object, {type(self.int_obj)}")
         self._electron_electron_repulsion_giao = electron_electron_repulsion_giao

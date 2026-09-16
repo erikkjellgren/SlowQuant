@@ -800,6 +800,7 @@ def one_elec_op_0i_0a(ints_mo: np.ndarray, num_inactive_orbs: int, num_active_or
         ints_mo: One-electron integrals for operator in MO basis.
         num_inactive_orbs: Number of inactive orbitals in spatial basis.
         num_active_orbs: Number of active orbitals in spatial basis.
+        triplet: If the operator is triplet spin-adapted.
 
     Returns:
         One-electron operator for active-space.
@@ -823,7 +824,7 @@ def one_elec_op_0i_0a(ints_mo: np.ndarray, num_inactive_orbs: int, num_active_or
 
 
 def one_elec_op_1i_1a(
-    ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int
+    ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int, triplet = False
 ) -> FermionicOperator:
     """Create one-electron operator that makes up to one change in the inactive and virtual orbitals.
 
@@ -832,10 +833,15 @@ def one_elec_op_1i_1a(
         num_inactive_orbs: Number of inactive orbitals in spatial basis.
         num_active_orbs: Number of active orbitals in spatial basis.
         num_virtual_orbs: Number of virtual orbitals in spatial basis.
+        triplet: If the operator is triplet spin-adapted.
 
     Returns:
         Modified one-electron operator.
     """
+    if not triplet:
+        E = Epq
+    else:
+        E = Tpq
     num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
     one_elec_op = FermionicOperator({})
     virtual_start = num_inactive_orbs + num_active_orbs
@@ -846,5 +852,5 @@ def one_elec_op_1i_1a(
             if p < num_inactive_orbs and q < num_inactive_orbs and p != q:
                 continue
             if abs(ints_mo[p, q]) > 10**-14:
-                one_elec_op += ints_mo[p, q] * Epq(p, q)
+                one_elec_op += ints_mo[p, q] * E(p, q)
     return one_elec_op

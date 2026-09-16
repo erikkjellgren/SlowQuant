@@ -15,7 +15,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     expectation_value,
     propagate_state,
 )
-from slowquant.unitary_coupled_cluster.operators import Epq, Tpq, epqrs
+from slowquant.unitary_coupled_cluster.operators import one_elec_op_0i_0a, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
@@ -301,25 +301,29 @@ class LinearResponse(LinearResponseBaseClass):
         """Calculate property gradient.
 
         Args:
-            prop_int1e: one-electron property integrals in MO basis.
-            prop_int2e: two-electron property integrals in MO basis.
+            int1e: one-electron property integrals in MO basis.
+            int2e: two-electron property integrals in MO basis.
 
         Returns:
             Property gradient.
-        """
+        """ 
 
-        # Check if singlet or triplet response
-        if not self.triplet:
-            E = Epq
+        if np.allclose(int1e, int1e.transpose(0, -1, -2)):
+            # real integral
+            fac = -1
+        elif np.allclose(int1e, -1 * int1e.transpose(0, -1, -2)):
+            # imaginary integral
+            fac = 1
         else:
-            if int2e is not None:
-                raise ValueError("Got triplet=True and int2e is not None, cannot be done simultaneously.")
-            E = Tpq
-
-        # Check that int1e and int2e match
+            raise ValueError("Wrong symmetry: int1e must be symmetric or antisymmetric")
+        
         if int2e is not None:
             if len(int1e) != len(int2e):
-                raise ValueError(f"Cartesian components in int1e and int2e must match, got {len(int1e)} and {len(int2e)}")
+                raise ValueError(f"Mismatched arrays: int1e and int2e must have the same length, got {len(int1e)} and {len(int2e)}")
+            if self.triplet:
+                raise ValueError("Not implemented: triplet response and int2e cannot be used simutaniously.")
+            if not np.allclose(int2e, -1 * fac * int2e.transpose(0,2,1,4,3)):
+                raise ValueError("Mismatched symmetry: int1e and int2e must either both be symmetric or antisymmetric")
 
         idx_shift_q = len(self.q_ops)
         V = np.zeros((len(self.q_ops + self.G_ops), len(int1e)))
@@ -344,75 +348,29 @@ class LinearResponse(LinearResponseBaseClass):
                         self.wf.rdm2,
                     )
 
-        for idx, G in enumerate(self.G_ops):
-            G_ket = propagate_state([G], self.wf.ci_coeffs, *self.index_info)
-            Gd_ket = propagate_state([G.dagger], self.wf.ci_coeffs, *self.index_info)
-            # one-electron part
-            # Inactive part
-            for i in range(self.wf.num_inactive_orbs):
-                E_ket = propagate_state([E(i, i)], self.wf.ci_coeffs, *self.index_info) 
-                # < 0 | G E | 0 >
-                val = expectation_value(
-                    Gd_ket, 
-                    [], 
-                    E_ket, 
+        for comp, op_int1e in enumerate(int1e):
+            if int2e is None:
+                op = one_elec_op_0i_0a(op_int1e, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.triplet)
+            else:
+                op = hamiltonian_0i_0a(op_int1e, int2e[comp], self.wf.num_inactive_orbs, self.wf.num_active_orbs)
+            op_ket = propagate_state([op], self.wf.ci_coeffs, *self.index_info)
+            opd_ket = propagate_state([op.dagger], self.wf.ci_coeffs, *self.index_info)
+            for idx, G in enumerate(self.G_ops):
+                G_ket = propagate_state([G], self.wf.ci_coeffs, *self.index_info)
+                Gd_ket = propagate_state([G.dagger], self.wf.ci_coeffs, *self.index_info)
+                # < 0 | G op | 0 >
+                V[idx + idx_shift_q, comp] += expectation_value(
+                    Gd_ket,
+                    [],
+                    op_ket,
                     *self.index_info
                 )
-                # - < 0 | E G | 0 >
-                val -= expectation_value(
-                    E_ket, # E_ket = Ed_ket for E(i,i)
-                    [], 
-                    G_ket, 
+                # - < 0 | op G | 0 >
+                V[idx + idx_shift_q, comp] -= expectation_value(
+                    opd_ket,
+                    [],
+                    G_ket,
                     *self.index_info
-                ) 
-                V[idx + idx_shift_q, :] += int1e[:, i, i] * val
-            # Active part
-            for v in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):
-                for w in range(
-                    self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs
-                ):
-                    E_ket = propagate_state([E(v, w)], self.wf.ci_coeffs, *self.index_info)
-                    Ed_ket = propagate_state([E(w, v)], self.wf.ci_coeffs, *self.index_info)
-                    # < 0 | G E | 0 >
-                    val = expectation_value(
-                        Gd_ket, 
-                        [], 
-                        E_ket, 
-                        *self.index_info
-                    )
-                    # - < 0 | E G | 0 >
-                    val -= expectation_value(
-                        Ed_ket, 
-                        [], 
-                        G_ket, 
-                        *self.index_info
-                    )
-                    V[idx + idx_shift_q, :] += int1e[:, v, w] * val
-
-            # two-electron part
-            if int2e is not None:  # seperate in inactive and active latter
-                for p in range(self.wf.num_inactive_orbs + self.wf.num_active_orbs):
-                    for q in range(self.wf.num_inactive_orbs + self.wf.num_active_orbs):
-                        for r in range(self.wf.num_inactive_orbs + self.wf.num_active_orbs):
-                            for s in range(self.wf.num_inactive_orbs + self.wf.num_active_orbs):
-                                e_ket = propagate_state([epqrs(p, q, r, s)], self.wf.ci_coeffs, *self.index_info)
-                                ed_ket = propagate_state([epqrs(s, r, q, p)], self.wf.ci_coeffs, *self.index_info)
-                                # < 0 | G e | 0 >
-                                val = expectation_value(
-                                    Gd_ket, 
-                                    [], 
-                                    e_ket, 
-                                    *self.index_info
-                                )
-                                # - < 0 | e G | 0 >
-                                val -= expectation_value(
-                                    ed_ket, 
-                                    [], 
-                                    G_ket, 
-                                    *self.index_info
-                                )
-                                V[idx + idx_shift_q, :] += int2e[:, p, q, r, s] * val      
+                )
         
-        if np.allclose(int1e, int1e.transpose(0, -1, -2)): # check if 2e are also imagniry, if one is and the other isn't throw and error
-            return np.vstack((V, -1 * V))
-        return np.vstack((V, V))
+        return np.vstack((V, fac * V))
