@@ -73,7 +73,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     sscobj = SSC(mf)
     sscobj.cphf = True
     sscobj.conv_tol = 1e-9
-    sscobj.mb = "RMB"
+    sscobj.mb = "RKB"
     sscobj.verbose = 5
     sscobj.with_fcsd = True
     jj = sscobj.kernel()
@@ -81,8 +81,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # Shieldings PySCF:
     nmr = nmr_dhf.NMR(mf)
     nmr.cphf = True
-    nmr.mb = 'RMB'      # or 'RKB'
-    nmr.gauge_orig = None #[0,0,0]  # GIAO vs. # [0,0,0]
+    nmr.mb = 'RKB'      # or 'RKB'
+    nmr.gauge_orig = [0,0,0]  # GIAO vs. # [0,0,0]
 
     shielding = nmr.kernel()
 
@@ -133,23 +133,23 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
     # WF object:
-    WF = GeneralizedWaveFunctionUPS(
-        active_space,
-        C_MO,
-        mol, 
-        K_pairs,
-        False,
-        "fUCCSD",
-        {"n_layers": 0, "is_spin_conserving" : False},
-        include_active_kappa=True,
-    )
+    # WF = GeneralizedWaveFunctionUPS(
+    #     active_space,
+    #     C_MO,
+    #     mol, 
+    #     K_pairs,
+    #     False,
+    #     "fUCCSD",
+    #     {"n_layers": 0, "is_spin_conserving" : False},
+    #     include_active_kappa=True,
+    # )
 
-    np.random.seed(20)
-    if len(WF.thetas) > 0:
-        real = np.random.uniform(-0.05,0.05,len(WF.thetas_real))
-        #imag = np.zeros_like(WF.thetas_imag)
-        imag = np.random.uniform(-0.05,0.05,len(WF.thetas_real))
-        WF.set_thetas(real, imag)
+    # np.random.seed(20)
+    # if len(WF.thetas) > 0:
+    #     real = np.random.uniform(-0.05,0.05,len(WF.thetas_real))
+    #     #imag = np.zeros_like(WF.thetas_imag)
+    #     imag = np.random.uniform(-0.05,0.05,len(WF.thetas_real))
+    #     WF.set_thetas(real, imag)
 
 
     # data = np.load("LiH((1,1),4).npz") 
@@ -158,20 +158,20 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # data = np.load("HF((1,1),4).npz")
     # data = np.load("H2-6-31g-J((1,1),4).npz")
     # data = np.load("HF((2,2),6).npz")
-    # data = np.load("H2-dyallv2z((1,1),6).npz")
+    data = np.load("H2-dyallv2z((1,1),6).npz")
 
-    # WF = GeneralizedWaveFunctionUPS(
-    #     active_space,
-    #     data["c_mo"],
-    #     #C_MO,
-    #     mol,
-    #     K_pairs,
-    #     False,
-    #     "fUCCSD",
-    #     {"n_layers": 1, "is_spin_conserving" : False},
-    #     include_active_kappa=True,
-    # )
-    # WF.set_thetas(data["thetas_real"], data["thetas_imag"])
+    WF = GeneralizedWaveFunctionUPS(
+        active_space,
+        data["c_mo"],
+        #C_MO,
+        mol,
+        K_pairs,
+        False,
+        "fUCCSD",
+        {"n_layers": 1, "is_spin_conserving" : False},
+        include_active_kappa=True,
+    )
+    WF.set_thetas(data["thetas_real"], data["thetas_imag"])
 
 
     print("DHF", mf.energy_elec()[0])
@@ -206,7 +206,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     print("PySCF:", sigma_iso)
 
-    LR.get_shieldings_4comp_iso(RMB_GIAO = True, output = True)
+    LR.get_shieldings_4comp_iso(RMB_GIAO = False)
 
     LR.get_SSCC_4comp_iso()
 
@@ -230,17 +230,17 @@ def H2():
     # with open('dyall2zp_H.nwchem', 'w') as f:
     #     f.write(dyall_v2z)
     #     f.close()
-    #basis = dyall_v2z
+    basis = dyall_v2z
     #basis = dyall_cv2z
     #basis = "sto-3g"
     #basis = "sto-6g"
     #basis = "631-g"
     #basis = "6-311-g"
-    basis = J_6_31g
+    #basis = J_6_31g
     #basis = J_6_311g_pp_ss
     #active_space = ((1, 1), 8)
-    #active_space = ((1, 1), 6)
-    active_space = ((1,1),2)
+    active_space = ((1, 1), 6)
+    #active_space = ((1,1),2)
     #active_space = ((1,1),4)
     #active_space = (2, 4)
     charge = 0
@@ -483,4 +483,4 @@ def N3():
 
 
 ###RUN SCRIPT###
-HCl()
+H2()
