@@ -165,9 +165,9 @@ def test_shield_LiH_sto3g():
     assert np.all(abs(shield[:,0] - 38.7983) < thresh)
     assert np.all(abs(shield[:,1] - 72.9730) < thresh)
 
-def test_shield_LiH_sto3g_allprojected():
+def test_shield_LiH_sto3g_projected_q():
     """
-    Test of NMR shielding constants for LiH(2,2)/STO-3G with allprojected LR
+    Test of NMR shielding constants for LiH(2,2)/STO-3G with allprojected and projected_statetransfer LR
     """
     geometry = """H  0.0   0.0  0.7;
             Li  0.0  0.0  -0.7;"""
@@ -202,15 +202,23 @@ def test_shield_LiH_sto3g_allprojected():
     )
     qWF.run_wf_optimization_2step("rotosolve", True)
 
+    print("\nAllprojected")
     # with SQ
     prop = properties(WF, lr_formulation="allprojected")
     dia, para = prop.get_nuclear_shielding_tensor()
-    shield = np.trace(dia + para, axis1=1, axis2=2) / 3
+    shield_proj = np.trace(dia + para, axis1=1, axis2=2) / 3
 
     # with QSQ
     prop = properties(qWF, lr_formulation="allprojected")
     dia, para = prop.get_nuclear_shielding_tensor()
-    shield_q = np.trace(dia + para, axis1=1, axis2=2) / 3
+    shield_qproj = np.trace(dia + para, axis1=1, axis2=2) / 3
 
-    # Check shielding constant - reference dalton mcscf
-    assert np.allclose(shield, shield_q)
+    assert np.allclose(shield_proj, shield_qproj)
+
+    print("\nProjected_statetransfer")
+    # with SQ
+    prop = properties(WF, lr_formulation="projected_statetransfer")
+    dia, para = prop.get_nuclear_shielding_tensor()
+    shield_st = np.trace(dia + para, axis1=1, axis2=2) / 3
+
+    assert np.allclose(shield_proj,shield_st)

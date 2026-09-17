@@ -20,12 +20,14 @@ class properties():
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS | WaveFunctionCircuit,
         lr_formulation: str,
-        property_options: dict[str, Any] = {},
+        response_options: dict[str, Any] = {},
     ) -> None:
-        """Initialize property calculations.
+        """Initialize response property calculations.
 
         Args:
             wave_function: Wave function object.
+            lr_formulation: Name of linear response formulation
+            response_options: Response options
         """
         self.wf = wave_function
         self.lr_formulation = lr_formulation.lower()
@@ -48,7 +50,7 @@ class properties():
         else:
             raise ValueError(f"Got incompatible wave function type, {type(self.wf)}")
 
-        self.property_options = property_options
+        self.response_options = response_options
         self._LR_singlet = None
         self._LR_triplet = None
 
@@ -81,7 +83,7 @@ class properties():
                     raise ValueError(f"Got unknown lr_formulation, {self.lr_formulation}")
                 self._LR_singlet = lr.LinearResponse(
                     self.wf,
-                    excitations=self.property_options.get("excitations", "SD"),
+                    excitations=self.response_options.get("excitations", "SD"),
                     triplet=False
                 )
             else:
@@ -89,33 +91,33 @@ class properties():
                     from slowquant.qiskit_interface.linear_response import allprojected
                     self._LR_singlet = allprojected.quantumLR(
                         self.wf,
-                        excitations=self.property_options.get("excitations", "SD"),
+                        excitations=self.response_options.get("excitations", "SD"),
                         triplet=False,
                     )
                     self._LR_singlet.run(
-                        do_gradients = self.property_options.get("do_gradients", True),
+                        do_gradients = self.response_options.get("do_gradients", True),
                     )
                 elif self.lr_formulation == "naive":
                     from slowquant.qiskit_interface.linear_response import naive
                     self._LR_singlet = naive.quantumLR(
                         self.wf,
-                        excitations=self.property_options.get("excitations", "SD"),
+                        excitations=self.response_options.get("excitations", "SD"),
                         triplet=False,
                     )
                     self._LR_singlet.run(
-                        do_rdm = self.property_options.get("do_rdm", True),
-                        do_gradients = self.property_options.get("do_gradients", True),
+                        do_rdm = self.response_options.get("do_rdm", True),
+                        do_gradients = self.response_options.get("do_gradients", True),
                     )
                 elif self.lr_formulation == "projected":
                     from slowquant.qiskit_interface.linear_response import projected
                     self._LR_singlet = projected.quantumLR(
                         self.wf,
-                        excitations=self.property_options.get("excitations", "SD"),
+                        excitations=self.response_options.get("excitations", "SD"),
                         triplet=False,
                     )
                     self._LR_singlet.run(
-                        do_rdm = self.property_options.get("do_rdm", True),
-                        do_gradients = self.property_options.get("do_gradients", True),
+                        do_rdm = self.response_options.get("do_rdm", True),
+                        do_gradients = self.response_options.get("do_gradients", True),
                     )
                 elif self.lr_formulation in ("allselfconsistent", "allstatetransfer", "projected_statetransfer", "selfconsistent", "statetransfer"):
                     raise NotImplementedError(f"Only allprojected, naive and projected are implemented for WaveFunctionCircuit, got {self.lr_formulation}")
@@ -153,7 +155,7 @@ class properties():
                     raise ValueError(f"Got unknown lr_formulation, {self.lr_formulation}")
                 self._LR_triplet = lr.LinearResponse(
                     self.wf,
-                    excitations=self.property_options.get("excitations", "SD"),
+                    excitations=self.response_options.get("excitations", "SD"),
                     triplet=True
                 )
             else:
@@ -161,33 +163,33 @@ class properties():
                     from slowquant.qiskit_interface.linear_response import allprojected
                     self._LR_triplet = allprojected.quantumLR(
                         self.wf,
-                        excitations=self.property_options.get("excitations", "SD"),
+                        excitations=self.response_options.get("excitations", "SD"),
                         triplet=True,
                     )
                     self._LR_triplet.run(
-                        do_gradients = self.property_options.get("do_gradients", True),
+                        do_gradients = self.response_options.get("do_gradients", True),
                     )
                 elif self.lr_formulation == "naive":
                     from slowquant.qiskit_interface.linear_response import naive
                     self._LR_triplet = naive.quantumLR(
                         self.wf,
-                        excitations=self.property_options.get("excitations", "SD"),
+                        excitations=self.response_options.get("excitations", "SD"),
                         triplet=True,
                     )
                     self._LR_triplet.run(
-                        do_rdm = self.property_options.get("do_rdm", True),
-                        do_gradients = self.property_options.get("do_gradients", True),
+                        do_rdm = self.response_options.get("do_rdm", True),
+                        do_gradients = self.response_options.get("do_gradients", True),
                     )
                 elif self.lr_formulation == "projected":
                     from slowquant.qiskit_interface.linear_response import projected
                     self._LR_triplet = projected.quantumLR(
                         self.wf,
-                        excitations=self.property_options.get("excitations", "SD"),
+                        excitations=self.response_options.get("excitations", "SD"),
                         triplet=True,
                     )
                     self._LR_triplet.run(
-                        do_rdm = self.property_options.get("do_rdm", True),
-                        do_gradients = self.property_options.get("do_gradients", True),
+                        do_rdm = self.response_options.get("do_rdm", True),
+                        do_gradients = self.response_options.get("do_gradients", True),
                     )
                 elif self.lr_formulation in ("allselfconsistent", "allstatetransfer", "projected_statetransfer", "selfconsistent", "statetransfer"):
                     raise NotImplementedError(f"Only allprojected, naive and projected are implemented for WaveFunctionCircuit, got {self.lr_formulation}")
@@ -374,7 +376,7 @@ class properties():
 
         return dia_shield, para_shield
     
-    def get_spin_spin_coupling_constant(self) -> np.ndarray:
+    def get_spin_spin_coupling_tensor(self) -> np.ndarray:
         """Calculate the spin-spin coupling constant tensor of each nuclei.
 
         Returns:
@@ -408,7 +410,7 @@ class properties():
                             self.wf.num_virtual_orbs
                         )
                     )
-                dso.k.append(val)
+                dso_k.append(val)
             
             dso_k = - np.array(dso_k).reshape((3,3))
             dso[k,:,:] = dso_k - dso_k.trace() * np.eye(3)
