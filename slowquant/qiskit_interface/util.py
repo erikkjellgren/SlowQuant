@@ -475,18 +475,18 @@ class Clique:
                 return clique_head.head
         raise ValueError(f"Could not find matching clique for Pauli, {pauli}")
 
-    def get_empty_heads(self, mitigation_int) -> list[str]:
-        """Return all heads that do not have any data for a specific mitigation int.
+    def get_empty_heads(self, mitigation_flags: MitigationFlags | None = None) -> list[str]:
+        """Return all heads that do not have data for a mitigation configuration.
 
         Args:
-            mitigation_int: Mitigation integer, default is 0.
+            mitigation_flags: Mitigation flags object, default is None.
 
         Returns:
-            List of heads that have no data for the given mitigation integer.
+            List of heads that have no data for the given mitigation configuration.
         """
         empties = []
         for clique_head in self.cliques:
-            if clique_head.distr.is_empty(mitigation_int):
+            if clique_head.distr.is_empty(mitigation_flags):
                 empties.append(clique_head.head)
         return empties
 

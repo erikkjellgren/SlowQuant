@@ -22,6 +22,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.integral_manager import IntegralManager
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
+    build_operator_matrix,
     construct_ups_state,
     expectation_value,
     get_grad_action,
@@ -310,6 +311,8 @@ class WaveFunctionUPS:
                 self.num_active_orbs,
                 self.ansatz_options,
             )
+        elif ansatz.lower() == "none":
+            print("UPS wave function with no Ansatz was chosen.")
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
@@ -845,6 +848,14 @@ class WaveFunctionUPS:
         if qiskit_form:
             return H.get_qiskit_form(self.num_active_orbs)
         return H
+
+    def _get_hamiltonian_matrix(self) -> np.ndarray:
+        """Return Hamiltonian matrix.
+
+        Returns:
+            Hamiltonian matrix
+        """
+        return build_operator_matrix(self._get_hamiltonian(), self.ci_info)  # type: ignore
 
     def run_wf_optimization_2step(
         self,
