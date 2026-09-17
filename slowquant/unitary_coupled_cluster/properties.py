@@ -6,6 +6,7 @@ from typing import Any
 
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
+from slowquant.qiskit_interface.circuit_wavefunction import WaveFunctionCircuit
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
@@ -13,12 +14,12 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.unitary_coupled_cluster.operators import one_elec_op_0i_0a
 from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
-from slowquant.unitary_coupled_cluster.linear_response import naive
 
 class properties():
     def __init__(
         self,
-        wave_function: WaveFunctionUCC | WaveFunctionUPS,
+        wave_function: WaveFunctionUCC | WaveFunctionUPS | WaveFunctionCircuit,
+        lr_formulation: str,
         property_options: dict[str, Any] = {},
     ) -> None:
         """Initialize property calculations.
@@ -27,6 +28,9 @@ class properties():
             wave_function: Wave function object.
         """
         self.wf = wave_function
+        self.lr_formulation = lr_formulation.lower()
+        self.QSQ = False
+
         if isinstance(self.wf, WaveFunctionUCC):
             self.index_info = (
                 self.wf.ci_info,
@@ -39,6 +43,8 @@ class properties():
                 self.wf.thetas,
                 self.wf.ups_layout,
             )
+        elif isinstance(self.wf, WaveFunctionCircuit):
+            self.QSQ = True
         else:
             raise ValueError(f"Got incompatible wave function type, {type(self.wf)}")
 
@@ -54,17 +60,68 @@ class properties():
             singlet spin-adapted linear response object
         """
         if self._LR_singlet is None:
-            if "excitations" not in self.property_options.keys():
-                # default option
-                self.property_options["excitations"] = "SD"
-            if "lr_formulation" not in self.property_options.keys():
-                # default option
-                self.property_options["lr_formulation"] = naive
-            self._LR_singlet = self.property_options["lr_formulation"].LinearResponse(
-                self.wf, 
-                excitations=self.property_options["excitations"], 
-                triplet=False
+            if not self.QSQ:
+                if self.lr_formulation == "allprojected":
+                    from slowquant.unitary_coupled_cluster.linear_response import allprojected as lr
+                elif self.lr_formulation == "allselfconsistent":
+                    from slowquant.unitary_coupled_cluster.linear_response import allselfconsistent as lr
+                elif self.lr_formulation == "allstatetransfer":
+                    from slowquant.unitary_coupled_cluster.linear_response import allstatetransfer as lr
+                elif self.lr_formulation == "naive":
+                    from slowquant.unitary_coupled_cluster.linear_response import naive as lr
+                elif self.lr_formulation == "projected_statetransfer":
+                    from slowquant.unitary_coupled_cluster.linear_response import projected_statetransfer as lr                
+                elif self.lr_formulation == "projected":
+                    from slowquant.unitary_coupled_cluster.linear_response import projected as lr
+                elif self.lr_formulation == "selfconsistent":
+                    from slowquant.unitary_coupled_cluster.linear_response import selfconsistent as lr
+                elif self.lr_formulation == "statetransfer":
+                    from slowquant.unitary_coupled_cluster.linear_response import statetransfer as lr
+                else:
+                    raise ValueError(f"Got unknown lr_formulation, {self.lr_formulation}")
+                self._LR_singlet = lr.LinearResponse(
+                    self.wf,
+                    excitations=self.property_options.get("excitations", "SD"),
+                    triplet=False
                 )
+            else:
+                if self.lr_formulation == "allprojected":
+                    from slowquant.qiskit_interface.linear_response import allprojected
+                    self._LR_singlet = allprojected.quantumLR(
+                        self.wf,
+                        excitations=self.property_options.get("excitations", "SD"),
+                        triplet=False,
+                    )
+                    self._LR_singlet.run(
+                        do_gradients = self.property_options.get("do_gradients", True),
+                    )
+                elif self.lr_formulation == "naive":
+                    from slowquant.qiskit_interface.linear_response import naive
+                    self._LR_singlet = naive.quantumLR(
+                        self.wf,
+                        excitations=self.property_options.get("excitations", "SD"),
+                        triplet=False,
+                    )
+                    self._LR_singlet.run(
+                        do_rdm = self.property_options.get("do_rdm", True),
+                        do_gradients = self.property_options.get("do_gradients", True),
+                    )
+                elif self.lr_formulation == "projected":
+                    from slowquant.qiskit_interface.linear_response import projected
+                    self._LR_singlet = projected.quantumLR(
+                        self.wf,
+                        excitations=self.property_options.get("excitations", "SD"),
+                        triplet=False,
+                    )
+                    self._LR_singlet.run(
+                        do_rdm = self.property_options.get("do_rdm", True),
+                        do_gradients = self.property_options.get("do_gradients", True),
+                    )
+                elif self.lr_formulation in ("allselfconsistent", "allstatetransfer", "projected_statetransfer", "selfconsistent", "statetransfer"):
+                    raise NotImplementedError(f"Only allprojected, naive and projected are implemented for WaveFunctionCircuit, got {self.lr_formulation}")
+                else:
+                    raise ValueError(f"Got unknown lr_formulation, {self.lr_formulation}")
+
         return self._LR_singlet
     
     @property
@@ -75,17 +132,68 @@ class properties():
             triplet spin-adapted linear response object
         """
         if self._LR_triplet is None:
-            if "excitations" not in self.property_options.keys():
-                # default option
-                self.property_options["excitations"] = "SD"
-            if "lr_formulation" not in self.property_options.keys():
-                # default option
-                self.property_options["lr_formulation"] = naive
-            self._LR_triplet = self.property_options["lr_formulation"].LinearResponse(
-                self.wf, 
-                excitations=self.property_options["excitations"], 
-                triplet=True
+            if not self.QSQ:
+                if self.lr_formulation == "allprojected":
+                    from slowquant.unitary_coupled_cluster.linear_response import allprojected as lr
+                elif self.lr_formulation == "allselfconsistent":
+                    from slowquant.unitary_coupled_cluster.linear_response import allselfconsistent as lr
+                elif self.lr_formulation == "allstatetransfer":
+                    from slowquant.unitary_coupled_cluster.linear_response import allstatetransfer as lr
+                elif self.lr_formulation == "naive":
+                    from slowquant.unitary_coupled_cluster.linear_response import naive as lr
+                elif self.lr_formulation == "projected_statetransfer":
+                    from slowquant.unitary_coupled_cluster.linear_response import projected_statetransfer as lr                
+                elif self.lr_formulation == "projected":
+                    from slowquant.unitary_coupled_cluster.linear_response import projected as lr
+                elif self.lr_formulation == "selfconsistent":
+                    from slowquant.unitary_coupled_cluster.linear_response import selfconsistent as lr
+                elif self.lr_formulation == "statetransfer":
+                    from slowquant.unitary_coupled_cluster.linear_response import statetransfer as lr
+                else:
+                    raise ValueError(f"Got unknown lr_formulation, {self.lr_formulation}")
+                self._LR_triplet = lr.LinearResponse(
+                    self.wf,
+                    excitations=self.property_options.get("excitations", "SD"),
+                    triplet=True
                 )
+            else:
+                if self.lr_formulation == "allprojected":
+                    from slowquant.qiskit_interface.linear_response import allprojected
+                    self._LR_triplet = allprojected.quantumLR(
+                        self.wf,
+                        excitations=self.property_options.get("excitations", "SD"),
+                        triplet=True,
+                    )
+                    self._LR_triplet.run(
+                        do_gradients = self.property_options.get("do_gradients", True),
+                    )
+                elif self.lr_formulation == "naive":
+                    from slowquant.qiskit_interface.linear_response import naive
+                    self._LR_triplet = naive.quantumLR(
+                        self.wf,
+                        excitations=self.property_options.get("excitations", "SD"),
+                        triplet=True,
+                    )
+                    self._LR_triplet.run(
+                        do_rdm = self.property_options.get("do_rdm", True),
+                        do_gradients = self.property_options.get("do_gradients", True),
+                    )
+                elif self.lr_formulation == "projected":
+                    from slowquant.qiskit_interface.linear_response import projected
+                    self._LR_triplet = projected.quantumLR(
+                        self.wf,
+                        excitations=self.property_options.get("excitations", "SD"),
+                        triplet=True,
+                    )
+                    self._LR_triplet.run(
+                        do_rdm = self.property_options.get("do_rdm", True),
+                        do_gradients = self.property_options.get("do_gradients", True),
+                    )
+                elif self.lr_formulation in ("allselfconsistent", "allstatetransfer", "projected_statetransfer", "selfconsistent", "statetransfer"):
+                    raise NotImplementedError(f"Only allprojected, naive and projected are implemented for WaveFunctionCircuit, got {self.lr_formulation}")
+                else:
+                    raise ValueError(f"Got unknown lr_formulation, {self.lr_formulation}")
+
         return self._LR_triplet
 
     def get_polarisability(self, freq=0) -> np.ndarray:
@@ -135,10 +243,22 @@ class properties():
 
             for comp in dia_mo:
                 dia_op = one_elec_op_0i_0a(comp, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-                dia_i.append(expectation_value(self.wf.ci_coeffs, 
-                                               [dia_op], 
-                                               self.wf.ci_coeffs, 
-                                               *self.index_info))
+                if not self.QSQ:
+                    val = expectation_value(
+                        self.wf.ci_coeffs, 
+                        [dia_op], 
+                        self.wf.ci_coeffs, 
+                        *self.index_info
+                    )
+                else:
+                    val = self.wf.QI.quantum_expectation_value(
+                        dia_op.get_folded_operator(
+                            self.wf.num_inactive_orbs, 
+                            self.wf.num_active_orbs, 
+                            self.wf.num_virtual_orbs
+                        )
+                    )
+                dia_i.append(val)
             
             dia_shield[i,:,:] = np.array(dia_i).reshape((3,3))
             
@@ -201,10 +321,22 @@ class properties():
 
             for comp in dia_mo:
                 dia_op = one_elec_op_0i_0a(comp, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-                dia_i.append(expectation_value(self.wf.ci_coeffs, 
-                                               [dia_op], 
-                                               self.wf.ci_coeffs, 
-                                               *self.index_info))
+                if not self.QSQ:
+                    val = expectation_value(
+                        self.wf.ci_coeffs, 
+                        [dia_op], 
+                        self.wf.ci_coeffs, 
+                        *self.index_info
+                    )
+                else:
+                    val = self.wf.QI.quantum_expectation_value(
+                        dia_op.get_folded_operator(
+                            self.wf.num_inactive_orbs, 
+                            self.wf.num_active_orbs, 
+                            self.wf.num_virtual_orbs
+                        )
+                    )
+                dia_i.append(val)
             
             dia_shield[i,:,:] = np.array(dia_i).reshape((3,3))
             
@@ -261,10 +393,22 @@ class properties():
 
             for comp in dso_mo:
                 dso_op = one_elec_op_0i_0a(comp, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-                dso_k.append(expectation_value(self.wf.ci_coeffs, 
-                                               [dso_op], 
-                                               self.wf.ci_coeffs, 
-                                               *self.index_info))
+                if not self.QSQ:
+                    val = expectation_value(
+                        self.wf.ci_coeffs, 
+                        [dso_op], 
+                        self.wf.ci_coeffs, 
+                        *self.index_info
+                    )
+                else:
+                    val = self.wf.QI.quantum_expectation_value(
+                        dso_op.get_folded_operator(
+                            self.wf.num_inactive_orbs, 
+                            self.wf.num_active_orbs, 
+                            self.wf.num_virtual_orbs
+                        )
+                    )
+                dso.k.append(val)
             
             dso_k = - np.array(dso_k).reshape((3,3))
             dso[k,:,:] = dso_k - dso_k.trace() * np.eye(3)
