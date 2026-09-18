@@ -31,8 +31,6 @@ space, i.e. CI_Info.is_spin_product, which excludes get_indexing_extended.
 
 from __future__ import annotations
 
-import functools
-
 import numba as nb
 import numpy as np
 
@@ -146,7 +144,6 @@ class SpinFactorizedOperator:
         self.sigma3_layout: tuple[np.ndarray, ...] | None = None
 
 
-@functools.lru_cache(maxsize=2**18)
 def split_spin_string(
     op_key: tuple[tuple[int, ...], tuple[int, ...]], num_active_orbs: int
 ) -> tuple[tuple[tuple[int, ...], tuple[int, ...]], tuple[tuple[int, ...], tuple[int, ...]], int] | None:

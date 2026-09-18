@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-import functools
 import itertools
 import re
 from collections import defaultdict
@@ -255,9 +254,6 @@ def do_product_extended_normal_ordering_rankreduction(
             yield (tuple(dagger_list), tuple(nondagger_list)), phase
 
 
-# An operator is typically rebuilt with the same strings and only new factors on every
-# evaluation, and how a string folds does not depend on its factor, so it is worth memoizing.
-@functools.lru_cache(maxsize=2**18)
 def fold_fermionic_string(
     op_key: tuple[tuple[int, ...], tuple[int, ...]],
     num_inactive_orbs: int,
