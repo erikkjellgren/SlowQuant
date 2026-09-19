@@ -1723,6 +1723,146 @@ def apply_spin_block_layout(states: np.ndarray, layout: tuple, theta: float, ci_
     )
 
 
+@nb.jit(nopython=True, cache=True)
+def overlap_alpha_string_pairs(
+    bra: np.ndarray,
+    ket: np.ndarray,
+    src: np.ndarray,
+    dst: np.ndarray,
+    sign: np.ndarray,
+    out: np.ndarray,
+) -> None:
+    r"""Add :math:`\left<\text{bra}\right|\hat{T}\left|\text{ket}\right>` for an alpha generator.
+
+    Args:
+        bra: Bra states as (number of states, alpha strings, beta strings).
+        ket: Ket states, same shape.
+        src: First alpha string of each pair.
+        dst: Second alpha string of each pair.
+        sign: Phase of each pair.
+        out: One overlap per state, added into.
+    """
+    for pair in range(len(src)):
+        p = src[pair]
+        q = dst[pair]
+        phase = sign[pair]
+        for state_idx in range(bra.shape[0]):
+            partial = 0.0
+            for col in range(bra.shape[2]):
+                partial += (
+                    bra[state_idx, q, col] * ket[state_idx, p, col]
+                    - bra[state_idx, p, col] * ket[state_idx, q, col]
+                )
+            out[state_idx] += phase * partial
+
+
+@nb.jit(nopython=True, cache=True)
+def overlap_beta_string_pairs(
+    bra: np.ndarray,
+    ket: np.ndarray,
+    src: np.ndarray,
+    dst: np.ndarray,
+    sign: np.ndarray,
+    out: np.ndarray,
+) -> None:
+    r"""Add :math:`\left<\text{bra}\right|\hat{T}\left|\text{ket}\right>` for a beta generator.
+
+    The alpha blocks are walked on the outside so that each one, which is contiguous, is read
+    once while every pair is applied to it.
+
+    Args:
+        bra: Bra states as (number of states, alpha strings, beta strings).
+        ket: Ket states, same shape.
+        src: First beta string of each pair.
+        dst: Second beta string of each pair.
+        sign: Phase of each pair.
+        out: One overlap per state, added into.
+    """
+    for state_idx in range(bra.shape[0]):
+        total = 0.0
+        for row in range(bra.shape[1]):
+            for pair in range(len(src)):
+                p = src[pair]
+                q = dst[pair]
+                total += sign[pair] * (
+                    bra[state_idx, row, q] * ket[state_idx, row, p]
+                    - bra[state_idx, row, p] * ket[state_idx, row, q]
+                )
+        out[state_idx] += total
+
+
+@nb.jit(nopython=True, cache=True)
+def overlap_string_grid(
+    bra: np.ndarray,
+    ket: np.ndarray,
+    alpha_src: np.ndarray,
+    alpha_dst: np.ndarray,
+    alpha_sign: np.ndarray,
+    beta_src: np.ndarray,
+    beta_dst: np.ndarray,
+    beta_sign: np.ndarray,
+    out: np.ndarray,
+) -> None:
+    r"""Add :math:`\left<\text{bra}\right|\hat{T}\left|\text{ket}\right>` for a mixed generator.
+
+    Args:
+        bra: Bra states as (number of states, alpha strings, beta strings).
+        ket: Ket states, same shape.
+        alpha_src: First alpha string of each alpha pair.
+        alpha_dst: Second alpha string of each alpha pair.
+        alpha_sign: Phase of each alpha pair.
+        beta_src: First beta string of each beta pair.
+        beta_dst: Second beta string of each beta pair.
+        beta_sign: Phase of each beta pair.
+        out: One overlap per state, added into.
+    """
+    for alpha_pair in range(len(alpha_src)):
+        pa = alpha_src[alpha_pair]
+        qa = alpha_dst[alpha_pair]
+        for beta_pair in range(len(beta_src)):
+            pb = beta_src[beta_pair]
+            qb = beta_dst[beta_pair]
+            phase = alpha_sign[alpha_pair] * beta_sign[beta_pair]
+            for state_idx in range(bra.shape[0]):
+                out[state_idx] += phase * (
+                    bra[state_idx, qa, qb] * ket[state_idx, pa, pb]
+                    - bra[state_idx, pa, pb] * ket[state_idx, qa, qb]
+                )
+
+
+def string_pairing_overlap(
+    bra: np.ndarray,
+    ket: np.ndarray,
+    layout: tuple[int, tuple[np.ndarray, ...], tuple[np.ndarray, ...]],
+    ci_info: CI_Info,
+    out: np.ndarray,
+) -> None:
+    r"""Add :math:`\left<\text{bra}\right|\hat{T}\left|\text{ket}\right>` through the pairing.
+
+    The gradient of a unitary product state needs this number, not the state the generator
+    produces, and the pairing gives it directly: a generator moves each determinant of a pair to
+    the other, so the overlap is a sum over the pairs. Forming the state first costs a pass to
+    zero it, a pass to fill it and a pass to read it back; this reads only the paired entries.
+
+    Args:
+        bra: Bra states as (number of states, number of determinants).
+        ket: Ket states, same shape.
+        layout: Which spins the generator touches and its string pairs.
+        ci_info: Information about the CI space.
+        out: One overlap per state, added into.
+    """
+    kind, alpha_pairs, beta_pairs = layout
+    shape = (bra.shape[0], ci_info.num_alpha_strings, ci_info.num_beta_strings)
+    bra_matrix = bra.reshape(shape)
+    ket_matrix = ket.reshape(shape)
+    if kind == ROTATION_ALPHA:
+        overlap_alpha_string_pairs(bra_matrix, ket_matrix, *alpha_pairs, out)
+    elif kind == ROTATION_BETA:
+        overlap_beta_string_pairs(bra_matrix, ket_matrix, *beta_pairs, out)
+    else:
+        overlap_string_grid(bra_matrix, ket_matrix, *alpha_pairs, *beta_pairs, out)
+
+
 def propagate_state_factorized(
     op: FermionicOperator, state: np.ndarray, ci_info: CI_Info, tmp_state: np.ndarray
 ) -> np.ndarray | None:

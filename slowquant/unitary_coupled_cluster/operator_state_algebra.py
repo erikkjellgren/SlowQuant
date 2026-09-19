@@ -25,6 +25,7 @@ from slowquant.unitary_coupled_cluster.spin_factorized_algebra import (
     build_string_rotation_layout,
     propagate_state_factorized,
     propagate_state_SA_factorized,
+    string_pairing_overlap,
 )
 from slowquant.unitary_coupled_cluster.spin_ordering import alpha_idx, beta_idx
 from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
@@ -2272,40 +2273,26 @@ def apply_generator_once_SA(
     return out
 
 
-def get_grad_action(
-    state: np.ndarray,
-    idx: int,
-    ci_info: CI_Info,
-    ups_struct: UpsStructure,
-) -> np.ndarray:
-    r"""Get effect of differentiation with respect to "idx" operator in the UPS expansion.
+def gradient_generators(
+    idx: int, ci_info: CI_Info, ups_struct: UpsStructure
+) -> tuple[list[FermionicOperator], list[tuple[str, tuple[int, ...]]], float]:
+    r"""The generators whose sum is the derivative factor of one unitary.
 
     .. math::
-        \frac{\partial}{\partial \theta_i}\left(\left<\text{CSF}\right|\boldsymbol{U}(\theta_{i-1})\boldsymbol{U}(\theta_i)\right) =
-        \left<\text{CSF}\right|\boldsymbol{U}(\theta_{i-1})\frac{\partial \boldsymbol{U}(\theta_i)}{\partial \theta_i}
+        \frac{\partial}{\partial\theta_i}\exp\left(\theta_i\hat{T}_i\right)
+            = \exp\left(\theta_i\hat{T}_i\right)\hat{T}_i
 
-    With,
-
-    .. math::
-        \begin{align}
-        \frac{\partial \boldsymbol{U}(\theta_i)}{\partial \theta_i} &= \frac{\partial}{\partial \theta_i}\exp\left(\theta_i \hat{T}_i\right)\\
-                &= \exp\left(\theta_i \hat{T}_i\right)\hat{T}_i
-        \end{align}
-
-    This function only applies the $\hat{T}_i$ part to the state.
-
-    #. 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
+    so the derivative needs the bare generator, which for a spin-adapted single is the sum of
+    an alpha and a beta one.
 
     Args:
-        state: State vector.
         idx: Index of operator in the ups_struct.
         ci_info: Information about the CI space.
         ups_struct: UPS structure object.
 
     Returns:
-        State with derivative of the idx'th unitary applied.
+        The generators, the cache key naming each, and an overall factor.
     """
-    # Select unitary operation based on idx
     exc_type = ups_struct.excitation_operator_type[idx]
     exc_indices = ups_struct.excitation_indices[idx]
     if exc_type in ("sa_single",):
@@ -2314,12 +2301,10 @@ def get_grad_action(
         (i, a) = embed_spatial_indices(exc_indices, ci_info)
         Ta = G1(alpha_idx(i, ci_info.num_active_orbs), alpha_idx(a, ci_info.num_active_orbs), True)
         Tb = G1(beta_idx(i, ci_info.num_active_orbs), beta_idx(a, ci_info.num_active_orbs), True)
-        # Apply missing T factor of derivative
-        tmp = A * apply_generator_once(
-            state,
+        return (
             [Ta, Tb],
-            ci_info,
             [("sa_single_alpha", tuple(exc_indices)), ("sa_single_beta", tuple(exc_indices))],
+            float(A),
         )
     elif exc_type in (
         "single",
@@ -2374,11 +2359,65 @@ def get_grad_action(
             T = G2_sa(i, j, a, b, 5, True, num_orbs=ci_info.num_active_orbs)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
-        # Apply missing T factor of derivative
-        tmp = apply_generator_once(state, [T], ci_info, [(exc_type, tuple(exc_indices))])
-    else:
-        raise ValueError(f"Got unknown excitation type, {exc_type}")
-    return tmp
+        return [T], [(exc_type, tuple(exc_indices))], 1.0
+    raise ValueError(f"Got unknown excitation type, {exc_type}")
+
+
+def get_grad_action(state: np.ndarray, idx: int, ci_info: CI_Info, ups_struct: UpsStructure) -> np.ndarray:
+    r"""Get effect of differentiation with respect to "idx" operator in the UPS expansion.
+
+    .. math::
+        \frac{\partial \boldsymbol{U}(\theta_i)}{\partial \theta_i}
+            = \exp\left(\theta_i \hat{T}_i\right)\hat{T}_i
+
+    This function only applies the :math:`\hat{T}_i` part to the state.
+
+    #. 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
+
+    Args:
+        state: State vector.
+        idx: Index of operator in the ups_struct.
+        ci_info: Information about the CI space.
+        ups_struct: UPS structure object.
+
+    Returns:
+        State with derivative of the idx'th unitary applied.
+    """
+    operators, cache_keys, factor = gradient_generators(idx, ci_info, ups_struct)
+    return factor * apply_generator_once(state, operators, ci_info, cache_keys)
+
+
+def get_grad_overlap(
+    bra: np.ndarray, ket: np.ndarray, idx: int, ci_info: CI_Info, ups_struct: UpsStructure
+) -> np.ndarray:
+    r"""Overlap of a bra with the derivative factor of one unitary acting on a ket.
+
+    .. math::
+        \left<\text{bra}\right|\hat{T}_i\left|\text{ket}\right>
+
+    which is what the gradient needs. Where the generator pairs spin strings the overlap is
+    summed over the pairs, so the state the generator would produce is never formed.
+
+    Args:
+        bra: Bra states as (number of states, number of determinants).
+        ket: Ket states, same shape.
+        idx: Index of operator in the ups_struct.
+        ci_info: Information about the CI space.
+        ups_struct: UPS structure object.
+
+    Returns:
+        One overlap per state.
+    """
+    operators, cache_keys, factor = gradient_generators(idx, ci_info, ups_struct)
+    layouts = [get_string_rotation_layout(op, ci_info, key) for op, key in zip(operators, cache_keys)]
+    if any(layout is None for layout in layouts):
+        acted = apply_generator_once_SA(ket, operators, ci_info, cache_keys)
+        return factor * np.einsum("ij,ij->i", bra, acted)
+    out = np.zeros(bra.shape[0])
+    for layout in layouts:
+        if layout is not None:
+            string_pairing_overlap(bra, ket, layout, ci_info, out)
+    return factor * out
 
 
 def get_grad_action_SA(

@@ -24,7 +24,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     construct_ups_state_SA,
     expectation_value,
     expectation_value_SA,
-    get_grad_action_SA,
+    get_grad_overlap,
     propagate_state_SA,
     propagate_unitary_SA,
 )
@@ -941,18 +941,15 @@ class WaveFunctionSAUPS:
             )
             # CSF reference state on ket
             ket_vec = np.copy(self.ref_coeffs)
-            ket_vec_tmp = np.copy(self.ref_coeffs)
             # Calculate analytical derivative w.r.t. each theta using gradient_action function
             for i in range(len(self.thetas)):
-                # Loop over each state in SA
-                ket_vec_tmp = get_grad_action_SA(
-                    ket_vec,
-                    i,
-                    self.ci_info,
-                    self.ups_layout,
+                # One overlap per state in the average, contracted without forming the state
+                # the generator would produce.
+                gradient[i + num_kappa] += (
+                    2
+                    * float(np.sum(get_grad_overlap(bra_vec, ket_vec, i, self.ci_info, self.ups_layout)))
+                    / len(bra_vec)
                 )
-                for bra, ket in zip(bra_vec, ket_vec_tmp):
-                    gradient[i + num_kappa] += 2 * np.matmul(bra, ket) / len(bra_vec)
                 # Product rule implications on reference bra and CSF ket
                 # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
                 bra_vec = propagate_unitary_SA(

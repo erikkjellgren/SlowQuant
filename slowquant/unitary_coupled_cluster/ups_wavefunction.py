@@ -25,7 +25,7 @@ from slowquant.unitary_coupled_cluster.integral_manager import IntegralManager
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     construct_ups_state,
     expectation_value,
-    get_grad_action,
+    get_grad_overlap,
     propagate_state,
     propagate_state_SA,
     propagate_unitary,
@@ -1052,17 +1052,20 @@ class WaveFunctionUPS:
             )
             # CSF reference state on ket
             ket_vec = np.copy(self.ref_coeffs)
-            ket_vec_tmp = np.copy(self.ref_coeffs)
             # Calculate analytical derivative w.r.t. each theta using gradient_action function
             for i in range(len(self.thetas)):
-                # Derivative action w.r.t. i-th theta on CSF ket
-                ket_vec_tmp = get_grad_action(
-                    ket_vec,
-                    i,
-                    self.ci_info,
-                    self.ups_layout,
+                # Derivative action w.r.t. i-th theta on CSF ket, contracted with the bra
+                # directly: the gradient needs the number, not the state.
+                gradient[i + num_kappa] += (
+                    2
+                    * get_grad_overlap(
+                        bra_vec.reshape(1, -1),
+                        ket_vec.reshape(1, -1),
+                        i,
+                        self.ci_info,
+                        self.ups_layout,
+                    )[0]
                 )
-                gradient[i + num_kappa] += 2 * np.matmul(bra_vec, ket_vec_tmp)
                 # Product rule implications on reference bra and CSF ket
                 # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
                 # Both of these are this function's own working vectors, so the unitary is
