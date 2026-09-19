@@ -894,6 +894,7 @@ def apply_spin_blocked_exponential(
     theta: float,
     ci_info: CI_Info,
     cache_key: tuple[str, tuple[int, ...]],
+    in_place: bool = False,
 ) -> np.ndarray | None:
     r"""Apply the exponential of a generator through its spin-string cell pairs, if it has them.
 
@@ -903,6 +904,7 @@ def apply_spin_blocked_exponential(
         theta: Ansatz parameter value.
         ci_info: Information about the CI space.
         cache_key: Excitation type and indices naming this generator.
+        in_place: Rotate the states handed in rather than a copy of them.
 
     Returns:
         New states, or None if the generator does not block over spin-string cells.
@@ -910,7 +912,7 @@ def apply_spin_blocked_exponential(
     layout = get_spin_block_layout(op, ci_info, cache_key)
     if layout is None:
         return None
-    out = np.copy(states)
+    out = states if in_place else np.copy(states)
     apply_spin_block_layout(out, layout, theta, ci_info)
     return out
 
@@ -1007,6 +1009,7 @@ def apply_spin_adapted_double(
     theta: float,
     ci_info: CI_Info,
     cache_key: tuple[str, tuple[int, ...]],
+    in_place: bool = False,
 ) -> np.ndarray:
     r"""Apply the exponential of a spin-adapted double excitation generator to a state.
 
@@ -1026,19 +1029,23 @@ def apply_spin_adapted_double(
         theta: Ansatz parameter value.
         ci_info: Information about the CI space.
         cache_key: Excitation type and indices naming this generator.
+        in_place: Work on the state handed in rather than a copy of it. Only for a
+                  caller that owns the array.
 
     Returns:
         New state.
     """
-    spin_blocked = apply_spin_blocked_exponential(state.reshape(1, -1), op, theta, ci_info, cache_key)
+    spin_blocked = apply_spin_blocked_exponential(
+        state.reshape(1, -1), op, theta, ci_info, cache_key, in_place=in_place
+    )
     if spin_blocked is not None:
         return spin_blocked.reshape(state.shape)
     blocked = apply_blocked_exponential(state.reshape(1, -1), op, theta, ci_info, cache_key)
     if blocked is not None:
         return blocked.reshape(state.shape)
     frequencies, weights = SPIN_ADAPTED_DOUBLE_SERIES[exc_type]
-    out = np.copy(state)
-    power = state
+    out = state if in_place else np.copy(state)
+    power = np.copy(state) if in_place else state
     for order, weight in enumerate(weights, start=1):
         power = propagate_state([op], power, ci_info, do_folding=False)
         out += spin_adapted_double_weight(order, weight, frequencies, theta) * power
@@ -1052,6 +1059,7 @@ def apply_spin_adapted_double_SA(
     theta: float,
     ci_info: CI_Info,
     cache_key: tuple[str, tuple[int, ...]],
+    in_place: bool = False,
 ) -> np.ndarray:
     r"""Apply the exponential of a spin-adapted double to every state of a state average.
 
@@ -1065,19 +1073,21 @@ def apply_spin_adapted_double_SA(
         theta: Ansatz parameter value.
         ci_info: Information about the CI space.
         cache_key: Excitation type and indices naming this generator.
+        in_place: Work on the state handed in rather than a copy of it. Only for a
+                  caller that owns the array.
 
     Returns:
         New states.
     """
-    spin_blocked = apply_spin_blocked_exponential(states, op, theta, ci_info, cache_key)
+    spin_blocked = apply_spin_blocked_exponential(states, op, theta, ci_info, cache_key, in_place=in_place)
     if spin_blocked is not None:
         return spin_blocked
     blocked = apply_blocked_exponential(states, op, theta, ci_info, cache_key)
     if blocked is not None:
         return blocked
     frequencies, weights = SPIN_ADAPTED_DOUBLE_SERIES[exc_type]
-    out = np.copy(states)
-    power = states
+    out = states if in_place else np.copy(states)
+    power = np.copy(states) if in_place else states
     for order, weight in enumerate(weights, start=1):
         power = propagate_state_SA([op], power, ci_info, do_folding=False)
         out += spin_adapted_double_weight(order, weight, frequencies, theta) * power
@@ -1987,6 +1997,7 @@ def propagate_unitary(
     ci_info: CI_Info,
     thetas: Sequence[float],
     ups_struct: UpsStructure,
+    in_place: bool = False,
 ) -> np.ndarray:
     """Apply unitary from UPS operator number 'idx' to state.
 
@@ -1999,6 +2010,8 @@ def propagate_unitary(
         ci_info: Information about the CI space.
         thetas: Values for ansatz parameters.
         ups_struct: UPS structure object.
+        in_place: Apply the unitary to the state handed in rather than to a copy of it. Only for
+                  a caller that owns the array, as the gradient's two propagated states are.
 
     Returns:
         State with unitary applied.
@@ -2008,7 +2021,7 @@ def propagate_unitary(
     exc_indices = ups_struct.excitation_indices[idx]
     theta = thetas[idx]
     if abs(theta) < 10**-28:
-        return np.copy(state)
+        return state if in_place else np.copy(state)
     if exc_type in ("sa_single",):
         A = 1  # 2**(-1/2)
         (i, a) = embed_spatial_indices(exc_indices, ci_info)
@@ -2022,6 +2035,7 @@ def propagate_unitary(
             A * theta,
             ci_info,
             ("sa_single_alpha", tuple(exc_indices)),
+            in_place=in_place,
         )
         out = apply_generator_exponential(
             out, Tb, A * theta, ci_info, ("sa_single_beta", tuple(exc_indices)), in_place=True
@@ -2056,19 +2070,27 @@ def propagate_unitary(
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Analytical application on state vector
-        out = apply_generator_exponential(state, T, theta, ci_info, (exc_type, tuple(exc_indices)))
+        out = apply_generator_exponential(
+            state, T, theta, ci_info, (exc_type, tuple(exc_indices)), in_place=in_place
+        )
     elif exc_type in ("sa_double_2", "sa_double_3"):
         (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
         T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
-        out = apply_spin_adapted_double(state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)))
+        out = apply_spin_adapted_double(
+            state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)), in_place=in_place
+        )
     elif exc_type in ("sa_double_4",):
         (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
         T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
-        out = apply_spin_adapted_double(state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)))
+        out = apply_spin_adapted_double(
+            state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)), in_place=in_place
+        )
     elif exc_type in ("sa_double_5",):
         (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
         T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
-        out = apply_spin_adapted_double(state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)))
+        out = apply_spin_adapted_double(
+            state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)), in_place=in_place
+        )
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")
     return out
@@ -2080,6 +2102,7 @@ def propagate_unitary_SA(
     ci_info: CI_Info,
     thetas: Sequence[float],
     ups_struct: UpsStructure,
+    in_place: bool = False,
 ) -> np.ndarray:
     """Apply unitary from UPS operator number 'idx' to state.
 
@@ -2092,6 +2115,8 @@ def propagate_unitary_SA(
         ci_info: Information about the CI space.
         thetas: Values for ansatz parameters.
         ups_struct: UPS structure object.
+        in_place: Apply the unitary to the state handed in rather than to a copy of it. Only for
+                  a caller that owns the array, as the gradient's two propagated states are.
 
     Returns:
         State with unitary applied.
@@ -2101,7 +2126,7 @@ def propagate_unitary_SA(
     exc_indices = ups_struct.excitation_indices[idx]
     theta = thetas[idx]
     if abs(theta) < 10**-28:
-        return np.copy(state)
+        return state if in_place else np.copy(state)
     if exc_type in ("sa_single",):
         A = 1  # 2**(-1/2)
         (i, a) = embed_spatial_indices(exc_indices, ci_info)
@@ -2115,6 +2140,7 @@ def propagate_unitary_SA(
             A * theta,
             ci_info,
             ("sa_single_alpha", tuple(exc_indices)),
+            in_place=in_place,
         )
         out = apply_generator_exponential_SA(
             out,
@@ -2153,19 +2179,27 @@ def propagate_unitary_SA(
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Analytical application on state vector
-        out = apply_generator_exponential_SA(state, T, theta, ci_info, (exc_type, tuple(exc_indices)))
+        out = apply_generator_exponential_SA(
+            state, T, theta, ci_info, (exc_type, tuple(exc_indices)), in_place=in_place
+        )
     elif exc_type in ("sa_double_2", "sa_double_3"):
         (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
         T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
-        out = apply_spin_adapted_double_SA(state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)))
+        out = apply_spin_adapted_double_SA(
+            state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)), in_place=in_place
+        )
     elif exc_type in ("sa_double_4",):
         (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
         T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
-        out = apply_spin_adapted_double_SA(state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)))
+        out = apply_spin_adapted_double_SA(
+            state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)), in_place=in_place
+        )
     elif exc_type in ("sa_double_5",):
         (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
         T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
-        out = apply_spin_adapted_double_SA(state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)))
+        out = apply_spin_adapted_double_SA(
+            state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)), in_place=in_place
+        )
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")
     return out

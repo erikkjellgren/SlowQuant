@@ -1065,12 +1065,15 @@ class WaveFunctionUPS:
                 gradient[i + num_kappa] += 2 * np.matmul(bra_vec, ket_vec_tmp)
                 # Product rule implications on reference bra and CSF ket
                 # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
+                # Both of these are this function's own working vectors, so the unitary is
+                # applied to them rather than to a copy.
                 bra_vec = propagate_unitary(
                     bra_vec,
                     i,
                     self.ci_info,
                     self.thetas,
                     self.ups_layout,
+                    in_place=True,
                 )
                 ket_vec = propagate_unitary(
                     ket_vec,
@@ -1078,6 +1081,7 @@ class WaveFunctionUPS:
                     self.ci_info,
                     self.thetas,
                     self.ups_layout,
+                    in_place=True,
                 )
             self.num_energy_evals += 2 * np.sum(
                 list(self.ups_layout.grad_param_R.values())
