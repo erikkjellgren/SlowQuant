@@ -65,14 +65,14 @@ class LinearResponse(LinearResponseBaseClass):
             )
         else:
             raise ValueError(f"Got incompatible wave function type, {type(self.wf)}")
-        num_det = len(ci_info.idx2det)
+        num_det = ci_info.num_dets
         self.ref_coeffs = np.zeros(num_det)
         # Assembled in the human readable interleaved ordering, where the three spaces are
         # contiguous, then converted to the blocked ordering the CI space uses.
         ref_det = (
             "1" * self.wf.num_inactive_spin_orbs + self.wf._ref_det + "0" * self.wf.num_virtual_spin_orbs
         )
-        self.ref_coeffs[ci_info.det2idx[int(det_interleaved_to_blocked(ref_det), 2)]] = 1
+        self.ref_coeffs[ci_info.index_of_determinant(int(det_interleaved_to_blocked(ref_det), 2))] = 1
         self.ci_coeffs = propagate_state(["U"], self.ref_coeffs, *self.index_info_extended)
         self.q_ops: list[FermionicOperator] = []
         for i, a in self.wf.kappa_hf_like_idx:

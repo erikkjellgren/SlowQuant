@@ -236,7 +236,7 @@ class WaveFunctionSAUPS:
             self.num_active_elec_alpha,
             self.num_active_elec_beta,
         )
-        self.num_det = len(self.ci_info.idx2det)
+        self.num_det = self.ci_info.num_dets
         # SA details
         self.num_states = len(states[0])
         self.ref_coeffs = np.zeros((self.num_states, self.num_det))  # state vector for each state in SA
@@ -256,7 +256,7 @@ class WaveFunctionSAUPS:
                 # one in the blocked ordering permutes its creation operators, which carries a
                 # sign. For a single determinant that is a global phase, but these states are
                 # superpositions, so the relative signs are physical.
-                idx = self.ci_info.det2idx[int(det_interleaved_to_blocked(on_vec), 2)]
+                idx = self.ci_info.index_of_determinant(int(det_interleaved_to_blocked(on_vec), 2))
                 self.ref_coeffs[i, idx] = coeff * get_reordering_sign(on_vec)
         self._ci_coeffs = np.copy(self.ref_coeffs)
         for i, coeff_i in enumerate(self.ci_coeffs):

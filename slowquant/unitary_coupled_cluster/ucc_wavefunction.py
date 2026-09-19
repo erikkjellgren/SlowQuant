@@ -241,11 +241,11 @@ class WaveFunctionUCC:
             self.num_active_elec_alpha,
             self.num_active_elec_beta,
         )
-        self.num_det = len(self.ci_info.idx2det)
+        self.num_det = self.ci_info.num_dets
         self.ref_coeffs = np.zeros(self.num_det, dtype=float)
         print("Reference (active) determinant:", ref_det)
         # The reference determinant is given interleaved, the CI space is blocked.
-        self.ref_coeffs[self.ci_info.det2idx[int(det_interleaved_to_blocked(ref_det), 2)]] = 1
+        self.ref_coeffs[self.ci_info.index_of_determinant(int(det_interleaved_to_blocked(ref_det), 2))] = 1
         self._ci_coeffs = np.copy(self.ref_coeffs)
         # Construct UCC Structure
         self.ucc_layout = UccStructure()

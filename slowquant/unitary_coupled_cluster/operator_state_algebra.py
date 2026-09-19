@@ -660,7 +660,7 @@ def build_generator_blocks(op: FermionicOperator, ci_info: CI_Info) -> tuple[np.
         those matrices. None if the generator leaves the CI space or connects too much of it to
         be worth blocking.
     """
-    num_dets = len(ci_info.idx2det)
+    num_dets = ci_info.num_dets
     ramp = np.arange(1.0, num_dets + 1.0)
     rows, cols, values = [], [], []
     try:
@@ -813,7 +813,7 @@ def build_rotation_layout(
         First and second determinant of each pair with its phase, or None if the generator does
         not act as a signed pairing of determinants.
     """
-    num_dets = len(ci_info.idx2det)
+    num_dets = ci_info.num_dets
     ramp = np.arange(1.0, num_dets + 1.0)
     try:
         phases = propagate_state([op], np.ones(num_dets), ci_info, do_folding=False)
@@ -1186,8 +1186,6 @@ def propagate_state(
     """
     if len(operators) == 0:
         return np.copy(state)
-    idx2det = ci_info.idx2det
-    det2idx = ci_info.det2idx
     num_inactive_orbs = ci_info.num_inactive_orbs
     num_active_orbs = ci_info.num_active_orbs
     num_virtual_orbs = ci_info.num_virtual_orbs
@@ -1257,6 +1255,11 @@ def propagate_state(
                     tmp_state = np.zeros_like(state, dtype=float)
                     tmp_state_is_zero = True
                 continue
+            # Only the general kernels below index by determinant. Over a spin product these two
+            # maps are derived on demand and hold one entry per determinant each, so asking for
+            # them here rather than above keeps them unbuilt on the path that never needs them.
+            idx2det = ci_info.idx2det
+            det2idx = ci_info.det2idx
             # loop over all strings of annihilation operators in FermionicOperator sum
             if is_parallel:
                 for fermi_label in op_folded.operators.keys():
@@ -1347,8 +1350,6 @@ def propagate_state_SA(
     """
     if len(operators) == 0:
         return np.copy(state)
-    idx2det = ci_info.idx2det
-    det2idx = ci_info.det2idx
     num_inactive_orbs = ci_info.num_inactive_orbs
     num_active_orbs = ci_info.num_active_orbs
     num_virtual_orbs = ci_info.num_virtual_orbs
@@ -1408,6 +1409,11 @@ def propagate_state_SA(
                     tmp_state = np.zeros_like(state, dtype=float)
                     tmp_state_is_zero = True
                 continue
+            # Only the general kernels below index by determinant. Over a spin product these two
+            # maps are derived on demand and hold one entry per determinant each, so asking for
+            # them here rather than above keeps them unbuilt on the path that never needs them.
+            idx2det = ci_info.idx2det
+            det2idx = ci_info.det2idx
             # loop over all strings of annihilation operators in FermionicOperator sum
             if is_parallel:
                 for fermi_label in op_folded.operators.keys():
