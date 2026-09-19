@@ -44,6 +44,12 @@ IDENTITY_SUB_STRING: tuple[tuple[int, ...], tuple[int, ...]] = ((), ())
 # strings of each term is cheaper. Measured on Hamiltonians and excitation generators from
 # CAS(4,4) to CAS(12,12), which sit two orders of magnitude apart on this scale.
 CONTRACTION_MIN_MATMUL_SIZE = 128
+# How much larger the one-spin matrix may be than the number of excitations it holds before it
+# is cheaper to walk the excitations instead. A matrix product runs faster per element than a
+# scattered walk, so the matrix pays off well before it is full. The two cases this separates sit
+# two to three orders of magnitude apart, see use_dense_spin_matrix, so the exact value is not
+# delicate.
+DENSE_SPIN_MATRIX_FILL = 64
 
 
 class SpinFactorizedOperator:
@@ -783,9 +789,13 @@ def use_dense_spin_matrix(num_strings: int, num_other_strings: int, num_excitati
 
     The matrix has :math:`N^2` entries while the terms hold only as many excitations as they
     hold, so forming one is worth it when the operator fills a reasonable fraction of it. A
-    Hamiltonian does, at every active space size; a single excitation generator fills a couple
-    of diagonals at any size. So this asks how dense the operator is, not how large the CI space
-    is, and the answer does not change as the active space grows.
+    Hamiltonian does; a single excitation generator fills a couple of diagonals at any size.
+
+    The matrix is worth forming well before it is full, because a matrix product runs faster per
+    element than a walk over the excitations. Measured on hydrogen chains, a Hamiltonian needs
+    N^2 of about 2, 4 and 8 times its excitation count at CAS(10,10), CAS(12,12) and CAS(14,14)
+    and is 2.2 to 2.4 times faster dense at all three, while a single excitation needs 450 to
+    6400 times and is 17 to 200 times slower dense. The bar sits between those, far from both.
 
     The second test keeps the matrix from dwarfing the CI vector itself when the two spin spaces
     are very different in size, as they are for a high spin state.
@@ -798,9 +808,9 @@ def use_dense_spin_matrix(num_strings: int, num_other_strings: int, num_excitati
     Returns:
         True if the group should be applied as a dense matrix.
     """
-    return num_strings * num_strings <= 8 * max(num_excitations, 1) and num_strings <= 8 * max(
-        num_other_strings, 1
-    )
+    return num_strings * num_strings <= DENSE_SPIN_MATRIX_FILL * max(
+        num_excitations, 1
+    ) and num_strings <= 8 * max(num_other_strings, 1)
 
 
 def build_derived_forms(factorized: SpinFactorizedOperator, ci_info: CI_Info) -> None:
