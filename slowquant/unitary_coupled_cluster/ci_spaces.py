@@ -51,6 +51,7 @@ class CI_Info:
         "spin_arena_length",
         "spin_arena_packed",
         "spin_op_cache",
+        "string_rotation_layouts",
     )
 
     def __init__(
@@ -158,6 +159,13 @@ class CI_Info:
         # The same for generators that connect more than two determinants at a time, see
         # operator_state_algebra.build_generator_blocks.
         self.block_layouts: dict[tuple[str, tuple[int, ...]], tuple[np.ndarray, ...] | None] = {}
+        # The same rotations again, but held as pairs of spin strings rather than pairs of
+        # determinants, which is what a spin product allows and what keeps the ansatz's memory
+        # independent of the size of the CI space. See
+        # spin_factorized_algebra.build_string_rotation_layout.
+        self.string_rotation_layouts: dict[
+            tuple[str, tuple[int, ...]], tuple[int, tuple[np.ndarray, ...], tuple[np.ndarray, ...]] | None
+        ] = {}
 
     @property
     def idx2det(self) -> np.ndarray:

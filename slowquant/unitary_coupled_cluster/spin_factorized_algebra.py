@@ -927,6 +927,240 @@ def apply_factorized_operator(
     return tmp_state
 
 
+# Which spins a generator's rotation touches, which decides the kernel that applies it.
+ROTATION_ALPHA = 0
+ROTATION_BETA = 1
+ROTATION_MIXED = 2
+
+
+@nb.jit(nopython=True, cache=True)
+def rotate_alpha_string_pairs(
+    states: np.ndarray,
+    src: np.ndarray,
+    dst: np.ndarray,
+    sign: np.ndarray,
+    cos_theta: float,
+    sin_theta: float,
+) -> None:
+    r"""Rotate paired alpha strings of the CI matrix in place, a row operation.
+
+    .. math::
+        \begin{pmatrix}C_{p,:}\\C_{q,:}\end{pmatrix} \leftarrow
+        \begin{pmatrix}\cos\theta & -\Gamma\sin\theta\\
+                       \Gamma\sin\theta & \cos\theta\end{pmatrix}
+        \begin{pmatrix}C_{p,:}\\C_{q,:}\end{pmatrix}
+
+    Args:
+        states: States as (number of states, alpha strings, beta strings), updated in place.
+        src: First alpha string of each pair.
+        dst: Second alpha string of each pair.
+        sign: Phase of each pair.
+        cos_theta: Cosine of the rotation angle.
+        sin_theta: Sine of the rotation angle.
+    """
+    for pair in range(len(src)):
+        p = src[pair]
+        q = dst[pair]
+        signed_sin = sign[pair] * sin_theta
+        for state_idx in range(states.shape[0]):
+            for col in range(states.shape[2]):
+                amplitude_p = states[state_idx, p, col]
+                amplitude_q = states[state_idx, q, col]
+                states[state_idx, p, col] = cos_theta * amplitude_p - signed_sin * amplitude_q
+                states[state_idx, q, col] = signed_sin * amplitude_p + cos_theta * amplitude_q
+
+
+@nb.jit(nopython=True, cache=True)
+def rotate_beta_string_pairs(
+    states: np.ndarray,
+    src: np.ndarray,
+    dst: np.ndarray,
+    sign: np.ndarray,
+    cos_theta: float,
+    sin_theta: float,
+) -> None:
+    """Rotate paired beta strings of the CI matrix in place, a column operation.
+
+    Args:
+        states: States as (number of states, alpha strings, beta strings), updated in place.
+        src: First beta string of each pair.
+        dst: Second beta string of each pair.
+        sign: Phase of each pair.
+        cos_theta: Cosine of the rotation angle.
+        sin_theta: Sine of the rotation angle.
+    """
+    for state_idx in range(states.shape[0]):
+        for row in range(states.shape[1]):
+            for pair in range(len(src)):
+                p = src[pair]
+                q = dst[pair]
+                signed_sin = sign[pair] * sin_theta
+                amplitude_p = states[state_idx, row, p]
+                amplitude_q = states[state_idx, row, q]
+                states[state_idx, row, p] = cos_theta * amplitude_p - signed_sin * amplitude_q
+                states[state_idx, row, q] = signed_sin * amplitude_p + cos_theta * amplitude_q
+
+
+@nb.jit(nopython=True, cache=True)
+def rotate_string_grid(
+    states: np.ndarray,
+    alpha_src: np.ndarray,
+    alpha_dst: np.ndarray,
+    alpha_sign: np.ndarray,
+    beta_src: np.ndarray,
+    beta_dst: np.ndarray,
+    beta_sign: np.ndarray,
+    cos_theta: float,
+    sin_theta: float,
+) -> None:
+    r"""Rotate the CI matrix in place for a generator that moves both spins.
+
+    The generator takes :math:`\left(p_\alpha,p_\beta\right)` to
+    :math:`\left(q_\alpha,q_\beta\right)`, so the pairs are the product of the alpha pairs and
+    the beta pairs and the phase is the product of the two phases.
+
+    Args:
+        states: States as (number of states, alpha strings, beta strings), updated in place.
+        alpha_src: First alpha string of each alpha pair.
+        alpha_dst: Second alpha string of each alpha pair.
+        alpha_sign: Phase of each alpha pair.
+        beta_src: First beta string of each beta pair.
+        beta_dst: Second beta string of each beta pair.
+        beta_sign: Phase of each beta pair.
+        cos_theta: Cosine of the rotation angle.
+        sin_theta: Sine of the rotation angle.
+    """
+    for alpha_pair in range(len(alpha_src)):
+        pa = alpha_src[alpha_pair]
+        qa = alpha_dst[alpha_pair]
+        for beta_pair in range(len(beta_src)):
+            pb = beta_src[beta_pair]
+            qb = beta_dst[beta_pair]
+            signed_sin = alpha_sign[alpha_pair] * beta_sign[beta_pair] * sin_theta
+            for state_idx in range(states.shape[0]):
+                amplitude_p = states[state_idx, pa, pb]
+                amplitude_q = states[state_idx, qa, qb]
+                states[state_idx, pa, pb] = cos_theta * amplitude_p - signed_sin * amplitude_q
+                states[state_idx, qa, qb] = signed_sin * amplitude_p + cos_theta * amplitude_q
+
+
+def build_string_rotation_layout(
+    op: FermionicOperator, ci_info: CI_Info
+) -> tuple[int, tuple[np.ndarray, ...], tuple[np.ndarray, ...]] | None:
+    r"""Find the spin strings that the exponential of a generator rotates.
+
+    An excitation generator is one excitation minus its adjoint, so over a spin product its
+    factorized form holds exactly two terms with opposite factors: one carries the excitation
+    and the other carries it back. Reading the first one off gives the pairing directly, in the
+    space of alpha and beta strings rather than the space of determinants,
+
+    .. math::
+        \hat{T}\left|p_\alpha p_\beta\right> = \Gamma\left|q_\alpha q_\beta\right>,\qquad
+        \Gamma = \Gamma_\alpha\Gamma_\beta
+
+    which is the same rotation the determinant form describes, held in a form that does not grow
+    with the CI space. A generator touching one spin pairs strings of that spin and leaves the
+    other alone, so the rotation is a row or column operation on the CI matrix and a single pair
+    covers a whole row; one touching both spins pairs the products of its two sets of strings.
+
+    That is the whole memory argument for large active spaces. A single excitation at CAS(16,16)
+    pairs about 3,400 alpha strings, against 44.7 million determinants, and the state itself is
+    the only thing left that grows with the determinant count.
+
+    Args:
+        op: Excitation generator, already folded into the active space.
+        ci_info: Information about the CI space, which must be a spin product.
+
+    Returns:
+        Which spins the rotation touches and the alpha and beta string pairs with their phases,
+        or None if the operator is not one excitation and its adjoint over this space.
+    """
+    if not ci_info.is_spin_product:
+        return None
+    factorized = factorize_operator(op, ci_info)
+    if factorized is None:
+        return None
+    num_pure_alpha = len(factorized.pure_alpha_factor)
+    num_pure_beta = len(factorized.pure_beta_factor)
+    num_mixed = len(factorized.mixed_factor)
+    # One excitation and its adjoint, and nothing else, or this is not a pairing.
+    if num_pure_alpha + num_pure_beta + num_mixed != 2:
+        return None
+    # The arena is only final once every sub-string of the operator has asked for its slice.
+    alpha_arena = get_spin_arena(ci_info, True)
+    beta_arena = get_spin_arena(ci_info, False)
+    empty = (np.zeros(0, dtype=np.int32), np.zeros(0, dtype=np.int32), np.zeros(0, dtype=float))
+
+    def take(arena, start, stop, factor):
+        """Copy one term's slice out of the shared arena, with its factor folded into the phase."""
+        return (
+            np.array(arena[0][start:stop], dtype=np.int32),
+            np.array(arena[1][start:stop], dtype=np.int32),
+            np.array(arena[2][start:stop], dtype=float) * factor,
+        )
+
+    if num_pure_alpha == 2:
+        if factorized.pure_alpha_factor[0] * factorized.pure_alpha_factor[1] >= 0:
+            return None
+        pairs = take(
+            alpha_arena,
+            factorized.pure_alpha_start[0],
+            factorized.pure_alpha_stop[0],
+            factorized.pure_alpha_factor[0],
+        )
+        return (ROTATION_ALPHA, pairs, empty) if len(pairs[0]) else None
+    if num_pure_beta == 2:
+        if factorized.pure_beta_factor[0] * factorized.pure_beta_factor[1] >= 0:
+            return None
+        pairs = take(
+            beta_arena,
+            factorized.pure_beta_start[0],
+            factorized.pure_beta_stop[0],
+            factorized.pure_beta_factor[0],
+        )
+        return (ROTATION_BETA, empty, pairs) if len(pairs[0]) else None
+    if num_mixed == 2:
+        if factorized.mixed_factor[0] * factorized.mixed_factor[1] >= 0:
+            return None
+        alpha_pairs = take(
+            alpha_arena,
+            factorized.mixed_alpha_start[0],
+            factorized.mixed_alpha_stop[0],
+            factorized.mixed_factor[0],
+        )
+        beta_pairs = take(beta_arena, factorized.mixed_beta_start[0], factorized.mixed_beta_stop[0], 1.0)
+        if not len(alpha_pairs[0]) or not len(beta_pairs[0]):
+            return None
+        return ROTATION_MIXED, alpha_pairs, beta_pairs
+    return None
+
+
+def apply_string_rotation(
+    states: np.ndarray,
+    layout: tuple[int, tuple[np.ndarray, ...], tuple[np.ndarray, ...]],
+    theta: float,
+    ci_info: CI_Info,
+) -> None:
+    r"""Apply :math:`\exp(\theta\hat{T})` through its string pairs, in place.
+
+    Args:
+        states: States as (number of states, number of determinants), updated in place.
+        layout: Which spins the rotation touches and the string pairs, see
+                build_string_rotation_layout.
+        theta: Ansatz parameter value.
+        ci_info: Information about the CI space.
+    """
+    kind, alpha_pairs, beta_pairs = layout
+    matrix = states.reshape(states.shape[0], ci_info.num_alpha_strings, ci_info.num_beta_strings)
+    cos_theta, sin_theta = np.cos(theta), np.sin(theta)
+    if kind == ROTATION_ALPHA:
+        rotate_alpha_string_pairs(matrix, *alpha_pairs, cos_theta, sin_theta)
+    elif kind == ROTATION_BETA:
+        rotate_beta_string_pairs(matrix, *beta_pairs, cos_theta, sin_theta)
+    else:
+        rotate_string_grid(matrix, *alpha_pairs, *beta_pairs, cos_theta, sin_theta)
+
+
 def propagate_state_factorized(
     op: FermionicOperator, state: np.ndarray, ci_info: CI_Info, tmp_state: np.ndarray
 ) -> np.ndarray | None:

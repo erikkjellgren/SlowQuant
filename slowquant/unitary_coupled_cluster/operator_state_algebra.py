@@ -18,6 +18,8 @@ from slowquant.unitary_coupled_cluster.operators import (
     G2_sa,
 )
 from slowquant.unitary_coupled_cluster.spin_factorized_algebra import (
+    apply_string_rotation,
+    build_string_rotation_layout,
     propagate_state_factorized,
     propagate_state_SA_factorized,
 )
@@ -1028,6 +1030,24 @@ def apply_spin_adapted_double_SA(
     return out
 
 
+def get_string_rotation_layout(
+    op: FermionicOperator, ci_info: CI_Info, cache_key: tuple[str, tuple[int, ...]]
+) -> tuple[int, tuple[np.ndarray, ...], tuple[np.ndarray, ...]] | None:
+    """Get the string-space rotation of a generator, building it the first time it is asked for.
+
+    Args:
+        op: Excitation generator, already embedded in the CI space.
+        ci_info: Information about the CI space.
+        cache_key: Excitation type and indices naming this generator.
+
+    Returns:
+        String rotation layout, or None if the generator is not a pairing over a spin product.
+    """
+    if cache_key not in ci_info.string_rotation_layouts:
+        ci_info.string_rotation_layouts[cache_key] = build_string_rotation_layout(op, ci_info)
+    return ci_info.string_rotation_layouts[cache_key]
+
+
 def apply_generator_exponential(
     state: np.ndarray,
     op: FermionicOperator,
@@ -1054,6 +1074,11 @@ def apply_generator_exponential(
     Returns:
         New state.
     """
+    strings = get_string_rotation_layout(op, ci_info, cache_key)
+    if strings is not None:
+        out = np.copy(state)
+        apply_string_rotation(out.reshape(1, -1), strings, theta, ci_info)
+        return out
     layout = get_rotation_layout(op, ci_info, cache_key)
     if layout is not None:
         out = np.copy(state)
@@ -1091,6 +1116,11 @@ def apply_generator_exponential_SA(
     Returns:
         New states.
     """
+    strings = get_string_rotation_layout(op, ci_info, cache_key)
+    if strings is not None:
+        out = np.copy(states)
+        apply_string_rotation(out, strings, theta, ci_info)
+        return out
     layout = get_rotation_layout(op, ci_info, cache_key)
     if layout is not None:
         out = np.copy(states)
