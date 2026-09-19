@@ -1161,6 +1161,117 @@ def apply_string_rotation(
         rotate_string_grid(matrix, *alpha_pairs, *beta_pairs, cos_theta, sin_theta)
 
 
+@nb.jit(nopython=True, cache=True)
+def accumulate_alpha_string_pairs(
+    out: np.ndarray, states: np.ndarray, src: np.ndarray, dst: np.ndarray, sign: np.ndarray
+) -> None:
+    r"""Add :math:`\hat{T}\left|\nu\right>` for an alpha-only generator into out.
+
+    Args:
+        out: States to add into, as (number of states, alpha strings, beta strings).
+        states: States the generator acts on, same shape.
+        src: First alpha string of each pair.
+        dst: Second alpha string of each pair.
+        sign: Phase of each pair.
+    """
+    for pair in range(len(src)):
+        p = src[pair]
+        q = dst[pair]
+        phase = sign[pair]
+        for state_idx in range(states.shape[0]):
+            for col in range(states.shape[2]):
+                out[state_idx, q, col] += phase * states[state_idx, p, col]
+                out[state_idx, p, col] -= phase * states[state_idx, q, col]
+
+
+@nb.jit(nopython=True, cache=True)
+def accumulate_beta_string_pairs(
+    out: np.ndarray, states: np.ndarray, src: np.ndarray, dst: np.ndarray, sign: np.ndarray
+) -> None:
+    r"""Add :math:`\hat{T}\left|\nu\right>` for a beta-only generator into out.
+
+    Args:
+        out: States to add into, as (number of states, alpha strings, beta strings).
+        states: States the generator acts on, same shape.
+        src: First beta string of each pair.
+        dst: Second beta string of each pair.
+        sign: Phase of each pair.
+    """
+    for state_idx in range(states.shape[0]):
+        for row in range(states.shape[1]):
+            for pair in range(len(src)):
+                p = src[pair]
+                q = dst[pair]
+                phase = sign[pair]
+                out[state_idx, row, q] += phase * states[state_idx, row, p]
+                out[state_idx, row, p] -= phase * states[state_idx, row, q]
+
+
+@nb.jit(nopython=True, cache=True)
+def accumulate_string_grid(
+    out: np.ndarray,
+    states: np.ndarray,
+    alpha_src: np.ndarray,
+    alpha_dst: np.ndarray,
+    alpha_sign: np.ndarray,
+    beta_src: np.ndarray,
+    beta_dst: np.ndarray,
+    beta_sign: np.ndarray,
+) -> None:
+    r"""Add :math:`\hat{T}\left|\nu\right>` for a generator moving both spins into out.
+
+    Args:
+        out: States to add into, as (number of states, alpha strings, beta strings).
+        states: States the generator acts on, same shape.
+        alpha_src: First alpha string of each alpha pair.
+        alpha_dst: Second alpha string of each alpha pair.
+        alpha_sign: Phase of each alpha pair.
+        beta_src: First beta string of each beta pair.
+        beta_dst: Second beta string of each beta pair.
+        beta_sign: Phase of each beta pair.
+    """
+    for alpha_pair in range(len(alpha_src)):
+        pa = alpha_src[alpha_pair]
+        qa = alpha_dst[alpha_pair]
+        for beta_pair in range(len(beta_src)):
+            pb = beta_src[beta_pair]
+            qb = beta_dst[beta_pair]
+            phase = alpha_sign[alpha_pair] * beta_sign[beta_pair]
+            for state_idx in range(states.shape[0]):
+                out[state_idx, qa, qb] += phase * states[state_idx, pa, pb]
+                out[state_idx, pa, pb] -= phase * states[state_idx, qa, qb]
+
+
+def accumulate_string_pairing(
+    out: np.ndarray,
+    states: np.ndarray,
+    layout: tuple[int, tuple[np.ndarray, ...], tuple[np.ndarray, ...]],
+    ci_info: CI_Info,
+) -> None:
+    r"""Add :math:`\hat{T}\left|\nu\right>` into out, through the generator's string pairs.
+
+    The gradient of a unitary product state needs the bare generator applied once, and the
+    pairing that its exponential uses describes that too: it is the same map without the cosine
+    and sine. Going through it costs one sweep rather than a walk over the operator's strings.
+
+    Args:
+        out: States to add into, as (number of states, number of determinants).
+        states: States the generator acts on, same shape.
+        layout: Which spins the generator touches and its string pairs.
+        ci_info: Information about the CI space.
+    """
+    kind, alpha_pairs, beta_pairs = layout
+    shape = (states.shape[0], ci_info.num_alpha_strings, ci_info.num_beta_strings)
+    out_matrix = out.reshape(shape)
+    state_matrix = states.reshape(shape)
+    if kind == ROTATION_ALPHA:
+        accumulate_alpha_string_pairs(out_matrix, state_matrix, *alpha_pairs)
+    elif kind == ROTATION_BETA:
+        accumulate_beta_string_pairs(out_matrix, state_matrix, *beta_pairs)
+    else:
+        accumulate_string_grid(out_matrix, state_matrix, *alpha_pairs, *beta_pairs)
+
+
 def propagate_state_factorized(
     op: FermionicOperator, state: np.ndarray, ci_info: CI_Info, tmp_state: np.ndarray
 ) -> np.ndarray | None:

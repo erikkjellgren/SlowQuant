@@ -18,6 +18,7 @@ from slowquant.unitary_coupled_cluster.operators import (
     G2_sa,
 )
 from slowquant.unitary_coupled_cluster.spin_factorized_algebra import (
+    accumulate_string_pairing,
     apply_string_rotation,
     build_string_rotation_layout,
     propagate_state_factorized,
@@ -1054,6 +1055,7 @@ def apply_generator_exponential(
     theta: float,
     ci_info: CI_Info,
     cache_key: tuple[str, tuple[int, ...]],
+    in_place: bool = False,
 ) -> np.ndarray:
     r"""Apply the exponential of an excitation generator to a state.
 
@@ -1070,13 +1072,15 @@ def apply_generator_exponential(
         theta: Ansatz parameter value.
         ci_info: Information about the CI space.
         cache_key: Excitation type and indices naming this generator.
+        in_place: Rotate the state handed in rather than a copy of it. Only for a caller that
+                  owns the array, which the ansatz builders do and propagate_unitary does not.
 
     Returns:
         New state.
     """
     strings = get_string_rotation_layout(op, ci_info, cache_key)
     if strings is not None:
-        out = np.copy(state)
+        out = state if in_place else np.copy(state)
         apply_string_rotation(out.reshape(1, -1), strings, theta, ci_info)
         return out
     layout = get_rotation_layout(op, ci_info, cache_key)
@@ -1100,6 +1104,7 @@ def apply_generator_exponential_SA(
     theta: float,
     ci_info: CI_Info,
     cache_key: tuple[str, tuple[int, ...]],
+    in_place: bool = False,
 ) -> np.ndarray:
     r"""Apply the exponential of an excitation generator to every state of a state average.
 
@@ -1112,13 +1117,15 @@ def apply_generator_exponential_SA(
         theta: Ansatz parameter value.
         ci_info: Information about the CI space.
         cache_key: Excitation type and indices naming this generator.
+        in_place: Rotate the state handed in rather than a copy of it. Only for a caller that
+                  owns the array, which the ansatz builders do and propagate_unitary does not.
 
     Returns:
         New states.
     """
     strings = get_string_rotation_layout(op, ci_info, cache_key)
     if strings is not None:
-        out = np.copy(states)
+        out = states if in_place else np.copy(states)
         apply_string_rotation(out, strings, theta, ci_info)
         return out
     layout = get_rotation_layout(op, ci_info, cache_key)
@@ -1734,6 +1741,7 @@ def construct_ups_state(
                 A * theta,
                 ci_info,
                 ("sa_single_alpha", tuple(exc_indices)),
+                in_place=True,
             )
             out = apply_generator_exponential(
                 out,
@@ -1741,6 +1749,7 @@ def construct_ups_state(
                 A * theta,
                 ci_info,
                 ("sa_single_beta", tuple(exc_indices)),
+                in_place=True,
             )
         elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
             # Create T matrix
@@ -1774,7 +1783,9 @@ def construct_ups_state(
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
             # Analytical application on state vector
-            out = apply_generator_exponential(out, T, theta, ci_info, (exc_type, tuple(exc_indices)))
+            out = apply_generator_exponential(
+                out, T, theta, ci_info, (exc_type, tuple(exc_indices)), in_place=True
+            )
         elif exc_type in ("sa_double_2", "sa_double_3"):
             (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
             T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
@@ -1843,6 +1854,7 @@ def construct_ups_state_SA(
                 A * theta,
                 ci_info,
                 ("sa_single_alpha", tuple(exc_indices)),
+                in_place=True,
             )
             out = apply_generator_exponential_SA(
                 out,
@@ -1850,6 +1862,7 @@ def construct_ups_state_SA(
                 A * theta,
                 ci_info,
                 ("sa_single_beta", tuple(exc_indices)),
+                in_place=True,
             )
         elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
             # Create T matrix
@@ -1883,7 +1896,9 @@ def construct_ups_state_SA(
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
             # Analytical application on state vector
-            out = apply_generator_exponential_SA(out, T, theta, ci_info, (exc_type, tuple(exc_indices)))
+            out = apply_generator_exponential_SA(
+                out, T, theta, ci_info, (exc_type, tuple(exc_indices)), in_place=True
+            )
         elif exc_type in ("sa_double_2", "sa_double_3"):
             (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
             T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
@@ -1949,7 +1964,9 @@ def propagate_unitary(
             ci_info,
             ("sa_single_alpha", tuple(exc_indices)),
         )
-        out = apply_generator_exponential(out, Tb, A * theta, ci_info, ("sa_single_beta", tuple(exc_indices)))
+        out = apply_generator_exponential(
+            out, Tb, A * theta, ci_info, ("sa_single_beta", tuple(exc_indices)), in_place=True
+        )
     elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
         # Create T matrix
         if exc_type == "single":
@@ -2095,6 +2112,73 @@ def propagate_unitary_SA(
     return out
 
 
+def apply_generator_once(
+    state: np.ndarray,
+    operators: list[FermionicOperator],
+    ci_info: CI_Info,
+    cache_keys: list[tuple[str, tuple[int, ...]]],
+) -> np.ndarray:
+    r"""Apply a sum of excitation generators once.
+
+    .. math::
+        \left|\tilde{0}\right> = \sum_k \hat{T}_k\left|0\right>
+
+    Each generator that pairs spin strings goes through that pairing, which is the same map its
+    unitary rotates over and is already cached for it. Anything else falls back to the general
+    operator machinery.
+
+    Args:
+        state: State.
+        operators: Excitation generators, already embedded in the CI space.
+        ci_info: Information about the CI space.
+        cache_keys: Excitation type and indices naming each generator.
+
+    Returns:
+        New state.
+    """
+    layouts = [get_string_rotation_layout(op, ci_info, key) for op, key in zip(operators, cache_keys)]
+    if any(layout is None for layout in layouts):
+        total = propagate_state([operators[0]], state, ci_info, do_folding=False)
+        for op in operators[1:]:
+            total = total + propagate_state([op], state, ci_info, do_folding=False)
+        return total
+    resolved = [layout for layout in layouts if layout is not None]
+    out = np.zeros_like(state)
+    for layout in resolved:
+        accumulate_string_pairing(out.reshape(1, -1), state.reshape(1, -1), layout, ci_info)
+    return out
+
+
+def apply_generator_once_SA(
+    states: np.ndarray,
+    operators: list[FermionicOperator],
+    ci_info: CI_Info,
+    cache_keys: list[tuple[str, tuple[int, ...]]],
+) -> np.ndarray:
+    r"""Apply a sum of excitation generators once to every state of a state average.
+
+    Args:
+        states: States as (number of states, number of determinants).
+        operators: Excitation generators, already embedded in the CI space.
+        ci_info: Information about the CI space.
+        cache_keys: Excitation type and indices naming each generator.
+
+    Returns:
+        New states.
+    """
+    layouts = [get_string_rotation_layout(op, ci_info, key) for op, key in zip(operators, cache_keys)]
+    if any(layout is None for layout in layouts):
+        total = propagate_state_SA([operators[0]], states, ci_info, do_folding=False)
+        for op in operators[1:]:
+            total = total + propagate_state_SA([op], states, ci_info, do_folding=False)
+        return total
+    resolved = [layout for layout in layouts if layout is not None]
+    out = np.zeros_like(states)
+    for layout in resolved:
+        accumulate_string_pairing(out, states, layout, ci_info)
+    return out
+
+
 def get_grad_action(
     state: np.ndarray,
     idx: int,
@@ -2138,11 +2222,11 @@ def get_grad_action(
         Ta = G1(alpha_idx(i, ci_info.num_active_orbs), alpha_idx(a, ci_info.num_active_orbs), True)
         Tb = G1(beta_idx(i, ci_info.num_active_orbs), beta_idx(a, ci_info.num_active_orbs), True)
         # Apply missing T factor of derivative
-        tmp = propagate_state(
-            [A * (Ta + Tb)],
+        tmp = A * apply_generator_once(
             state,
+            [Ta, Tb],
             ci_info,
-            do_folding=False,
+            [("sa_single_alpha", tuple(exc_indices)), ("sa_single_beta", tuple(exc_indices))],
         )
     elif exc_type in (
         "single",
@@ -2198,12 +2282,7 @@ def get_grad_action(
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Apply missing T factor of derivative
-        tmp = propagate_state(
-            [T],
-            state,
-            ci_info,
-            do_folding=False,
-        )
+        tmp = apply_generator_once(state, [T], ci_info, [(exc_type, tuple(exc_indices))])
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")
     return tmp
@@ -2252,11 +2331,11 @@ def get_grad_action_SA(
         Ta = G1(alpha_idx(i, ci_info.num_active_orbs), alpha_idx(a, ci_info.num_active_orbs), True)
         Tb = G1(beta_idx(i, ci_info.num_active_orbs), beta_idx(a, ci_info.num_active_orbs), True)
         # Apply missing T factor of derivative
-        tmp = propagate_state_SA(
-            [A * (Ta + Tb)],
+        tmp = A * apply_generator_once_SA(
             state,
+            [Ta, Tb],
             ci_info,
-            do_folding=False,
+            [("sa_single_alpha", tuple(exc_indices)), ("sa_single_beta", tuple(exc_indices))],
         )
     elif exc_type in (
         "single",
@@ -2312,12 +2391,7 @@ def get_grad_action_SA(
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Apply missing T factor of derivative
-        tmp = propagate_state_SA(
-            [T],
-            state,
-            ci_info,
-            do_folding=False,
-        )
+        tmp = apply_generator_once_SA(state, [T], ci_info, [(exc_type, tuple(exc_indices))])
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")
     return tmp
