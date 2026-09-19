@@ -6,11 +6,36 @@ import numba.typed as nbt
 import numpy as np
 
 
+@nb.jit(nopython=True, inline="always")
+def bitcount(x: int) -> int:
+    """Count number of ones in binary representation of an integer.
+
+    Implementaion of Brian Kernighan algorithm,
+    https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetKernighan
+
+    Args:
+        x: Integer.
+
+    Returns:
+        Number of ones in the binary.
+    """
+    b = 0
+    while x > 0:
+        x &= x - 1
+        b += 1
+    return b
+
+
 class CI_Info:
     __slots__ = (
         "alpha_str2idx",
+        "alpha_str2idx_nb",
         "beta_str2idx",
+        "beta_str2idx_nb",
+        "block_layouts",
         "det2idx",
+        "idx2alpha_str",
+        "idx2beta_str",
         "idx2det",
         "num_active_elec_alpha",
         "num_active_elec_beta",
@@ -19,7 +44,12 @@ class CI_Info:
         "num_beta_strings",
         "num_inactive_orbs",
         "num_virtual_orbs",
+        "rotation_layouts",
         "space_extension_offset",
+        "spin_arena",
+        "spin_arena_length",
+        "spin_arena_packed",
+        "spin_op_cache",
     )
 
     def __init__(
@@ -45,9 +75,9 @@ class CI_Info:
         .. math::
             I = I_\alpha N_\beta + I_\beta
 
-        These are not used by the operator-state algebra yet. They are stored because the product
-        structure is what a future factorized algebra would be built on. For an expansion that is
-        not a spin product the maps are empty and num_alpha_strings and num_beta_strings are zero.
+        The product structure is what spin_factorized_algebra is built on. For an expansion that
+        is not a spin product the maps are empty, num_alpha_strings and num_beta_strings are zero,
+        and is_spin_product is False, which routes the algebra back to the general kernels.
 
         Args:
             num_inactive_orbs: Number of inactive spatial orbitals.
@@ -76,6 +106,64 @@ class CI_Info:
         self.beta_str2idx = {} if beta_str2idx is None else beta_str2idx
         self.num_alpha_strings = len(self.alpha_str2idx)
         self.num_beta_strings = len(self.beta_str2idx)
+        # Array form of the per-spin maps, which is what the Numba kernels of the
+        # spin-factorized algebra can consume. Empty when the space is not a spin product.
+        self.idx2alpha_str = np.zeros(self.num_alpha_strings, dtype=int)
+        for spin_str, spin_idx in self.alpha_str2idx.items():
+            self.idx2alpha_str[spin_idx] = spin_str
+        self.idx2beta_str = np.zeros(self.num_beta_strings, dtype=int)
+        for spin_str, spin_idx in self.beta_str2idx.items():
+            self.idx2beta_str[spin_idx] = spin_str
+        # The same maps again for the Numba kernels, which cannot read a Python dict.
+        self.alpha_str2idx_nb = nbt.Dict.empty(key_type=nb.int64, value_type=nb.int64)
+        for spin_str, spin_idx in self.alpha_str2idx.items():
+            self.alpha_str2idx_nb[spin_str] = spin_idx
+        self.beta_str2idx_nb = nbt.Dict.empty(key_type=nb.int64, value_type=nb.int64)
+        for spin_str, spin_idx in self.beta_str2idx.items():
+            self.beta_str2idx_nb[spin_str] = spin_idx
+        # Excitation maps of the spin sub-strings seen so far, one arena per spin, laid out back
+        # to back. A map says which spin string each one goes to and with what phase, and depends
+        # only on the CI space, so it is built once and reused by every later operator.
+        # spin_op_cache gives a sub-string its slice of the arena, spin_arena_length is where the
+        # next one starts, and spin_arena_packed is the concatenated form, rebuilt only when a
+        # new sub-string is added.
+        self.spin_op_cache: dict[tuple[bool, tuple[int, ...], tuple[int, ...]], tuple[int, int]] = {}
+        self.spin_arena: dict[bool, list[tuple[np.ndarray, np.ndarray, np.ndarray]]] = {
+            True: [],
+            False: [],
+        }
+        self.spin_arena_length: dict[bool, int] = {True: 0, False: 0}
+        self.spin_arena_packed: dict[bool, tuple[np.ndarray, np.ndarray, np.ndarray] | None] = {
+            True: None,
+            False: None,
+        }
+        # Determinant pairs rotated by each ansatz generator, see
+        # operator_state_algebra.build_rotation_layout. Keyed by excitation type and indices,
+        # holding None for a generator that is not a pairing. Depends only on the CI space, so
+        # it survives every change of the ansatz parameters.
+        self.rotation_layouts: dict[
+            tuple[str, tuple[int, ...]], tuple[np.ndarray, np.ndarray, np.ndarray] | None
+        ] = {}
+        # The same for generators that connect more than two determinants at a time, see
+        # operator_state_algebra.build_generator_blocks.
+        self.block_layouts: dict[tuple[str, tuple[int, ...]], tuple[np.ndarray, ...] | None] = {}
+
+    @property
+    def is_spin_product(self) -> bool:
+        r"""Check if the determinant expansion is a product of an alpha and a beta string space.
+
+        True for get_indexing and False for get_indexing_extended. Only a spin product can be
+        acted on with the spin-factorized algebra, and only for a spin product does
+
+        .. math::
+            I = I_\alpha N_\beta + I_\beta
+
+        hold.
+
+        Returns:
+            True if the expansion is a spin product.
+        """
+        return self.num_alpha_strings != 0
 
 
 def generate_spin_strings(num_orbs: int, num_elec: int) -> Generator[list[int], None, None]:

@@ -16,6 +16,7 @@ from slowquant.molecularintegrals.integralfunctions import (
 from slowquant.SlowQuant import SlowQuant
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
 from slowquant.unitary_coupled_cluster.density_matrix import (
+    build_rdm12,
     get_electronic_energy,
     get_orbital_gradient,
 )
@@ -116,6 +117,7 @@ class WaveFunctionUPS:
         self._rdm4 = None
         self._h_mo = None
         self._g_mo = None
+        self._hamiltonian: FermionicOperator | None = None
         self._energy_elec: float | None = None
         self.num_energy_evals = 0
         self._c_mo = mo_coeffs
@@ -309,7 +311,7 @@ class WaveFunctionUPS:
                 self.ansatz_options["excitations"].append("GpD")
             elif ansatz.lower() == "fuccpd":
                 self.ansatz_options["excitations"].append("pD")
-            elif ansatz.lower() == "safuccspd":
+            elif ansatz.lower() == "safuccsd":
                 self.ansatz_options["excitations"].append("SAS")
                 self.ansatz_options["excitations"].append("SAD")
             self.ups_layout.create_fUCC(
@@ -360,6 +362,7 @@ class WaveFunctionUPS:
         """
         self._h_mo = None
         self._g_mo = None
+        self._hamiltonian = None
         self._energy_elec = None
         self._kappa = k.copy()
         if isinstance(self._kappa, np.ndarray):
@@ -455,6 +458,34 @@ class WaveFunctionUPS:
         return self._g_mo
 
     @property
+    def energy_hamiltonian(self) -> FermionicOperator:
+        r"""Get the energy Hamiltonian over the inactive and active orbitals.
+
+        .. math::
+            \hat{H} = \sum_{pq}h_{pq}\hat{E}_{pq}
+                    + \frac{1}{2}\sum_{pqrs}g_{pqrs}\hat{e}_{pqrs}
+
+        Building this costs several times more than applying it, and it depends only on the
+        integrals, so it is kept until the orbitals move. The kappa setter drops it along with
+        the integrals it is built from.
+
+        The returned operator is shared, so it must not be modified in place. Folding it, which
+        is what applying it does, returns a new operator and is safe.
+
+        Returns:
+            Energy Hamiltonian.
+        """
+        if self._hamiltonian is None:
+            self._hamiltonian = hamiltonian_0i_0a(
+                self.h_mo,
+                self.g_mo,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.num_virtual_orbs,
+            )
+        return self._hamiltonian
+
+    @property
     def rdm1(self) -> np.ndarray:
         """Calculate one-electron reduced density matrix in the active space.
 
@@ -462,19 +493,7 @@ class WaveFunctionUPS:
             One-electron reduced density matrix.
         """
         if self._rdm1 is None:
-            self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs), dtype=float)
-            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                p_ = p - self.num_inactive_orbs
-                for q in range(self.num_inactive_orbs, p + 1):
-                    q_ = q - self.num_inactive_orbs
-                    val = expectation_value(
-                        self.ci_coeffs,
-                        [Epq(p, q, self.num_orbs)],
-                        self.ci_coeffs,
-                        self.ci_info,
-                    )
-                    self._rdm1[p_, q_] = val  # type: ignore
-                    self._rdm1[q_, p_] = val  # type: ignore
+            self._rdm1, self._rdm2 = build_rdm12(self.ci_coeffs, self.ci_info)
         return self._rdm1
 
     @property
@@ -485,43 +504,7 @@ class WaveFunctionUPS:
             Two-electron reduced density matrix.
         """
         if self._rdm2 is None:
-            self._rdm2 = np.zeros(
-                (
-                    self.num_active_orbs,
-                    self.num_active_orbs,
-                    self.num_active_orbs,
-                    self.num_active_orbs,
-                ),
-                dtype=float,
-            )
-            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                p_ = p - self.num_inactive_orbs
-                for q in range(self.num_inactive_orbs, p + 1):
-                    q_ = q - self.num_inactive_orbs
-                    for r in range(self.num_inactive_orbs, p + 1):
-                        r_ = r - self.num_inactive_orbs
-                        if p == q:
-                            s_lim = r + 1
-                        elif p == r:
-                            s_lim = q + 1
-                        elif q < r:
-                            s_lim = p
-                        else:
-                            s_lim = p + 1
-                        for s in range(self.num_inactive_orbs, s_lim):
-                            s_ = s - self.num_inactive_orbs
-                            val = expectation_value(
-                                self.ci_coeffs,
-                                [Epq(p, q, self.num_orbs) * Epq(r, s, self.num_orbs)],
-                                self.ci_coeffs,
-                                self.ci_info,
-                            )
-                            if q == r:
-                                val -= self.rdm1[p_, s_]
-                            self._rdm2[p_, q_, r_, s_] = val  # type: ignore
-                            self._rdm2[r_, s_, p_, q_] = val  # type: ignore
-                            self._rdm2[q_, p_, s_, r_] = val  # type: ignore
-                            self._rdm2[s_, r_, q_, p_] = val  # type: ignore
+            self._rdm1, self._rdm2 = build_rdm12(self.ci_coeffs, self.ci_info)
         return self._rdm2
 
     @property
@@ -738,15 +721,7 @@ class WaveFunctionUPS:
         if self._energy_elec is None:
             self._energy_elec = expectation_value(
                 self.ci_coeffs,
-                [
-                    hamiltonian_0i_0a(
-                        self.h_mo,
-                        self.g_mo,
-                        self.num_inactive_orbs,
-                        self.num_active_orbs,
-                        self.num_virtual_orbs,
-                    )
-                ],
+                [self.energy_hamiltonian],
                 self.ci_coeffs,
                 self.ci_info,
             )
@@ -758,9 +733,7 @@ class WaveFunctionUPS:
         Returns:
             FermionicOperator.
         """
-        H = hamiltonian_0i_0a(
-            self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
-        )
+        H = self.energy_hamiltonian
         H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
 
         if qiskit_form:
@@ -1023,15 +996,7 @@ class WaveFunctionUPS:
         else:
             E = expectation_value(
                 self.ci_coeffs,
-                [
-                    hamiltonian_0i_0a(
-                        self.h_mo,
-                        self.g_mo,
-                        self.num_inactive_orbs,
-                        self.num_active_orbs,
-                        self.num_virtual_orbs,
-                    )
-                ],
+                [self.energy_hamiltonian],
                 self.ci_coeffs,
                 self.ci_info,
             )
@@ -1071,13 +1036,7 @@ class WaveFunctionUPS:
                 self.rdm2,
             )
         if theta_optimization:
-            Hamiltonian = hamiltonian_0i_0a(
-                self.h_mo,
-                self.g_mo,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.num_virtual_orbs,
-            )
+            Hamiltonian = self.energy_hamiltonian
             # Reference bra state (no differentiations)
             bra_vec = propagate_state(
                 [Hamiltonian],
@@ -1167,9 +1126,7 @@ class WaveFunctionUPS:
         for i in range(theta_idx + 1, len(thetas_local)):
             state_vecs = propagate_unitary_SA(state_vecs, i, self.ci_info, thetas_local, self.ups_layout)
 
-        Hamiltonian = hamiltonian_0i_0a(
-            self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
-        )
+        Hamiltonian = self.energy_hamiltonian
         bra_vec = propagate_state_SA([Hamiltonian], state_vecs, self.ci_info, thetas_local, self.ups_layout)
 
         energies = []
