@@ -540,22 +540,28 @@ def apply_pure_spin_terms(
     Returns:
         New state.
     """
-    for term in range(len(factors)):
-        factor = factors[term]
-        for k in range(starts[term], stops[term]):
-            fac = factor * sign[k]
-            if is_alpha:
+    if is_alpha:
+        # An alpha excitation moves a whole beta block, which is contiguous.
+        for term in range(len(factors)):
+            factor = factors[term]
+            for k in range(starts[term], stops[term]):
+                fac = factor * sign[k]
                 src_offset = src[k] * num_beta_strings
                 dst_offset = dst[k] * num_beta_strings
                 for i in range(num_beta_strings):
                     tmp_state[dst_offset + i] += fac * state[src_offset + i]
-            else:
-                src_offset = src[k]
-                dst_offset = dst[k]
-                for i in range(num_alpha_strings):
-                    tmp_state[i * num_beta_strings + dst_offset] += (
-                        fac * state[i * num_beta_strings + src_offset]
-                    )
+    else:
+        # A beta excitation touches one entry of every alpha block, so walking the excitations
+        # on the outside strides through the whole state once per excitation and uses eight
+        # bytes of every cache line it touches. Walking the alpha blocks on the outside instead
+        # keeps one block, which is a contiguous row, in cache while all of the excitations are
+        # applied to it. The contributions to an entry still arrive in the same order.
+        for i in range(num_alpha_strings):
+            base = i * num_beta_strings
+            for term in range(len(factors)):
+                factor = factors[term]
+                for k in range(starts[term], stops[term]):
+                    tmp_state[base + dst[k]] += factor * sign[k] * state[base + src[k]]
     return tmp_state
 
 
