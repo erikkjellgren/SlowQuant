@@ -19,7 +19,9 @@ from slowquant.unitary_coupled_cluster.operators import (
 )
 from slowquant.unitary_coupled_cluster.spin_factorized_algebra import (
     accumulate_string_pairing,
+    apply_spin_block_layout,
     apply_string_rotation,
+    build_spin_block_layout,
     build_string_rotation_layout,
     propagate_state_factorized,
     propagate_state_SA_factorized,
@@ -868,6 +870,51 @@ def get_rotation_layout(
     return ci_info.rotation_layouts[cache_key]
 
 
+def get_spin_block_layout(
+    op: FermionicOperator, ci_info: CI_Info, cache_key: tuple[str, tuple[int, ...]]
+) -> tuple | None:
+    """Get the per-spin blocked form of a generator, building it the first time it is asked for.
+
+    Args:
+        op: Excitation generator, already embedded in the CI space.
+        ci_info: Information about the CI space.
+        cache_key: Excitation type and indices naming this generator.
+
+    Returns:
+        The cell pair layout, or None if the generator does not block this way.
+    """
+    if cache_key not in ci_info.spin_block_layouts:
+        ci_info.spin_block_layouts[cache_key] = build_spin_block_layout(op, ci_info)
+    return ci_info.spin_block_layouts[cache_key]
+
+
+def apply_spin_blocked_exponential(
+    states: np.ndarray,
+    op: FermionicOperator,
+    theta: float,
+    ci_info: CI_Info,
+    cache_key: tuple[str, tuple[int, ...]],
+) -> np.ndarray | None:
+    r"""Apply the exponential of a generator through its spin-string cell pairs, if it has them.
+
+    Args:
+        states: States as (number of states, number of determinants).
+        op: Excitation generator, already embedded in the CI space.
+        theta: Ansatz parameter value.
+        ci_info: Information about the CI space.
+        cache_key: Excitation type and indices naming this generator.
+
+    Returns:
+        New states, or None if the generator does not block over spin-string cells.
+    """
+    layout = get_spin_block_layout(op, ci_info, cache_key)
+    if layout is None:
+        return None
+    out = np.copy(states)
+    apply_spin_block_layout(out, layout, theta, ci_info)
+    return out
+
+
 def get_block_layout(
     op: FermionicOperator, ci_info: CI_Info, cache_key: tuple[str, tuple[int, ...]]
 ) -> tuple[np.ndarray, ...] | None:
@@ -983,6 +1030,9 @@ def apply_spin_adapted_double(
     Returns:
         New state.
     """
+    spin_blocked = apply_spin_blocked_exponential(state.reshape(1, -1), op, theta, ci_info, cache_key)
+    if spin_blocked is not None:
+        return spin_blocked.reshape(state.shape)
     blocked = apply_blocked_exponential(state.reshape(1, -1), op, theta, ci_info, cache_key)
     if blocked is not None:
         return blocked.reshape(state.shape)
@@ -1019,6 +1069,9 @@ def apply_spin_adapted_double_SA(
     Returns:
         New states.
     """
+    spin_blocked = apply_spin_blocked_exponential(states, op, theta, ci_info, cache_key)
+    if spin_blocked is not None:
+        return spin_blocked
     blocked = apply_blocked_exponential(states, op, theta, ci_info, cache_key)
     if blocked is not None:
         return blocked
@@ -1088,6 +1141,9 @@ def apply_generator_exponential(
         out = np.copy(state)
         rotate_determinant_pairs(out.reshape(1, -1), *layout, np.cos(theta), np.sin(theta))
         return out
+    spin_blocked = apply_spin_blocked_exponential(state.reshape(1, -1), op, theta, ci_info, cache_key)
+    if spin_blocked is not None:
+        return spin_blocked.reshape(state.shape)
     blocked = apply_blocked_exponential(state.reshape(1, -1), op, theta, ci_info, cache_key)
     if blocked is not None:
         return blocked.reshape(state.shape)
@@ -1133,6 +1189,9 @@ def apply_generator_exponential_SA(
         out = np.copy(states)
         rotate_determinant_pairs(out, *layout, np.cos(theta), np.sin(theta))
         return out
+    spin_blocked = apply_spin_blocked_exponential(states, op, theta, ci_info, cache_key)
+    if spin_blocked is not None:
+        return spin_blocked
     blocked = apply_blocked_exponential(states, op, theta, ci_info, cache_key)
     if blocked is not None:
         return blocked

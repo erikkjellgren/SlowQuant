@@ -1272,6 +1272,451 @@ def accumulate_string_pairing(
         accumulate_string_grid(out_matrix, state_matrix, *alpha_pairs, *beta_pairs)
 
 
+@nb.jit(nopython=True, cache=True)
+def label_connected_spin_strings(src: np.ndarray, dst: np.ndarray, num_strings: int) -> np.ndarray:
+    """Label each spin string with the group of strings the operator connects it to.
+
+    Args:
+        src: Spin string an operator term acts on.
+        dst: Spin string it is taken to.
+        num_strings: Number of spin strings.
+
+    Returns:
+        Group label of every spin string.
+    """
+    parent = np.arange(num_strings)
+    for entry in range(len(src)):
+        root_a = src[entry]
+        root_b = dst[entry]
+        while parent[root_a] != root_a:
+            parent[root_a] = parent[parent[root_a]]
+            root_a = parent[root_a]
+        while parent[root_b] != root_b:
+            parent[root_b] = parent[parent[root_b]]
+            root_b = parent[root_b]
+        if root_a != root_b:
+            parent[root_a] = root_b
+    for string_idx in range(num_strings):
+        root = string_idx
+        while parent[root] != root:
+            root = parent[root]
+        parent[string_idx] = root
+    return parent
+
+
+@nb.jit(nopython=True, cache=True)
+def rotate_spin_cell_pairs(
+    states: np.ndarray,
+    alpha_start: np.ndarray,
+    alpha_members: np.ndarray,
+    alpha_sig: np.ndarray,
+    beta_start: np.ndarray,
+    beta_members: np.ndarray,
+    beta_sig: np.ndarray,
+    pair_offset: np.ndarray,
+    pair_count: np.ndarray,
+    group_start: np.ndarray,
+    group_size: np.ndarray,
+    group_rows: np.ndarray,
+    group_cols: np.ndarray,
+    group_shape: np.ndarray,
+    rotations: np.ndarray,
+    buffer: np.ndarray,
+    rows_buffer: np.ndarray,
+) -> None:
+    r"""Apply the exponential to each pair of spin-string cells, in place.
+
+    The operator cannot move a determinant out of the cell pair its two strings belong to, and
+    inside a pair it splits further into groups it cannot mix. Both structures depend only on the
+    pair of cell signatures, of which there are a handful however large the CI space is, so the
+    rotations are shared and only the strings of each cell are looked up per pair.
+
+    Args:
+        states: States as (number of states, alpha strings, beta strings), updated in place.
+        alpha_start: Where each alpha cell begins in alpha_members, with the end appended.
+        alpha_members: Alpha strings of every cell, one cell after another.
+        alpha_sig: Signature of each alpha cell.
+        beta_start: Where each beta cell begins in beta_members, with the end appended.
+        beta_members: Beta strings of every cell, one cell after another.
+        beta_sig: Signature of each beta cell.
+        pair_offset: First group of each signature pair.
+        pair_count: Number of groups of each signature pair.
+        group_start: Where each group begins in group_rows and group_cols.
+        group_size: Number of determinants in each group.
+        group_rows: Position within its alpha cell of every group member.
+        group_cols: Position within its beta cell of every group member.
+        group_shape: Which distinct rotation each group uses.
+        rotations: Rotation of each distinct group, as (number of them, n, n).
+        buffer: Scratch of at least the largest group.
+        rows_buffer: Scratch of (largest alpha cell) by (number of beta strings).
+    """
+    alpha_here = np.empty(64, dtype=np.int64)
+    beta_here = np.empty(64, dtype=np.int64)
+    num_beta_strings = states.shape[2]
+    for alpha_cell in range(len(alpha_sig)):
+        first_alpha = alpha_start[alpha_cell]
+        size_alpha = alpha_start[alpha_cell + 1] - first_alpha
+        signature_alpha = alpha_sig[alpha_cell]
+        for row in range(size_alpha):
+            alpha_here[row] = alpha_members[first_alpha + row]
+        for state_idx in range(states.shape[0]):
+            state = states[state_idx]
+            # The cell's rows are scattered through the CI matrix but its work touches all of
+            # them many times over, so they are streamed into one small contiguous block first.
+            # Every alpha string belongs to exactly one cell, so this reads and writes the whole
+            # state once in total.
+            for row in range(size_alpha):
+                source = state[alpha_here[row]]
+                for col in range(num_beta_strings):
+                    rows_buffer[row, col] = source[col]
+            for beta_cell in range(len(beta_sig)):
+                first_beta = beta_start[beta_cell]
+                size_beta = beta_start[beta_cell + 1] - first_beta
+                for col in range(size_beta):
+                    beta_here[col] = beta_members[first_beta + col]
+                offset = pair_offset[signature_alpha, beta_sig[beta_cell]]
+                for group_idx in range(pair_count[signature_alpha, beta_sig[beta_cell]]):
+                    group = offset + group_idx
+                    size = group_size[group]
+                    begin = group_start[group]
+                    rotation = rotations[group_shape[group]]
+                    for member in range(size):
+                        buffer[member] = rows_buffer[
+                            group_rows[begin + member], beta_here[group_cols[begin + member]]
+                        ]
+                    for member in range(size):
+                        total = 0.0
+                        for other in range(size):
+                            total += rotation[member, other] * buffer[other]
+                        rows_buffer[group_rows[begin + member], beta_here[group_cols[begin + member]]] = total
+            for row in range(size_alpha):
+                target = state[alpha_here[row]]
+                for col in range(num_beta_strings):
+                    target[col] = rows_buffer[row, col]
+
+
+def build_spin_cells(
+    num_strings: int, terms: list[tuple[np.ndarray, np.ndarray, np.ndarray]]
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Group the strings of one spin into the sets the operator's terms connect.
+
+    Args:
+        num_strings: Number of spin strings.
+        terms: Each term's map over the strings of this spin.
+
+    Returns:
+        Where each cell begins, the strings of every cell, and each string's position in its cell.
+    """
+    if terms:
+        src = np.concatenate([term[0] for term in terms]).astype(np.int64)
+        dst = np.concatenate([term[1] for term in terms]).astype(np.int64)
+    else:
+        src = dst = np.zeros(0, dtype=np.int64)
+    label = label_connected_spin_strings(src, dst, num_strings)
+    order = np.argsort(label, kind="stable")
+    boundaries = np.flatnonzero(np.concatenate(([True], label[order][1:] != label[order][:-1])))
+    starts = np.concatenate((boundaries, [num_strings]))
+    position = np.empty(num_strings, dtype=np.int64)
+    position[order] = np.arange(num_strings) - np.repeat(starts[:-1], np.diff(starts))
+    return starts.astype(np.int32), order.astype(np.int32), position
+
+
+def spin_cell_signatures(
+    starts: np.ndarray,
+    members: np.ndarray,
+    position: np.ndarray,
+    label_of: np.ndarray,
+    terms: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
+    pure_terms: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
+) -> tuple[np.ndarray, list]:
+    """Describe each cell by how the operator's terms move its members, with their phases.
+
+    Two cells that move the same way carry the same exponential, and only a handful of ways
+    exist however large the CI space is, because a cell is fixed by the occupation of the few
+    orbitals the operator touches.
+
+    Args:
+        starts: Where each cell begins in members.
+        members: Spin strings of every cell.
+        position: Each string's position within its cell.
+        label_of: Which cell each string belongs to.
+        terms: Each term acting on both spins, as a map over this spin's strings.
+        pure_terms: Each term acting on this spin alone.
+
+    Returns:
+        Signature of each cell, and the distinct signatures.
+    """
+    identifiers = np.empty(len(starts) - 1, dtype=np.int32)
+    seen: dict = {}
+    distinct: list = []
+    moves_by_cell: list = [[[] for _ in range(len(terms) + len(pure_terms))] for _ in range(len(starts) - 1)]
+    for term_idx, (src, dst, sign) in enumerate(list(terms) + list(pure_terms)):
+        for from_string, to_string, phase in zip(src, dst, sign):
+            cell = label_of[int(from_string)]
+            moves_by_cell[cell][term_idx].append(
+                (int(position[int(from_string)]), int(position[int(to_string)]), float(phase))
+            )
+    for cell in range(len(starts) - 1):
+        key = (
+            int(starts[cell + 1] - starts[cell]),
+            tuple(tuple(sorted(moves)) for moves in moves_by_cell[cell]),
+        )
+        found = seen.get(key)
+        if found is None:
+            found = len(distinct)
+            seen[key] = found
+            distinct.append(key)
+        identifiers[cell] = found
+    return identifiers, distinct
+
+
+# A cell pair spans this many determinants at most before the layout is refused as too dense.
+MAX_SPIN_CELL_PAIR = 64
+
+
+def local_generator_matrix(
+    alpha_signature: tuple,
+    beta_signature: tuple,
+    mixed_factors: np.ndarray,
+    pure_alpha_factors: np.ndarray,
+    pure_beta_factors: np.ndarray,
+) -> np.ndarray:
+    r"""Build the generator restricted to one pair of spin-string cells.
+
+    .. math::
+        \hat{T} = \sum_t c_t\,\hat{A}_t\otimes\hat{B}_t
+                + \sum_u c_u\,\hat{A}_u\otimes 1
+                + \sum_v c_v\,1\otimes\hat{B}_v
+
+    so on the :math:`\left|A\right|\left|B\right|` determinants the pair spans it is a small
+    dense matrix, and the exponential of that is what the cell pair needs.
+
+    Args:
+        alpha_signature: Size of the alpha cell and how each term moves its members.
+        beta_signature: Size of the beta cell and how each term moves its members.
+        mixed_factors: Factor in front of each term acting on both spins.
+        pure_alpha_factors: Factor in front of each term acting on alpha alone.
+        pure_beta_factors: Factor in front of each term acting on beta alone.
+
+    Returns:
+        The generator on the cell pair.
+    """
+    size_alpha, alpha_moves = alpha_signature
+    size_beta, beta_moves = beta_signature
+    num_mixed = len(mixed_factors)
+    matrix = np.zeros((size_alpha * size_beta, size_alpha * size_beta))
+    for term, factor in enumerate(mixed_factors):
+        for from_alpha, to_alpha, alpha_phase in alpha_moves[term]:
+            for from_beta, to_beta, beta_phase in beta_moves[term]:
+                matrix[to_alpha * size_beta + to_beta, from_alpha * size_beta + from_beta] += (
+                    factor * alpha_phase * beta_phase
+                )
+    # A term on one spin alone leaves the other spin's string where it is.
+    for term, factor in enumerate(pure_alpha_factors):
+        for from_alpha, to_alpha, alpha_phase in alpha_moves[num_mixed + term]:
+            for beta in range(size_beta):
+                matrix[to_alpha * size_beta + beta, from_alpha * size_beta + beta] += factor * alpha_phase
+    for term, factor in enumerate(pure_beta_factors):
+        for from_beta, to_beta, beta_phase in beta_moves[num_mixed + term]:
+            for alpha in range(size_alpha):
+                matrix[alpha * size_beta + to_beta, alpha * size_beta + from_beta] += factor * beta_phase
+    return matrix
+
+
+def build_spin_block_layout(op: FermionicOperator, ci_info: CI_Info) -> tuple | None:
+    r"""Block diagonalize a generator over pairs of spin-string cells.
+
+    A generator that is not one excitation and its adjoint, a spin-adapted double above all, is
+    not a rotation of pairs. It is still block diagonal, and over a spin product the blocks are
+    visible per spin: the strings of each spin fall into cells that the operator's terms connect,
+    the operator cannot take a determinant out of the cell pair its two strings lie in, and
+    inside a pair it splits further into groups, so
+
+    .. math::
+        \exp\left(\theta\hat{T}\right)
+            = \bigoplus_{A,B}\bigoplus_{g}\exp\left(\theta T^{(A,B)}_g\right)
+
+    Cells are small and the number of distinct shapes does not grow with the active space,
+    because a cell is fixed by the occupation of the few orbitals the generator touches. So the
+    whole layout is two arrays over the spin strings and a handful of small matrices, rather
+    than the determinant-indexed groups this replaces, which cost one entry per determinant.
+
+    Args:
+        op: Excitation generator, already folded into the active space.
+        ci_info: Information about the CI space, which must be a spin product.
+
+    Returns:
+        The cells of each spin, the signature of each cell, and the groups of each signature pair
+        with their diagonalized generators. None if the generator does not block this way.
+    """
+    if not ci_info.is_spin_product:
+        return None
+    factorized = factorize_operator(op, ci_info)
+    if (
+        factorized is None
+        or len(factorized.mixed_factor) + len(factorized.pure_alpha_factor) + len(factorized.pure_beta_factor)
+        == 0
+    ):
+        return None
+    alpha_arena = get_spin_arena(ci_info, True)
+    beta_arena = get_spin_arena(ci_info, False)
+
+    def slices(arena, starts, stops):
+        """Each term's map over the strings of one spin."""
+        return [(arena[0][s:e], arena[1][s:e], arena[2][s:e]) for s, e in zip(starts, stops)]
+
+    alpha_terms = slices(alpha_arena, factorized.mixed_alpha_start, factorized.mixed_alpha_stop)
+    beta_terms = slices(beta_arena, factorized.mixed_beta_start, factorized.mixed_beta_stop)
+    alpha_pure = slices(alpha_arena, factorized.pure_alpha_start, factorized.pure_alpha_stop)
+    beta_pure = slices(beta_arena, factorized.pure_beta_start, factorized.pure_beta_stop)
+
+    alpha_start, alpha_members, alpha_position = build_spin_cells(
+        ci_info.num_alpha_strings, alpha_terms + alpha_pure
+    )
+    beta_start, beta_members, beta_position = build_spin_cells(
+        ci_info.num_beta_strings, beta_terms + beta_pure
+    )
+    alpha_label = np.empty(ci_info.num_alpha_strings, dtype=np.int64)
+    alpha_label[alpha_members] = np.repeat(np.arange(len(alpha_start) - 1), np.diff(alpha_start))
+    beta_label = np.empty(ci_info.num_beta_strings, dtype=np.int64)
+    beta_label[beta_members] = np.repeat(np.arange(len(beta_start) - 1), np.diff(beta_start))
+    alpha_sig, alpha_distinct = spin_cell_signatures(
+        alpha_start, alpha_members, alpha_position, alpha_label, alpha_terms, alpha_pure
+    )
+    beta_sig, beta_distinct = spin_cell_signatures(
+        beta_start, beta_members, beta_position, beta_label, beta_terms, beta_pure
+    )
+    if max(np.diff(alpha_start).max(), 1) * max(np.diff(beta_start).max(), 1) > MAX_SPIN_CELL_PAIR:
+        return None
+
+    pair_offset = np.zeros((len(alpha_distinct), len(beta_distinct)), dtype=np.int32)
+    pair_count = np.zeros((len(alpha_distinct), len(beta_distinct)), dtype=np.int32)
+    group_start: list[int] = []
+    group_size: list[int] = []
+    group_rows: list[int] = []
+    group_cols: list[int] = []
+    group_shape: list[int] = []
+    generators: list[np.ndarray] = []
+    seen_blocks: dict[bytes, int] = {}
+    members_so_far = 0
+    for first, alpha_signature in enumerate(alpha_distinct):
+        for second, beta_signature in enumerate(beta_distinct):
+            matrix = local_generator_matrix(
+                alpha_signature,
+                beta_signature,
+                factorized.mixed_factor,
+                factorized.pure_alpha_factor,
+                factorized.pure_beta_factor,
+            )
+            if not np.allclose(matrix, -matrix.T):
+                # An anti-Hermitian generator gives antisymmetric blocks; if it did not, the
+                # maps above did not describe it.
+                return None
+            size_beta = beta_signature[0]
+            reach = np.abs(matrix) + np.abs(matrix.T) + np.eye(len(matrix))
+            label = label_connected_spin_strings(*np.nonzero(reach), len(matrix))
+            pair_offset[first, second] = len(group_start)
+            for root in np.unique(label):
+                local = np.flatnonzero(label == root)
+                group_start.append(members_so_far)
+                group_size.append(len(local))
+                group_rows.extend(int(x) // size_beta for x in local)
+                group_cols.extend(int(x) % size_beta for x in local)
+                members_so_far += len(local)
+                block = matrix[np.ix_(local, local)]
+                # Most groups repeat: the same few small generators appear over and over, so
+                # only the distinct ones are diagonalized and kept.
+                key = block.tobytes()
+                found = seen_blocks.get(key)
+                if found is None:
+                    found = len(generators)
+                    seen_blocks[key] = found
+                    generators.append(block)
+                group_shape.append(found)
+            pair_count[first, second] = len(group_start) - pair_offset[first, second]
+    largest = max(group_size)
+    vectors = np.zeros((len(generators), largest, largest), dtype=complex)
+    values = np.zeros((len(generators), largest))
+    for shape, matrix in enumerate(generators):
+        dim = len(matrix)
+        eigenvalues, eigenvectors = np.linalg.eigh(1j * matrix)
+        vectors[shape, :dim, :dim] = eigenvectors
+        values[shape, :dim] = eigenvalues
+        for pad in range(dim, largest):
+            vectors[shape, pad, pad] = 1.0
+    return (
+        alpha_start,
+        alpha_members,
+        alpha_sig,
+        beta_start,
+        beta_members,
+        beta_sig,
+        pair_offset,
+        pair_count,
+        np.array(group_start, dtype=np.int32),
+        np.array(group_size, dtype=np.int32),
+        np.array(group_rows, dtype=np.int32),
+        np.array(group_cols, dtype=np.int32),
+        np.array(group_shape, dtype=np.int32),
+        vectors,
+        values,
+        largest,
+    )
+
+
+def apply_spin_block_layout(states: np.ndarray, layout: tuple, theta: float, ci_info: CI_Info) -> None:
+    r"""Apply :math:`\exp(\theta\hat{T})` group by group within each cell pair, in place.
+
+    Args:
+        states: States as (number of states, number of determinants), updated in place.
+        layout: The cells, signature pairs and their groups, see build_spin_block_layout.
+        theta: Ansatz parameter value.
+        ci_info: Information about the CI space.
+    """
+    (
+        alpha_start,
+        alpha_members,
+        alpha_sig,
+        beta_start,
+        beta_members,
+        beta_sig,
+        pair_offset,
+        pair_count,
+        group_start,
+        group_size,
+        group_rows,
+        group_cols,
+        group_shape,
+        vectors,
+        values,
+        largest,
+    ) = layout
+    phases = np.exp(-1j * theta * values)[:, np.newaxis, :]
+    rotations = np.ascontiguousarray(
+        np.real((vectors * phases) @ np.conjugate(np.transpose(vectors, (0, 2, 1))))
+    )
+    matrix = states.reshape(states.shape[0], ci_info.num_alpha_strings, ci_info.num_beta_strings)
+    rotate_spin_cell_pairs(
+        matrix,
+        alpha_start,
+        alpha_members,
+        alpha_sig,
+        beta_start,
+        beta_members,
+        beta_sig,
+        pair_offset,
+        pair_count,
+        group_start,
+        group_size,
+        group_rows,
+        group_cols,
+        group_shape,
+        rotations,
+        np.empty(largest),
+        np.empty((int(np.diff(alpha_start).max()), ci_info.num_beta_strings)),
+    )
+
+
 def propagate_state_factorized(
     op: FermionicOperator, state: np.ndarray, ci_info: CI_Info, tmp_state: np.ndarray
 ) -> np.ndarray | None:

@@ -50,6 +50,7 @@ class CI_Info:
         "spin_arena",
         "spin_arena_length",
         "spin_arena_packed",
+        "spin_block_layouts",
         "spin_op_cache",
         "string_rotation_layouts",
     )
@@ -163,6 +164,9 @@ class CI_Info:
         # determinants, which is what a spin product allows and what keeps the ansatz's memory
         # independent of the size of the CI space. See
         # spin_factorized_algebra.build_string_rotation_layout.
+        # Generators that are not pairings, the spin-adapted doubles above all, block over pairs
+        # of spin-string cells instead. See spin_factorized_algebra.build_spin_block_layout.
+        self.spin_block_layouts: dict[tuple[str, tuple[int, ...]], tuple | None] = {}
         self.string_rotation_layouts: dict[
             tuple[str, tuple[int, ...]], tuple[int, tuple[np.ndarray, ...], tuple[np.ndarray, ...]] | None
         ] = {}
