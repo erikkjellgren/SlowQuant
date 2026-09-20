@@ -460,7 +460,10 @@ def rotate_determinant_pairs(
                        \Gamma\sin\theta & \cos\theta\end{pmatrix}
         \begin{pmatrix}c_p\\c_q\end{pmatrix}
 
-    The pairs are disjoint, so this needs no output vector.
+    The determinant-space counterpart of
+    spin_factorized_algebra.rotate_alpha_string_pairs, used when the CI space is not a spin
+    product and the rotation cannot be held per spin string. The pairs are disjoint, so this
+    needs no output vector.
 
     Args:
         states: States as (number of states, number of determinants), updated in place.
@@ -483,10 +486,23 @@ def rotate_determinant_pairs(
 
 MAX_EXPONENTIAL_BLOCK = 64
 
-# Frequencies and the weight of each power of the generator in the closed form of a
-# spin-adapted double, as the branches that used to carry a copy each spelled them. Odd
-# powers are weighted by sin(S*theta) and even ones by cos(S*theta)-1. Only reached when
-# the generator cannot be blocked, see build_generator_blocks.
+# Frequencies S and the weight k of each power of the generator in the closed form of a
+# spin-adapted double, as the branches that used to carry a copy each spelled them. Odd powers
+# are weighted by sin(S*theta) and even ones by cos(S*theta)-1, see spin_adapted_double_weight.
+#
+# The keys name the five cases of 10.48550/arXiv.2505.00883: sa_double_1 is Eq. 14, which
+# reduces to a plain fermionic double and is a pairing, so it never reaches this table.
+# sa_double_2 and sa_double_3 are Eq. 15 and 16, two frequencies and four powers, from Eq. 45
+# and Table I. sa_double_4 is Eq. 17, four frequencies and eight powers, from Eq. 47 and
+# Table II. sa_double_5 is Eq. 18, the triplet-coupled case, five frequencies and ten powers,
+# from Eq. 49 and Table III.
+#
+# Only reached when the generator cannot be blocked, see build_generator_blocks and
+# spin_factorized_algebra.build_spin_block_layout, since a sweep over the blocks replaces the
+# up to ten applications of the generator this table would otherwise cost.
+#
+# . 10.48550/arXiv.2505.00883, Eq. 41-49, and Tables I, II and III
+# . 10.48550/arXiv.2505.02984, Eq. 35, D1, and, D2
 SPIN_ADAPTED_DOUBLE_SERIES: dict[str, tuple[tuple[float, ...], tuple[tuple[float, ...], ...]]] = {
     "sa_double_2": (
         (1, math.sqrt(2) / 2),
@@ -571,6 +587,11 @@ SPIN_ADAPTED_DOUBLE_SERIES: dict[str, tuple[tuple[float, ...], tuple[tuple[float
 def label_connected_determinants(src: np.ndarray, dst: np.ndarray, num_dets: int) -> np.ndarray:
     """Label each determinant with the connected group of the generator it belongs to.
 
+    Reads the generator's determinant map as the edges of a graph and returns its connected
+    components, by union-find. A determinant the generator annihilates is a component on its
+    own, and the generator cannot mix two components, which is what makes the exponential block
+    diagonal over them.
+
     Args:
         src: Determinant the generator acts on.
         dst: Determinant it is taken to.
@@ -610,9 +631,10 @@ def rotate_determinant_blocks(
     r"""Apply a small dense rotation to each group of determinants, in place.
 
     .. math::
-        c_{d_r} \leftarrow \sum_s R^{(b)}_{rs} c_{d_s}
+        c_{d_r} \leftarrow \sum_s \left[\exp\left(\theta T^{(b)}\right)\right]_{rs} c_{d_s}
 
-    The groups are disjoint, so this needs no output vector.
+    The groups are disjoint, so this needs no output vector. Determinants no group reaches are
+    left alone, which is what the identity part of the exponential does to them.
 
     Args:
         states: States as (number of states, number of determinants), updated in place.
@@ -652,10 +674,22 @@ def build_generator_blocks(op: FermionicOperator, ci_info: CI_Info) -> tuple[np.
     groups of up to eight, of which only a handful are distinct however large the active space
     is, because a group is fixed by the occupation of the few orbitals the generator touches.
 
+    The point of blocking a spin-adapted double is that its closed form is a sum over up to ten
+    powers of the generator, each of which costs one application, see
+    SPIN_ADAPTED_DOUBLE_SERIES. Diagonalizing the blocks once turns that into a single sweep at
+    every parameter value the optimizer visits.
+
     Each fermionic string of the generator is a signed map of determinants on its own, so
     applying it to :math:`v_k = k+1`, which is positive and all different, names the determinant
     each one came from and the sign it picked up. The groups and their matrices follow from
     those maps.
+
+    Over a spin product the same blocking is done per spin-string cell instead, which does not
+    grow with the CI space, see spin_factorized_algebra.build_spin_block_layout. This form is
+    what is left for a space that is not a spin product.
+
+    #. 10.48550/arXiv.2505.00883, Eq. 45, 47, and, 49 (SA doubles)
+    #. 10.48550/arXiv.2505.02984, Eq. 35, D1, and, D2 (SA doubles)
 
     Args:
         op: Excitation generator, already embedded in the CI space.
@@ -751,6 +785,8 @@ def diagonalize_generator_blocks(blocks: np.ndarray) -> tuple[np.ndarray, np.nda
         \exp\left(\theta T\right) = V e^{-i\theta\lambda}V^\dagger
 
     which is real and costs two small matrix products to assemble once the parameter is known.
+    The blocks depend only on the generator and the CI space, not on the parameter, so this is
+    paid once per generator and the optimizer only ever redoes the two products.
 
     Args:
         blocks: Generator blocks as (number of distinct groups, size, size).
@@ -766,6 +802,14 @@ def exponentiate_generator_blocks(
     eigenvectors: np.ndarray, eigenvalues: np.ndarray, theta: float
 ) -> np.ndarray:
     r"""Assemble :math:`\exp(\theta T^{(b)})` for every distinct block.
+
+    .. math::
+        \exp\left(\theta T^{(b)}\right) = V e^{-i\theta\lambda}V^\dagger
+
+    from the eigendecomposition of :math:`iT^{(b)}` built once by
+    diagonalize_generator_blocks. This is the only part of a blocked exponential that has to be
+    redone when the parameter changes, and it runs over the distinct block shapes rather than
+    over the groups, of which there are many more.
 
     Args:
         eigenvectors: Eigenvectors of each block.
@@ -784,8 +828,9 @@ def build_rotation_layout(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
     r"""Find the determinant pairs that the exponential of a generator rotates.
 
-    An excitation generator :math:`\hat{T} = \hat{T}_{\text{exc}} - \hat{T}_{\text{exc}}^\dagger`
-    squares to minus a projector,
+    An excitation generator :math:`\hat{T} = \hat{\tau} - \hat{\tau}^\dagger` squares to minus a
+    projector, because :math:`\hat{\tau}^\dagger\hat{\tau}` projects onto the determinants the
+    excitation does not annihilate,
 
     .. math::
         \hat{T}^2 = -\left[\hat{n}_i\left(1-\hat{n}_a\right)
@@ -794,8 +839,8 @@ def build_rotation_layout(
     so that :math:`\hat{T}^3 = -\hat{T}` and the series for the exponential closes,
 
     .. math::
-        \exp\left(\theta\hat{T}\right) = 1 + \sin\theta\,\hat{T}
-                                       + \left(1-\cos\theta\right)\hat{T}^2
+        \exp\left(\theta\hat{T}\right) = \hat{I} + \hat{T}\sin\theta
+                                       + \hat{T}^2\left(1-\cos\theta\right)
 
     Because :math:`\hat{P}` is diagonal, the determinant basis splits into the determinants the
     generator annihilates, which the unitary leaves alone, and pairs
@@ -810,6 +855,13 @@ def build_rotation_layout(
     :math:`v_k = k+1` gives :math:`\Gamma\left(p+1\right)` there, which names the partner. The
     two are then checked against each other, so a generator that is not a signed pairing, such
     as a spin-adapted double, reports None and is left to the caller.
+
+    Over a spin product the same pairing is held per spin string instead, which does not grow
+    with the CI space, see spin_factorized_algebra.build_string_rotation_layout. This form is
+    what is left for a space that is not a spin product.
+
+    #. 10.48550/arXiv.2303.10825, Eq. 29-32 (v1)
+    #. 10.48550/arXiv.2505.00883, Eq. 6 and 7
 
     Args:
         op: Excitation generator, already embedded in the CI space.
@@ -856,7 +908,9 @@ def get_rotation_layout(
     """Get the rotation layout of a generator, building it the first time it is asked for.
 
     The layout depends only on the generator and the CI space, so it is reused across every
-    parameter value the optimizer visits.
+    parameter value the optimizer visits. It costs one entry per determinant the generator
+    reaches, so over a spin product get_string_rotation_layout is asked first and this is only
+    reached for a space that is not a product.
 
     Args:
         op: Excitation generator, already embedded in the CI space.
@@ -875,6 +929,10 @@ def get_spin_block_layout(
     op: FermionicOperator, ci_info: CI_Info, cache_key: tuple[str, tuple[int, ...]]
 ) -> tuple | None:
     """Get the per-spin blocked form of a generator, building it the first time it is asked for.
+
+    The layout depends only on the generator and the CI space, so it is reused across every
+    parameter value the optimizer visits. Only the exponential of the small blocks is rebuilt
+    when the parameter changes, see spin_factorized_algebra.apply_spin_block_layout.
 
     Args:
         op: Excitation generator, already embedded in the CI space.
@@ -898,6 +956,13 @@ def apply_spin_blocked_exponential(
     in_place: bool = False,
 ) -> np.ndarray | None:
     r"""Apply the exponential of a generator through its spin-string cell pairs, if it has them.
+
+    .. math::
+        \left|\tilde{\nu}\right> = \exp\left(\theta\hat{T}\right)\left|\nu\right>
+            = \bigoplus_{A,B}\bigoplus_g\exp\left(\theta T^{(A,B)}_g\right)\left|\nu\right>
+
+    The route a spin-adapted double takes over a spin product, see
+    spin_factorized_algebra.build_spin_block_layout.
 
     Args:
         states: States as (number of states, number of determinants).
@@ -924,7 +989,8 @@ def get_block_layout(
     """Get the blocked form of a generator, building and diagonalizing it the first time.
 
     The blocks depend only on the generator and the CI space, so they are reused across every
-    parameter value the optimizer visits and only their exponential is rebuilt.
+    parameter value the optimizer visits and only their exponential is rebuilt, see
+    exponentiate_generator_blocks.
 
     Args:
         op: Excitation generator, already embedded in the CI space.
@@ -958,6 +1024,10 @@ def apply_blocked_exponential(
 
     .. math::
         \left|\tilde{\nu}\right> = \exp\left(\theta\hat{T}\right)\left|\nu\right>
+            = \bigoplus_b\exp\left(\theta T^{(b)}\right)\left|\nu\right>
+
+    The determinant-space counterpart of apply_spin_blocked_exponential, used when the CI space
+    is not a spin product.
 
     Args:
         states: States as (number of states, number of determinants).
@@ -985,9 +1055,24 @@ def spin_adapted_double_weight(
 ) -> float:
     r"""Weight of one power of the generator in the closed form of a spin-adapted double.
 
+    A spin-adapted double does not obey :math:`\hat{G}^3=-\hat{G}`. It obeys a higher-order
+    polynomial relation instead, so its exponential closes only after several powers and carries
+    several frequencies :math:`S_f`,
+
+    .. math::
+        \exp\left(\theta\,{}^\text{SA}\hat{G}\right)
+            = \hat{I} + \sum_m c_m\left(\theta\right)\,{}^\text{SA}\hat{G}^m
+
+    with the weight of each power given by
+
     .. math::
         c_m = \sum_f k^{(m)}_f \sin\left(S_f\theta\right) \quad m \text{ odd}, \qquad
         c_m = \sum_f k^{(m)}_f \left(\cos\left(S_f\theta\right)-1\right) \quad m \text{ even}
+
+    The frequencies and the coefficients :math:`k^{(m)}_f` are the tables of the reference and
+    are spelled out in SPIN_ADAPTED_DOUBLE_SERIES.
+
+    #. 10.48550/arXiv.2505.00883, Eq. 41-44, and Tables I, II and III
 
     Args:
         order: Power of the generator this weight belongs to, counted from one.
@@ -1018,10 +1103,23 @@ def apply_spin_adapted_double(
         \left|\tilde{0}\right> = \exp\left(\theta\hat{T}\right)\left|0\right>
 
     Unlike a plain excitation these generators carry several frequencies, so their exponential
-    is not a rotation of determinant pairs. It is still block diagonal, over groups of at most
-    eight determinants, and taking it that way costs one sweep instead of one application of the
-    generator per power. When the groups cannot be built the closed form is summed instead,
-    which is what the code did everywhere before.
+    is not a rotation of determinant pairs but the multi-term closed form
+
+    .. math::
+        \exp\left(\theta\,{}^\text{SA}\hat{G}\right)
+            = \hat{I} + \sum_m c_m\left(\theta\right)\,{}^\text{SA}\hat{G}^m
+
+    which costs one application of the generator per power, four for the cases with two
+    repeated indices, eight for four distinct indices and ten for the triplet-coupled case.
+
+    It is still block diagonal though, over groups of at most eight determinants, and taking it
+    that way costs one sweep instead. Over a spin product the groups are found per spin-string
+    cell so that the layout does not grow with the CI space; otherwise they are found per
+    determinant. When neither works the closed form above is summed, which is what the code did
+    everywhere before.
+
+    #. 10.48550/arXiv.2505.00883, Eq. 45, 47, and, 49 (SA doubles)
+    #. 10.48550/arXiv.2505.02984, Eq. 35, D1, and, D2 (SA doubles)
 
     Args:
         state: State.
@@ -1067,6 +1165,12 @@ def apply_spin_adapted_double_SA(
     .. math::
         \left|\tilde{\nu}\right> = \exp\left(\theta\hat{T}\right)\left|\nu\right>
 
+    Same three routes as apply_spin_adapted_double, applied to every state at once so that the
+    blocks and their exponential are built once for the whole average.
+
+    #. 10.48550/arXiv.2505.00883, Eq. 45, 47, and, 49 (SA doubles)
+    #. 10.48550/arXiv.2505.02984, Eq. 35, D1, and, D2 (SA doubles)
+
     Args:
         states: States as (number of states, number of determinants).
         op: Excitation generator, already embedded in the CI space.
@@ -1100,6 +1204,11 @@ def get_string_rotation_layout(
 ) -> tuple[int, tuple[np.ndarray, ...], tuple[np.ndarray, ...]] | None:
     """Get the string-space rotation of a generator, building it the first time it is asked for.
 
+    The layout depends only on the generator and the CI space, so it is reused across every
+    parameter value the optimizer visits. It costs one entry per spin string rather than one per
+    determinant, which is what keeps the memory of an ansatz independent of the size of the
+    active space, see spin_factorized_algebra.build_string_rotation_layout.
+
     Args:
         op: Excitation generator, already embedded in the CI space.
         ci_info: Information about the CI space.
@@ -1126,9 +1235,27 @@ def apply_generator_exponential(
     .. math::
         \left|\tilde{0}\right> = \exp\left(\theta\hat{T}\right)\left|0\right>
 
-    A generator that pairs determinants is applied as a Givens rotation, see
-    build_rotation_layout. Anything else, a spin-adapted double in particular, falls back to
-    summing the three terms of the closed form.
+    A generator that is one excitation and its adjoint obeys :math:`\hat{T}^3=-\hat{T}`, so its
+    exponential closes after two terms,
+
+    .. math::
+        \exp\left(\theta\hat{T}\right) = \hat{I} + \hat{T}\sin\theta
+                                       + \hat{T}^2\left(1-\cos\theta\right)
+
+    and acts as a Givens rotation on pairs of basis states. The routes below are that rotation
+    held in progressively more general form, each falling back to the next:
+
+    #. pairs of spin strings, which do not grow with the CI space, over a spin product,
+    #. pairs of determinants, for a CI space that is not a spin product,
+    #. blocks over spin-string cells, for a generator that is not a pairing at all,
+    #. blocks over determinants, for the same generator over a space that is not a product,
+    #. the closed form above, summed with two extra state vectors.
+
+    The last one is what the code did everywhere before, and is what a spin-adapted double falls
+    back to when it cannot be blocked, with more terms, see apply_spin_adapted_double.
+
+    #. 10.48550/arXiv.2303.10825, Eq. 29-32 (v1)
+    #. 10.48550/arXiv.2505.00883, Eq. 6 and 7
 
     Args:
         state: State.
@@ -1177,6 +1304,12 @@ def apply_generator_exponential_SA(
 
     .. math::
         \left|\tilde{\nu}\right> = \exp\left(\theta\hat{T}\right)\left|\nu\right>
+
+    Same routes as apply_generator_exponential, applied to every state at once so that the
+    layout is looked up once for the whole average.
+
+    #. 10.48550/arXiv.2303.10825, Eq. 29-32 (v1)
+    #. 10.48550/arXiv.2505.00883, Eq. 6 and 7
 
     Args:
         states: States as (number of states, number of determinants).
@@ -1276,6 +1409,15 @@ def propagate_state(
 
     .. math::
         \left|\tilde{0}\right> = \hat{O}\left|0\right>
+
+    There are two kernels behind this and they must agree bit for bit. When the CI space is a
+    product of an alpha and a beta string space and every string of the operator is :math:`S_z`
+    conserving, the operator factorizes as
+    :math:`\hat{O} = \pm\hat{O}_\alpha\otimes\hat{O}_\beta` and is applied per spin, see
+    spin_factorized_algebra. That is the fast route and is tried first. A string that changes
+    the electron count of a spin, or a CI space that is not a spin product, such as the one
+    get_indexing_extended builds, falls back to the general kernel below, which walks the
+    determinants one operator string at a time.
 
     Args:
         operators: List of operators.
@@ -1439,7 +1581,12 @@ def propagate_state_SA(
     This would violate the "do not multiply folded operators" rule.
 
     .. math::
-        \left|\tilde{0}\right> = \hat{O}\left|0\right>
+        \left|\tilde{\nu}\right> = \hat{O}\left|\nu\right>
+
+    The same two kernels as propagate_state, with the operator applied to every state of the
+    average. The operator is the same for all of them, so the spin-factorized route builds its
+    one-spin matrices and its contraction layout once and reuses them across the states, see
+    spin_factorized_algebra.propagate_state_SA_factorized.
 
     Args:
         operators: List of operators.
@@ -2217,9 +2364,21 @@ def apply_generator_once(
     .. math::
         \left|\tilde{0}\right> = \sum_k \hat{T}_k\left|0\right>
 
+    This is the factor the derivative of a unitary leaves behind,
+
+    .. math::
+        \frac{\partial}{\partial\theta_i}\exp\left(\theta_i\hat{T}_i\right)
+            = \exp\left(\theta_i\hat{T}_i\right)\hat{T}_i
+
+    and the sum is over the pieces one ansatz parameter drives, which for a spin-adapted single
+    is an alpha and a beta generator.
+
     Each generator that pairs spin strings goes through that pairing, which is the same map its
     unitary rotates over and is already cached for it. Anything else falls back to the general
     operator machinery.
+
+    #. 10.48550/arXiv.2303.10825, Eq. 36 (v1)
+    #. 10.48550/arXiv.2505.00883, Eq. 9 (spin-adapted single as an alpha and a beta generator)
 
     Args:
         state: State.
@@ -2250,6 +2409,11 @@ def apply_generator_once_SA(
     cache_keys: list[tuple[str, tuple[int, ...]]],
 ) -> np.ndarray:
     r"""Apply a sum of excitation generators once to every state of a state average.
+
+    .. math::
+        \left|\tilde{\nu}\right> = \sum_k \hat{T}_k\left|\nu\right>
+
+    #. 10.48550/arXiv.2303.10825, Eq. 36 (v1)
 
     Args:
         states: States as (number of states, number of determinants).
@@ -2282,8 +2446,23 @@ def gradient_generators(
         \frac{\partial}{\partial\theta_i}\exp\left(\theta_i\hat{T}_i\right)
             = \exp\left(\theta_i\hat{T}_i\right)\hat{T}_i
 
-    so the derivative needs the bare generator, which for a spin-adapted single is the sum of
-    an alpha and a beta one.
+    so the derivative needs the bare generator. A spin-adapted single is the sum of an alpha and
+    a beta generator, which commute, so its unitary factorizes into one exponential per spin,
+
+    .. math::
+        {}^\text{SA}\hat{G}_{ai} = \frac{1}{\sqrt{2}}
+            \left(\hat{G}_{a_\alpha i_\alpha} + \hat{G}_{a_\beta i_\beta}\right),\qquad
+        \exp\left(\theta\,{}^\text{SA}\hat{G}_{ai}\right)
+            = \exp\left(\frac{\theta}{\sqrt{2}}\hat{G}_{a_\alpha i_\alpha}\right)
+              \exp\left(\frac{\theta}{\sqrt{2}}\hat{G}_{a_\beta i_\beta}\right)
+
+    It is returned as two operators rather than one, because each of them pairs spin strings on
+    its own while their sum does not. The ansatz absorbs the :math:`1/\sqrt{2}` into the
+    parameter, so the factor returned here is one and not :math:`2^{-1/2}`, matching how
+    propagate_unitary applies the two exponentials.
+
+    #. 10.48550/arXiv.2303.10825, Eq. 36 (v1)
+    #. 10.48550/arXiv.2505.00883, Eq. 9 and 10
 
     Args:
         idx: Index of operator in the ups_struct.
@@ -2392,11 +2571,18 @@ def get_grad_overlap(
 ) -> np.ndarray:
     r"""Overlap of a bra with the derivative factor of one unitary acting on a ket.
 
-    .. math::
-        \left<\text{bra}\right|\hat{T}_i\left|\text{ket}\right>
+    The energy gradient with respect to one ansatz parameter is
 
-    which is what the gradient needs. Where the generator pairs spin strings the overlap is
-    summed over the pairs, so the state the generator would produce is never formed.
+    .. math::
+        \frac{\partial\left<E\right>}{\partial\theta_i}
+            = 2\left<\psi^\prime_{i+1}\right|\hat{T}_i\left|\psi_i\right>
+
+    so what the optimizer needs is a number, not the state
+    :math:`\hat{T}_i\left|\psi_i\right>`. Where the generator pairs spin strings the overlap is
+    summed over the pairs directly, so that state is never formed: forming it would cost a pass
+    to zero it, a pass to fill it and a pass to read it back.
+
+    #. 10.48550/arXiv.2303.10825, Eq. 36 and 37 (v1)
 
     Args:
         bra: Bra states as (number of states, number of determinants).
