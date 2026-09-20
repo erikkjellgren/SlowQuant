@@ -1008,7 +1008,32 @@ class WaveFunctionUPS:
     def _calc_gradient_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
     ) -> np.ndarray:
-        """Calculate electronic gradient.
+        r"""Calculate electronic gradient.
+
+        The orbital part is taken from the density matrices. The ansatz part uses the
+        recurrence that walks the product of unitaries once rather than rebuilding it per
+        parameter. Writing the two partially propagated states as
+
+        .. math::
+            \left|\psi_j\right> = \prod_{k=j}^{1}\exp\left(\theta_k\hat{T}_k\right)
+                \left|\text{CSF}\right>,\qquad
+            \left<\psi^\prime_j\right| = \left<\psi\right|\hat{H}
+                \prod_{k=N}^{j}\exp\left(\theta_k\hat{T}_k\right)
+
+        the gradient with respect to one ansatz parameter and the step to the next one are
+
+        .. math::
+            \frac{\partial\left<E\right>}{\partial\theta_j}
+                = 2\left<\psi^\prime_{j+1}\right|\hat{T}_j\left|\psi_j\right>,\qquad
+            \left<\psi^\prime_j\right| = \left<\psi^\prime_{j+1}\right|
+                \exp\left(\theta_j\hat{T}_j\right),\quad
+            \left|\psi_{j-1}\right> = \exp\left(-\theta_j\hat{T}_j\right)\left|\psi_j\right>
+
+        so every parameter costs two rotations and one overlap, and only two state vectors are
+        ever held. The overlap is taken without forming
+        :math:`\hat{T}_j\left|\psi_j\right>`, see get_grad_overlap.
+
+        #. 10.48550/arXiv.2303.10825, Eq. 36 and 37 (v1)
 
         Args:
             parameters: Ansatz and orbital rotation parameters.
