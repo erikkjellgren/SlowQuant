@@ -27,6 +27,27 @@ index is :math:`I = I_\alpha N_\beta + I_\beta`, so no determinant lookup is nee
 
 This only applies to a determinant expansion that is a product of an alpha and a beta string
 space, i.e. CI_Info.is_spin_product, which excludes get_indexing_extended.
+
+With the CI vector held as a matrix over the two string spaces, :math:`C_{I_\alpha I_\beta}`, an
+operator then splits into the same three contributions a determinant-based full CI program makes
+its sigma vector from,
+
+.. math::
+    \boldsymbol{\sigma} = \underbrace{\boldsymbol{A}\boldsymbol{C}}_{\sigma_2}
+        + \underbrace{\boldsymbol{C}\boldsymbol{B}^T}_{\sigma_1}
+        + \underbrace{\sum_t c_t\boldsymbol{A}_t\boldsymbol{C}\boldsymbol{B}_t^T}_{\sigma_3}
+
+The two one-spin terms are a single matrix multiplication each and the alpha-beta coupling term
+is the expensive one, see apply_sigma3_terms. Nothing here is specific to the Hamiltonian: the
+excitation generators of an ansatz and the one-electron operators of a property calculation go
+through the same machinery, and a generator that is one excitation and its adjoint degenerates
+into a sweep of Givens rotations over pairs of spin strings, see build_string_rotation_layout.
+
+#. 10.1016/0009-2614(84)85513-X (determinant full CI over alpha and beta strings)
+#. 10.1016/0010-4655(89)90033-7 (determinant full CI over alpha and beta strings)
+#. 10.1063/1.455063 (the sigma1, sigma2 and sigma3 split)
+#. Molecular Electronic-Structure Theory, Ch. 11,
+   https://onlinelibrary.wiley.com/doi/book/10.1002/9781119019572
 """
 
 from __future__ import annotations
@@ -53,6 +74,39 @@ DENSE_SPIN_MATRIX_FILL = 64
 
 
 class SpinFactorizedOperator:
+    r"""Operator split into an alpha and a beta part over a spin-product CI space.
+
+    An :math:`S_z` conserving operator is a sum of products of a purely alpha and a purely beta
+    string, see the module docstring,
+
+    .. math::
+        \hat{O} = \sum_t c_t\,\hat{A}_t\otimes\hat{B}_t
+
+    With the CI vector held as a matrix over the two string spaces,
+    :math:`C_{I_\alpha I_\beta}`, the three kinds of term act in three different ways, which is
+    why they are stored apart,
+
+    .. math::
+        \begin{align}
+        \hat{A}_t\otimes 1 &\rightarrow \boldsymbol{A}_t\boldsymbol{C}\\
+        1\otimes\hat{B}_t &\rightarrow \boldsymbol{C}\boldsymbol{B}_t^T\\
+        \hat{A}_t\otimes\hat{B}_t &\rightarrow \boldsymbol{A}_t\boldsymbol{C}\boldsymbol{B}_t^T
+        \end{align}
+
+    The first two are the one-spin contributions that the sigma-vector literature calls
+    :math:`\sigma_1` and :math:`\sigma_2`, and the third is the alpha-beta coupling term
+    :math:`\sigma_3`, which is the expensive one. This is the same split a determinant-based
+    full CI program makes, applied here to an arbitrary folded operator rather than only to the
+    Hamiltonian.
+
+    The excitation maps themselves are not stored here. They live in the per-spin arenas of the
+    CI space, shared by every operator over that space, and each term only records which slice
+    of them it uses, see get_spin_sub_string_slice.
+
+    #. 10.1016/0009-2614(84)85513-X (determinant full CI over alpha and beta strings)
+    #. 10.1063/1.455063 (the sigma1, sigma2 and sigma3 split)
+    """
+
     __slots__ = (
         "alpha_dst",
         "alpha_matrix",
@@ -165,7 +219,17 @@ def split_spin_string(
         \hat{c}_\beta\hat{c}_\alpha\hat{a}_\beta\hat{a}_\alpha
         \rightarrow \left(\hat{c}_\alpha\hat{a}_\alpha\right)\left(\hat{c}_\beta\hat{a}_\beta\right)
 
-    which for a spin conserving string is :math:`\left(-1\right)^{k_\alpha k_\beta}`.
+    which for a spin conserving string is :math:`\left(-1\right)^{k_\alpha k_\beta}`, with
+    :math:`k_\sigma` the number of creation operators of spin :math:`\sigma`. Moving the
+    :math:`k_\beta` beta creation operators past the :math:`k_\alpha` alpha creation operators
+    costs :math:`k_\alpha k_\beta` transpositions, and moving the annihilation operators back
+    costs the same again, but the beta annihilation operators are moved past the alpha
+    annihilation operators rather than the alpha creation ones, so the two do not cancel. The
+    remaining two phases of the factorization are handled inside the spin blocks, see the module
+    docstring.
+
+    A string that is not :math:`S_z` conserving, one that moves an electron between the spins,
+    does not map the spin product onto itself at all and has no such splitting.
 
     Args:
         op_key: Fermionic string, tuple of creation and annihilation spin-orbital indices.
@@ -197,11 +261,29 @@ def build_spin_excitation_map(
     num_active_orbs: int,
     parity_check: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Build the excitation map of one spin sub-string over a spin string space.
+    r"""Build the excitation map of one spin sub-string over a spin string space.
+
+    A spin sub-string acts on the strings of its own spin as a signed one-to-one map,
+
+    .. math::
+        \hat{A}\left|J_\sigma\right> = \Gamma_{J_\sigma}\left|K_\sigma\right>
+        \quad\text{or}\quad 0
+
+    so all it needs is, for every string that survives the annihilation and creation screening,
+    the string it is taken to and the phase :math:`\Gamma_{J_\sigma}=\pm 1` it picks up. That is
+    the classic string excitation list of a determinant-based full CI program, here for one
+    normal-ordered string of an arbitrary operator rather than for the single excitations of a
+    Hamiltonian.
+
+    The map depends only on the spin string space, never on the factor the operator puts in
+    front of the string, and there are only as many entries as there are spin strings. That is
+    what makes it worth building once and sharing, see get_spin_sub_string_slice.
 
     Follows the same two-step algorithm as apply_operator_serial, with the determinant replaced
     by a single spin string, see the module docstring for why that is exact. Screening and
     traversal order are the same, so the phase matches the unfactorized kernel term by term.
+
+    #. 10.1016/0009-2614(84)85513-X (string excitation lists)
 
     Args:
         idx2spin_str: Maps spin string index to spin string.
@@ -247,11 +329,16 @@ def build_spin_excitation_map(
 def get_spin_sub_string_slice(
     ci_info: CI_Info, sub_string: tuple[tuple[int, ...], tuple[int, ...]], is_alpha: bool
 ) -> tuple[int, int]:
-    """Get the slice of the spin arena holding the excitation map of one spin sub-string.
+    r"""Get the slice of the spin arena holding the excitation map of one spin sub-string.
 
     The map depends only on the spin string space and the sub-string, never on the factor in
     front of it, so it is built once and appended to the arena of that spin. Every later
     operator over the same CI space reuses it.
+
+    That sharing is what keeps the cost of an operator away from the determinant count. A
+    Hamiltonian over :math:`N` active orbitals has :math:`O\left(N^4\right)` strings but only
+    :math:`O\left(N^2\right)` distinct sub-strings per spin, the one-electron excitations
+    :math:`\hat{E}^\sigma_{pq}`, and each of their maps holds at most one entry per spin string.
 
     Args:
         ci_info: Information about the CI space.
@@ -299,6 +386,10 @@ def get_spin_sub_string_slice(
 def get_spin_arena(ci_info: CI_Info, is_alpha: bool) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Get the excitation maps of every spin sub-string built so far, laid out back to back.
 
+    The arena is the single flat copy of every string excitation list over this CI space, and a
+    term of an operator is a slice of it rather than a map of its own. It only grows, so the
+    concatenated form is rebuilt when a new sub-string has been added and reused otherwise.
+
     Args:
         ci_info: Information about the CI space.
         is_alpha: Get the alpha arena, otherwise the beta one.
@@ -335,10 +426,27 @@ def factorize_operator(op: FermionicOperator, ci_info: CI_Info) -> SpinFactorize
     .. math::
         \hat{O} = \sum_t c_t\hat{A}_t\otimes\hat{B}_t
 
+    For the active space Hamiltonian this is the familiar form behind a string-driven full CI
+    sigma vector,
+
+    .. math::
+        \hat{H} = \sum_{pq}h_{pq}\hat{E}_{pq}
+                + \frac{1}{2}\sum_{pqrs}g_{pqrs}\left(\hat{E}_{pq}\hat{E}_{rs}
+                  - \delta_{qr}\hat{E}_{ps}\right)
+
+    whose one-spin part gives :math:`\sigma_1` and :math:`\sigma_2` and whose
+    :math:`\hat{E}^\alpha_{pq}\hat{E}^\beta_{rs}` part gives :math:`\sigma_3`. Nothing here is
+    specific to the Hamiltonian though: any folded, :math:`S_z` conserving operator splits the
+    same way, which is what lets the excitation generators of an ansatz and the one-electron
+    operators of a property calculation go through the same machinery.
+
     The terms are split into those acting on one spin only, which are a matrix on one side of
     the CI vector, and those acting on both, which couple the two. The sub-string excitation
     maps live on the CI space and are shared, so this only records which slice of them each
     term uses, and then build_derived_forms decides how each group will be applied.
+
+    #. 10.1016/0009-2614(84)85513-X (determinant full CI over alpha and beta strings)
+    #. 10.1063/1.455063 (the sigma1, sigma2 and sigma3 split)
 
     Args:
         op: Folded fermionic operator.
@@ -431,12 +539,22 @@ def build_pure_spin_matrix(
     vector seen as a matrix :math:`C_{I_\alpha I_\beta}` it acts on one side,
 
     .. math::
-        \sigma = \boldsymbol{A}\boldsymbol{C}\quad\text{or}\quad
-        \sigma = \boldsymbol{C}\boldsymbol{B}^T
+        \boldsymbol{\sigma} = \boldsymbol{A}\boldsymbol{C}\quad\text{or}\quad
+        \boldsymbol{\sigma} = \boldsymbol{C}\boldsymbol{B}^T
 
-    All such terms share that side, so their sum is a single matrix and the whole group costs
-    one matrix multiplication. Summing them first is also a compression, since a Hamiltonian
-    holds far more excitations than the matrix has entries.
+    with the one-spin matrix collected from the excitation maps of the individual terms,
+
+    .. math::
+        A_{K_\alpha J_\alpha} = \sum_t c_t \Gamma^{(t)}_{J_\alpha}
+        \delta_{K_\alpha, \hat{A}_t J_\alpha}
+
+    These are the :math:`\sigma_1` and :math:`\sigma_2` contributions of a string-driven CI
+    sigma vector, and writing them as one matrix product per spin is what that literature does
+    too. All such terms share that side, so their sum is a single matrix and the whole group
+    costs one matrix multiplication. Summing them first is also a compression, since a
+    Hamiltonian holds far more excitations than the matrix has entries.
+
+    #. 10.1063/1.455063 (the one-spin sigma1 and sigma2 contributions)
 
     Args:
         matrix: Matrix to accumulate into, over the strings of one spin.
@@ -476,8 +594,20 @@ def apply_mixed_terms(
 ) -> np.ndarray:
     r"""Apply the terms that act on both spins, pairing the surviving strings of each.
 
-    The determinant index is :math:`I = I_\alpha N_\beta + I_\beta`, so a term only has to walk
-    the surviving alpha and beta strings and can combine them by arithmetic.
+    These are the :math:`\sigma_3` terms, taken one term at a time rather than as a contraction,
+
+    .. math::
+        \sigma\left(K_\alpha,K_\beta\right) \mathrel{+}= \sum_t c_t\,
+            \Gamma^{(t)}_{J_\alpha}\Gamma^{(t)}_{J_\beta}\,C\left(J_\alpha,J_\beta\right)
+
+    where for term :math:`t` the pair :math:`\left(J_\alpha,J_\beta\right)` runs over the
+    product of the alpha strings and the beta strings that survive it. The determinant index is
+    :math:`I = I_\alpha N_\beta + I_\beta`, so a term only has to walk the surviving alpha and
+    beta strings and can combine them by arithmetic, with no determinant lookup.
+
+    This touches exactly the elements that contribute and nothing else, which is why it wins for
+    a sparse operator such as a single excitation generator. A dense operator such as a
+    Hamiltonian is better served by apply_sigma3_terms, see prefer_contraction_over_pairs.
 
     Args:
         state: Original state.
@@ -525,10 +655,17 @@ def apply_pure_spin_terms(
 ) -> np.ndarray:
     r"""Apply the terms that act on one spin only, as a sparse scatter.
 
-    The same one-sided action as build_pure_spin_matrix, but walked excitation by excitation
-    instead of formed into a matrix, for an operator too sparse to fill one. Because the CI
-    vector is stored as :math:`I = I_\alpha N_\beta + I_\beta`, an alpha excitation moves a whole
-    contiguous beta block of it, while a beta excitation touches one entry of every alpha block.
+    The same one-sided action as build_pure_spin_matrix,
+
+    .. math::
+        \sigma\left(K_\alpha,I_\beta\right) \mathrel{+}= \sum_t c_t\Gamma^{(t)}_{J_\alpha}
+            C\left(J_\alpha,I_\beta\right),\qquad
+        \left|K_\alpha\right> \propto \hat{A}_t\left|J_\alpha\right>
+
+    but walked excitation by excitation instead of formed into a matrix, for an operator too
+    sparse to fill one. Because the CI vector is stored as
+    :math:`I = I_\alpha N_\beta + I_\beta`, an alpha excitation moves a whole contiguous beta
+    block of it, while a beta excitation touches one entry of every alpha block.
 
     Args:
         state: Original state.
@@ -582,9 +719,12 @@ def build_sigma3_layout(
     .. math::
         \hat{O}_\text{mixed} = \sum_{ab}g_{ab}\hat{A}_a\otimes\hat{B}_b
 
-    For a Hamiltonian the sub-strings are the one-electron excitations of each spin and
+    For a Hamiltonian the sub-strings are the one-electron excitations of each spin,
+    :math:`\hat{A}_a = \hat{E}^\alpha_{pq}` and :math:`\hat{B}_b = \hat{E}^\beta_{rs}`, and
     :math:`g_{ab}` is the two-electron integral matrix :math:`g_{pqrs}`, which is the form the
-    sigma vector literature writes this in.
+    sigma vector literature writes this in. The number of sub-strings is then at most
+    :math:`N^2` per spin however many strings the operator holds, so a Hamiltonian with
+    :math:`O\left(N^4\right)` terms collapses onto an :math:`N^2\times N^2` matrix.
 
     That is what turns the group into a dense contraction, see apply_sigma3_terms. The start of
     a sub-string's slice of the arena identifies it uniquely, so it is used as its name here.
@@ -592,6 +732,8 @@ def build_sigma3_layout(
     The alpha excitations are regrouped by the alpha string they produce rather than by the
     sub-string they belong to, because the contraction is done one output alpha string at a
     time. The groups are padded to a common width with a zero phase, which contributes nothing.
+
+    #. 10.1063/1.455063 (sigma3 as a contraction over one-electron excitations)
 
     Args:
         factorized: Spin-factorized operator.
@@ -687,14 +829,26 @@ def apply_sigma3_terms(
             \left<I_\beta\left|\hat{E}^\beta_{rs}\right|J_\beta\right>
             C\left(J_\alpha J_\beta\right)
 
-    following Knowles and Handy. Written per output alpha string it is three steps: gather the
-    rows of the CI vector that couple into it, contract those against the coefficient matrix
-    over sub-strings, and scatter the result through the beta excitations.
+    Written per output alpha string it is three steps, and only the middle one costs anything,
+
+    .. math::
+        \begin{align}
+        D_{a I_\beta} &= \Gamma_{J_\alpha}C\left(J_\alpha,I_\beta\right)
+            &&\text{gather the rows reaching } I_\alpha\\
+        F_{b I_\beta} &= \sum_a g_{ab} D_{a I_\beta}
+            &&\text{contract over the alpha sub-strings}\\
+        \sigma\left(I_\alpha,K_\beta\right) &\mathrel{+}= \Gamma_{J_\beta}F_{b J_\beta}
+            &&\text{scatter through the beta excitations}
+        \end{align}
 
     The gather and the scatter are cheap and the contraction between them is a matrix
     multiplication, which is what makes this faster than pairing the surviving strings of every
     term. Only the alpha sub-strings that actually reach this alpha string take part, so the
-    contraction stays narrow rather than running over all of them.
+    contraction stays narrow rather than running over all of them, and the CI vector is read
+    once per output alpha string rather than once per term.
+
+    #. 10.1016/0009-2614(84)85513-X (the gather, contract and scatter structure)
+    #. 10.1063/1.455063 (sigma3)
 
     Args:
         state: Original state.
@@ -816,9 +970,13 @@ def use_dense_spin_matrix(num_strings: int, num_other_strings: int, num_excitati
 def build_derived_forms(factorized: SpinFactorizedOperator, ci_info: CI_Info) -> None:
     """Fill in the parts of an operator that do not depend on the state it will act on.
 
-    The one-spin groups become a matrix each where that is worth it, and the terms acting on
-    both spins get their contraction layout. A state-averaged wave function applies the same
-    operator to every one of its states, so this is done once and reused.
+    The one-spin groups become a matrix each where that is worth it, see use_dense_spin_matrix,
+    and the terms acting on both spins get their contraction layout where that is worth it, see
+    prefer_contraction_over_pairs. Both choices only reorder the summation, so either branch
+    gives the same numbers and a misjudgement costs time and nothing else.
+
+    A state-averaged wave function applies the same operator to every one of its states, and an
+    optimizer applies the same Hamiltonian at every iteration, so this is done once and reused.
 
     Args:
         factorized: Spin-factorized operator, updated in place.
@@ -862,7 +1020,19 @@ def build_derived_forms(factorized: SpinFactorizedOperator, ci_info: CI_Info) ->
 def apply_factorized_operator(
     factorized: SpinFactorizedOperator, state: np.ndarray, ci_info: CI_Info, tmp_state: np.ndarray
 ) -> np.ndarray:
-    """Apply a factorized operator to one state.
+    r"""Apply a factorized operator to one state.
+
+    Assembles the three contributions of the sigma vector,
+
+    .. math::
+        \boldsymbol{\sigma} = \underbrace{\boldsymbol{A}\boldsymbol{C}}_{\sigma_2}
+            + \underbrace{\boldsymbol{C}\boldsymbol{B}^T}_{\sigma_1}
+            + \underbrace{\sum_t c_t\boldsymbol{A}_t\boldsymbol{C}\boldsymbol{B}_t^T}_{\sigma_3}
+
+    where the CI vector is reshaped into the matrix :math:`C_{I_\alpha I_\beta}` at no cost,
+    because the determinant index is already :math:`I = I_\alpha N_\beta + I_\beta`. Each of the
+    three has two kernels, a dense one and a sparse one, and which of them runs was decided once
+    by build_derived_forms.
 
     Args:
         factorized: Spin-factorized operator.
@@ -960,11 +1130,17 @@ def rotate_alpha_string_pairs(
 ) -> None:
     r"""Rotate paired alpha strings of the CI matrix in place, a row operation.
 
+    An alpha-only generator leaves the beta string alone, so a single pair of alpha strings
+    rotates two whole rows of :math:`C_{I_\alpha I_\beta}` against each other,
+
     .. math::
         \begin{pmatrix}C_{p,:}\\C_{q,:}\end{pmatrix} \leftarrow
         \begin{pmatrix}\cos\theta & -\Gamma\sin\theta\\
                        \Gamma\sin\theta & \cos\theta\end{pmatrix}
         \begin{pmatrix}C_{p,:}\\C_{q,:}\end{pmatrix}
+
+    The pairs are disjoint and the rows are contiguous, so this needs no output vector and
+    touches each element of the state at most once.
 
     Args:
         states: States as (number of states, alpha strings, beta strings), updated in place.
@@ -995,7 +1171,18 @@ def rotate_beta_string_pairs(
     cos_theta: float,
     sin_theta: float,
 ) -> None:
-    """Rotate paired beta strings of the CI matrix in place, a column operation.
+    r"""Rotate paired beta strings of the CI matrix in place, a column operation.
+
+    The transpose of rotate_alpha_string_pairs,
+
+    .. math::
+        \begin{pmatrix}C_{:,p} & C_{:,q}\end{pmatrix} \leftarrow
+        \begin{pmatrix}C_{:,p} & C_{:,q}\end{pmatrix}
+        \begin{pmatrix}\cos\theta & \Gamma\sin\theta\\
+                       -\Gamma\sin\theta & \cos\theta\end{pmatrix}
+
+    A column is strided rather than contiguous, so the rows are walked on the outside and every
+    pair is applied to a row while it is in cache.
 
     Args:
         states: States as (number of states, alpha strings, beta strings), updated in place.
@@ -1032,8 +1219,17 @@ def rotate_string_grid(
     r"""Rotate the CI matrix in place for a generator that moves both spins.
 
     The generator takes :math:`\left(p_\alpha,p_\beta\right)` to
-    :math:`\left(q_\alpha,q_\beta\right)`, so the pairs are the product of the alpha pairs and
-    the beta pairs and the phase is the product of the two phases.
+    :math:`\left(q_\alpha,q_\beta\right)`, so the determinant pairs are the product of the alpha
+    pairs and the beta pairs and the phase is the product of the two phases,
+
+    .. math::
+        \begin{pmatrix}C_{p_\alpha p_\beta}\\C_{q_\alpha q_\beta}\end{pmatrix} \leftarrow
+        \begin{pmatrix}\cos\theta & -\Gamma_\alpha\Gamma_\beta\sin\theta\\
+                       \Gamma_\alpha\Gamma_\beta\sin\theta & \cos\theta\end{pmatrix}
+        \begin{pmatrix}C_{p_\alpha p_\beta}\\C_{q_\alpha q_\beta}\end{pmatrix}
+
+    Unlike the one-spin cases this reaches single elements rather than whole rows, so the
+    number of pairs it walks is the product of the two string counts.
 
     Args:
         states: States as (number of states, alpha strings, beta strings), updated in place.
@@ -1065,10 +1261,24 @@ def build_string_rotation_layout(
 ) -> tuple[int, tuple[np.ndarray, ...], tuple[np.ndarray, ...]] | None:
     r"""Find the spin strings that the exponential of a generator rotates.
 
-    An excitation generator is one excitation minus its adjoint, so over a spin product its
-    factorized form holds exactly two terms with opposite factors: one carries the excitation
-    and the other carries it back. Reading the first one off gives the pairing directly, in the
-    space of alpha and beta strings rather than the space of determinants,
+    An excitation generator :math:`\hat{T} = \hat{\tau} - \hat{\tau}^\dagger` obeys
+    :math:`\hat{T}^3 = -\hat{T}`, because :math:`\hat{\tau}^\dagger\hat{\tau}` is a projector
+    onto the determinants the excitation does not annihilate. Its exponential therefore closes
+    after two terms,
+
+    .. math::
+        \exp\left(\theta\hat{T}\right) = \hat{I} + \hat{T}\sin\theta
+                                       + \hat{T}^2\left(1-\cos\theta\right)
+
+    and since :math:`-\hat{T}^2` is that projector, the determinant basis splits into the
+    determinants the generator annihilates, which the unitary leaves alone, and pairs
+    :math:`\left\{\left|p\right>,\left|q\right>\right\}` on which the three terms above sum to a
+    single Givens rotation by :math:`\Gamma\theta`.
+
+    Over a spin product the pairing need not be held per determinant at all. The factorized form
+    of such a generator holds exactly two terms with opposite factors, one carrying the
+    excitation and the other carrying it back, so reading the first one off gives the pairing
+    directly in the space of alpha and beta strings,
 
     .. math::
         \hat{T}\left|p_\alpha p_\beta\right> = \Gamma\left|q_\alpha q_\beta\right>,\qquad
@@ -1082,6 +1292,9 @@ def build_string_rotation_layout(
     That is the whole memory argument for large active spaces. A single excitation at CAS(16,16)
     pairs about 3,400 alpha strings, against 44.7 million determinants, and the state itself is
     the only thing left that grows with the determinant count.
+
+    #. 10.48550/arXiv.2303.10825, Eq. 29-32 (v1)
+    #. 10.48550/arXiv.2505.00883, Eq. 6 and 7
 
     Args:
         op: Excitation generator, already folded into the active space.
@@ -1159,6 +1372,12 @@ def apply_string_rotation(
 ) -> None:
     r"""Apply :math:`\exp(\theta\hat{T})` through its string pairs, in place.
 
+    .. math::
+        \left|\tilde{\nu}\right> = \exp\left(\theta\hat{T}\right)\left|\nu\right>
+
+    One sweep of Givens rotations over the pairs found by build_string_rotation_layout, which
+    replaces the three-term closed form and the two extra state vectors it would need.
+
     Args:
         states: States as (number of states, number of determinants), updated in place.
         layout: Which spins the rotation touches and the string pairs, see
@@ -1183,6 +1402,15 @@ def accumulate_alpha_string_pairs(
 ) -> None:
     r"""Add :math:`\hat{T}\left|\nu\right>` for an alpha-only generator into out.
 
+    .. math::
+        \begin{align}
+        C_{q,:} &\mathrel{+}= \Gamma\,C_{p,:}\\
+        C_{p,:} &\mathrel{-}= \Gamma\,C_{q,:}
+        \end{align}
+
+    the bare generator rather than its exponential, which is the antisymmetric part of the
+    Givens rotation in rotate_alpha_string_pairs without the cosine and sine.
+
     Args:
         out: States to add into, as (number of states, alpha strings, beta strings).
         states: States the generator acts on, same shape.
@@ -1205,6 +1433,17 @@ def accumulate_beta_string_pairs(
     out: np.ndarray, states: np.ndarray, src: np.ndarray, dst: np.ndarray, sign: np.ndarray
 ) -> None:
     r"""Add :math:`\hat{T}\left|\nu\right>` for a beta-only generator into out.
+
+    The transpose of accumulate_alpha_string_pairs,
+
+    .. math::
+        \begin{align}
+        C_{:,q} &\mathrel{+}= \Gamma\,C_{:,p}\\
+        C_{:,p} &\mathrel{-}= \Gamma\,C_{:,q}
+        \end{align}
+
+    with the rows walked on the outside so each contiguous row is read once while every pair is
+    applied to it.
 
     Args:
         out: States to add into, as (number of states, alpha strings, beta strings).
@@ -1236,6 +1475,14 @@ def accumulate_string_grid(
 ) -> None:
     r"""Add :math:`\hat{T}\left|\nu\right>` for a generator moving both spins into out.
 
+    .. math::
+        \begin{align}
+        C_{q_\alpha q_\beta} &\mathrel{+}= \Gamma_\alpha\Gamma_\beta\,C_{p_\alpha p_\beta}\\
+        C_{p_\alpha p_\beta} &\mathrel{-}= \Gamma_\alpha\Gamma_\beta\,C_{q_\alpha q_\beta}
+        \end{align}
+
+    over the product of the alpha pairs and the beta pairs.
+
     Args:
         out: States to add into, as (number of states, alpha strings, beta strings).
         states: States the generator acts on, same shape.
@@ -1266,9 +1513,15 @@ def accumulate_string_pairing(
 ) -> None:
     r"""Add :math:`\hat{T}\left|\nu\right>` into out, through the generator's string pairs.
 
+    .. math::
+        \hat{T}\left|p\right> = \Gamma\left|q\right>,\qquad
+        \hat{T}\left|q\right> = -\Gamma\left|p\right>
+
     The gradient of a unitary product state needs the bare generator applied once, and the
     pairing that its exponential uses describes that too: it is the same map without the cosine
     and sine. Going through it costs one sweep rather than a walk over the operator's strings.
+
+    #. 10.48550/arXiv.2303.10825, Eq. 36 (v1)
 
     Args:
         out: States to add into, as (number of states, number of determinants).
@@ -1291,6 +1544,14 @@ def accumulate_string_pairing(
 @nb.jit(nopython=True, cache=True)
 def label_connected_spin_strings(src: np.ndarray, dst: np.ndarray, num_strings: int) -> np.ndarray:
     """Label each spin string with the group of strings the operator connects it to.
+
+    Reads the operator's excitation maps as the edges of a graph on the strings of one spin and
+    returns its connected components, by union-find. A string the operator never touches is a
+    component on its own.
+
+    The components are what build_spin_cells calls cells: the operator cannot take a string out
+    of the component it lies in, so it cannot take a determinant out of the pair of components
+    its two strings lie in.
 
     Args:
         src: Spin string an operator term acts on.
@@ -1342,10 +1603,18 @@ def rotate_spin_cell_pairs(
 ) -> None:
     r"""Apply the exponential to each pair of spin-string cells, in place.
 
+    .. math::
+        c_{d_r} \leftarrow \sum_s \left[\exp\left(\theta T^{(A,B)}_g\right)\right]_{rs}c_{d_s}
+
     The operator cannot move a determinant out of the cell pair its two strings belong to, and
     inside a pair it splits further into groups it cannot mix. Both structures depend only on the
     pair of cell signatures, of which there are a handful however large the CI space is, so the
     rotations are shared and only the strings of each cell are looked up per pair.
+
+    The groups are disjoint, so no output vector is needed. The rows of one alpha cell are
+    streamed into a contiguous buffer first, because they are scattered through the CI matrix
+    but are read once per beta cell; every alpha string belongs to exactly one cell, so the
+    whole state is still read and written once in total.
 
     Args:
         states: States as (number of states, alpha strings, beta strings), updated in place.
@@ -1416,6 +1685,12 @@ def build_spin_cells(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Group the strings of one spin into the sets the operator's terms connect.
 
+    The cells are the connected components of label_connected_spin_strings, sorted so that the
+    members of a cell are contiguous. A cell is small: a generator touches a handful of
+    orbitals, so a cell holds at most a few strings whatever the active space size, and the
+    number of cells grows with the number of strings rather than with the number of
+    determinants.
+
     Args:
         num_strings: Number of spin strings.
         terms: Each term's map over the strings of this spin.
@@ -1445,11 +1720,17 @@ def spin_cell_signatures(
     terms: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
     pure_terms: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
 ) -> tuple[np.ndarray, list]:
-    """Describe each cell by how the operator's terms move its members, with their phases.
+    r"""Describe each cell by how the operator's terms move its members, with their phases.
 
-    Two cells that move the same way carry the same exponential, and only a handful of ways
-    exist however large the CI space is, because a cell is fixed by the occupation of the few
-    orbitals the operator touches.
+    A signature is the cell size together with, for every term of the operator, the list of
+    moves :math:`\left(i \rightarrow j, \Gamma\right)` it makes inside the cell, written in
+    positions within the cell rather than absolute string indices. Two cells with the same
+    signature therefore carry literally the same small matrix, so the exponential is built once
+    per signature pair and not once per cell.
+
+    Only a handful of signatures exist however large the CI space is, because a cell is fixed by
+    the occupation of the few orbitals the operator touches, and there are only so many ways to
+    occupy them. That is what makes this layout independent of the determinant count.
 
     Args:
         starts: Where each cell begins in members.
@@ -1499,13 +1780,25 @@ def local_generator_matrix(
 ) -> np.ndarray:
     r"""Build the generator restricted to one pair of spin-string cells.
 
+    The generator is a sum of factorized terms,
+
     .. math::
         \hat{T} = \sum_t c_t\,\hat{A}_t\otimes\hat{B}_t
                 + \sum_u c_u\,\hat{A}_u\otimes 1
                 + \sum_v c_v\,1\otimes\hat{B}_v
 
-    so on the :math:`\left|A\right|\left|B\right|` determinants the pair spans it is a small
-    dense matrix, and the exponential of that is what the cell pair needs.
+    so on the :math:`\left|A\right|\left|B\right|` determinants that the cell pair
+    :math:`\left(A,B\right)` spans it is a small dense matrix,
+
+    .. math::
+        T^{(A,B)}_{\left(a^\prime b^\prime\right),\left(ab\right)}
+            = \sum_t c_t\Gamma^{(t)}_{a}\Gamma^{(t)}_{b}
+            + \delta_{b^\prime b}\sum_u c_u\Gamma^{(u)}_{a}
+            + \delta_{a^\prime a}\sum_v c_v\Gamma^{(v)}_{b}
+
+    with :math:`a,b` positions within their cell. It is real and antisymmetric, being the
+    restriction of an anti-Hermitian real generator, and the exponential of that is what the
+    cell pair needs.
 
     Args:
         alpha_signature: Size of the alpha cell and how each term moves its members.
@@ -1543,19 +1836,37 @@ def build_spin_block_layout(op: FermionicOperator, ci_info: CI_Info) -> tuple | 
     r"""Block diagonalize a generator over pairs of spin-string cells.
 
     A generator that is not one excitation and its adjoint, a spin-adapted double above all, is
-    not a rotation of pairs. It is still block diagonal, and over a spin product the blocks are
-    visible per spin: the strings of each spin fall into cells that the operator's terms connect,
-    the operator cannot take a determinant out of the cell pair its two strings lie in, and
-    inside a pair it splits further into groups, so
+    not a rotation of pairs. Those operators carry several frequencies, so their closed form is
+    a sum over powers rather than a single Givens rotation,
+
+    .. math::
+        \exp\left(\theta\,{}^\text{SA}\hat{G}\right) = \hat{I}
+            + \sum_n\sum_{m\,\text{odd}} k^{(m)}_n\,{}^\text{SA}\hat{G}^m\sin\left(S_n\theta\right)
+            + \sum_n\sum_{m\,\text{even}} k^{(m)}_n\,{}^\text{SA}\hat{G}^m
+              \left(\cos\left(S_n\theta\right)-1\right)
+
+    which costs one application of the generator per power, up to ten of them, see
+    operator_state_algebra.SPIN_ADAPTED_DOUBLE_SERIES.
+
+    Taking the exponential structurally instead costs one sweep. The generator is still block
+    diagonal, and over a spin product the blocks are visible per spin: the strings of each spin
+    fall into cells that the operator's terms connect, the operator cannot take a determinant
+    out of the cell pair its two strings lie in, and inside a pair it splits further into groups,
+    so
 
     .. math::
         \exp\left(\theta\hat{T}\right)
             = \bigoplus_{A,B}\bigoplus_{g}\exp\left(\theta T^{(A,B)}_g\right)
 
+    Each small block is exponentiated by diagonalizing it once, see apply_spin_block_layout.
+
     Cells are small and the number of distinct shapes does not grow with the active space,
     because a cell is fixed by the occupation of the few orbitals the generator touches. So the
     whole layout is two arrays over the spin strings and a handful of small matrices, rather
     than the determinant-indexed groups this replaces, which cost one entry per determinant.
+
+    #. 10.48550/arXiv.2505.00883, Eq. 45, 47, and, 49 (SA doubles)
+    #. 10.48550/arXiv.2505.02984, Eq. 35, D1, and, D2 (SA doubles)
 
     Args:
         op: Excitation generator, already folded into the active space.
@@ -1683,6 +1994,16 @@ def build_spin_block_layout(op: FermionicOperator, ci_info: CI_Info) -> tuple | 
 def apply_spin_block_layout(states: np.ndarray, layout: tuple, theta: float, ci_info: CI_Info) -> None:
     r"""Apply :math:`\exp(\theta\hat{T})` group by group within each cell pair, in place.
 
+    Each group's generator was diagonalized once when the layout was built. A real antisymmetric
+    :math:`T` makes :math:`iT` Hermitian, so :math:`iT = V\lambda V^\dagger` and the exponential
+    at any angle is two small matrix products,
+
+    .. math::
+        \exp\left(\theta T\right) = V e^{-i\theta\lambda}V^\dagger
+
+    which is real. Only the distinct group shapes are exponentiated, a handful of matrices no
+    larger than the cell pair they live in, and the sweep over the state then costs one pass.
+
     Args:
         states: States as (number of states, number of determinants), updated in place.
         layout: The cells, signature pairs and their groups, see build_spin_block_layout.
@@ -1744,6 +2065,10 @@ def overlap_alpha_string_pairs(
 ) -> None:
     r"""Add :math:`\left<\text{bra}\right|\hat{T}\left|\text{ket}\right>` for an alpha generator.
 
+    .. math::
+        \left<\text{bra}\right|\hat{T}\left|\text{ket}\right> = \sum_{\left\{p,q\right\}}\Gamma
+            \sum_{I_\beta}\left(b_{q I_\beta}k_{p I_\beta} - b_{p I_\beta}k_{q I_\beta}\right)
+
     Args:
         bra: Bra states as (number of states, alpha strings, beta strings).
         ket: Ket states, same shape.
@@ -1776,6 +2101,10 @@ def overlap_beta_string_pairs(
     out: np.ndarray,
 ) -> None:
     r"""Add :math:`\left<\text{bra}\right|\hat{T}\left|\text{ket}\right>` for a beta generator.
+
+    .. math::
+        \left<\text{bra}\right|\hat{T}\left|\text{ket}\right> = \sum_{\left\{p,q\right\}}\Gamma
+            \sum_{I_\alpha}\left(b_{I_\alpha q}k_{I_\alpha p} - b_{I_\alpha p}k_{I_\alpha q}\right)
 
     The alpha blocks are walked on the outside so that each one, which is contiguous, is read
     once while every pair is applied to it.
@@ -1815,6 +2144,12 @@ def overlap_string_grid(
 ) -> None:
     r"""Add :math:`\left<\text{bra}\right|\hat{T}\left|\text{ket}\right>` for a mixed generator.
 
+    .. math::
+        \left<\text{bra}\right|\hat{T}\left|\text{ket}\right>
+            = \sum_{\left\{p_\alpha,q_\alpha\right\}}\sum_{\left\{p_\beta,q_\beta\right\}}
+              \Gamma_\alpha\Gamma_\beta\left(b_{q_\alpha q_\beta}k_{p_\alpha p_\beta}
+              - b_{p_\alpha p_\beta}k_{q_\alpha q_\beta}\right)
+
     Args:
         bra: Bra states as (number of states, alpha strings, beta strings).
         ket: Ket states, same shape.
@@ -1849,10 +2184,24 @@ def string_pairing_overlap(
 ) -> None:
     r"""Add :math:`\left<\text{bra}\right|\hat{T}\left|\text{ket}\right>` through the pairing.
 
-    The gradient of a unitary product state needs this number, not the state the generator
-    produces, and the pairing gives it directly: a generator moves each determinant of a pair to
-    the other, so the overlap is a sum over the pairs. Forming the state first costs a pass to
-    zero it, a pass to fill it and a pass to read it back; this reads only the paired entries.
+    The gradient of a unitary product state is this number, not the state the generator
+    produces,
+
+    .. math::
+        \frac{\partial\left<E\right>}{\partial\theta_j}
+            = 2\left<\psi^\prime_{j+1}\right|\hat{T}_j\left|\psi_j\right>
+
+    and the pairing gives it directly: a generator moves each determinant of a pair to the
+    other, so the overlap is a sum over the pairs,
+
+    .. math::
+        \left<\text{bra}\right|\hat{T}\left|\text{ket}\right>
+            = \sum_{\left\{p,q\right\}}\Gamma\left(b_q k_p - b_p k_q\right)
+
+    Forming the state first costs a pass to zero it, a pass to fill it and a pass to read it
+    back; this reads only the paired entries.
+
+    #. 10.48550/arXiv.2303.10825, Eq. 36 and 37 (v1)
 
     Args:
         bra: Bra states as (number of states, number of determinants).
@@ -1876,7 +2225,15 @@ def string_pairing_overlap(
 def propagate_state_factorized(
     op: FermionicOperator, state: np.ndarray, ci_info: CI_Info, tmp_state: np.ndarray
 ) -> np.ndarray | None:
-    """Apply a folded operator to a state using the spin-factorized algebra.
+    r"""Apply a folded operator to a state using the spin-factorized algebra.
+
+    .. math::
+        \left|\tilde{0}\right> = \hat{O}\left|0\right>
+
+    The spin-factorized route is the fast one and is tried first by propagate_state. It needs a
+    CI space that is a product of an alpha and a beta string space and an operator all of whose
+    strings are :math:`S_z` conserving; anything else returns None and falls back to the general
+    determinant kernel.
 
     Args:
         op: Folded fermionic operator.
@@ -1896,10 +2253,14 @@ def propagate_state_factorized(
 def propagate_state_SA_factorized(
     op: FermionicOperator, states: np.ndarray, ci_info: CI_Info, tmp_states: np.ndarray
 ) -> np.ndarray | None:
-    """Apply a folded operator to every state of a state-averaged wave function.
+    r"""Apply a folded operator to every state of a state-averaged wave function.
 
-    The operator is the same for every state, so everything that does not depend on the state
-    is done once and only the application is repeated.
+    .. math::
+        \left|\tilde{\nu}\right> = \hat{O}\left|\nu\right>
+
+    The operator is the same for every state, so everything that does not depend on the state,
+    the one-spin matrices and the contraction layout, is built once by build_derived_forms and
+    only the application is repeated.
 
     Args:
         op: Folded fermionic operator.
