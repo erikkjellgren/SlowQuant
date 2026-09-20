@@ -568,13 +568,21 @@ def test_pp_ups_to_circuit() -> None:
         do_pp=True,
     )
 
+    # Started away from zero on purpose. From zero this lands in a narrow minimum a few steps
+    # from the origin, and which of several minima within 2e-5 of each other it reaches depends
+    # on the order terms are summed in, so the converged energy moved twice under changes that
+    # were numerically equivalent. A flat start falls into a wide minimum that every small flat
+    # start reaches, and that survives reordering the summation. It is far from the answer: the
+    # parameters travel up to 0.55 from it.
+    WF.thetas = [0.05] * len(WF.thetas)
+
     WF.run_wf_optimization(orbital_optimization=True)
 
-    assert abs(WF.energy_elec + 84.00238471763942) < 10**-10
+    assert abs(WF.energy_elec + 84.00336939532) < 10**-10
 
     qWF = circuit_wavefunction_from_ups(WF, Sampler(), JordanWignerMapper(), shots=None)
 
-    assert abs(qWF.energy_elec + 84.00238471763942) < 10**-10
+    assert abs(qWF.energy_elec + 84.00336939532) < 10**-10
 
 
 def test_openshell_reference() -> None:
