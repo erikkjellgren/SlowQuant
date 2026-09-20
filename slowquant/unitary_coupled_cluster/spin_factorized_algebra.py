@@ -1404,8 +1404,8 @@ def accumulate_alpha_string_pairs(
 
     .. math::
         \begin{align}
-        C_{q,:} &\mathrel{+}= \Gamma\,C_{p,:}\\
-        C_{p,:} &\mathrel{-}= \Gamma\,C_{q,:}
+        \text{out}_{q,:} &\mathrel{+}= \Gamma\,C_{p,:}\\
+        \text{out}_{p,:} &\mathrel{-}= \Gamma\,C_{q,:}
         \end{align}
 
     the bare generator rather than its exponential, which is the antisymmetric part of the
@@ -1438,8 +1438,8 @@ def accumulate_beta_string_pairs(
 
     .. math::
         \begin{align}
-        C_{:,q} &\mathrel{+}= \Gamma\,C_{:,p}\\
-        C_{:,p} &\mathrel{-}= \Gamma\,C_{:,q}
+        \text{out}_{:,q} &\mathrel{+}= \Gamma\,C_{:,p}\\
+        \text{out}_{:,p} &\mathrel{-}= \Gamma\,C_{:,q}
         \end{align}
 
     with the rows walked on the outside so each contiguous row is read once while every pair is
@@ -1477,8 +1477,8 @@ def accumulate_string_grid(
 
     .. math::
         \begin{align}
-        C_{q_\alpha q_\beta} &\mathrel{+}= \Gamma_\alpha\Gamma_\beta\,C_{p_\alpha p_\beta}\\
-        C_{p_\alpha p_\beta} &\mathrel{-}= \Gamma_\alpha\Gamma_\beta\,C_{q_\alpha q_\beta}
+        \text{out}_{q_\alpha q_\beta} &\mathrel{+}= \Gamma_\alpha\Gamma_\beta\,C_{p_\alpha p_\beta}\\
+        \text{out}_{p_\alpha p_\beta} &\mathrel{-}= \Gamma_\alpha\Gamma_\beta\,C_{q_\alpha q_\beta}
         \end{align}
 
     over the product of the alpha pairs and the beta pairs.

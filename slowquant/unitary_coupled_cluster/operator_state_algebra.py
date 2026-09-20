@@ -1245,11 +1245,11 @@ def apply_generator_exponential(
     and acts as a Givens rotation on pairs of basis states. The routes below are that rotation
     held in progressively more general form, each falling back to the next:
 
-    #. pairs of spin strings, which do not grow with the CI space, over a spin product,
-    #. pairs of determinants, for a CI space that is not a spin product,
-    #. blocks over spin-string cells, for a generator that is not a pairing at all,
-    #. blocks over determinants, for the same generator over a space that is not a product,
-    #. the closed form above, summed with two extra state vectors.
+    * pairs of spin strings, which do not grow with the CI space, over a spin product,
+    * pairs of determinants, for a CI space that is not a spin product,
+    * blocks over spin-string cells, for a generator that is not a pairing at all,
+    * blocks over determinants, for the same generator over a space that is not a product,
+    * the closed form above, summed with two extra state vectors.
 
     The last one is what the code did everywhere before, and is what a spin-adapted double falls
     back to when it cannot be blocked, with more terms, see apply_spin_adapted_double.
