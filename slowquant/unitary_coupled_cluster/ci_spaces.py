@@ -27,6 +27,41 @@ def bitcount(x: int) -> int:
 
 
 class CI_Info:
+    r"""Determinant expansion of an active space, and the caches built over it.
+
+    The spin-orbital ordering is alpha/beta-blocked, so a determinant integer splits into an
+    alpha string in the high half and a beta string in the low half, see spin_ordering,
+
+    .. math::
+        \left|I\right> = \left|I_\alpha\right>\otimes\left|I_\beta\right>
+
+    For a complete active space the expansion is the full product of the two string spaces,
+
+    .. math::
+        \dim = \binom{N}{N_\alpha}\binom{N}{N_\beta},\qquad
+        I = I_\alpha N_\beta + I_\beta
+
+    with the alpha strings enumerated in the outer loop and the beta strings in the inner one,
+    see get_indexing. Only the two per-spin maps are stored; the maps over every determinant
+    follow from them and are built lazily, because they are the two largest structures in the
+    program, see idx2det and det2idx.
+
+    That product structure is what spin_factorized_algebra needs. For an expansion that is not a
+    spin product, which get_indexing_extended builds, the per-spin maps are empty,
+    num_alpha_strings and num_beta_strings are zero, and is_spin_product is False, which routes
+    the algebra back to the general determinant kernels.
+
+    Everything else held here is a cache, built on first use and never invalidated, so a
+    CI_Info must not be mutated after determinants have been acted on:
+
+    * spin_arena and spin_op_cache, the string excitation lists shared by every operator over
+      this space, see spin_factorized_algebra.get_spin_sub_string_slice.
+    * string_rotation_layouts and spin_block_layouts, the exponential of each ansatz generator
+      held per spin string, which does not grow with the number of determinants.
+    * rotation_layouts and block_layouts, the same two held per determinant, which is what is
+      left when the space is not a spin product.
+    """
+
     __slots__ = (
         "_det2idx",
         "_idx2det",
@@ -67,20 +102,7 @@ class CI_Info:
         alpha_str2idx: dict[int, int] | None = None,
         beta_str2idx: dict[int, int] | None = None,
     ) -> None:
-        r"""Initialize configuration expansion information object.
-
-        The spin-orbital ordering is alpha/beta-blocked, so a determinant integer splits into an
-        alpha string in the high half and a beta string in the low half, see spin_ordering.
-
-        When the expansion is a product of an alpha and a beta string space, which is the case for
-        get_indexing but not for get_indexing_extended, the per-spin index maps relate the two,
-
-        .. math::
-            I = I_\alpha N_\beta + I_\beta
-
-        The product structure is what spin_factorized_algebra is built on. For an expansion that
-        is not a spin product the maps are empty, num_alpha_strings and num_beta_strings are zero,
-        and is_spin_product is False, which routes the algebra back to the general kernels.
+        """Initialize configuration expansion information object.
 
         Args:
             num_inactive_orbs: Number of inactive spatial orbitals.
@@ -180,7 +202,9 @@ class CI_Info:
                 = \left(\text{str}_\alpha \ll N\right) | \text{str}_\beta
 
         Costs eight bytes per determinant, so over a spin product it is left unbuilt until
-        something asks for it, which only the general kernels do.
+        something asks for it, which only the general kernels do. At CAS(16,16) that is 1.3 GB
+        over 165.6 million determinants, against 206 kB for the two per-spin maps of 12,870
+        entries each that it is derived from.
 
         Returns:
             Index to determinant mapping.
@@ -314,7 +338,19 @@ def get_indexing(
     num_active_elec_alpha: int,
     num_active_elec_beta: int,
 ) -> CI_Info:
-    """Get relation between index and determinant.
+    r"""Get relation between index and determinant.
+
+    Enumerates the complete active space as the product of an alpha and a beta string space,
+
+    .. math::
+        \left|I\right> = \left|I_\alpha\right>\otimes\left|I_\beta\right>,\qquad
+        I = I_\alpha N_\beta + I_\beta
+
+    with the alpha strings in the outer loop and the beta strings in the inner one. That
+    ordering is load bearing for spin_factorized_algebra, which reads the CI vector as a matrix
+    :math:`C_{I_\alpha I_\beta}` without copying it, so the two loops must not be swapped.
+
+    #. 10.1063/1.455063 (alpha and beta strings as the two axes of the CI vector)
 
     Args:
         num_inactive_orbs: Number of inactive spatial orbitals.

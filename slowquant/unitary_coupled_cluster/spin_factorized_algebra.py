@@ -1290,8 +1290,8 @@ def build_string_rotation_layout(
     covers a whole row; one touching both spins pairs the products of its two sets of strings.
 
     That is the whole memory argument for large active spaces. A single excitation at CAS(16,16)
-    pairs about 3,400 alpha strings, against 44.7 million determinants, and the state itself is
-    the only thing left that grows with the determinant count.
+    pairs 3,432 alpha strings, against 165.6 million determinants, and the state itself is the
+    only thing left that grows with the determinant count.
 
     #. 10.48550/arXiv.2303.10825, Eq. 29-32 (v1)
     #. 10.48550/arXiv.2505.00883, Eq. 6 and 7

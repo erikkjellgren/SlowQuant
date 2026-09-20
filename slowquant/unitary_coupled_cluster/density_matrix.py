@@ -147,11 +147,26 @@ def build_single_excitation_layout(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     r"""Lay out the one-electron excitations of each spin over the string spaces.
 
-    Everything here concerns :math:`\hat{E}_{pq}=\hat{E}^\alpha_{pq}+\hat{E}^\beta_{pq}` acting
-    on the string spaces. The density matrices are accumulated one output alpha string at a
-    time, so the alpha excitations are grouped by the string they produce and padded to a common
-    width with a zero phase, which contributes nothing. The beta excitations leave the alpha
-    string alone and so act within a row, and are grouped by orbital pair instead.
+    Everything here concerns the singlet excitation operator
+
+    .. math::
+        \hat{E}_{pq} = \hat{E}^\alpha_{pq} + \hat{E}^\beta_{pq}
+                     = \hat{a}^\dagger_{p\alpha}\hat{a}_{q\alpha}
+                     + \hat{a}^\dagger_{p\beta}\hat{a}_{q\beta}
+
+    acting on the string spaces. Over a spin product each half is a signed one-to-one map of the
+    strings of its own spin, so the whole set of :math:`N^2` operators is described by two
+    string excitation lists and nothing that grows with the number of determinants. They are
+    taken from the shared per-spin arenas, so an operator applied earlier over the same CI space
+    has already paid for them, see spin_factorized_algebra.get_spin_sub_string_slice.
+
+    The density matrices are accumulated one output alpha string at a time, so the alpha
+    excitations are grouped by the string they produce and padded to a common width with a zero
+    phase, which contributes nothing. The beta excitations leave the alpha string alone and so
+    act within a row, and are grouped by orbital pair instead.
+
+    #. 10.1016/0009-2614(84)85513-X (string excitation lists)
+    #. 10.1063/1.455063 (the same alpha and beta split as the sigma vector)
 
     Args:
         ci_info: Information about the CI space.
@@ -225,18 +240,37 @@ def accumulate_rdm12(
 ) -> None:
     r"""Add one state's contribution to the density matrices, one alpha string at a time.
 
-    The singlet excitation operator is self-adjoint under exchange of its indices, so every
-    two-electron element is an inner product of two states that have each had one such operator
-    applied,
+    The singlet excitation operator is self-adjoint under exchange of its indices,
+    :math:`\hat{E}_{pq}^\dagger = \hat{E}_{qp}`, so every two-electron element is an inner
+    product of two states that have each had one such operator applied,
 
     .. math::
         \left<0\left|\hat{E}_{pq}\hat{E}_{rs}\right|0\right>
         = \left<\hat{E}_{qp}0\right.\left|\hat{E}_{rs}0\right>
 
-    That inner product runs over determinants, so it splits over the output alpha string. For a
-    single one it is enough to hold the excited states restricted to that row, which is a buffer
-    over orbital pairs and beta strings rather than over the whole expansion. The alpha
-    excitations gather the rows that feed this one, the beta excitations act inside it.
+    Writing :math:`\left|pq\right> = \hat{E}_{pq}\left|0\right>`, the whole two-electron density
+    matrix is therefore the Gram matrix of the :math:`N^2` singly excited states, and the
+    one-electron one is their overlap with the state itself,
+
+    .. math::
+        G_{\left(pq\right)\left(rs\right)}
+            = \left<pq\right.\left|rs\right>,\qquad
+        \Gamma^{[1]}_{pq} = \left<pq\right.\left|0\right>
+
+    Holding all :math:`N^2` of those states at once costs :math:`N^2` times the CI vector, which
+    is where this used to run out of memory. The inner product runs over determinants though, so
+    it splits over the output alpha string,
+
+    .. math::
+        \left<pq\right.\left|rs\right> = \sum_{I_\alpha}\sum_{I_\beta}
+            \left(pq\right)_{I_\alpha I_\beta}\left(rs\right)_{I_\alpha I_\beta}
+
+    and for a single :math:`I_\alpha` it is enough to hold the excited states restricted to that
+    row, an :math:`N^2` by :math:`N_\beta` buffer rather than :math:`N^2` by the whole
+    expansion. The alpha excitations gather the rows that feed this one, the beta excitations act
+    inside it, and the two inner products are then a matrix product each.
+
+    #. 10.1063/1.455063 (the same alpha and beta split as the sigma vector)
 
     Args:
         state_matrix: State, as a matrix over the alpha and beta string spaces.
@@ -281,6 +315,11 @@ def build_rdm12(ci_coeffs: np.ndarray, ci_info: CI_Info) -> tuple[np.ndarray, np
         \Gamma^{[1]}_{pq} = \left<0\left|\hat{E}_{pq}\right|0\right>,\qquad
         \Gamma^{[2]}_{pqrs} = \left<0\left|\hat{E}_{pq}\hat{E}_{rs}\right|0\right>
                               - \delta_{qr}\Gamma^{[1]}_{ps}
+
+    The two-electron element comes out of accumulate_rdm12 as a Gram matrix over orbital pairs,
+    :math:`G_{\left(pq\right)\left(rs\right)} = \left<\hat{E}_{qp}0\right.\left|\hat{E}_{rs}0\right>`,
+    so the first two indices are swapped when it is reshaped and the
+    :math:`\delta_{qr}\Gamma^{[1]}_{ps}` term is then subtracted.
 
     Several states are averaged over with equal weight, matching expectation_value_SA. They are
     processed one at a time, so the memory needed grows with neither the number of states nor
