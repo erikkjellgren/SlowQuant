@@ -15,7 +15,7 @@ from slowquant.molecularintegrals.integralfunctions import (
 from slowquant.unitary_coupled_cluster.operators import one_elec_op_0i_0a
 from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
 
-class properties():
+class Properties():
     def __init__(
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS | WaveFunctionCircuit,
@@ -54,148 +54,98 @@ class properties():
         self._LR_singlet = None
         self._LR_triplet = None
 
+    def run_LR(self, triplet: bool):
+        """Create linear response object.
+
+        Args:
+            triplet: use triplet spin-adaptation.
+        
+        Returns:
+            linear response object
+        """
+        if not self.QSQ:
+            if self.lr_formulation in ("allprojected", "allproj"):
+                from slowquant.unitary_coupled_cluster.linear_response import allprojected as lr
+            elif self.lr_formulation in ("allselfconsistent, allsc"):
+                from slowquant.unitary_coupled_cluster.linear_response import allselfconsistent as lr
+            elif self.lr_formulation in ("allstatetransfer", "allst"):
+                from slowquant.unitary_coupled_cluster.linear_response import allstatetransfer as lr
+            elif self.lr_formulation in ("naive"):
+                from slowquant.unitary_coupled_cluster.linear_response import naive as lr
+            elif self.lr_formulation in ("projected_statetransfer", "proj_st"):
+                from slowquant.unitary_coupled_cluster.linear_response import projected_statetransfer as lr                
+            elif self.lr_formulation in ("projected", "proj"):
+                from slowquant.unitary_coupled_cluster.linear_response import projected as lr
+            elif self.lr_formulation in ("selfconsistent", "sc"):
+                from slowquant.unitary_coupled_cluster.linear_response import selfconsistent as lr
+            elif self.lr_formulation in ("statetransfer", "st"):
+                from slowquant.unitary_coupled_cluster.linear_response import statetransfer as lr
+            else:
+                raise ValueError(f"Got unknown lr_formulation, {self.lr_formulation}")
+            LR = lr.LinearResponse(
+                self.wf,
+                excitations=self.response_options.get("excitations", "SD"),
+                triplet=triplet
+            )
+        else:
+            if self.lr_formulation in ("allprojected", "allproj"):
+                from slowquant.qiskit_interface.linear_response import allprojected
+                LR = allprojected.quantumLR(
+                    self.wf,
+                    excitations=self.response_options.get("excitations", "SD"),
+                    triplet=triplet,
+                )
+                LR.run(
+                    do_gradients = self.response_options.get("do_gradients", True),
+                )
+            elif self.lr_formulation in ("naive"):
+                from slowquant.qiskit_interface.linear_response import naive
+                LR = naive.quantumLR(
+                    self.wf,
+                    excitations=self.response_options.get("excitations", "SD"),
+                    triplet=triplet,
+                )
+                LR.run(
+                    do_rdm = self.response_options.get("do_rdm", True),
+                    do_gradients = self.response_options.get("do_gradients", True),
+                )
+            elif self.lr_formulation in ("projected", "proj"):
+                from slowquant.qiskit_interface.linear_response import projected
+                LR = projected.quantumLR(
+                    self.wf,
+                    excitations=self.response_options.get("excitations", "SD"),
+                    triplet=triplet,
+                )
+                LR.run(
+                    do_rdm = self.response_options.get("do_rdm", True),
+                    do_gradients = self.response_options.get("do_gradients", True),
+                )
+            elif self.lr_formulation in ("allselfconsistent", "allsc", "allstatetransfer", "allst", "projected_statetransfer", "proj_st", "selfconsistent", "sc", "statetransfer", "st"):
+                raise NotImplementedError(f"Only allprojected, naive and projected are implemented for WaveFunctionCircuit, got {self.lr_formulation}")
+            else:
+                raise ValueError(f"Got unknown lr_formulation, {self.lr_formulation}")
+        return LR
+
     @property
-    def LR_singlet(self) -> np.ndarray:
+    def LR_singlet(self):
         """Calculate singlet linear response.
         
         Returns:
             singlet spin-adapted linear response object
         """
         if self._LR_singlet is None:
-            if not self.QSQ:
-                if self.lr_formulation == "allprojected":
-                    from slowquant.unitary_coupled_cluster.linear_response import allprojected as lr
-                elif self.lr_formulation == "allselfconsistent":
-                    from slowquant.unitary_coupled_cluster.linear_response import allselfconsistent as lr
-                elif self.lr_formulation == "allstatetransfer":
-                    from slowquant.unitary_coupled_cluster.linear_response import allstatetransfer as lr
-                elif self.lr_formulation == "naive":
-                    from slowquant.unitary_coupled_cluster.linear_response import naive as lr
-                elif self.lr_formulation == "projected_statetransfer":
-                    from slowquant.unitary_coupled_cluster.linear_response import projected_statetransfer as lr                
-                elif self.lr_formulation == "projected":
-                    from slowquant.unitary_coupled_cluster.linear_response import projected as lr
-                elif self.lr_formulation == "selfconsistent":
-                    from slowquant.unitary_coupled_cluster.linear_response import selfconsistent as lr
-                elif self.lr_formulation == "statetransfer":
-                    from slowquant.unitary_coupled_cluster.linear_response import statetransfer as lr
-                else:
-                    raise ValueError(f"Got unknown lr_formulation, {self.lr_formulation}")
-                self._LR_singlet = lr.LinearResponse(
-                    self.wf,
-                    excitations=self.response_options.get("excitations", "SD"),
-                    triplet=False
-                )
-            else:
-                if self.lr_formulation == "allprojected":
-                    from slowquant.qiskit_interface.linear_response import allprojected
-                    self._LR_singlet = allprojected.quantumLR(
-                        self.wf,
-                        excitations=self.response_options.get("excitations", "SD"),
-                        triplet=False,
-                    )
-                    self._LR_singlet.run(
-                        do_gradients = self.response_options.get("do_gradients", True),
-                    )
-                elif self.lr_formulation == "naive":
-                    from slowquant.qiskit_interface.linear_response import naive
-                    self._LR_singlet = naive.quantumLR(
-                        self.wf,
-                        excitations=self.response_options.get("excitations", "SD"),
-                        triplet=False,
-                    )
-                    self._LR_singlet.run(
-                        do_rdm = self.response_options.get("do_rdm", True),
-                        do_gradients = self.response_options.get("do_gradients", True),
-                    )
-                elif self.lr_formulation == "projected":
-                    from slowquant.qiskit_interface.linear_response import projected
-                    self._LR_singlet = projected.quantumLR(
-                        self.wf,
-                        excitations=self.response_options.get("excitations", "SD"),
-                        triplet=False,
-                    )
-                    self._LR_singlet.run(
-                        do_rdm = self.response_options.get("do_rdm", True),
-                        do_gradients = self.response_options.get("do_gradients", True),
-                    )
-                elif self.lr_formulation in ("allselfconsistent", "allstatetransfer", "projected_statetransfer", "selfconsistent", "statetransfer"):
-                    raise NotImplementedError(f"Only allprojected, naive and projected are implemented for WaveFunctionCircuit, got {self.lr_formulation}")
-                else:
-                    raise ValueError(f"Got unknown lr_formulation, {self.lr_formulation}")
-
+            self._LR_singlet = self.run_LR(triplet=False)
         return self._LR_singlet
     
     @property
-    def LR_triplet(self) -> np.ndarray:
+    def LR_triplet(self):
         """Calculate triplet linear response.
         
         Returns:
             triplet spin-adapted linear response object
         """
         if self._LR_triplet is None:
-            if not self.QSQ:
-                if self.lr_formulation == "allprojected":
-                    from slowquant.unitary_coupled_cluster.linear_response import allprojected as lr
-                elif self.lr_formulation == "allselfconsistent":
-                    from slowquant.unitary_coupled_cluster.linear_response import allselfconsistent as lr
-                elif self.lr_formulation == "allstatetransfer":
-                    from slowquant.unitary_coupled_cluster.linear_response import allstatetransfer as lr
-                elif self.lr_formulation == "naive":
-                    from slowquant.unitary_coupled_cluster.linear_response import naive as lr
-                elif self.lr_formulation == "projected_statetransfer":
-                    from slowquant.unitary_coupled_cluster.linear_response import projected_statetransfer as lr                
-                elif self.lr_formulation == "projected":
-                    from slowquant.unitary_coupled_cluster.linear_response import projected as lr
-                elif self.lr_formulation == "selfconsistent":
-                    from slowquant.unitary_coupled_cluster.linear_response import selfconsistent as lr
-                elif self.lr_formulation == "statetransfer":
-                    from slowquant.unitary_coupled_cluster.linear_response import statetransfer as lr
-                else:
-                    raise ValueError(f"Got unknown lr_formulation, {self.lr_formulation}")
-                self._LR_triplet = lr.LinearResponse(
-                    self.wf,
-                    excitations=self.response_options.get("excitations", "SD"),
-                    triplet=True
-                )
-            else:
-                if self.lr_formulation == "allprojected":
-                    from slowquant.qiskit_interface.linear_response import allprojected
-                    self._LR_triplet = allprojected.quantumLR(
-                        self.wf,
-                        excitations=self.response_options.get("excitations", "SD"),
-                        triplet=True,
-                    )
-                    self._LR_triplet.run(
-                        do_gradients = self.response_options.get("do_gradients", True),
-                    )
-                elif self.lr_formulation == "naive":
-                    from slowquant.qiskit_interface.linear_response import naive
-                    self._LR_triplet = naive.quantumLR(
-                        self.wf,
-                        excitations=self.response_options.get("excitations", "SD"),
-                        triplet=True,
-                    )
-                    self._LR_triplet.run(
-                        do_rdm = self.response_options.get("do_rdm", True),
-                        do_gradients = self.response_options.get("do_gradients", True),
-                    )
-                elif self.lr_formulation == "projected":
-                    from slowquant.qiskit_interface.linear_response import projected
-                    self._LR_triplet = projected.quantumLR(
-                        self.wf,
-                        excitations=self.response_options.get("excitations", "SD"),
-                        triplet=True,
-                    )
-                    self._LR_triplet.run(
-                        do_rdm = self.response_options.get("do_rdm", True),
-                        do_gradients = self.response_options.get("do_gradients", True),
-                    )
-                elif self.lr_formulation in ("allselfconsistent", "allstatetransfer", "projected_statetransfer", "selfconsistent", "statetransfer"):
-                    raise NotImplementedError(f"Only allprojected, naive and projected are implemented for WaveFunctionCircuit, got {self.lr_formulation}")
-                else:
-                    raise ValueError(f"Got unknown lr_formulation, {self.lr_formulation}")
-
+            self._LR_triplet = self.run_LR(triplet=True)
         return self._LR_triplet
 
     def get_polarisability(self, freq=0) -> np.ndarray:
