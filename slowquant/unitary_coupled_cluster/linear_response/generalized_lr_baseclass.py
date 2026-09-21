@@ -194,11 +194,6 @@ class LinearResponseBaseClass:
         # f"{np.max(np.abs(hessian_for - hessian_efter)):.2e}")  
 
         
-        # for i in range(len(self.hessian)):
-        #     print(self.hessian[i][i], i)
-                
-        # eigval, eigvec, sigma_eigs, keep = solve_lr_drop_sigma_null(self.hessian, self.metric, cut=1e-10)
-
         eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)     
      
             
@@ -211,27 +206,27 @@ class LinearResponseBaseClass:
         
 
         #AE
-        # operator_labels = np.array(
-        #     self.operator_labels_q +
-        #     self.operator_labels_G +
-        #     self.operator_labels_q +
-        #     self.operator_labels_G,
-        #     dtype=object)
-        # for i in range(len(eigval)):
-        #     vec=eigvec[:,i]
-        #     absvec = np.abs(vec)
+        operator_labels = np.array(
+            self.operator_labels_q +
+            self.operator_labels_G +
+            self.operator_labels_q +
+            self.operator_labels_G,
+            dtype=object)
+        for i in range(len(eigval)):
+            vec=eigvec[:,i]
+            absvec = np.abs(vec)
         
-        #     print('Eigenvalue', eigval[i],'Max value eigvec', np.max(abs(vec)), 'Max value eigvec index', np.argmax(abs(vec)))
-        #     # k = np.argmax(np.abs(vec))
-        #     # print("dominant operator:", operator_labels[k])
+            print('Eigenvalue', eigval[i],'Max value eigvec', np.max(abs(vec)), 'Max value eigvec index', np.argmax(abs(vec)))
+            # k = np.argmax(np.abs(vec))
+            # print("dominant operator:", operator_labels[k])
 
-        #     # top 3 contributors
-        #     top3 = np.argsort(absvec)[-3:][::-1]
-        #     # print(len(top3))
-        #     for j in top3:
-        #         print(
-        #         "  operator:", operator_labels[j],
-        #         " weight:", absvec[j])
+            # top 3 contributors
+            top3 = np.argsort(absvec)[-3:][::-1]
+            # print(len(top3))
+            for j in top3:
+                print(
+                "  operator:", operator_labels[j],
+                " weight:", absvec[j])
 
 
         #     # print(self.operator_labels[k])
