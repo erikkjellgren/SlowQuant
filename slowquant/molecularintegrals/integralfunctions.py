@@ -257,7 +257,7 @@ def generalized_one_electron_transform(C: np.ndarray, int_1e_inp: np.ndarray, x2
     """int_1e_inp = int_1e_kin+int_1e_nuc"""
     if x2c:
         return np.einsum("aP,ab,bQ->PQ", C.conj(), int_1e_inp, C, optimize=True)
-    else:     
+    else:    
         cont1 = np.einsum(
             "aP,bQ, ab->PQ",
             C[: int(C.shape[0] / 2)].conj(),

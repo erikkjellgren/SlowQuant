@@ -47,6 +47,7 @@ def test_efg_dipmom_PC_HF():
         mol,
         "fUCCSD",
         True, #Do x2c
+        False,
         {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
@@ -264,6 +265,7 @@ def test_polarizability_H2():
             mol,
             "fUCCSD",
             False, #Do x2c
+            False,
             {"n_layers": 1, "is_spin_conserving" : False},
             include_active_kappa=True,
         )

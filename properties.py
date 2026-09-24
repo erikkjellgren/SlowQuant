@@ -63,10 +63,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         active_space,
         c_mo,
         mol,
-        "fUCCSD",
+        "gtups",
         True, #Do x2c
         False, #Do ecp
-        {"n_layers": 1, "is_spin_conserving" : False},
+        {"n_layers": 5, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
@@ -75,36 +75,36 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     WF.set_thetas(ny_theta_real, ny_theta_imag)
 
-    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
+    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=False, tol=1e-10, maxiter = 2000)
 
-    # Saving the data:
-    directory = os.getcwd()
-    name = "" #Rememember to give the run a name
+    # # Saving the data:
+    # directory = os.getcwd()
+    # name = "HF_gtups_1" #Rememember to give the run a name
 
-    # Saving the data:
-    j,k = 0,0
-    while j < 100:
-        if j < 10:
-            if os.path.exists("%s/%s_UCCSD_0%s.npz" % (directory, name, j)):
-                k = j + 1
-        else:
-            if os.path.exists("%s/%s_UCCSD_%s.npz" % (directory, name, j)):
-                k = j +1
-        j += 1
+    # # Saving the data:
+    # j,k = 0,0
+    # while j < 100:
+    #     if j < 10:
+    #         if os.path.exists("%s/%s_gtups_0%s.npz" % (directory, name, j)):
+    #             k = j + 1
+    #     else:
+    #         if os.path.exists("%s/%s_gtups_%s.npz" % (directory, name, j)):
+    #             k = j +1
+    #     j += 1
 
-    if k < 10:
-        k = f"0{k}"
+    # if k < 10:
+    #     k = f"0{k}"
 
-    data_file_UCCSD = Path("%s_UCCSD_%s.npz" % (name, k))
+    # data_file_UCCSD = Path("%s_gtups_%s.npz" % (name, k))
 
-    print("\nName of the UCCSD data file:", data_file_UCCSD)
+    # print("\nName of the gtups data file:", data_file_UCCSD)
 
-    np.savez(
-        data_file_UCCSD,
-        c_mo=WF.c_mo,
-        thetas_real=WF.thetas_real,
-        thetas_imag=WF.thetas_imag
-        )
+    # np.savez(
+    #     data_file_UCCSD,
+    #     c_mo=WF.c_mo,
+    #     thetas_real=WF.thetas_real,
+    #     thetas_imag=WF.thetas_imag
+    #     )
 
     print('Calc energy',WF._energy_elec)
     print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
@@ -112,45 +112,47 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # print('Optimized thetas', WF.thetas)
     # print('Optimized MO coefficients',WF.c_mo)
 
-    dip_ao = build_x2c_pc_operator(mf, mol, "int1e_r", 'int1e_sprsp', c, x2c=True, picture_change=True, spin_free=False)
+    dip_ao = build_x2c_pc_operator(mf, mol, "int1e_r", 'int1e_sprsp', c, x2c=False, picture_change=False, spin_free=False)
 
 
     "Calculate Excitation energies"
     LR = generalized_naive.LinearResponse(WF, excitations="sd")
     LR.calc_excitation_energies()
     print(LR.excitation_energies)
-
-    print(dip_ao.shape)
-    "Calculate polarizability"
-    prop_grad = LR.get_property_gradient(dip_ao) #Computes property gradient V
-    response = solve(LR.hessian, prop_grad) # solve (E-h_bar omega S)X=V (the solution/responsevector) with omega =0 response = solve(LR.hessian- omega LR.metric, prop_grad) for non-static?
-    alpha = np.einsum('ix,ix->x', prop_grad.conj(), response)
+    Osc = LR.get_oscillator_strength(dip_ao, x2c=False)
+    print('Osc. LR ideal', Osc) #forskel på denne og strengths??
 
 
-    print(f'Polarizabilities:\n \t xx: {alpha[0]:.4f} \t yy: {alpha[1]:.4f} \t zz: {alpha[2]:.4f}')
+    # "Calculate polarizability"
+    # prop_grad = LR.get_property_gradient(dip_ao) #Computes property gradient V
+    # response = solve(LR.hessian, prop_grad) # solve (E-h_bar omega S)X=V (the solution/responsevector) with omega =0 response = solve(LR.hessian- omega LR.metric, prop_grad) for non-static?
+    # alpha = np.einsum('ix,ix->x', prop_grad.conj(), response)
 
 
-    "Calculate dipole moments"
-    mux = generalized_one_electron_transform(WF.c_mo, dip_ao[0], x2c=True) #false for spinfree PC...
-    muy = generalized_one_electron_transform(WF.c_mo, dip_ao[1], x2c=True) #false for spinfree...
-    muz = generalized_one_electron_transform(WF.c_mo, dip_ao[2], x2c=True) #false for spinfree...
-    mu_op_x = generalized_one_elec_op_0i_0a(mux, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
-    mu_op_y = generalized_one_elec_op_0i_0a(muy, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
-    mu_op_z = generalized_one_elec_op_0i_0a(muz, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
-    dip_x=generalized_expectation_value(WF.ci_coeffs, [mu_op_x], WF.ci_coeffs, WF.ci_info)
-    dip_y=generalized_expectation_value(WF.ci_coeffs, [mu_op_y], WF.ci_coeffs, WF.ci_info)
-    dip_z=generalized_expectation_value(WF.ci_coeffs, [mu_op_z], WF.ci_coeffs, WF.ci_info)
+    # print(f'Polarizabilities:\n \t xx: {alpha[0]:.4f} \t yy: {alpha[1]:.4f} \t zz: {alpha[2]:.4f}')
 
 
-    print(f'Electric Dipolemoments:\n \t xx: {dip_x:.4f} \t yy: {dip_y:.4f} \t zz: {dip_z:.4f}')
+    # "Calculate dipole moments"
+    # mux = generalized_one_electron_transform(WF.c_mo, dip_ao[0], x2c=True) #false for spinfree PC...
+    # muy = generalized_one_electron_transform(WF.c_mo, dip_ao[1], x2c=True) #false for spinfree...
+    # muz = generalized_one_electron_transform(WF.c_mo, dip_ao[2], x2c=True) #false for spinfree...
+    # mu_op_x = generalized_one_elec_op_0i_0a(mux, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
+    # mu_op_y = generalized_one_elec_op_0i_0a(muy, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
+    # mu_op_z = generalized_one_elec_op_0i_0a(muz, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
+    # dip_x=generalized_expectation_value(WF.ci_coeffs, [mu_op_x], WF.ci_coeffs, WF.ci_info)
+    # dip_y=generalized_expectation_value(WF.ci_coeffs, [mu_op_y], WF.ci_coeffs, WF.ci_info)
+    # dip_z=generalized_expectation_value(WF.ci_coeffs, [mu_op_z], WF.ci_coeffs, WF.ci_info)
 
 
-    charges = mol.atom_charges()
-    coords = mol.atom_coords()
-    nuclear_dipole = np.einsum('i,ij->j', charges, coords)
+    # print(f'Electric Dipolemoments:\n \t xx: {dip_x:.4f} \t yy: {dip_y:.4f} \t zz: {dip_z:.4f}')
 
 
-    print(f'Total Dipolemoments:\n \t xx: {-dip_x+nuclear_dipole[0]:.4f} \t yy: {-dip_y+nuclear_dipole[1]:.4f} \t zz: {-dip_z+nuclear_dipole[2]:.4f}')
+    # charges = mol.atom_charges()
+    # coords = mol.atom_coords()
+    # nuclear_dipole = np.einsum('i,ij->j', charges, coords)
+
+
+    # print(f'Total Dipolemoments:\n \t xx: {-dip_x+nuclear_dipole[0]:.4f} \t yy: {-dip_y+nuclear_dipole[1]:.4f} \t zz: {-dip_z+nuclear_dipole[2]:.4f}')
 
 
 
@@ -357,6 +359,6 @@ def h2():
     )
 
 
-# h2()
+h2()
 # HCl()
-HF()
+# HF()

@@ -316,7 +316,7 @@ class LinearResponseBaseClass:
 
 
 
-    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray], x2c) -> np.ndarray:
         """Calculate transition dipole moment.
 
         Args:
@@ -327,7 +327,7 @@ class LinearResponseBaseClass:
         """
         raise NotImplementedError
 
-    def get_oscillator_strength(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_oscillator_strength(self, dipole_integrals: Sequence[np.ndarray], x2c: bool = False) -> np.ndarray:
         r"""Calculate oscillator strength.
 
         .. math::
@@ -339,7 +339,7 @@ class LinearResponseBaseClass:
         Returns:
             Oscillator Strength.
         """
-        transition_dipoles = self.get_transition_dipole(dipole_integrals)
+        transition_dipoles = self.get_transition_dipole(dipole_integrals, x2c)
         osc_strs = np.zeros(len(transition_dipoles))
         for idx, (excitation_energy, transition_dipole) in enumerate(
             zip(self.excitation_energies, transition_dipoles)

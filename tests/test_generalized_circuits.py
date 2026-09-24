@@ -42,6 +42,7 @@ def test_circuits_gradient_h32() -> None:
             mol,
             "fUCCSD",
             False, #Do x2c
+            False,
             {"n_layers": 0, "is_spin_conserving" : False},
             include_active_kappa=True,
         )
@@ -54,6 +55,7 @@ def test_circuits_gradient_h32() -> None:
             mol,
             "fUCCSD",
             False, #Do x2c
+            False,
             {"n_layers": 1, "is_spin_conserving" : False},
             include_active_kappa=True,
         )
@@ -132,6 +134,7 @@ def test_circuits_h3() -> None:
             mol,
             "fUCCSD",
             False, #Do x2c
+            False,
             {"n_layers": 0, "is_spin_conserving" : False},
             include_active_kappa=True,
         )
@@ -144,6 +147,7 @@ def test_circuits_h3() -> None:
             mol,
             "fUCCSD",
             False, #Do x2c
+            False,
             {"n_layers": 1, "is_spin_conserving" : False},
             include_active_kappa=True,
         )
