@@ -63,10 +63,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         active_space,
         c_mo,
         mol,
-        "gtups",
+        "fuccsd",
         True, #Do x2c
         False, #Do ecp
-        {"n_layers": 5, "is_spin_conserving" : False},
+        {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
@@ -112,15 +112,15 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # print('Optimized thetas', WF.thetas)
     # print('Optimized MO coefficients',WF.c_mo)
 
-    dip_ao = build_x2c_pc_operator(mf, mol, "int1e_r", 'int1e_sprsp', c, x2c=False, picture_change=False, spin_free=False)
+    dip_ao = build_x2c_pc_operator(mf, mol, "int1e_r", 'int1e_sprsp', c, x2c=True, picture_change=True, spin_free=False)
 
 
-    "Calculate Excitation energies"
-    LR = generalized_naive.LinearResponse(WF, excitations="sd")
-    LR.calc_excitation_energies()
-    print(LR.excitation_energies)
-    Osc = LR.get_oscillator_strength(dip_ao, x2c=False)
-    print('Osc. LR ideal', Osc) #forskel på denne og strengths??
+    # "Calculate Excitation energies"
+    # LR = generalized_naive.LinearResponse(WF, excitations="sd")
+    # LR.calc_excitation_energies()
+    # print(LR.excitation_energies)
+    # Osc = LR.get_oscillator_strength(dip_ao, x2c=False)
+    # print('Osc. LR ideal', Osc) #forskel på denne og strengths??
 
 
     # "Calculate polarizability"
@@ -161,12 +161,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     charges = mol.atom_charges()
 
     for A in range(mol.natm):
-        int_pc = build_x2c_pc_operator_efg(mf, mol, A, c, x2c=False, picture_change=True, spin_free=False)  # (3, 3, 2*nao_c, 2*nao_c)
+        int_pc = build_x2c_pc_operator_efg(mf, mol, A, c, x2c=True, picture_change=True, spin_free=False)  # (3, 3, 2*nao_c, 2*nao_c)
 
         efg_elec = np.zeros((3, 3)) #create the EFG matrix
         for alpha in range(3):
             for beta in range(3):
-                mo = generalized_one_electron_transform(WF.c_mo, int_pc[alpha, beta], x2c=False) #must be false for sf...
+                mo = generalized_one_electron_transform(WF.c_mo, int_pc[alpha, beta], x2c=True) #must be false for sf...
                 op = generalized_one_elec_op_0i_0a(mo, WF.num_inactive_spin_orbs, WF.num_active_spin_orbs)
                 efg_elec[alpha, beta] = generalized_expectation_value(
                     WF.ci_coeffs, [op], WF.ci_coeffs, WF.ci_info)
@@ -226,7 +226,6 @@ def build_x2c_pc_operator(mf, mol, int_LL, int_SS, c, x2c=True, picture_change=T
                     nao = xmol.nao
                     r = xmol.intor_symmetric(int_LL)                          # (3, nao_x, nao_x)
                     c1 = 0.5 / c
-                    print(sprsp.shape)
                     sprsp = xmol.intor_symmetric(int_SS).reshape(3, 4, nao, nao)
                     sprsp_sf = sprsp[:, 3] * (c1**2)
                     return mf.with_x2c.picture_change((r, sprsp_sf)) 
@@ -326,7 +325,7 @@ def HCl():
     # basis = {'H':'sto-3g','Cl': 'x2c-SVPall.nw'}
     basis = {'H': gto.uncontract(load('x2c-SVPall.nw', 'H')),
                 'Cl': gto.uncontract(load('x2c-SVPall.nw', 'Cl'))}
-    active_space = ((3,3), 8) #spin orbitaler or spinor basis
+    active_space = ((4,4), 10) #spin orbitaler or spinor basis
     charge = 0
     spin = 0
     NR(
@@ -338,7 +337,7 @@ def HF():
         H  0.0  0.0  0.91680 """
     basis = {'H': gto.uncontract(load('x2c-SVPall.nw', 'H')),
                 'F': gto.uncontract(load('x2c-SVPall.nw', 'F'))}
-    active_space = ((3,3), 8) #spin orbitaler or spinor basis
+    active_space = ((4,4), 10) #spin orbitaler or spinor basis
     charge = 0
     spin = 0
     NR(
@@ -359,6 +358,20 @@ def h2():
     )
 
 
-h2()
+# h2()
 # HCl()
 # HF()
+
+def HBr():
+    geometry = """H  0.0   0.0  1.41443;
+        Br  0.0  0.0  0.0 """
+    basis = {'H': gto.uncontract(load('x2c-SVPall.nw', 'H')),
+                'Br': gto.uncontract(load('x2c-SVPall.nw', 'Br'))}
+    active_space = ((3,3), 8) #spin orbitaler or spinor basis
+    charge = 0
+    spin = 0
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+
+HBr()
