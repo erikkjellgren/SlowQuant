@@ -348,25 +348,25 @@ class LinearResponse(LinearResponseBaseClass):
                         self.wf.rdm2,
                     )
 
-        for comp, op_int1e in enumerate(int1e):
+        for mu, int1e_mu in enumerate(int1e):
             if int2e is None:
-                op = one_elec_op_0i_0a(op_int1e, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.triplet)
+                op = one_elec_op_0i_0a(int1e_mu, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.triplet)
             else:
-                op = hamiltonian_0i_0a(op_int1e, int2e[comp], self.wf.num_inactive_orbs, self.wf.num_active_orbs)
+                op = hamiltonian_0i_0a(int1e_mu, int2e[mu], self.wf.num_inactive_orbs, self.wf.num_active_orbs)
             op_ket = propagate_state([op], self.wf.ci_coeffs, *self.index_info)
             opd_ket = propagate_state([op.dagger], self.wf.ci_coeffs, *self.index_info)
             for idx, G in enumerate(self.G_ops):
                 G_ket = propagate_state([G], self.wf.ci_coeffs, *self.index_info)
                 Gd_ket = propagate_state([G.dagger], self.wf.ci_coeffs, *self.index_info)
                 # < 0 | G op | 0 >
-                V[idx + idx_shift_q, comp] += expectation_value(
+                V[idx + idx_shift_q, mu] += expectation_value(
                     Gd_ket,
                     [],
                     op_ket,
                     *self.index_info
                 )
                 # - < 0 | op G | 0 >
-                V[idx + idx_shift_q, comp] -= expectation_value(
+                V[idx + idx_shift_q, mu] -= expectation_value(
                     opd_ket,
                     [],
                     G_ket,

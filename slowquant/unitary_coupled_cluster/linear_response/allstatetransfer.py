@@ -216,37 +216,37 @@ class LinearResponse(LinearResponseBaseClass):
         idx_shift_q = len(self.q_ops)
         V = np.zeros((len(self.q_ops + self.G_ops), len(int1e)))
 
-        for comp, op_int1e in enumerate(int1e):
+        for mu, int1e_mu in enumerate(int1e):
             # Orbital response part
             if int2e is None:
-                op = one_elec_op_1i_1a(op_int1e, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs, self.triplet)
+                op = one_elec_op_1i_1a(int1e_mu, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs, self.triplet)
             else:
-                op = hamiltonian_1i_1a(op_int1e, int2e[comp], self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs)
-            Udopd_ket = propagate_state(["Ud", op.dagger], self.wf.ci_coeffs, *self.index_info)
+                op = hamiltonian_1i_1a(int1e_mu, int2e[mu], self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs)
+            Udopd_ket = propagate_state(["Ud", op.dagger], self.ci_coeffs, *self.index_info_extended)
             for idx, q in enumerate(self.q_ops):
-                q_ket = propagate_state([q], self.wf.csf_coeffs, *self.index_info)
+                q_ket = propagate_state([q], self.csf_coeffs, *self.index_info_extended)
                 # - < 0 | op U q | CSF >
-                V[idx, comp] -= expectation_value(
+                V[idx, mu] -= expectation_value(
                     Udopd_ket,
                     [],
                     q_ket,
-                    *self.index_info
+                    *self.index_info_extended
                 )
 
             # Excitation response part
             if int2e is None:
-                op = one_elec_op_0i_0a(op_int1e, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.triplet)
+                op = one_elec_op_0i_0a(int1e_mu, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.triplet)
             else:
-                op = hamiltonian_0i_0a(op_int1e, int2e[comp], self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-            Udopd_ket = propagate_state(["Ud", op.dagger], self.wf.ci_coeffs, *self.index_info)
+                op = hamiltonian_0i_0a(int1e_mu, int2e[mu], self.wf.num_inactive_orbs, self.wf.num_active_orbs)
+            Udopd_ket = propagate_state(["Ud", op.dagger], self.ci_coeffs, *self.index_info_extended)
             for idx, G in enumerate(self.G_ops):
-                G_ket = propagate_state([G], self.wf.csf_coeffs, *self.index_info)
+                G_ket = propagate_state([G], self.csf_coeffs, *self.index_info_extended)
                 # - < 0 | op U G | CSF >
-                V[idx + idx_shift_q, comp] -= expectation_value(
+                V[idx + idx_shift_q, mu] -= expectation_value(
                     Udopd_ket,
                     [],
                     G_ket,
-                    *self.index_info
+                    *self.index_info_extended
                 )
         
         return np.vstack((V, fac * V))
