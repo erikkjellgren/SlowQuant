@@ -165,8 +165,6 @@ class LinearResponseBaseClass:
         print('cond E', np.linalg.cond(S))
 
         
-        print('Vi er her ideal')
-
         # hessian_for = self.hessian
         # print('Hessian før', hessian_for)
         # metric_for = self.metric
@@ -196,11 +194,6 @@ class LinearResponseBaseClass:
         # f"{np.max(np.abs(hessian_for - hessian_efter)):.2e}")  
 
         
-        # for i in range(len(self.hessian)):
-        #     print(self.hessian[i][i], i)
-                
-        # eigval, eigvec, sigma_eigs, keep = solve_lr_drop_sigma_null(self.hessian, self.metric, cut=1e-10)
-
         eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)     
      
             
@@ -213,27 +206,27 @@ class LinearResponseBaseClass:
         
 
         #AE
-        # operator_labels = np.array(
-        #     self.operator_labels_q +
-        #     self.operator_labels_G +
-        #     self.operator_labels_q +
-        #     self.operator_labels_G,
-        #     dtype=object)
-        # for i in range(len(eigval)):
-        #     vec=eigvec[:,i]
-        #     absvec = np.abs(vec)
+        operator_labels = np.array(
+            self.operator_labels_q +
+            self.operator_labels_G +
+            self.operator_labels_q +
+            self.operator_labels_G,
+            dtype=object)
+        for i in range(len(eigval)):
+            vec=eigvec[:,i]
+            absvec = np.abs(vec)
         
-        #     print('Eigenvalue', eigval[i],'Max value eigvec', np.max(abs(vec)), 'Max value eigvec index', np.argmax(abs(vec)))
-        #     # k = np.argmax(np.abs(vec))
-        #     # print("dominant operator:", operator_labels[k])
+            print('Eigenvalue', eigval[i],'Max value eigvec', np.max(abs(vec)), 'Max value eigvec index', np.argmax(abs(vec)))
+            # k = np.argmax(np.abs(vec))
+            # print("dominant operator:", operator_labels[k])
 
-        #     # top 3 contributors
-        #     top3 = np.argsort(absvec)[-3:][::-1]
-        #     # print(len(top3))
-        #     for j in top3:
-        #         print(
-        #         "  operator:", operator_labels[j],
-        #         " weight:", absvec[j])
+            # top 3 contributors
+            top3 = np.argsort(absvec)[-3:][::-1]
+            # print(len(top3))
+            for j in top3:
+                print(
+                "  operator:", operator_labels[j],
+                " weight:", absvec[j])
 
 
         #     # print(self.operator_labels[k])
@@ -323,7 +316,7 @@ class LinearResponseBaseClass:
 
 
 
-    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray], x2c) -> np.ndarray:
         """Calculate transition dipole moment.
 
         Args:
@@ -334,7 +327,7 @@ class LinearResponseBaseClass:
         """
         raise NotImplementedError
 
-    def get_oscillator_strength(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_oscillator_strength(self, dipole_integrals: Sequence[np.ndarray], x2c: bool = False) -> np.ndarray:
         r"""Calculate oscillator strength.
 
         .. math::
@@ -346,7 +339,7 @@ class LinearResponseBaseClass:
         Returns:
             Oscillator Strength.
         """
-        transition_dipoles = self.get_transition_dipole(dipole_integrals)
+        transition_dipoles = self.get_transition_dipole(dipole_integrals, x2c)
         osc_strs = np.zeros(len(transition_dipoles))
         for idx, (excitation_energy, transition_dipole) in enumerate(
             zip(self.excitation_energies, transition_dipoles)

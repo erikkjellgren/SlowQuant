@@ -123,6 +123,246 @@ def tUPS(
     return qc, grad_param_R
 
 
+
+def gtUPS(
+    occ_spin_idx: list[int], #AE
+    unocc_spin_idx: list[int], #AE  
+    num_spin_orbs: int,
+    num_elec: tuple[int, int],
+    mapper: FermionicMapper,
+    ansatz_options: dict[str, Any],
+) -> tuple[QuantumCircuit, dict[str, int]]:
+    """Create tUPS ansatz.
+
+    #. 10.1103/PhysRevResearch.6.023300 (tUPS)
+    #. 10.1088/1367-2630/ac2cb3 (QNP)
+
+    Ansatz Options:
+        * n_layers [int]: Number of layers.
+        * do_pp [bool]: Do perfect pairing. (default: False)
+        * do_qnp [bool]: Do QNP tiling. (default: False)
+        * skip_last_singles [bool]: Skip last layer of singles operators. (default: False)
+
+    Args:
+        num_orbs: Number of spatial orbitals.
+        num_elec: Number of alpha and beta electrons.
+        mapper: Fermionic to qubit mapper.
+        ansatz_options: Ansatz options.
+
+    Returns:
+        tUPS ansatz circuit and R parameters needed for gradients.
+    """
+    valid_options = ("n_layers", "do_pp", "do_qnp", "skip_last_singles", "is_spin_conserving")
+    for option in ansatz_options:
+        if option not in valid_options:
+            raise ValueError(f"Got unknown option for tUPS, {option}. Valid options are: {valid_options}")
+    if "n_layers" not in ansatz_options.keys():
+        raise ValueError("tUPS require the option 'n_layers'")
+    n_layers = ansatz_options["n_layers"]
+    if "do_pp" in ansatz_options.keys():
+        do_pp = ansatz_options["do_pp"]
+    else:
+        do_pp = False
+    if "do_qnp" in ansatz_options.keys():
+        do_qnp = ansatz_options["do_qnp"]
+    else:
+        do_qnp = False
+
+    if not isinstance(mapper, JordanWignerMapper) and do_pp:
+        raise ValueError(f"pp-tUPS only implemented for JW mapper, got: {type(mapper)}")
+    if do_pp and np.sum(num_elec) != num_spin_orbs:
+        raise ValueError(
+            f"pp-tUPS only implemented for number of electrons and number of orbitals being the same, got: ({np.sum(num_elec)}, {num_orbs}), (elec, orbs)"
+        )
+    if "skip_last_singles" in ansatz_options.keys():
+        skip_last_singles = ansatz_options["skip_last_singles"]
+    else:
+        skip_last_singles = False
+
+    qc = HartreeFock(num_spin_orbs, (0, 0), mapper)  # empty circuit with qubit number based on mapper
+    grad_param_R_r = {}
+    grad_param_R_phi = {}
+    idx = 0
+    # Layer loop
+    for n in range(n_layers):
+        for p in range(0, num_spin_orbs//2 - 1, 2):  # first column of brick-wall
+            if not do_qnp:
+                # First single
+                #ahpha alpha
+                qc = single_excitation_generalized(2 * p, 2 * p + 2, num_spin_orbs, qc,  Parameter(f"norm{idx:09d}"), Parameter(f"phi{idx:09d}"), mapper)
+                print(2 * p, 2 * p + 2)
+                grad_param_R_r[f"norm{idx:09d}"] = 2 #den der var der før var 4...
+                grad_param_R_phi[f"phi{idx:09d}"] = 2
+                idx += 1
+
+                #beta beta
+                qc = single_excitation_generalized(
+                2 * p + 1, 2 * p + 3, num_spin_orbs, qc,
+                Parameter(f"norm{idx:09d}"), Parameter(f"phi{idx:09d}"), mapper
+            )
+                print(2 * p + 1, 2 * p + 3)
+                grad_param_R_r[f"norm{idx:09d}"] = 2
+                grad_param_R_phi[f"phi{idx:09d}"] = 2
+                idx += 1
+
+                #cross
+                qc = single_excitation_generalized(
+                2 * p, 2 * p + 3, num_spin_orbs, qc,
+                Parameter(f"norm{idx:09d}"), Parameter(f"phi{idx:09d}"), mapper
+            )
+                print(2*p+2*p+3)
+                grad_param_R_r[f"norm{idx:09d}"] = 2
+                grad_param_R_phi[f"phi{idx:09d}"] = 2
+                idx += 1
+
+                #cross
+                qc = single_excitation_generalized(
+                2*p+1 , 2 * p + 2, num_spin_orbs, qc,
+                Parameter(f"norm{idx:09d}"), Parameter(f"phi{idx:09d}"), mapper
+            )
+                print(2*p+1,2*p+2)
+                grad_param_R_r[f"norm{idx:09d}"] = 2
+                grad_param_R_phi[f"phi{idx:09d}"] = 2
+                idx += 1
+            # Double
+            qc = double_excitation_generalized(
+                2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3, num_spin_orbs, qc,  Parameter(f"norm{idx:09d}"), Parameter(f"phi{idx:09d}"), mapper
+            )
+            print(2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3)
+            grad_param_R_r[f"norm{idx:09d}"] = 2
+            grad_param_R_phi[f"phi{idx:09d}"] = 4
+            idx += 1
+            # Second single
+            if n + 1 == n_layers and skip_last_singles and num_spin_orbs//2 == 2:
+                # Special case for two orbitals.
+                # Here the layer is only one block, thus,
+                # the last single excitation is earlier than expected.
+                continue
+            #ahpha alpha
+            qc = single_excitation_generalized(2 * p, 2 * p + 2, num_spin_orbs, qc,  Parameter(f"norm{idx:09d}"), Parameter(f"phi{idx:09d}"), mapper)
+            grad_param_R_r[f"norm{idx:09d}"] = 2 #den der var der før var 4...
+            grad_param_R_phi[f"phi{idx:09d}"] = 2
+            idx += 1
+            print(2 * p, 2 * p + 2)
+
+            #beta beta
+            qc = single_excitation_generalized(
+            2 * p + 1, 2 * p + 3, num_spin_orbs, qc,
+            Parameter(f"norm{idx:09d}"), Parameter(f"phi{idx:09d}"), mapper
+        )
+            grad_param_R_r[f"norm{idx:09d}"] = 2
+            grad_param_R_phi[f"phi{idx:09d}"] = 2
+            idx += 1
+            print(2 * p + 1, 2 * p + 3)
+
+
+            #cross
+            qc = single_excitation_generalized(
+            2 * p, 2 * p + 3, num_spin_orbs, qc,
+            Parameter(f"norm{idx:09d}"), Parameter(f"phi{idx:09d}"), mapper
+        )
+            grad_param_R_r[f"norm{idx:09d}"] = 2
+            grad_param_R_phi[f"phi{idx:09d}"] = 2
+            idx += 1
+            print(2 * p, 2 * p + 3)
+
+            #cross
+            qc = single_excitation_generalized(
+            2 * p + 1 , 2 * p + 2, num_spin_orbs, qc,
+            Parameter(f"norm{idx:09d}"), Parameter(f"phi{idx:09d}"), mapper
+        )
+            grad_param_R_r[f"norm{idx:09d}"] = 2
+            grad_param_R_phi[f"phi{idx:09d}"] = 2
+            idx += 1
+            print(2 * p + 1 , 2 * p + 2)
+
+            
+        for p in range(1, num_spin_orbs//2 - 1, 2):  # second column of brick-wall
+            if not do_qnp:
+                # First single
+                #ahpha alpha
+                qc = single_excitation_generalized(2 * p, 2 * p + 2, num_spin_orbs, qc,  Parameter(f"norm{idx:09d}"), Parameter(f"phi{idx:09d}"), mapper)
+                grad_param_R_r[f"norm{idx:09d}"] = 2 #den der var der før var 4...
+                grad_param_R_phi[f"phi{idx:09d}"] = 2
+                idx += 1
+
+                #beta beta
+                qc = single_excitation_generalized(
+                2 * p + 1, 2 * p + 3, num_spin_orbs, qc,
+                Parameter(f"norm{idx:09d}"), Parameter(f"phi{idx:09d}"), mapper
+            )
+                grad_param_R_r[f"norm{idx:09d}"] = 2
+                grad_param_R_phi[f"phi{idx:09d}"] = 2
+                idx += 1
+
+                #cross
+                qc = single_excitation_generalized(
+                2 * p, 2 * p + 3, num_spin_orbs, qc,
+                Parameter(f"norm{idx:09d}"), Parameter(f"phi{idx:09d}"), mapper
+            )
+                grad_param_R_r[f"norm{idx:09d}"] = 2
+                grad_param_R_phi[f"phi{idx:09d}"] = 2
+                idx += 1
+
+                #cross
+                qc = single_excitation_generalized(
+                2*p+1 , 2 * p + 2, num_spin_orbs, qc,
+                Parameter(f"norm{idx:09d}"), Parameter(f"phi{idx:09d}"), mapper
+            )
+                grad_param_R_r[f"norm{idx:09d}"] = 2
+                grad_param_R_phi[f"phi{idx:09d}"] = 2
+                idx += 1
+            # Double
+            qc = double_excitation_generalized(
+                2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3, num_spin_orbs, qc,  Parameter(f"norm{idx:09d}"), Parameter(f"phi{idx:09d}"), mapper
+            )
+            grad_param_R_r[f"norm{idx:09d}"] = 2
+            grad_param_R_phi[f"phi{idx:09d}"] = 4
+            idx += 1
+            # Second single
+            if n + 1 == n_layers and skip_last_singles and num_spin_orbs//2 == 2:
+                # Special case for two orbitals.
+                # Here the layer is only one block, thus,
+                # the last single excitation is earlier than expected.
+                continue
+            #ahpha alpha
+            qc = single_excitation_generalized(2 * p, 2 * p + 2, num_spin_orbs, qc,  Parameter(f"norm{idx:09d}"), Parameter(f"phi{idx:09d}"), mapper)
+            grad_param_R_r[f"norm{idx:09d}"] = 2 #den der var der før var 4...
+            grad_param_R_phi[f"phi{idx:09d}"] = 2
+            idx += 1
+
+            #beta beta
+            qc = single_excitation_generalized(
+            2 * p + 1, 2 * p + 3, num_spin_orbs, qc,
+            Parameter(f"norm{idx:09d}"), Parameter(f"phi{idx:09d}"), mapper
+        )
+            grad_param_R_r[f"norm{idx:09d}"] = 2
+            grad_param_R_phi[f"phi{idx:09d}"] = 2
+            idx += 1
+
+            #cross
+            qc = single_excitation_generalized(
+            2 * p, 2 * p + 3, num_spin_orbs, qc,
+            Parameter(f"norm{idx:09d}"), Parameter(f"phi{idx:09d}"), mapper
+        )
+            grad_param_R_r[f"norm{idx:09d}"] = 2
+            grad_param_R_phi[f"phi{idx:09d}"] = 2
+            idx += 1
+
+            #cross
+            qc = single_excitation_generalized(
+            2 * p + 1 , 2 * p + 2, num_spin_orbs, qc,
+            Parameter(f"norm{idx:09d}"), Parameter(f"phi{idx:09d}"), mapper
+        )
+            grad_param_R_r[f"norm{idx:09d}"] = 2
+            grad_param_R_phi[f"phi{idx:09d}"] = 2
+            idx += 1
+
+    return qc, grad_param_R_r, grad_param_R_phi
+
+
+
+
 def fUCC(
     occ_spin_idx: list[int], #AE
     unocc_spin_idx: list[int], #AE  

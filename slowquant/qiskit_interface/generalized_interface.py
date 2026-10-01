@@ -22,7 +22,7 @@ from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
-from slowquant.qiskit_interface.generalized_custom_ansatz import SDSfUCC, fUCC, tUPS
+from slowquant.qiskit_interface.generalized_custom_ansatz import SDSfUCC, fUCC, gtUPS, tUPS
 from slowquant.qiskit_interface.util import (
     Clique,
     MitigationFlags,
@@ -59,7 +59,7 @@ class QuantumInterface:
         do_M_ansatz0: bool = False,
         do_M_ansatz0_plus: bool = False,
         do_postselection: bool = False,
-        do_generalized: bool = False
+        do_generalized: bool = False,
     ) -> None:
         """Interface to Qiskit to use IBM quantum hardware or simulator.
 
@@ -91,6 +91,7 @@ class QuantumInterface:
             "fUCC",
             "SDSfUCC",
             "HF",
+            "gtups"
         )
         if not isinstance(ansatz, QuantumCircuit) and ansatz not in allowed_ansatz:
             raise ValueError(
@@ -130,7 +131,13 @@ class QuantumInterface:
         self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
         self._M_shots = None  # define a separate number of shots for M
 
-    def construct_circuit(self, occ_spin_idx, unocc_spin_idx, num_spin_orbs: int, num_elec: tuple[int, int], do_generalized: bool=False) -> None:
+    def construct_circuit(
+        self,
+        occ_spin_idx,
+        unocc_spin_idx,
+        num_spin_orbs: int,
+        num_elec: tuple[int, int],
+    ) -> None:
         """Construct qiskit circuit.
 
         Args:
@@ -149,7 +156,6 @@ class QuantumInterface:
             str, int
         ] = {}  # Contains information about the parameterization needed for gradient evaluations.
 
-
         # State prep circuit
         if isinstance(self.ansatz, QuantumCircuit):
             self.state_circuit: QuantumCircuit = QuantumCircuit(
@@ -167,10 +173,10 @@ class QuantumInterface:
             for p in range(0, 2 * num_orbs):
                 if p % 2 == 0:
                     self.state_circuit.x(p)
-        #Relevant ??? Annika
+        # Relevant ??? Annika
         else:
             self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
-            #self.state_circuit = QuantumCircuit(num_spin_orbs)
+            # self.state_circuit = QuantumCircuit(num_spin_orbs)
         self.num_qubits = self.state_circuit.num_qubits
 
         # Ansatz Circuit
@@ -190,13 +196,17 @@ class QuantumInterface:
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R_r, self.grad_param_R_phi = fUCC(occ_spin_idx, unocc_spin_idx, num_orbs, self.num_elec, self.mapper, self.ansatz_options) #AE
+            self.circuit, self.grad_param_R_r, self.grad_param_R_phi = fUCC(
+                occ_spin_idx, unocc_spin_idx, num_orbs, self.num_elec, self.mapper, self.ansatz_options
+            )  # AE
         elif self.ansatz == "HF":
             if len(self.ansatz_options) != 0:
                 raise ValueError(f"No options available for HF got {self.ansatz_options}")
             self.circuit = QuantumCircuit(self.num_qubits)  # empty ansatz circuit
         elif self.ansatz == "tUPS":
             self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+        elif self.ansatz == "gtups":
+            self.circuit, self.grad_param_R_r, self.grad_param_R_phi = gtUPS(occ_spin_idx, unocc_spin_idx, num_spin_orbs, self.num_elec, self.mapper, self.ansatz_options)
         elif self.ansatz == "QNP":
             self.ansatz_options["do_qnp"] = True
             self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
@@ -206,7 +216,9 @@ class QuantumInterface:
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R_r, self.grad_param_R_phi = fUCC(occ_spin_idx, unocc_spin_idx, num_orbs, self.num_elec, self.mapper, self.ansatz_options) #AE
+            self.circuit, self.grad_param_R_r, self.grad_param_R_phi = fUCC(
+                occ_spin_idx, unocc_spin_idx, num_orbs, self.num_elec, self.mapper, self.ansatz_options
+            )  # AE
         elif self.ansatz == "kSAfUpCCGSD":
             self.ansatz_options["SAGS"] = True
             self.ansatz_options["GpD"] = True
@@ -669,8 +681,8 @@ class QuantumInterface:
         else:
             run_parameters = custom_parameters
             save_paulis = False
-        
-        #print(run_parameters) # AWE print
+
+        # print(run_parameters) # AWE print
 
         # Check if saving is requested
         if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)) and save_paulis:
@@ -1062,10 +1074,20 @@ class QuantumInterface:
 
             if len(head_mit) != 0:
                 if self.mitigation_flags.do_M_mitigation:  # apply error mitigation if requested
-                    self._apply_M_mitigation(distr_raw, run_circuit, circuit_M)
+                    # Reuse distributions that already have the requested M mitigation.
+                    M_only_flags = copy.copy(self.mitigation_flags)
+                    M_only_flags.do_postselection = False
+                    empty_M_heads = self.saver[det_int].get_empty_heads(M_only_flags)
+                    if len(empty_M_heads) == 0:
+                        distr_raw = [
+                            distr.copy()
+                            for distr in self.saver[det_int].get_distr_heads(head_mit, M_only_flags)
+                        ]
+                    else:
+                        self._apply_M_mitigation(distr_raw, run_circuit, circuit_M)
 
                 if self.mitigation_flags.do_postselection:  # apply post-selection if requested
-                    self._apply_postselection(distr_raw, head_mit)
+                    self._apply_postselection(distr_raw, head_mit, self.ansatz_options)
 
                 # save mitigated results
                 self.saver[det_int].update_distr(head_mit, distr_raw, self.mitigation_flags)
@@ -1271,7 +1293,7 @@ class QuantumInterface:
             for i, dist in enumerate(distr):
                 distr[i] = correct_distribution(dist, Minv)
 
-    def _apply_postselection(self, distr: list[dict[int, float]], heads: list[str]) -> None:
+    def _apply_postselection(self, distr: list[dict[int, float]], heads: list[str], ansatz_options) -> None:
         """Apply post-selection to the distributions.
 
         Args:
@@ -1280,7 +1302,9 @@ class QuantumInterface:
         """
         for i, (dist, head) in enumerate(zip(distr, heads)):
             if "X" not in head and "Y" not in head:
-                distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits, self.do_generalized)
+                distr[i] = postselection(
+                    dist, self.mapper, self.num_elec, self.num_qubits, self.ansatz_options
+                )
 
     def _one_call_sampler_distributions(
         self,

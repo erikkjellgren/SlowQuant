@@ -799,7 +799,7 @@ class UpsStructure:
                     # First single alpha alpha
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((2 * p, 2 * p + 2))
-                    print(2 * p, 2 * p + 2)
+                    # print(2 * p, 2 * p + 2)
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
@@ -807,7 +807,7 @@ class UpsStructure:
                     # First single beta beta
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((2 * p + 1, 2 * p + 3))
-                    print(2 * p + 1, 2 * p + 3)
+                    # print(2 * p + 1, 2 * p + 3)
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
@@ -830,7 +830,7 @@ class UpsStructure:
                 # Double
                 self.excitation_operator_type.append("double")
                 self.excitation_indices.append((2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3))
-                print(2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3)
+                # print(2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3)
                 self.grad_param_R[f"p{self.n_params:09d}"] = 2
                 self.param_names.append(f"p{self.n_params:09d}")
                 self.n_params += 1
@@ -851,7 +851,7 @@ class UpsStructure:
                     # First single
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((2 * p, 2 * p + 2))
-                    print(2 * p, 2 * p + 2)
+                    # print(2 * p, 2 * p + 2)
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
@@ -859,7 +859,7 @@ class UpsStructure:
 
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((2 * p + 1, 2 * p + 3))
-                    print(2 * p + 1, 2 * p + 3)
+                    # print(2 * p + 1, 2 * p + 3)
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
@@ -890,14 +890,14 @@ class UpsStructure:
                     # First single
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((2 * p, 2 * p + 2))
-                    print(2 * p, 2 * p + 2)
+                    # print(2 * p, 2 * p + 2)
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
 
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((2 * p + 1, 2 * p + 3))
-                    print(2 * p + 1, 2 * p + 3)
+                    # print(2 * p + 1, 2 * p + 3)
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
@@ -919,7 +919,7 @@ class UpsStructure:
                 # Double
                 self.excitation_operator_type.append("double")
                 self.excitation_indices.append((2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3))
-                print(2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3)
+                # print(2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3)
                 self.grad_param_R[f"p{self.n_params:09d}"] = 2
                 self.param_names.append(f"p{self.n_params:09d}")
                 self.n_params += 1
@@ -936,14 +936,14 @@ class UpsStructure:
                     # First single
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((2 * p, 2 * p + 2))
-                    print(2 * p, 2 * p + 2)
+                    # print(2 * p, 2 * p + 2)
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
 
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((2 * p + 1, 2 * p + 3))
-                    print(2 * p + 1, 2 * p + 3)
+                    # print(2 * p + 1, 2 * p + 3)
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1

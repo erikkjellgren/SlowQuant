@@ -623,7 +623,7 @@ class LinearResponse(LinearResponseBaseClass):
                 
 
                                 
-    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray],  x2c: bool = False) -> np.ndarray:
         """Calculate transition dipole moment.
 
         Args:
@@ -635,9 +635,9 @@ class LinearResponse(LinearResponseBaseClass):
         if len(dipole_integrals) != 3:
             raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
         number_excitations = len(self.excitation_energies)
-        mux = generalized_one_electron_transform(self.wf.c_mo, dipole_integrals[0])
-        muy = generalized_one_electron_transform(self.wf.c_mo, dipole_integrals[1])
-        muz = generalized_one_electron_transform(self.wf.c_mo, dipole_integrals[2])
+        mux = generalized_one_electron_transform(self.wf.c_mo, dipole_integrals[0], x2c)
+        muy = generalized_one_electron_transform(self.wf.c_mo, dipole_integrals[1], x2c)
+        muz = generalized_one_electron_transform(self.wf.c_mo, dipole_integrals[2], x2c)
         mux_op = generalized_one_elec_op_0i_0a(
             mux,
             self.wf.num_inactive_spin_orbs,
