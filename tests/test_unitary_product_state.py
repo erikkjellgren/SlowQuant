@@ -10,6 +10,66 @@ from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
 
+def test_ups_cas() -> None:
+    """Test that CAS stores the active-space ground state."""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule("H 0.0 0.0 0.0; H 0.0 0.0 1.8;", distance_unit="angstrom")
+    SQobj.set_basis_set("STO-3G")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+
+    WF = WaveFunctionUPS((2, 2), SQobj.hartree_fock.mo_coeff, SQobj, ansatz="CAS")
+    H = WF._get_hamiltonian_matrix()
+
+    assert np.isclose(np.linalg.norm(WF.ci_coeffs), 1.0)
+    assert np.allclose(H @ WF.ci_coeffs, WF.energy_elec * WF.ci_coeffs)
+    assert np.isclose(WF.energy_elec, np.linalg.eigvalsh(H)[0])
+
+    LR = naivelr.LinearResponse(WF, excitations="SD")
+    LR.calc_excitation_energies()
+    assert np.allclose(LR.excitation_energies, [0.54127603, 0.59557680], atol=10**-7)
+
+
+def test_ups_cas_orbital_optimization() -> None:
+    """Test that orbital optimization turns CAS into CASSCF."""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule("Li 0.0 0.0 0.0; H 0.0 0.0 1.67;", distance_unit="angstrom")
+    SQobj.set_basis_set("STO-3G")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+
+    WF = WaveFunctionUPS((2, 2), SQobj.hartree_fock.mo_coeff, SQobj, ansatz="CAS")
+    cas_energy = WF.energy_elec
+    WF.run_orbital_optimization(tol=1e-10, maxiter=100, is_silent_subiterations=True)
+    H = WF._get_hamiltonian_matrix()
+
+    assert WF.energy_elec < cas_energy
+    assert np.allclose(H @ WF.ci_coeffs, WF.energy_elec * WF.ci_coeffs)
+    assert abs(WF.energy_elec - (-8.82994417)) < 10**-7
+
+    LR = naivelr.LinearResponse(WF, excitations="SD")
+    LR.calc_excitation_energies()
+    assert np.allclose(
+        LR.excitation_energies,
+        [
+            0.12957585,
+            0.17886098,
+            0.17886098,
+            0.60514687,
+            0.64716118,
+            0.74104287,
+            0.74104287,
+            1.00397219,
+            2.07479339,
+            2.13715608,
+            2.13715608,
+            2.45576005,
+            2.95518159,
+        ],
+        atol=10**-6,
+    )
+
+
 def test_ups_naivelr() -> None:
     """Test LiH UCCSD(2,2) LR."""
     SQobj = sq.SlowQuant()
