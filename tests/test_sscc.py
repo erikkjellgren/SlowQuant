@@ -223,7 +223,3 @@ def test_sscc_LiH_sto3g_projected_q():
     j_st = np.trace(dso + pso + fc + sd, axis1=1, axis2=2) / 3
 
     assert np.allclose(j_proj,j_st)
-
-test_sscc_H2_sto3g()
-test_sscc_LiH_sto3g()
-test_sscc_LiH_sto3g_projected_q()
