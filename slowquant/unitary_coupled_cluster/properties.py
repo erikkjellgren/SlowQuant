@@ -31,8 +31,9 @@ class Properties():
         """
         self.wf = wave_function
         self.lr_formulation = lr_formulation.lower()
-        self.QSQ = False
+        self.qLR = False
 
+        # Do I need to change this for the lr formulations that use the index_info_extended?
         if isinstance(self.wf, WaveFunctionUCC):
             self.index_info = (
                 self.wf.ci_info,
@@ -46,7 +47,7 @@ class Properties():
                 self.wf.ups_layout,
             )
         elif isinstance(self.wf, WaveFunctionCircuit):
-            self.QSQ = True
+            self.qLR = True
         else:
             raise ValueError(f"Got incompatible wave function type, {type(self.wf)}")
 
@@ -63,34 +64,34 @@ class Properties():
         Returns:
             linear response object
         """
-        if not self.QSQ:
+        if not self.qLR:
             if self.lr_formulation in ("allprojected", "allproj"):
-                from slowquant.unitary_coupled_cluster.linear_response import allprojected as lr
-            elif self.lr_formulation in ("allselfconsistent, allsc"):
-                from slowquant.unitary_coupled_cluster.linear_response import allselfconsistent as lr
+                from slowquant.unitary_coupled_cluster.linear_response.allprojected import LinearResponse
+            elif self.lr_formulation in ("allselfconsistent", "allsc"):
+                from slowquant.unitary_coupled_cluster.linear_response.allselfconsistent import LinearResponse
             elif self.lr_formulation in ("allstatetransfer", "allst"):
-                from slowquant.unitary_coupled_cluster.linear_response import allstatetransfer as lr
+                from slowquant.unitary_coupled_cluster.linear_response.allstatetransfer import LinearResponse
             elif self.lr_formulation in ("naive"):
-                from slowquant.unitary_coupled_cluster.linear_response import naive as lr
+                from slowquant.unitary_coupled_cluster.linear_response.naive import LinearResponse
             elif self.lr_formulation in ("projected_statetransfer", "proj_st"):
-                from slowquant.unitary_coupled_cluster.linear_response import projected_statetransfer as lr                
+                from slowquant.unitary_coupled_cluster.linear_response.projected_statetransfer import LinearResponse
             elif self.lr_formulation in ("projected", "proj"):
-                from slowquant.unitary_coupled_cluster.linear_response import projected as lr
+                from slowquant.unitary_coupled_cluster.linear_response.projected import LinearResponse
             elif self.lr_formulation in ("selfconsistent", "sc"):
-                from slowquant.unitary_coupled_cluster.linear_response import selfconsistent as lr
+                from slowquant.unitary_coupled_cluster.linear_response.selfconsistent import LinearResponse
             elif self.lr_formulation in ("statetransfer", "st"):
-                from slowquant.unitary_coupled_cluster.linear_response import statetransfer as lr
+                from slowquant.unitary_coupled_cluster.linear_response.statetransfer import LinearResponse
             else:
                 raise ValueError(f"Got unknown lr_formulation, {self.lr_formulation}")
-            LR = lr.LinearResponse(
+            LR = LinearResponse(
                 self.wf,
                 excitations=self.response_options.get("excitations", "SD"),
                 triplet=triplet
             )
         else:
             if self.lr_formulation in ("allprojected", "allproj"):
-                from slowquant.qiskit_interface.linear_response import allprojected
-                LR = allprojected.quantumLR(
+                from slowquant.qiskit_interface.linear_response.allprojected import quantumLR
+                LR = quantumLR(
                     self.wf,
                     excitations=self.response_options.get("excitations", "SD"),
                     triplet=triplet,
@@ -99,8 +100,8 @@ class Properties():
                     do_gradients = self.response_options.get("do_gradients", True),
                 )
             elif self.lr_formulation in ("naive"):
-                from slowquant.qiskit_interface.linear_response import naive
-                LR = naive.quantumLR(
+                from slowquant.qiskit_interface.linear_response.naive import quantumLR
+                LR = quantumLR(
                     self.wf,
                     excitations=self.response_options.get("excitations", "SD"),
                     triplet=triplet,
@@ -110,8 +111,8 @@ class Properties():
                     do_gradients = self.response_options.get("do_gradients", True),
                 )
             elif self.lr_formulation in ("projected", "proj"):
-                from slowquant.qiskit_interface.linear_response import projected
-                LR = projected.quantumLR(
+                from slowquant.qiskit_interface.linear_response.projected import quantumLR
+                LR = quantumLR(
                     self.wf,
                     excitations=self.response_options.get("excitations", "SD"),
                     triplet=triplet,
@@ -129,12 +130,12 @@ class Properties():
     @property
     def LR_singlet(self):
         """Calculate singlet linear response.
-        
+                
         Returns:
             singlet spin-adapted linear response object
         """
         if self._LR_singlet is None:
-            self._LR_singlet = self.run_LR(triplet=False)
+            self._LR_singlet = self.run_LR(triplet = False)
         return self._LR_singlet
     
     @property
@@ -145,11 +146,69 @@ class Properties():
             triplet spin-adapted linear response object
         """
         if self._LR_triplet is None:
-            self._LR_triplet = self.run_LR(triplet=True)
+            self._LR_triplet = self.run_LR(triplet = True)
         return self._LR_triplet
 
-    def get_polarisability(self, freq=0) -> np.ndarray:
+    def get_excitation_energies(self, triplet: bool = False, osc_strs: bool = False) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+        """Calculate excitation energies.
+
+        Args:
+            triplet: use triplet spin-adaptation.
+            osc_strs: calculate oscillator strenghts
+
+        Returns:
+            excitation energies and if osc_strs is True osciallator strenghts)
+        """
+        if not triplet:
+            LR = self.LR_singlet
+        else:
+            LR = self.LR_triplet
+        
+        if not hasattr(LR, "excitation_energies"):
+            print("calculating excitation energies")
+            if not self.qLR:
+                LR.calc_excitation_energies()
+            else:
+                LR.get_excitation_energies()
+
+        if not osc_strs:
+            output = (
+                "Excitation # | Excitation energy [Hartree] | Excitation energy [eV]\n"
+            )
+
+            for i, exc_energy in enumerate(LR.excitation_energies):
+                exc_str = f"{exc_energy:2.6f}"
+                exc_str_ev = f"{exc_energy * 27.2114079527:3.6f}"
+                output += f"{str(i + 1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)}\n"
+            print(output)
+
+            return LR.excitation_energies
+
+        if not hasattr(LR, "oscillator_strengths"):
+            if self.qLR and not hasattr(LR, "normed_excitation_vectors"):
+                LR.get_normed_excitation_vectors()
+            LR.get_oscillator_strength()
+
+        output = (
+            "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n"
+        )
+
+        for i, (exc_energy, osc_strength) in enumerate(
+            zip(LR.excitation_energies, LR.oscillator_strengths)
+        ):
+            exc_str = f"{exc_energy:2.6f}"
+            exc_str_ev = f"{exc_energy * 27.2114079527:3.6f}"
+            osc_str = f"{osc_strength:1.6f}"
+            output += f"{str(i + 1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
+        print(output)
+
+        return LR.excitation_energies, LR.oscillator_strengths
+
+    def get_polarisability(self, freq: float = 0) -> np.ndarray:
         """Calculate the frequency dependent polarisability tensor.
+
+        Args:
+            freq: frequency.
 
         Returns:
             Polarisability tensor (in au).
@@ -195,7 +254,7 @@ class Properties():
 
             for comp in dia_mo:
                 dia_op = one_elec_op_0i_0a(comp, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-                if not self.QSQ:
+                if not self.qLR:
                     val = expectation_value(
                         self.wf.ci_coeffs, 
                         [dia_op], 
@@ -273,7 +332,7 @@ class Properties():
 
             for comp in dia_mo:
                 dia_op = one_elec_op_0i_0a(comp, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-                if not self.QSQ:
+                if not self.qLR:
                     val = expectation_value(
                         self.wf.ci_coeffs, 
                         [dia_op], 
@@ -326,7 +385,7 @@ class Properties():
 
         return dia_shield, para_shield
     
-    def get_spin_spin_coupling_tensor(self) -> np.ndarray:
+    def get_spin_spin_coupling_tensor(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Calculate the spin-spin coupling constant tensor of each nuclei.
 
         Returns:
@@ -345,7 +404,7 @@ class Properties():
 
             for comp in dso_mo:
                 dso_op = one_elec_op_0i_0a(comp, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-                if not self.QSQ:
+                if not self.qLR:
                     val = expectation_value(
                         self.wf.ci_coeffs, 
                         [dso_op], 
