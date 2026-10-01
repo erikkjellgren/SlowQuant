@@ -308,4 +308,4 @@ def h8():
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
 
-h3()
+h5()
