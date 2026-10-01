@@ -104,7 +104,3 @@ def test_H10_sto3g_naive():
     assert abs(alpha[0,0] - 72.343635) < thresh
     assert abs(alpha[1,1] - 0.0) < thresh
     assert abs(alpha[2,2] - 0.0) < thresh
-
-test_H2_sto3g_naive()
-test_LiH_sto3g_naive()
-test_H10_sto3g_naive()

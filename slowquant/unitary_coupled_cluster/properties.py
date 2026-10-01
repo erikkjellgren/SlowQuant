@@ -73,7 +73,7 @@ class Properties():
                 from slowquant.unitary_coupled_cluster.linear_response.allstatetransfer import LinearResponse
             elif self.lr_formulation in ("naive"):
                 from slowquant.unitary_coupled_cluster.linear_response.naive import LinearResponse
-            elif self.lr_formulation in ("projected_statetransfer", "proj_st"):
+            elif self.lr_formulation in ("projected_statetransfer", "proj_st", "projst"):
                 from slowquant.unitary_coupled_cluster.linear_response.projected_statetransfer import LinearResponse
             elif self.lr_formulation in ("projected", "proj"):
                 from slowquant.unitary_coupled_cluster.linear_response.projected import LinearResponse

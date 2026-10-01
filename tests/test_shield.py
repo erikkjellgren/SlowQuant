@@ -11,7 +11,7 @@ from slowquant.unitary_coupled_cluster.properties import properties
 
 def test_shield_H2_sto3g():
     """
-    Test of NMR shielding constants for with H2(2,2)/STO-3G with naive, project, statetransfer and selfconsistent LR
+    Test of NMR shielding constants for with H2(2,2)/STO-3G with naive, projected, statetransfer and selfconsistent LR
     """
     geometry = """H  0.0   0.0  0.7;
             H  0.0  0.0  -0.7;"""
@@ -90,7 +90,7 @@ def test_shield_H2_sto3g():
 
 def test_shield_LiH_sto3g():
     """
-    Test of NMR shielding constants for LiH(2,2)/STO-3G with naive, project, statetransfer and selfconsistent LR
+    Test of NMR shielding constants for LiH(2,2)/STO-3G with naive, projected, statetransfer and selfconsistent LR
     """
     geometry = """H  0.0   0.0  0.7;
             Li  0.0  0.0  -0.7;"""
