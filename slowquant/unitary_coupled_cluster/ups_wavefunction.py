@@ -311,9 +311,9 @@ class WaveFunctionUPS:
                 self.num_active_orbs,
                 self.ansatz_options,
             )
-        elif ansatz.lower() in ("casci", "casscf"):
-            # CASCI and CASSCF use the complete determinant basis directly,
-            # rather than a parametrized unitary-product-state layout.
+        elif ansatz.lower() == "cas":
+            # CAS uses the complete determinant basis directly rather than a
+            # parametrized unitary-product-state layout.
             self._set_cas_ground_state()
         elif ansatz.lower() == "none":
             print("UPS wave function with no Ansatz was chosen.")
@@ -365,7 +365,7 @@ class WaveFunctionUPS:
         self._rdm4 = None
         self._energy_elec = None
         self._thetas = theta_vals.copy()
-        if self._ansatz in ("casci", "casscf"):
+        if self._ansatz == "cas":
             self._set_cas_ground_state()
         else:
             self.ci_coeffs = construct_ups_state(
@@ -959,9 +959,9 @@ class WaveFunctionUPS:
     ) -> None:
         """Optimize only the molecular orbitals.
 
-        For a CASSCF wave function, the active-space Hamiltonian is
-        diagonalized for every set of orbitals, so both the CI coefficients
-        and orbitals remain variationally optimized.
+        For a CAS wave function, the active-space Hamiltonian is diagonalized
+        for every set of orbitals. Thus, applying this method to CAS performs
+        a CASSCF calculation.
 
         Args:
             tol: Convergence tolerance.
@@ -1016,7 +1016,7 @@ class WaveFunctionUPS:
                 self._kappa[i] = 0.0
                 self._kappa_old[i] = 0.0
 
-            if self._ansatz == "casscf":
+            if self._ansatz == "cas":
                 e_new = self._set_cas_ground_state()
             else:
                 e_new = float(res.fun)
@@ -1152,7 +1152,7 @@ class WaveFunctionUPS:
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
-            if self._ansatz == "casscf":
+            if self._ansatz == "cas":
                 E = self._set_cas_ground_state()
             else:
                 # RDM is more expensive than evaluation of the Hamiltonian.
@@ -1199,7 +1199,7 @@ class WaveFunctionUPS:
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
-            if self._ansatz == "casscf":
+            if self._ansatz == "cas":
                 self._set_cas_ground_state()
             gradient[:num_kappa] = get_orbital_gradient(
                 self.h_mo,

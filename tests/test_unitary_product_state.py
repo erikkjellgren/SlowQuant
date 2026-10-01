@@ -10,15 +10,15 @@ from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
 
-def test_ups_casci() -> None:
-    """Test that CASCI stores the active-space ground state."""
+def test_ups_cas() -> None:
+    """Test that CAS stores the active-space ground state."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule("H 0.0 0.0 0.0; H 0.0 0.0 1.8;", distance_unit="angstrom")
     SQobj.set_basis_set("STO-3G")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
 
-    WF = WaveFunctionUPS((2, 2), SQobj.hartree_fock.mo_coeff, SQobj, ansatz="CASCI")
+    WF = WaveFunctionUPS((2, 2), SQobj.hartree_fock.mo_coeff, SQobj, ansatz="CAS")
     H = WF._get_hamiltonian_matrix()
 
     assert np.isclose(np.linalg.norm(WF.ci_coeffs), 1.0)
@@ -30,20 +30,20 @@ def test_ups_casci() -> None:
     assert np.allclose(LR.excitation_energies, [0.54127603, 0.59557680], atol=10**-7)
 
 
-def test_ups_casscf() -> None:
-    """Test exact-CI orbital optimization for CASSCF."""
+def test_ups_cas_orbital_optimization() -> None:
+    """Test that orbital optimization turns CAS into CASSCF."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule("Li 0.0 0.0 0.0; H 0.0 0.0 1.67;", distance_unit="angstrom")
     SQobj.set_basis_set("STO-3G")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
 
-    WF = WaveFunctionUPS((2, 2), SQobj.hartree_fock.mo_coeff, SQobj, ansatz="CASSCF")
-    casci_energy = WF.energy_elec
+    WF = WaveFunctionUPS((2, 2), SQobj.hartree_fock.mo_coeff, SQobj, ansatz="CAS")
+    cas_energy = WF.energy_elec
     WF.run_orbital_optimization(tol=1e-10, maxiter=100, is_silent_subiterations=True)
     H = WF._get_hamiltonian_matrix()
 
-    assert WF.energy_elec < casci_energy
+    assert WF.energy_elec < cas_energy
     assert np.allclose(H @ WF.ci_coeffs, WF.energy_elec * WF.ci_coeffs)
     assert abs(WF.energy_elec - (-8.82994417)) < 10**-7
 
