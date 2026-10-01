@@ -1,7 +1,11 @@
 import numpy as np
+from qiskit_aer.primitives import Sampler as SamplerAer
+from qiskit_nature.second_q.mappers import JordanWignerMapper
 
 import slowquant.SlowQuant as sq
 from slowquant.unitary_coupled_cluster.properties import Properties
+from slowquant.qiskit_interface.circuit_wavefunction import WaveFunctionCircuit
+from slowquant.qiskit_interface.interface import QuantumInterface
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
@@ -29,14 +33,35 @@ def test_H2_631g_naive_q():
     )
     WF.run_wf_optimization_1step("BFGS", True)
 
+    # Optimize WF with QSQ
+    sampler = SamplerAer()
+    mapper = JordanWignerMapper()
+
+    QI = QuantumInterface(sampler, "fUCCSD", mapper)
+
+    qWF = WaveFunctionCircuit(
+        (2,2),
+        WF.c_mo,
+        SQobj,
+        QI,
+    )
+    qWF.run_wf_optimization_2step("rotosolve", False)
+
     # Linear Response
     print("\nNaive")
     prop = Properties(WF, "naive")
     excita_naive, osc_strs_naive = prop.get_excitation_energies(osc_strs=True)
 
+    # with qLR
+    prop = Properties(qWF, "naive")
+    excita_qnaive, osc_strs_qnaive = prop.get_excitation_energies(osc_strs=True)
+
     print("\nProjected")
     prop = Properties(WF, "proj")
     excita_proj, osc_strs_proj = prop.get_excitation_energies(osc_strs=True)    
+
+    prop = Properties(qWF, "proj")
+    excita_qproj, osc_strs_qproj = prop.get_excitation_energies(osc_strs=True) 
 
     print("\nSelfconsistent")
     prop = Properties(WF, "sc")
@@ -46,8 +71,8 @@ def test_H2_631g_naive_q():
     prop = Properties(WF, "st")
     excita_st, osc_strs_st = prop.get_excitation_energies(osc_strs=True)
 
-    excita = np.array([excita_naive, excita_proj, excita_sc, excita_st])
-    osc_strs = np.array([osc_strs_naive, osc_strs_proj, osc_strs_sc, osc_strs_st])
+    excita = np.array([excita_naive, excita_qnaive, excita_proj, excita_qproj, excita_sc, excita_st])
+    osc_strs = np.array([osc_strs_naive, osc_strs_qnaive, osc_strs_qproj, osc_strs_proj, osc_strs_sc, osc_strs_st])
 
     thresh = 10**-4
 
@@ -92,14 +117,35 @@ def test_LiH_sto3g_naive_q():
     )
     WF.run_wf_optimization_1step("BFGS", True)
 
+    # Optimize WF with QSQ
+    sampler = SamplerAer()
+    mapper = JordanWignerMapper()
+
+    QI = QuantumInterface(sampler, "fUCCSD", mapper)
+
+    qWF = WaveFunctionCircuit(
+        (2,2),
+        WF.c_mo,
+        SQobj,
+        QI,
+    )
+    qWF.run_wf_optimization_2step("rotosolve", False)
+
     # Linear Response
     print("\nNaive")
     prop = Properties(WF, "naive")
     excita_naive, osc_strs_naive = prop.get_excitation_energies(osc_strs=True)
 
+    # with qLR
+    prop = Properties(qWF, "naive")
+    excita_qnaive, osc_strs_qnaive = prop.get_excitation_energies(osc_strs=True)
+
     print("\nProjected")
     prop = Properties(WF, "proj")
     excita_proj, osc_strs_proj = prop.get_excitation_energies(osc_strs=True)    
+
+    prop = Properties(qWF, "proj")
+    excita_qproj, osc_strs_qproj = prop.get_excitation_energies(osc_strs=True) 
 
     print("\nSelfconsistent")
     prop = Properties(WF, "sc")
@@ -109,8 +155,8 @@ def test_LiH_sto3g_naive_q():
     prop = Properties(WF, "st")
     excita_st, osc_strs_st = prop.get_excitation_energies(osc_strs=True)
 
-    excita = np.array([excita_naive, excita_proj, excita_sc, excita_st])
-    osc_strs = np.array([osc_strs_naive, osc_strs_proj, osc_strs_sc, osc_strs_st])
+    excita = np.array([excita_naive, excita_qnaive, excita_proj, excita_qproj, excita_sc, excita_st])
+    osc_strs = np.array([osc_strs_naive, osc_strs_qnaive, osc_strs_qproj, osc_strs_proj, osc_strs_sc, osc_strs_st])
 
     thresh = 10**-4
 
@@ -169,17 +215,34 @@ def test_H2_631g_proj_q():
     )
     WF.run_wf_optimization_1step("BFGS", True)
 
+    # Optimize WF with QSQ
+    sampler = SamplerAer()
+    mapper = JordanWignerMapper()
+
+    QI = QuantumInterface(sampler, "fUCCSD", mapper)
+
+    qWF = WaveFunctionCircuit(
+        (2,2),
+        WF.c_mo,
+        SQobj,
+        QI,
+    )
+    qWF.run_wf_optimization_2step("rotosolve", False)
+
     # Linear Response
     print("\nAll-projected")
     prop = Properties(WF, "allproj")
     excita_allproj, osc_strs_allproj = prop.get_excitation_energies(osc_strs=True)
 
+    prop = Properties(qWF, "allproj")
+    excita_qallproj, osc_strs_qallproj = prop.get_excitation_energies(osc_strs=True)
+
     print("\nProjected-statetransfer")
     prop = Properties(WF, "projst")
     excita_projst, osc_strs_projst = prop.get_excitation_energies(osc_strs=True)
 
-    excita = np.array([excita_allproj, excita_projst])
-    osc_strs = np.array([osc_strs_allproj, osc_strs_projst])
+    excita = np.array([excita_allproj, excita_qallproj, excita_projst])
+    osc_strs = np.array([osc_strs_allproj, osc_strs_qallproj, osc_strs_projst])
 
     thresh = 10**-4
 
@@ -224,17 +287,34 @@ def test_LiH_sto3g_proj_q():
     )
     WF.run_wf_optimization_1step("BFGS", True)
 
+    # Optimize WF with QSQ
+    sampler = SamplerAer()
+    mapper = JordanWignerMapper()
+
+    QI = QuantumInterface(sampler, "fUCCSD", mapper)
+
+    qWF = WaveFunctionCircuit(
+        (2,2),
+        WF.c_mo,
+        SQobj,
+        QI,
+    )
+    qWF.run_wf_optimization_2step("rotosolve", False)
+
     # Linear Response
     print("\nAll-projected")
     prop = Properties(WF, "allproj")
     excita_allproj, osc_strs_allproj = prop.get_excitation_energies(osc_strs=True)
 
+    prop = Properties(qWF, "allproj")
+    excita_qallproj, osc_strs_qallproj = prop.get_excitation_energies(osc_strs=True)
+
     print("\nProjected-statetransfer")
     prop = Properties(WF, "projst")
     excita_projst, osc_strs_projst = prop.get_excitation_energies(osc_strs=True)
 
-    excita = np.array([excita_allproj, excita_projst])
-    osc_strs = np.array([osc_strs_allproj, osc_strs_projst])
+    excita = np.array([excita_allproj, excita_qallproj, excita_projst])
+    osc_strs = np.array([osc_strs_allproj, osc_strs_qallproj, osc_strs_projst])
 
     thresh = 10**-4
 

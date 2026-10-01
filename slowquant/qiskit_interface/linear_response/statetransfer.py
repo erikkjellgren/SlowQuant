@@ -1,14 +1,10 @@
 import numpy as np
 
-from slowquant.molecularintegrals.integralfunctions import (
-    one_electron_integral_transform,
-)
 from slowquant.qiskit_interface.linear_response.lr_baseclass import quantumLRBaseClass
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     get_determinant_expansion_from_operator_on_HF,
 )
-from slowquant.unitary_coupled_cluster.operators import one_elec_op_0i_0a
-
+from slowquant.unitary_coupled_cluster.operators import one_elec_op_0i_0a, hamiltonian_0i_0a
 
 class quantumLR(quantumLRBaseClass):
     def run(
@@ -83,54 +79,45 @@ class quantumLR(quantumLRBaseClass):
                 if i == j:
                     self.Sigma[i, j] = 1
 
-    def get_transition_dipole(self) -> np.ndarray:
-        """Calculate transition dipole moment.
+    def get_property_gradient(self, int1e: np.ndarray, int2e: np.ndarray | None = None) -> np.ndarray:
+        """Calculate property gradient.
+
+        Args:
+            int1e: one-electron property integrals in MO basis.
+            int2e: two-electron property integrals in MO basis.
 
         Returns:
-            Transition dipole moment.
-        """
-        number_excitations = len(self.excitation_energies)
-        dipole_integrals = self.wf.int_gen.electric_dipole
-        mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
-        muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
-        muz = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[2])
-        mux_op = one_elec_op_0i_0a(mux, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-        muy_op = one_elec_op_0i_0a(muy, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-        muz_op = one_elec_op_0i_0a(muz, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-        mux_active = mux_op.get_folded_operator(*self.orbs)
-        muy_active = muy_op.get_folded_operator(*self.orbs)
-        muz_active = muz_op.get_folded_operator(*self.orbs)
-        transition_dipoles = np.zeros((number_excitations, 3))
-        for state_number in range(number_excitations):
-            g_part_x = 0.0
-            g_part_y = 0.0
-            g_part_z = 0.0
-            for i in range(self.num_G):
-                # -Z * <CSF| Ud mux U G | CSF>
-                g_part_x -= self._Z_G_normed[i, state_number] * self.wf.QI.quantum_expectation_value_csfs(
-                    self.states["HF"], mux_active, self.states[f"G{i}"]
-                )
-                # Y * <CSF| Gd Ud mux U | CSF>
-                g_part_x += self._Y_G_normed[i, state_number] * self.wf.QI.quantum_expectation_value_csfs(
-                    self.states[f"G{i}"], mux_active, self.states["HF"]
-                )
-                # -Z * <CSF| Ud muy U G | CSF>
-                g_part_y -= self._Z_G_normed[i, state_number] * self.wf.QI.quantum_expectation_value_csfs(
-                    self.states["HF"], muy_active, self.states[f"G{i}"]
-                )
-                # Y * <CSF| Gd Ud muy U | CSF>
-                g_part_y += self._Y_G_normed[i, state_number] * self.wf.QI.quantum_expectation_value_csfs(
-                    self.states[f"G{i}"], muy_active, self.states["HF"]
-                )
-                # -Z * <CSF| Ud muz U G | CSF>
-                g_part_z -= self._Z_G_normed[i, state_number] * self.wf.QI.quantum_expectation_value_csfs(
-                    self.states["HF"], muz_active, self.states[f"G{i}"]
-                )
-                # Y * <CSF| Gd Ud muz U | CSF>
-                g_part_z += self._Y_G_normed[i, state_number] * self.wf.QI.quantum_expectation_value_csfs(
-                    self.states[f"G{i}"], muz_active, self.states["HF"]
-                )
-            transition_dipoles[state_number, 0] = g_part_x
-            transition_dipoles[state_number, 1] = g_part_y
-            transition_dipoles[state_number, 2] = g_part_z
-        return transition_dipoles
+            Property gradient.
+        """ 
+
+        if np.allclose(int1e, int1e.transpose(0, -1, -2)):
+            # real integral
+            fac = -1
+        elif np.allclose(int1e, -1 * int1e.transpose(0, -1, -2)):
+            # imaginary integral
+            fac = 1
+        else:
+            raise ValueError("Wrong symmetry: int1e must be symmetric or antisymmetric")
+        
+        if int2e is not None:
+            if len(int1e) != len(int2e):
+                raise ValueError(f"Mismatched arrays: int1e and int2e must have the same length, got {len(int1e)} and {len(int2e)}")
+            if self.triplet:
+                raise ValueError("Not implemented: triplet response and int2e cannot be used simutaniously.")
+            if not np.allclose(int2e, -1 * fac * int2e.transpose(0,2,1,4,3)):
+                raise ValueError("Mismatched symmetry: int1e and int2e must either both be symmetric or antisymmetric")
+
+        V = np.zeros((len(self.G_ops), len(int1e)))
+
+        for mu, int1e_mu in enumerate(int1e):
+            if int2e is None:
+                op = one_elec_op_0i_0a(int1e_mu, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.triplet)
+            else:
+                op = hamiltonian_0i_0a(int1e_mu, int2e[mu], self.wf.num_inactive_orbs, self.wf.num_active_orbs)
+            for idx in range(self.G_ops):
+                V[idx, mu] = self.wf.QI.quantum_expectation_value_csfs(
+                    self.states["HF"], 
+                    op.get_folded_operator(*self.orbs),
+                    self.states[f"G{idx}"])
+        
+        return np.vstack((V, fac * V))

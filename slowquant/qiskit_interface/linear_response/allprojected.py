@@ -1,8 +1,5 @@
 import numpy as np
 
-from slowquant.molecularintegrals.integralfunctions import (
-    one_electron_integral_transform,
-)
 from slowquant.qiskit_interface.linear_response.lr_baseclass import (
     get_num_CBS_elements,
     get_num_nonCBS,
@@ -10,7 +7,6 @@ from slowquant.qiskit_interface.linear_response.lr_baseclass import (
 )
 from slowquant.qiskit_interface.util import Clique
 from slowquant.unitary_coupled_cluster.density_matrix import (
-    get_orbital_response_property_gradient_response,
     get_orbital_response_property_gradient_1e,
     get_orbital_response_property_gradient_2e,
 )
@@ -391,93 +387,6 @@ class quantumLR(quantumLRBaseClass):
         self._analyze_std(A, B, Sigma, verbose=verbose, cv=cv, save=save)
         return A, B, Sigma
 
-    def get_transition_dipole(self) -> np.ndarray:
-        """Calculate transition dipole moment.
-
-        Returns:
-            Transition dipole moment.
-        """
-        number_excitations = len(self.excitation_energies)
-        dipole_integrals = self.wf.int_gen.electric_dipole
-        mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
-        muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
-        muz = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[2])
-        mux_op = one_elec_op_0i_0a(mux, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-        muy_op = one_elec_op_0i_0a(muy, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-        muz_op = one_elec_op_0i_0a(muz, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-
-        transition_dipoles = np.zeros((number_excitations, 3))
-        for state_number in range(number_excitations):
-            q_part_x = 0.0
-            q_part_y = 0.0
-            q_part_z = 0.0
-            if self.num_q != 0:
-                q_part_x = get_orbital_response_property_gradient_response(
-                    mux,
-                    self.wf.kappa_no_activeactive_idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.rdm1,
-                    self.normed_excitation_vectors,
-                    state_number,
-                    number_excitations,
-                )
-                q_part_y = get_orbital_response_property_gradient_response(
-                    muy,
-                    self.wf.kappa_no_activeactive_idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.rdm1,
-                    self.normed_excitation_vectors,
-                    state_number,
-                    number_excitations,
-                )
-                q_part_z = get_orbital_response_property_gradient_response(
-                    muz,
-                    self.wf.kappa_no_activeactive_idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.rdm1,
-                    self.normed_excitation_vectors,
-                    state_number,
-                    number_excitations,
-                )
-            g_part_x = 0.0
-            g_part_y = 0.0
-            g_part_z = 0.0
-            exp_mux = self.wf.QI.quantum_expectation_value(mux_op.get_folded_operator(*self.orbs))
-            exp_muy = self.wf.QI.quantum_expectation_value(muy_op.get_folded_operator(*self.orbs))
-            exp_muz = self.wf.QI.quantum_expectation_value(muz_op.get_folded_operator(*self.orbs))
-            for i, G in enumerate(self.G_ops):
-                exp_G = self._G_exp[i]
-                exp_Gmux = self.wf.QI.quantum_expectation_value(
-                    (G.dagger * mux_op).get_folded_operator(*self.orbs)
-                )
-                exp_Gmuy = self.wf.QI.quantum_expectation_value(
-                    (G.dagger * muy_op).get_folded_operator(*self.orbs)
-                )
-                exp_Gmuz = self.wf.QI.quantum_expectation_value(
-                    (G.dagger * muz_op).get_folded_operator(*self.orbs)
-                )
-
-                g_part_x += self._Z_G_normed[i, state_number] * exp_G * exp_mux
-                g_part_x -= self._Z_G_normed[i, state_number] * exp_Gmux
-                g_part_x -= self._Y_G_normed[i, state_number] * exp_G * exp_mux
-                g_part_x += self._Y_G_normed[i, state_number] * exp_Gmux
-                g_part_y += self._Z_G_normed[i, state_number] * exp_G * exp_muy
-                g_part_y -= self._Z_G_normed[i, state_number] * exp_Gmuy
-                g_part_y -= self._Y_G_normed[i, state_number] * exp_G * exp_muy
-                g_part_y += self._Y_G_normed[i, state_number] * exp_Gmuy
-                g_part_z += self._Z_G_normed[i, state_number] * exp_G * exp_muz
-                g_part_z -= self._Z_G_normed[i, state_number] * exp_Gmuz
-                g_part_z -= self._Y_G_normed[i, state_number] * exp_G * exp_muz
-                g_part_z += self._Y_G_normed[i, state_number] * exp_Gmuz
-
-            transition_dipoles[state_number, 0] = q_part_x + g_part_x
-            transition_dipoles[state_number, 1] = q_part_y + g_part_y
-            transition_dipoles[state_number, 2] = q_part_z + g_part_z
-        return transition_dipoles
-
     def get_property_gradient(self, int1e: np.ndarray, int2e: np.ndarray | None = None) -> np.ndarray:
         """Calculate property gradient.
 
@@ -530,13 +439,13 @@ class quantumLR(quantumLRBaseClass):
                     )
 
         # Excitation response part
-        for comp, op_int1e in enumerate(int1e):
+        for mu, int1e_mu in enumerate(int1e):
             if int2e is None:
-                op = one_elec_op_0i_0a(op_int1e, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.triplet)
+                op = one_elec_op_0i_0a(int1e_mu, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.triplet)
             else:
-                op = hamiltonian_0i_0a(op_int1e, int2e[comp], self.wf.num_inactive_orbs, self.wf.num_active_orbs)
+                op = hamiltonian_0i_0a(int1e_mu, int2e[mu], self.wf.num_inactive_orbs, self.wf.num_active_orbs)
             for idx, G in enumerate(self.G_ops):
-                V[idx + idx_shift_q, comp] = self.wf.QI.quantum_expectation_value((op).get_folded_operator(*self.orbs)) * self._G_exp[idx]
-                V[idx + idx_shift_q, comp] -= self.wf.QI.quantum_expectation_value((op * G).get_folded_operator(*self.orbs))
+                V[idx + idx_shift_q, mu] = self.wf.QI.quantum_expectation_value((op).get_folded_operator(*self.orbs)) * self._G_exp[idx]
+                V[idx + idx_shift_q, mu] -= self.wf.QI.quantum_expectation_value((op * G).get_folded_operator(*self.orbs))
         
         return np.vstack((V, fac * V))

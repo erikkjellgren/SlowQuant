@@ -1,8 +1,5 @@
 import numpy as np
 
-from slowquant.molecularintegrals.integralfunctions import (
-    one_electron_integral_transform,
-)
 from slowquant.qiskit_interface.linear_response.lr_baseclass import (
     get_num_CBS_elements,
     get_num_nonCBS,
@@ -14,11 +11,9 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_response_hessian_block,
     get_triplet_orbital_response_hessian_block,
     get_orbital_response_metric_sigma,
-    get_orbital_response_property_gradient_response,
     get_orbital_response_property_gradient_1e,
     get_orbital_response_property_gradient_2e,
 )
-from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.operators import (
     commutator,
     double_commutator,
@@ -475,81 +470,6 @@ class quantumLR(quantumLRBaseClass):
         self._analyze_std(A, B, Sigma, verbose=verbose, cv=cv, save=save)
         return A, B, Sigma
 
-    def get_transition_dipole(self) -> np.ndarray:
-        """Calculate transition dipole moment.
-
-        Returns:
-            Transition dipole moment.
-        """
-        number_excitations = len(self.excitation_energies)
-        dipole_integrals = self.wf.int_gen.electric_dipole
-        mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
-        muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
-        muz = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[2])
-        mux_op = one_elec_op_0i_0a(mux, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-        muy_op = one_elec_op_0i_0a(muy, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-        muz_op = one_elec_op_0i_0a(muz, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-        transition_dipole_x = 0.0
-        transition_dipole_y = 0.0
-        transition_dipole_z = 0.0
-        transition_dipoles = np.zeros((number_excitations, 3))
-        for state_number in range(number_excitations):
-            transfer_op = FermionicOperator({})
-            for i, G in enumerate(self.G_ops):
-                transfer_op += (
-                    self._Z_G_normed[i, state_number] * G.dagger + self._Y_G_normed[i, state_number] * G
-                )
-            q_part_x = 0.0
-            q_part_y = 0.0
-            q_part_z = 0.0
-            if self.num_q != 0:
-                q_part_x = get_orbital_response_property_gradient_response(
-                    mux,
-                    self.wf.kappa_no_activeactive_idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.rdm1,
-                    self.normed_excitation_vectors,
-                    state_number,
-                    number_excitations,
-                )
-                q_part_y = get_orbital_response_property_gradient_response(
-                    muy,
-                    self.wf.kappa_no_activeactive_idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.rdm1,
-                    self.normed_excitation_vectors,
-                    state_number,
-                    number_excitations,
-                )
-                q_part_z = get_orbital_response_property_gradient_response(
-                    muz,
-                    self.wf.kappa_no_activeactive_idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.rdm1,
-                    self.normed_excitation_vectors,
-                    state_number,
-                    number_excitations,
-                )
-            if self.num_G != 0:
-                transition_dipole_x = self.wf.QI.quantum_expectation_value(
-                    commutator(mux_op, transfer_op).get_folded_operator(*self.orbs)
-                )
-                transition_dipole_y = self.wf.QI.quantum_expectation_value(
-                    commutator(muy_op, transfer_op).get_folded_operator(*self.orbs)
-                )
-                transition_dipole_z = self.wf.QI.quantum_expectation_value(
-                    commutator(muz_op, transfer_op).get_folded_operator(*self.orbs)
-                )
-            transition_dipoles[state_number, 0] = q_part_x + transition_dipole_x
-            transition_dipoles[state_number, 1] = q_part_y + transition_dipole_y
-            transition_dipoles[state_number, 2] = q_part_z + transition_dipole_z
-
-        return transition_dipoles
-
-
     def get_property_gradient(self, int1e: np.ndarray, int2e: np.ndarray | None = None) -> np.ndarray:
         """Calculate property gradient.
 
@@ -602,12 +522,12 @@ class quantumLR(quantumLRBaseClass):
                     )
 
         # Excitation response part
-        for comp, op_int1e in enumerate(int1e):
+        for mu, int1e_mu in enumerate(int1e):
             if int2e is None:
-                op = one_elec_op_0i_0a(op_int1e, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.triplet)
+                op = one_elec_op_0i_0a(int1e_mu, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.triplet)
             else:
-                op = hamiltonian_0i_0a(op_int1e, int2e[comp], self.wf.num_inactive_orbs, self.wf.num_active_orbs)
+                op = hamiltonian_0i_0a(int1e_mu, int2e[mu], self.wf.num_inactive_orbs, self.wf.num_active_orbs)
             for idx, G in enumerate(self.G_ops):
-                V[idx + idx_shift_q, comp] = self.wf.QI.quantum_expectation_value(commutator(G, op).get_folded_operator(*self.orbs))
+                V[idx + idx_shift_q, mu] = self.wf.QI.quantum_expectation_value(commutator(G, op).get_folded_operator(*self.orbs))
         
         return np.vstack((V, fac * V))

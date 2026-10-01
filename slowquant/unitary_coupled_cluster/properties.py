@@ -165,7 +165,6 @@ class Properties():
             LR = self.LR_triplet
         
         if not hasattr(LR, "excitation_energies"):
-            print("calculating excitation energies")
             if not self.qLR:
                 LR.calc_excitation_energies()
             else:

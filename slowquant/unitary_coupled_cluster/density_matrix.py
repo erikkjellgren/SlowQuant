@@ -490,51 +490,6 @@ def get_orbital_response_vector_norm(
 
 
 @nb.jit(nopython=True)
-def get_orbital_response_property_gradient_response(
-    x_mo: np.ndarray,
-    kappa_idx: np.ndarray,
-    num_inactive_orbs: int,
-    num_active_orbs: int,
-    rdm1: np.ndarray,
-    response_vectors: np.ndarray,
-    state_number: int,
-    number_excitations: int,
-) -> float:
-    r"""Calculate the orbital part of property gradient time the response vector.
-
-    .. math::
-        P^{\hat{q}} = \sum_k\left<0\left|\left[\hat{O}_{k},\hat{X}\right]\right|0\right>
-
-    Args:
-        x_mo: Property integral in MO basis.
-        kappa_idx: Orbital parameter indices in spatial basis.
-        num_inactive_orbs: Number of inactive orbitals in spatial basis.
-        num_active_orbs: Number of active orbitals in spatial basis.
-        rdm1: Active part of 1-RDM.
-        response_vectors: Response vectors.
-        state_number: State number counting from zero.
-        number_excitations: Total number of excitations.
-
-    Returns:
-        Orbital part of property gradient times the response vector.
-    """
-    prop_grad = 0
-    for i, (m, n) in enumerate(kappa_idx):
-        for p in range(num_inactive_orbs + num_active_orbs):
-            prop_grad += (
-                (response_vectors[i + number_excitations, state_number] - response_vectors[i, state_number])
-                * x_mo[n, p]
-                * RDM1(m, p, num_inactive_orbs, num_active_orbs, rdm1)
-            )
-            prop_grad += (
-                (response_vectors[i, state_number] - response_vectors[i + number_excitations, state_number])
-                * x_mo[m, p]
-                * RDM1(n, p, num_inactive_orbs, num_active_orbs, rdm1)
-            )
-    return 2 ** (-1 / 2) * prop_grad
-
-
-@nb.jit(nopython=True)
 def get_orbital_response_hessian_block(
     h: np.ndarray,
     g: np.ndarray,

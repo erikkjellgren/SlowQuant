@@ -23,7 +23,7 @@ from slowquant.unitary_coupled_cluster.util import (
     iterate_t5,
     iterate_t6,
 )
-
+from slowquant.molecularintegrals.integralfunctions import one_electron_integral_transform
 
 class quantumLRBaseClass:
     def __init__(
@@ -412,11 +412,15 @@ class quantumLRBaseClass:
 
         return norms
 
-    def get_transition_dipole(self) -> np.ndarray:
-        """Calculate transition dipole moment.
+    def get_property_gradient(self, int1e: np.ndarray, int2e: np.ndarray | None = None) -> np.ndarray:
+        """Calculate property gradient.
+
+        Args:
+            int1e: one-electron property integrals in MO basis.
+            int2e: two-electron property integrals in MO basis.
 
         Returns:
-            Transition dipole moments.
+            Property gradient.
         """
         raise NotImplementedError
 
@@ -429,16 +433,24 @@ class quantumLRBaseClass:
         Returns:
             Oscillator Strength.
         """
-        transition_dipoles = self.get_transition_dipole()
-        osc_strs = np.zeros(len(transition_dipoles))
-        for idx, (excitation_energy, transition_dipole) in enumerate(
-            zip(self.excitation_energies, transition_dipoles)
-        ):
+        if not hasattr(self, "normed_excitation_vectors"):
+            raise ValueError(
+                "Normed excitation vectors have not been calculated. Run get_normed_excitation_vectors() first."
+            )
+
+        osc_strs = np.zeros(len(self.excitation_energies))
+        prop_grad = self.get_property_gradient(one_electron_integral_transform(self.wf.c_mo, self.wf.int_gen.electric_dipole))
+
+        for idx, excitation_energy in enumerate(
+            self.excitation_energies
+            ):
             osc_strs[idx] = (
                 2
                 / 3
                 * excitation_energy
-                * (transition_dipole[0] ** 2 + transition_dipole[1] ** 2 + transition_dipole[2] ** 2)
+                * (np.dot(prop_grad[:,0], self.normed_excitation_vectors[:,idx]) ** 2  
+                   + np.dot(prop_grad[:,1], self.normed_excitation_vectors[:,idx]) ** 2  
+                   + np.dot(prop_grad[:,2], self.normed_excitation_vectors[:,idx]) ** 2)
             )
         self.oscillator_strengths = osc_strs
         return osc_strs
