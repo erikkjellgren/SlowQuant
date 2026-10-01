@@ -14,12 +14,17 @@ class IntegralManager:
         "_kinetic_energy",
         "_nuclear_electron_attraction",
         "_overlap",
+        "_magnetic_field_H",
+        "_magnetic_field_H_z",
         "int_obj",
         "x2c",
         "ecp",
+        "B",
+        "orig",
+
     )
 
-    def __init__(self, integral_obj: SlowQuant | pyscf.gto.mole.Mole, x2c: bool = False, ecp = False) -> None:
+    def __init__(self, integral_obj: SlowQuant | pyscf.gto.mole.Mole, x2c: bool = False, ecp = False, B = None, orig = None) -> None:
         """Initilize the integral manager.
 
         Args:
@@ -32,8 +37,12 @@ class IntegralManager:
         self._overlap: np.ndarray | None = None
         self._electric_dipole: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
         self._h_ao: np.ndarray | None = None
+        self._magnetic_field_H: np.ndarray | None = None
+        self._magnetic_field_H_z: np.ndarray | None = None
         self.x2c = x2c
         self.ecp = ecp
+        self.B = B
+        self.orig = orig
 
     @property
     def num_elec(self) -> int:
@@ -149,3 +158,86 @@ class IntegralManager:
             raise ValueError("Got unknown integral object, {type(self.int_obj)}")
         self._overlap = overlap_int
         return overlap_int
+
+    @property
+    def magnetic_field_H(self) -> np.ndarray:
+        # Building the magnetic field Hamiltonian: 
+        nao = self.int_obj.nao
+
+        if self.orig == None:
+            self.orig = (0.0, 0.0, 0.0)
+
+        self.int_obj.set_common_origin(self.orig)
+
+        L = self.int_obj.intor('int1e_cg_irxp')
+
+        L_spinor = np.zeros((3, 2 * nao, 2 * nao), dtype=complex)
+        L_spinor[:, :nao, :nao] = L
+        L_spinor[:, nao:, nao:] = L
+    
+        rr = self.int_obj.intor('int1e_rr').reshape(3, 3, nao, nao)
+        dia_ao = 1/8 * (  (self.B[1]**2 + self.B[2]**2) * rr[0, 0]  + (self.B[0]**2 + self.B[2]**2) * rr[1, 1] 
+                        + (self.B[0]**2 + self.B[1]**2) * rr[2, 2] 
+                        - 2 * self.B[0]*self.B[1] * rr[0,1] - 2 * self.B[1]*self.B[2] * rr[1,2] - 2 * self.B[0]*self.B[2] * rr[0,2]) 
+    
+        H_dia = np.zeros((2 * nao, 2 * nao), dtype=complex)
+        H_dia[:nao, :nao] = dia_ao
+        H_dia[nao:, nao:] = dia_ao
+    
+        ovlp = self.int_obj.intor("int1e_ovlp")
+    
+        sigmaSB = np.zeros((2 * nao, 2 * nao), dtype=complex)
+        sigmaSB[:nao, :nao] =  ovlp * self.B[2]
+        sigmaSB[nao:, nao:] = -ovlp * self.B[2]
+        sigmaSB[:nao, nao:] =  ovlp * self.B[0] - 1j * ovlp * self.B[1]
+        sigmaSB[nao:, :nao] =  ovlp * self.B[0] + 1j * ovlp * self.B[1]
+
+        mf = pyscf.scf.GHF(self.int_obj)
+        hcoreB = mf.get_hcore().astype(complex)
+
+        g_e = 2.00231930436256            # Electronic g-factor
+
+        hcoreB -= 0.5 * 1j * np.einsum('k,kij->ij', self.B, L_spinor)   # Correct
+        hcoreB += H_dia                                                 # Correct 
+        hcoreB += 0.5 * g_e/2 * sigmaSB                                         # Correct
+    
+        return hcoreB
+
+
+    @property
+    def magnetic_field_H_z(self) -> np.ndarray:
+        # Building the magnetic field Hamiltonian: 
+        nao = self.int_obj.nao
+
+        if self.orig == None:
+            self.orig = (0.0, 0.0, 0.0)
+
+        self.int_obj.set_common_origin(self.orig)
+
+        Lz_ao = self.int_obj.intor('int1e_cg_irxp')[2]
+
+        Lz_spinor = np.zeros((2 * nao, 2 * nao), dtype=complex)
+        Lz_spinor[:nao, :nao] = Lz_ao
+        Lz_spinor[nao:, nao:] = Lz_ao
+
+        rr = self.int_obj.intor('int1e_rr').reshape(3, 3, nao, nao)
+        dia_ao = (self.B[2]**2 / 8.0) * (rr[0, 0] + rr[1, 1]) 
+
+        H_dia = np.zeros((2 * nao, 2 * nao), dtype=complex)
+        H_dia[:nao, :nao] = dia_ao
+        H_dia[nao:, nao:] = dia_ao
+
+        sigmaS = np.zeros((2 * nao, 2 * nao), dtype=complex)
+        sigmaS[:nao, :nao] =  self.int_obj.intor("int1e_ovlp")
+        sigmaS[nao:, nao:] = -self.int_obj.intor("int1e_ovlp")
+
+        g_e = 2.00231930436256            # Electronic g-factor
+
+        mf = pyscf.scf.GHF(self.int_obj)
+        hcoreB = mf.get_hcore().astype(complex)
+
+        hcoreB -= 0.5 * self.B[2] * 1j * Lz_spinor       # Correct for field in the z direction
+        hcoreB += H_dia                     # Correct for field in the z direction
+        hcoreB += 0.5 * g_e/2 * self.B[2] * sigmaS         # Correct for field in the z direction? Should there be a spin exchange contribution for cGHF?
+
+        return hcoreB
