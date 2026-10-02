@@ -7,7 +7,7 @@ from qiskit_nature.second_q.mappers import JordanWignerMapper
 from slowquant.qiskit_interface.circuit_wavefunction import WaveFunctionCircuit
 from slowquant.qiskit_interface.interface import QuantumInterface
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
-from slowquant.unitary_coupled_cluster.properties import properties
+from slowquant.unitary_coupled_cluster.properties import Properties
 
 def test_shield_giao_H2_sto3g():
     """
@@ -48,35 +48,35 @@ def test_shield_giao_H2_sto3g():
 
     print("\nNaive")
     # with SQ
-    prop = properties(WF, lr_formulation="naive")
+    prop = Properties(WF, lr_formulation="naive")
     dia, para = prop.get_nuclear_shielding_tensor_giao()
     shield_naive = np.trace(dia + para, axis1=1, axis2=2) / 3
 
     # with QSQ
-    prop = properties(qWF, lr_formulation="naive")
+    prop = Properties(qWF, lr_formulation="naive")
     dia, para = prop.get_nuclear_shielding_tensor_giao()
     shield_qnaive = np.trace(dia + para, axis1=1, axis2=2) / 3
 
     print("\nProjected")
     # with SQ
-    prop = properties(WF, lr_formulation="projected")
+    prop = Properties(WF, lr_formulation="projected")
     dia, para = prop.get_nuclear_shielding_tensor_giao()
     shield_proj = np.trace(dia + para, axis1=1, axis2=2) / 3
 
     # with QSQ
-    prop = properties(qWF, lr_formulation="projected")
+    prop = Properties(qWF, lr_formulation="projected")
     dia, para = prop.get_nuclear_shielding_tensor_giao()
     shield_qproj = np.trace(dia + para, axis1=1, axis2=2) / 3
 
     print("\nStatetransfer")
     # with SQ
-    prop = properties(WF, lr_formulation="statetransfer")
+    prop = Properties(WF, lr_formulation="statetransfer")
     dia, para = prop.get_nuclear_shielding_tensor_giao()
     shield_st = np.trace(dia + para, axis1=1, axis2=2) / 3
 
     print("\nSelfconsistent")
     # with SQ
-    prop = properties(WF, lr_formulation="selfconsistent")
+    prop = Properties(WF, lr_formulation="selfconsistent")
     dia, para = prop.get_nuclear_shielding_tensor_giao()
     shield_sc = np.trace(dia + para, axis1=1, axis2=2) / 3
 
@@ -123,37 +123,37 @@ def test_shield_giao_LiH_sto3g():
         mol,
         QI,
     )
-    qWF.run_wf_optimization_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", False)
 
     print("\nNaive")
     # with SQ
-    prop = properties(WF, lr_formulation="naive")
+    prop = Properties(WF, lr_formulation="naive")
     dia, para = prop.get_nuclear_shielding_tensor_giao()
     shield_naive = np.trace(dia + para, axis1=1, axis2=2) / 3
 
     # with QSQ
-    prop = properties(qWF, lr_formulation="naive")
+    prop = Properties(qWF, lr_formulation="naive")
     dia, para = prop.get_nuclear_shielding_tensor_giao()
     shield_qnaive = np.trace(dia + para, axis1=1, axis2=2) / 3
 
     print("\nProjected")
     # with SQ
-    prop = properties(WF, lr_formulation="projected")
+    prop = Properties(WF, lr_formulation="projected")
     dia, para = prop.get_nuclear_shielding_tensor_giao()
     shield_proj = np.trace(dia + para, axis1=1, axis2=2) / 3
 
     # with QSQ
-    prop = properties(qWF, lr_formulation="projected")
+    prop = Properties(qWF, lr_formulation="projected")
     dia, para = prop.get_nuclear_shielding_tensor_giao()
     shield_qproj = np.trace(dia + para, axis1=1, axis2=2) / 3
 
     print("\nStatetransfer")
-    prop = properties(WF, lr_formulation="statetransfer")
+    prop = Properties(WF, lr_formulation="statetransfer")
     dia, para = prop.get_nuclear_shielding_tensor_giao()
     shield_st = np.trace(dia + para, axis1=1, axis2=2) / 3
 
     print("\nSelfconsistent")
-    prop = properties(WF, lr_formulation="selfconsistent")
+    prop = Properties(WF, lr_formulation="selfconsistent")
     dia, para = prop.get_nuclear_shielding_tensor_giao()
     shield_sc = np.trace(dia + para, axis1=1, axis2=2) / 3
 
@@ -200,15 +200,15 @@ def test_shield_giao_LiH_sto3g_projected_q():
         mol,
         QI,
     )
-    qWF.run_wf_optimization_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", False)
 
     # with SQ
-    prop = properties(WF, lr_formulation="allprojected")
+    prop = Properties(WF, lr_formulation="allprojected")
     dia, para = prop.get_nuclear_shielding_tensor_giao()
     shield_proj = np.trace(dia + para, axis1=1, axis2=2) / 3
 
     # with QSQ
-    prop = properties(qWF, lr_formulation="allprojected")
+    prop = Properties(qWF, lr_formulation="allprojected")
     dia, para = prop.get_nuclear_shielding_tensor_giao()
     shield_qproj = np.trace(dia + para, axis1=1, axis2=2) / 3
 
@@ -216,7 +216,7 @@ def test_shield_giao_LiH_sto3g_projected_q():
 
     print("\nProjected_statetransfer")
     # with SQ
-    prop = properties(WF, lr_formulation="projected_statetransfer")
+    prop = Properties(WF, lr_formulation="projected_statetransfer")
     dia, para = prop.get_nuclear_shielding_tensor_giao()
     shield_st = np.trace(dia + para, axis1=1, axis2=2) / 3
 

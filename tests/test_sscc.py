@@ -7,7 +7,7 @@ from qiskit_nature.second_q.mappers import JordanWignerMapper
 from slowquant.qiskit_interface.circuit_wavefunction import WaveFunctionCircuit
 from slowquant.qiskit_interface.interface import QuantumInterface
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
-from slowquant.unitary_coupled_cluster.properties import properties
+from slowquant.unitary_coupled_cluster.properties import Properties
 
 def test_sscc_H2_sto3g():
     """
@@ -48,35 +48,35 @@ def test_sscc_H2_sto3g():
 
     print("\nNaive")
     # with SQ
-    prop = properties(WF, lr_formulation="naive")
+    prop = Properties(WF, lr_formulation="naive")
     dso, pso, fc, sd = prop.get_spin_spin_coupling_tensor()
     j_naive = np.trace(dso + pso + fc + sd, axis1=1, axis2=2) / 3
 
     # with QSQ
-    prop = properties(qWF, lr_formulation="naive")
+    prop = Properties(qWF, lr_formulation="naive")
     dso, pso, fc, sd = prop.get_spin_spin_coupling_tensor()
     j_qnaive = np.trace(dso + pso + fc + sd, axis1=1, axis2=2) / 3
 
     print("\nProjected")
     # with SQ
-    prop = properties(WF, lr_formulation="projected")
+    prop = Properties(WF, lr_formulation="projected")
     dso, pso, fc, sd = prop.get_spin_spin_coupling_tensor()
     j_proj = np.trace(dso + pso + fc + sd, axis1=1, axis2=2) / 3
 
     # with QSQ
-    prop = properties(qWF, lr_formulation="projected")
+    prop = Properties(qWF, lr_formulation="projected")
     dso, pso, fc, sd = prop.get_spin_spin_coupling_tensor()
     j_qproj = np.trace(dso + pso + fc + sd, axis1=1, axis2=2) / 3
 
     print("\nSelfconsistent")
     # with SQ
-    prop = properties(WF, lr_formulation="selfconsistent")
+    prop = Properties(WF, lr_formulation="selfconsistent")
     dso, pso, fc, sd = prop.get_spin_spin_coupling_tensor()
     j_sc = np.trace(dso + pso + fc + sd, axis1=1, axis2=2) / 3
 
     print("\nStatetransfer")
     # with SQ
-    prop = properties(WF, lr_formulation="statetransfer")
+    prop = Properties(WF, lr_formulation="statetransfer")
     dso, pso, fc, sd = prop.get_spin_spin_coupling_tensor()
     j_st = np.trace(dso + pso + fc + sd, axis1=1, axis2=2) / 3
 
@@ -123,39 +123,39 @@ def test_sscc_LiH_sto3g():
         mol,
         QI,
     )
-    qWF.run_wf_optimization_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", False)
 
     print("\nNaive")
     # with SQ
-    prop = properties(WF, lr_formulation="naive")
+    prop = Properties(WF, lr_formulation="naive")
     dso, pso, fc, sd = prop.get_spin_spin_coupling_tensor()
     j_naive = np.trace(dso + pso + fc + sd, axis1=1, axis2=2) / 3
 
     # with QSQ
-    prop = properties(qWF, lr_formulation="naive")
+    prop = Properties(qWF, lr_formulation="naive")
     dso, pso, fc, sd = prop.get_spin_spin_coupling_tensor()
     j_qnaive = np.trace(dso + pso + fc + sd, axis1=1, axis2=2) / 3
 
     print("\nProjected")
     # with SQ
-    prop = properties(WF, lr_formulation="projected")
+    prop = Properties(WF, lr_formulation="projected")
     dso, pso, fc, sd = prop.get_spin_spin_coupling_tensor()
     j_proj = np.trace(dso + pso + fc + sd, axis1=1, axis2=2) / 3
 
     # with QSQ
-    prop = properties(qWF, lr_formulation="projected")
+    prop = Properties(qWF, lr_formulation="projected")
     dso, pso, fc, sd = prop.get_spin_spin_coupling_tensor()
     j_qproj = np.trace(dso + pso + fc + sd, axis1=1, axis2=2) / 3
 
     print("\nSelfconsistent")
     # with SQ
-    prop = properties(WF, lr_formulation="selfconsistent")
+    prop = Properties(WF, lr_formulation="selfconsistent")
     dso, pso, fc, sd = prop.get_spin_spin_coupling_tensor()
     j_sc = np.trace(dso + pso + fc + sd, axis1=1, axis2=2) / 3
 
     print("\nStatetransfer")
     # with SQ
-    prop = properties(WF, lr_formulation="statetransfer")
+    prop = Properties(WF, lr_formulation="statetransfer")
     dso, pso, fc, sd = prop.get_spin_spin_coupling_tensor()
     j_st = np.trace(dso + pso + fc + sd, axis1=1, axis2=2) / 3
 
@@ -201,16 +201,16 @@ def test_sscc_LiH_sto3g_projected_q():
         mol,
         QI,
     )
-    qWF.run_wf_optimization_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", False)
 
     print("\nAllprojected")
     # with SQ
-    prop = properties(WF, lr_formulation="allprojected")
+    prop = Properties(WF, lr_formulation="allprojected")
     dso, pso, fc, sd = prop.get_spin_spin_coupling_tensor()
     j_proj = np.trace(dso + pso + fc + sd, axis1=1, axis2=2) / 3
 
     # with QSQ
-    prop = properties(qWF, lr_formulation="allprojected")
+    prop = Properties(qWF, lr_formulation="allprojected")
     dso, pso, fc, sd = prop.get_spin_spin_coupling_tensor()
     j_qproj = np.trace(dso + pso + fc + sd, axis1=1, axis2=2) / 3
 
@@ -218,7 +218,7 @@ def test_sscc_LiH_sto3g_projected_q():
 
     print("\nProjected_statetransfer")
     # with SQ
-    prop = properties(WF, lr_formulation="projected_statetransfer")
+    prop = Properties(WF, lr_formulation="projected_statetransfer")
     dso, pso, fc, sd = prop.get_spin_spin_coupling_tensor()
     j_st = np.trace(dso + pso + fc + sd, axis1=1, axis2=2) / 3
 
