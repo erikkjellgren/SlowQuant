@@ -209,7 +209,7 @@ class LinearResponse(LinearResponseBaseClass):
                 self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
                 # Make B
                 # - <CSF| Gd qd Ud H |0>
-                val = -expectation_value(
+                val = - expectation_value(
                         G_ket,
                         [],
                         qdUdH_ket,

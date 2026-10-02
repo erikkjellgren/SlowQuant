@@ -145,7 +145,7 @@ class LinearResponse(LinearResponseBaseClass):
         for j, qJ in enumerate(self.q_ops):
             for i, GI in enumerate(self.G_ops):
                 # Make A
-                # <0| [GId, H, qJ] |0>
+                # <0| [Gd, [H, q]] |0>
                 val = expectation_value(
                     self.wf.ci_coeffs,
                     [double_commutator(GI.dagger, self.H_1i_1a, qJ, do_symmetrized=False)],
@@ -154,7 +154,7 @@ class LinearResponse(LinearResponseBaseClass):
                 )
                 self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
                 # Make B
-                # <0| [GId, H, qJd] |0>
+                # <0| [Gd, [H, qd]] |0>
                 val = expectation_value(
                     self.wf.ci_coeffs,
                     [double_commutator(GI.dagger, self.H_1i_1a, qJ.dagger, do_symmetrized=False)],

@@ -190,7 +190,7 @@ class LinearResponse(LinearResponseBaseClass):
                     *self.index_info_extended,
                 )
                 # Make A
-                # <CSF| Gd Ud [H, q] |0>
+                # <CSF| Gd Ud [H, q] |0> = <CSF| Gd Ud H q |0>, commutator implementation is faster.
                 val = expectation_value(
                     G_ket,
                     [],
@@ -199,7 +199,7 @@ class LinearResponse(LinearResponseBaseClass):
                 )
                 self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
                 # Make B
-                # - <CSF| Gd Ud [qd, H] |0>
+                # - <CSF| Gd Ud [qd, H] |0> = - <CSF| Gd Ud qd H |0>, commutator implementation is faster.
                 val = - expectation_value(
                     G_ket,
                     [],
