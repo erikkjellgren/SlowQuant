@@ -484,18 +484,23 @@ def rotate_determinant_pairs(
             states[state_idx, q] = signed_sin * amplitude_p + cos_theta * amplitude_q
 
 
+# Largest group of determinants build_generator_blocks will diagonalize. The spin-adapted
+# doubles need at most 8, so this only refuses a generator that connects a large part of the
+# CI space at once, which then falls back to its closed form.
 MAX_EXPONENTIAL_BLOCK = 64
 
 # Frequencies S and the weight k of each power of the generator in the closed form of a
 # spin-adapted double, as the branches that used to carry a copy each spelled them. Odd powers
 # are weighted by sin(S*theta) and even ones by cos(S*theta)-1, see spin_adapted_double_weight.
 #
-# The keys name the five cases of 10.48550/arXiv.2505.00883: sa_double_1 is Eq. 14, which
-# reduces to a plain fermionic double and is a pairing, so it never reaches this table.
-# sa_double_2 and sa_double_3 are Eq. 15 and 16, two frequencies and four powers, from Eq. 45
-# and Table I. sa_double_4 is Eq. 17, four frequencies and eight powers, from Eq. 47 and
-# Table II. sa_double_5 is Eq. 18, the triplet-coupled case, five frequencies and ten powers,
-# from Eq. 49 and Table III.
+# The keys are the cases of operators.G2_sa, which map onto the five operators of
+# 10.48550/arXiv.2505.00883 as follows. sa_double_1 (i = j, a = b) is Eq. 14, which reduces to
+# a plain fermionic double and is a pairing, so it never reaches this table. sa_double_2
+# (i = j) is Eq. 16 and sa_double_3 (a = b) is Eq. 15; both have two frequencies and four
+# powers, from Eq. 45 and Table I, which the paper states holds for both. sa_double_4 is
+# Eq. 17, the singlet-coupled case with four distinct indices, four frequencies and eight
+# powers, from Eq. 47 and Table II. sa_double_5 is Eq. 18, the triplet-coupled case, five
+# frequencies and ten powers, from Eq. 49 and Table III.
 #
 # Only reached when the generator cannot be blocked, see build_generator_blocks and
 # spin_factorized_algebra.build_spin_block_layout, since a sweep over the blocks replaces the
@@ -829,12 +834,15 @@ def build_rotation_layout(
     r"""Find the determinant pairs that the exponential of a generator rotates.
 
     An excitation generator :math:`\hat{T} = \hat{\tau} - \hat{\tau}^\dagger` squares to minus a
-    projector, because :math:`\hat{\tau}^\dagger\hat{\tau}` projects onto the determinants the
-    excitation does not annihilate,
+    projector, because :math:`\hat{\tau}^2 = 0` and :math:`\hat{\tau}^\dagger\hat{\tau}`
+    projects onto the determinants the excitation does not annihilate,
 
     .. math::
-        \hat{T}^2 = -\left[\hat{n}_i\left(1-\hat{n}_a\right)
-                         + \hat{n}_a\left(1-\hat{n}_i\right)\right] \equiv -\hat{P}
+        \hat{T}^2 = -\left(\hat{\tau}^\dagger\hat{\tau} + \hat{\tau}\hat{\tau}^\dagger\right)
+                  \equiv -\hat{P},\qquad
+        \text{e.g. }\hat{P} = \hat{n}_i\left(1-\hat{n}_a\right)
+                            + \hat{n}_a\left(1-\hat{n}_i\right)
+        \text{ for }\hat{\tau} = \hat{a}^\dagger_a\hat{a}_i
 
     so that :math:`\hat{T}^3 = -\hat{T}` and the series for the exponential closes,
 
@@ -1109,8 +1117,9 @@ def apply_spin_adapted_double(
         \exp\left(\theta\,{}^\text{SA}\hat{G}\right)
             = \hat{I} + \sum_m c_m\left(\theta\right)\,{}^\text{SA}\hat{G}^m
 
-    which costs one application of the generator per power, four for the cases with two
-    repeated indices, eight for four distinct indices and ten for the triplet-coupled case.
+    which costs one application of the generator per power: four for the two cases with a
+    repeated index, eight for the singlet-coupled case with four distinct indices and ten for
+    the triplet-coupled one, see SPIN_ADAPTED_DOUBLE_SERIES.
 
     It is still block diagonal though, over groups of at most eight determinants, and taking it
     that way costs one sweep instead. Over a spin product the groups are found per spin-string
@@ -1128,8 +1137,10 @@ def apply_spin_adapted_double(
         theta: Ansatz parameter value.
         ci_info: Information about the CI space.
         cache_key: Excitation type and indices naming this generator.
-        in_place: Work on the state handed in rather than a copy of it. Only for a
-                  caller that owns the array.
+        in_place: Let the exponential overwrite the state handed in rather than a copy of it.
+                  Only for a caller that owns the array. The spin-blocked route and the closed
+                  form work in place, the determinant-blocked route returns a new array, so the
+                  result is always the return value.
 
     Returns:
         New state.
@@ -1178,8 +1189,10 @@ def apply_spin_adapted_double_SA(
         theta: Ansatz parameter value.
         ci_info: Information about the CI space.
         cache_key: Excitation type and indices naming this generator.
-        in_place: Work on the state handed in rather than a copy of it. Only for a
-                  caller that owns the array.
+        in_place: Let the exponential overwrite the state handed in rather than a copy of it.
+                  Only for a caller that owns the array. The spin-blocked route and the closed
+                  form work in place, the determinant-blocked route returns a new array, so the
+                  result is always the return value.
 
     Returns:
         New states.
@@ -1263,8 +1276,11 @@ def apply_generator_exponential(
         theta: Ansatz parameter value.
         ci_info: Information about the CI space.
         cache_key: Excitation type and indices naming this generator.
-        in_place: Rotate the state handed in rather than a copy of it. Only for a caller that
-                  owns the array, which the ansatz builders do and propagate_unitary does not.
+        in_place: Let the rotation overwrite the state handed in rather than a copy of it. Only
+                  for a caller that owns the array, which the ansatz builders and
+                  propagate_unitary do. Only the string-rotation route works in place; the
+                  others return a new array, so the result is always the return value and the
+                  array handed in may or may not have been changed.
 
     Returns:
         New state.
@@ -1317,8 +1333,11 @@ def apply_generator_exponential_SA(
         theta: Ansatz parameter value.
         ci_info: Information about the CI space.
         cache_key: Excitation type and indices naming this generator.
-        in_place: Rotate the state handed in rather than a copy of it. Only for a caller that
-                  owns the array, which the ansatz builders do and propagate_unitary does not.
+        in_place: Let the rotation overwrite the state handed in rather than a copy of it. Only
+                  for a caller that owns the array, which the ansatz builders and
+                  propagate_unitary do. Only the string-rotation route works in place; the
+                  others return a new array, so the result is always the return value and the
+                  array handed in may or may not have been changed.
 
     Returns:
         New states.
@@ -1347,7 +1366,15 @@ def apply_generator_exponential_SA(
 
 
 def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bool = False) -> np.ndarray:
-    """Build matrix representation of operator.
+    r"""Build matrix representation of operator.
+
+    .. math::
+        O_{IJ} = \left<I\left|\hat{O}\right|J\right>
+
+    over every pair of determinants of the CI space, so it costs :math:`N_\text{det}^2` and is
+    only for small spaces. It always goes through the determinant kernel and never through
+    spin_factorized_algebra, which is what makes it the independent reference the
+    spin-factorized tests compare against.
 
     Args:
         op: Fermionic number and spin conserving operator.
@@ -1410,9 +1437,10 @@ def propagate_state(
     .. math::
         \left|\tilde{0}\right> = \hat{O}\left|0\right>
 
-    There are two kernels behind this and they must agree bit for bit. When the CI space is a
-    product of an alpha and a beta string space and every string of the operator is :math:`S_z`
-    conserving, the operator factorizes as
+    There are two kernels behind this and they must agree to rounding, which
+    tests/test_spin_factorized_algebra.py holds them to at 1e-12; they sum in different orders,
+    so not bit for bit. When the CI space is a product of an alpha and a beta string space and
+    every string of the operator is :math:`S_z` conserving, the operator factorizes as
     :math:`\hat{O} = \pm\hat{O}_\alpha\otimes\hat{O}_\beta` and is applied per spin, see
     spin_factorized_algebra. That is the fast route and is tried first. A string that changes
     the electron count of a spin, or a CI space that is not a spin product, such as the one
@@ -2158,8 +2186,10 @@ def propagate_unitary(
         ci_info: Information about the CI space.
         thetas: Values for ansatz parameters.
         ups_struct: UPS structure object.
-        in_place: Apply the unitary to the state handed in rather than to a copy of it. Only for
-                  a caller that owns the array, as the gradient's two propagated states are.
+        in_place: Let the unitary overwrite the state handed in rather than a copy of it. Only
+                  for a caller that owns the array, as the gradient's two propagated states are.
+                  Not every route works in place, see apply_generator_exponential, so the result
+                  is always the return value.
 
     Returns:
         State with unitary applied.
@@ -2263,8 +2293,10 @@ def propagate_unitary_SA(
         ci_info: Information about the CI space.
         thetas: Values for ansatz parameters.
         ups_struct: UPS structure object.
-        in_place: Apply the unitary to the state handed in rather than to a copy of it. Only for
-                  a caller that owns the array, as the gradient's two propagated states are.
+        in_place: Let the unitary overwrite the state handed in rather than a copy of it. Only
+                  for a caller that owns the array, as the gradient's two propagated states are.
+                  Not every route works in place, see apply_generator_exponential, so the result
+                  is always the return value.
 
     Returns:
         State with unitary applied.
@@ -2373,9 +2405,9 @@ def apply_generator_once(
     and the sum is over the pieces one ansatz parameter drives, which for a spin-adapted single
     is an alpha and a beta generator.
 
-    Each generator that pairs spin strings goes through that pairing, which is the same map its
-    unitary rotates over and is already cached for it. Anything else falls back to the general
-    operator machinery.
+    When every generator pairs spin strings, each goes through that pairing, which is the same
+    map its unitary rotates over and is already cached for it. If any one of them does not, all
+    of them go through the general operator machinery instead.
 
     #. 10.48550/arXiv.2303.10825, Eq. 36 (v1)
     #. 10.48550/arXiv.2505.00883, Eq. 9 (spin-adapted single as an alpha and a beta generator)
@@ -2580,7 +2612,8 @@ def get_grad_overlap(
     so what the optimizer needs is a number, not the state
     :math:`\hat{T}_i\left|\psi_i\right>`. Where the generator pairs spin strings the overlap is
     summed over the pairs directly, so that state is never formed: forming it would cost a pass
-    to zero it, a pass to fill it and a pass to read it back.
+    to zero it, a pass to fill it and a pass to read it back. The factor of two and, for a state
+    average, the mean over the states are left to the caller.
 
     #. 10.48550/arXiv.2303.10825, Eq. 36 and 37 (v1)
 
