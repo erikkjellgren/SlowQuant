@@ -60,6 +60,11 @@ class CI_Info:
       held per spin string, which does not grow with the number of determinants.
     * rotation_layouts and block_layouts, the same two held per determinant, which is what is
       left when the space is not a spin product.
+
+    #. 10.1016/0009-2614(80)85158-X (alpha and beta strings)
+    #. 10.1063/1.455063 (the CI vector indexed as C(I_alpha, I_beta))
+    #. C. D. Sherrill, An Introduction to Configuration Interaction Theory, Eq. 6.3,
+       https://vergil.chemistry.gatech.edu/static/content/ci.pdf
     """
 
     __slots__ = (

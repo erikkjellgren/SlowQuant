@@ -254,8 +254,12 @@ def accumulate_rdm12(
 
     .. math::
         G_{\left(pq\right)\left(rs\right)}
-            = \left<pq\right.\left|rs\right>,\qquad
-        \Gamma^{[1]}_{pq} = \left<pq\right.\left|0\right>
+            = \left<pq\right.\left|rs\right>
+            = \left<0\left|\hat{E}_{qp}\hat{E}_{rs}\right|0\right>,\qquad
+        \left<pq\right.\left|0\right> = \Gamma^{[1]}_{qp} = \Gamma^{[1]}_{pq}
+
+    the last because the state is real, which makes :math:`\Gamma^{[1]}` symmetric. Note the
+    swapped first pair of indices in :math:`G`, which build_rdm12 undoes.
 
     Holding all :math:`N^2` of those states at once costs :math:`N^2` times the CI vector, which
     is where this used to run out of memory. The inner product runs over determinants though, so
@@ -317,7 +321,14 @@ def build_rdm12(ci_coeffs: np.ndarray, ci_info: CI_Info) -> tuple[np.ndarray, np
                               - \delta_{qr}\Gamma^{[1]}_{ps}
 
     The two-electron element comes out of accumulate_rdm12 as a Gram matrix over orbital pairs,
-    :math:`G_{\left(pq\right)\left(rs\right)} = \left<\hat{E}_{qp}0\right.\left|\hat{E}_{rs}0\right>`,
+
+    .. math::
+        G_{\left(pq\right)\left(rs\right)}
+            = \left<\hat{E}_{pq}0\right.\left|\hat{E}_{rs}0\right>
+            = \left<0\left|\hat{E}_{qp}\hat{E}_{rs}\right|0\right>
+            \quad\Rightarrow\quad
+        \left<0\left|\hat{E}_{pq}\hat{E}_{rs}\right|0\right> = G_{\left(qp\right)\left(rs\right)}
+
     so the first two indices are swapped when it is reshaped and the
     :math:`\delta_{qr}\Gamma^{[1]}_{ps}` term is then subtracted.
 

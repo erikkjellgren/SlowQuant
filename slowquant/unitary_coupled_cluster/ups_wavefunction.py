@@ -1020,18 +1020,29 @@ class WaveFunctionUPS:
             \left<\psi^\prime_j\right| = \left<\psi\right|\hat{H}
                 \prod_{k=N}^{j}\exp\left(\theta_k\hat{T}_k\right)
 
-        the gradient with respect to one ansatz parameter and the step to the next one are
+        the gradient with respect to one ansatz parameter is
 
         .. math::
             \frac{\partial\left<E\right>}{\partial\theta_j}
-                = 2\left<\psi^\prime_{j+1}\right|\hat{T}_j\left|\psi_j\right>,\qquad
-            \left<\psi^\prime_j\right| = \left<\psi^\prime_{j+1}\right|
-                \exp\left(\theta_j\hat{T}_j\right),\quad
-            \left|\psi_{j-1}\right> = \exp\left(-\theta_j\hat{T}_j\right)\left|\psi_j\right>
+                = 2\left<\psi^\prime_{j+1}\right|\hat{T}_j\left|\psi_j\right>
+                = 2\left<\psi^\prime_j\right|\hat{T}_j\left|\psi_{j-1}\right>
+
+        the two forms being equal because :math:`\hat{T}_j` commutes with its own exponential.
+        The reference walks this backwards from :math:`\left|\psi_N\right> = \left|\psi\right>`.
+        The loop here walks it forwards from the CSF instead, starting from
+        :math:`\left|\psi_0\right> = \left|\text{CSF}\right>` and
+        :math:`\left<\psi^\prime_1\right| = \left<\psi\right|\hat{H}\boldsymbol{U}`, which is
+        built once by applying the whole ansatz in reverse to :math:`\hat{H}\left|\psi\right>`,
+        and taking the second form of the gradient before each step
+
+        .. math::
+            \left|\psi_j\right> = \exp\left(\theta_j\hat{T}_j\right)\left|\psi_{j-1}\right>,\qquad
+            \left<\psi^\prime_{j+1}\right| = \left<\psi^\prime_j\right|
+                \exp\left(-\theta_j\hat{T}_j\right)
 
         so every parameter costs two rotations and one overlap, and only two state vectors are
         ever held. The overlap is taken without forming
-        :math:`\hat{T}_j\left|\psi_j\right>`, see get_grad_overlap.
+        :math:`\hat{T}_j\left|\psi_{j-1}\right>`, see get_grad_overlap.
 
         #. 10.48550/arXiv.2303.10825, Eq. 36 and 37 (v1)
 
@@ -1077,7 +1088,7 @@ class WaveFunctionUPS:
             )
             # CSF reference state on ket
             ket_vec = np.copy(self.ref_coeffs)
-            # Calculate analytical derivative w.r.t. each theta using gradient_action function
+            # Calculate analytical derivative w.r.t. each theta using get_grad_overlap
             for i in range(len(self.thetas)):
                 # Derivative action w.r.t. i-th theta on CSF ket, contracted with the bra
                 # directly: the gradient needs the number, not the state.
