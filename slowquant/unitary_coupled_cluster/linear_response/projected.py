@@ -15,7 +15,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     expectation_value,
     propagate_state,
 )
-from slowquant.unitary_coupled_cluster.operators import one_elec_op_0i_0a, hamiltonian_0i_0a
+from slowquant.unitary_coupled_cluster.operators import commutator, one_elec_op_0i_0a, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
@@ -133,12 +133,14 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.rdm1,
             )
         for j, qJ in enumerate(self.q_ops):
-            Hq_ket = propagate_state([self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info)
-            qdH_ket = propagate_state([qJ.dagger * self.H_1i_1a], self.wf.ci_coeffs, *self.index_info)
+            Hq_ket = propagate_state([commutator(self.H_1i_1a, qJ)], self.wf.ci_coeffs, *self.index_info)
+            qdH_ket = propagate_state(
+                [commutator(qJ.dagger, self.H_1i_1a)], self.wf.ci_coeffs, *self.index_info
+            )
             for i, GI in enumerate(self.G_ops):
                 G_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
                 # Make A
-                # <0| Gd H q |0>
+                # <0| Gd [H, q] |0> = <0| Gd H q |0>, commutator implementation is faster.
                 val = expectation_value(
                     G_ket,
                     [],
@@ -147,12 +149,12 @@ class LinearResponse(LinearResponseBaseClass):
                 )
                 self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = val
                 # Make B
-                # - <0| Gd qd H |0>
-                val = - expectation_value(
-                        G_ket,
-                        [],
-                        qdH_ket,
-                        *self.index_info,
+                # - <0| Gd [qd, H] |0> = - <0| Gd qd H |0>, commutator implementation is faster.
+                val = expectation_value(
+                    G_ket,
+                    [],
+                    qdH_ket,
+                    *self.index_info,
                 )
                 self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = val
         for j, GJ in enumerate(self.G_ops):

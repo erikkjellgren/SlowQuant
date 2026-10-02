@@ -15,7 +15,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     expectation_value,
     propagate_state,
 )
-from slowquant.unitary_coupled_cluster.operators import one_elec_op_0i_0a, hamiltonian_0i_0a
+from slowquant.unitary_coupled_cluster.operators import commutator, one_elec_op_0i_0a, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
@@ -131,12 +131,16 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.rdm1,
             )
         for j, qJ in enumerate(self.q_ops):
-            UdHq_ket = propagate_state(["Ud", self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info)
-            UdqdH_ket = propagate_state(["Ud", qJ.dagger * self.H_1i_1a], self.wf.ci_coeffs, *self.index_info)
+            UdHq_ket = propagate_state(
+                ["Ud", commutator(self.H_1i_1a, qJ)], self.wf.ci_coeffs, *self.index_info
+            )
+            UdqdH_ket = propagate_state(
+                ["Ud", commutator(qJ.dagger, self.H_1i_1a)], self.wf.ci_coeffs, *self.index_info
+            )
             for i, GI in enumerate(self.G_ops):
                 G_ket = propagate_state([GI], self.wf.csf_coeffs, *self.index_info)
                 # Make A
-                # <CSF| Gd Ud H q |0>
+                # <CSF| Gd Ud [H, q] |0> = <CSF| Gd Ud H q |0>, commutator implementation is faster.
                 val = expectation_value(
                     G_ket,
                     [],
@@ -145,7 +149,7 @@ class LinearResponse(LinearResponseBaseClass):
                 )
                 self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = val
                 # Make B
-                # - <CSF| Gd Ud qd H |0>
+                # - <CSF| Gd Ud [qd, H] |0> = - <CSF| Gd Ud qd H |0>, commutator implementation is faster.
                 val = - expectation_value(
                         G_ket,
                         [],
