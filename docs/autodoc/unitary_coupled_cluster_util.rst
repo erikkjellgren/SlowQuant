@@ -10,6 +10,12 @@ Unitary Coupled Cluster Util
 .. automodule:: slowquant.unitary_coupled_cluster.operator_state_algebra
     :members:
 
+.. automodule:: slowquant.unitary_coupled_cluster.spin_factorized_algebra
+    :members:
+
+.. automodule:: slowquant.unitary_coupled_cluster.spin_ordering
+    :members:
+
 .. automodule:: slowquant.unitary_coupled_cluster.operators
     :members:
 
