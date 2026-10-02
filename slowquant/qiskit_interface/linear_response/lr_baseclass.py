@@ -412,12 +412,13 @@ class quantumLRBaseClass:
 
         return norms
 
-    def get_property_gradient(self, int1e: np.ndarray, int2e: np.ndarray | None = None) -> np.ndarray:
+    def get_property_gradient(self, int1e: np.ndarray, int2e: np.ndarray | None = None, spin: bool = False) -> np.ndarray:
         """Calculate property gradient.
 
         Args:
             int1e: one-electron property integrals in MO basis.
             int2e: two-electron property integrals in MO basis.
+            spin: if the operator generated from the integrals contains spin.
 
         Returns:
             Property gradient.
@@ -439,7 +440,7 @@ class quantumLRBaseClass:
             )
 
         osc_strs = np.zeros(len(self.excitation_energies))
-        prop_grad = self.get_property_gradient(one_electron_integral_transform(self.wf.c_mo, self.wf.int_gen.electric_dipole))
+        prop_grad = self.get_property_gradient(one_electron_integral_transform(self.wf.c_mo, self.wf.int_gen.electric_dipole), spin = False)
 
         for idx, excitation_energy in enumerate(
             self.excitation_energies

@@ -268,12 +268,13 @@ class LinearResponse(LinearResponseBaseClass):
                 if i == j:
                     self.Sigma[i + idx_shift, j + idx_shift] = 1
 
-    def get_property_gradient(self, int1e: np.ndarray, int2e: np.ndarray | None = None) -> np.ndarray:
+    def get_property_gradient(self, int1e: np.ndarray, int2e: np.ndarray | None = None, spin: bool = False) -> np.ndarray:
         """Calculate property gradient.
 
         Args:
             int1e: one-electron property integrals in MO basis.
             int2e: two-electron property integrals in MO basis.
+            spin: if the operator generated from the integrals contains spin.
 
         Returns:
             Property gradient.
@@ -302,7 +303,7 @@ class LinearResponse(LinearResponseBaseClass):
         for mu, int1e_mu in enumerate(int1e):
             # Orbital response part
             if int2e is None:
-                op = one_elec_op_1i_1a(int1e_mu, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs, self.triplet)
+                op = one_elec_op_1i_1a(int1e_mu, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs, spin)
             else:
                 op = hamiltonian_1i_1a(int1e_mu, int2e[mu], self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs)
             Udop_ket = propagate_state(["Ud", op], self.ci_coeffs, *self.index_info_extended)
@@ -327,7 +328,7 @@ class LinearResponse(LinearResponseBaseClass):
 
             # Excitation response part
             if int2e is None:
-                op = one_elec_op_0i_0a(int1e_mu, self.wf.num_inactive_orbs, self.wf.num_active_orbs, triplet=self.triplet)
+                op = one_elec_op_0i_0a(int1e_mu, self.wf.num_inactive_orbs, self.wf.num_active_orbs, spin)
             else:
                 op = hamiltonian_0i_0a(int1e_mu, int2e[mu], self.wf.num_inactive_orbs, self.wf.num_active_orbs)
             Udop_ket = propagate_state(["Ud", op], self.ci_coeffs, *self.index_info_extended)

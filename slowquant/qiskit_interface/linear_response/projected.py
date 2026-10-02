@@ -507,12 +507,13 @@ class quantumLR(quantumLRBaseClass):
         self._analyze_std(A, B, Sigma, verbose=verbose, cv=cv, save=save)
         return A, B, Sigma
 
-    def get_property_gradient(self, int1e: np.ndarray, int2e: np.ndarray | None = None) -> np.ndarray:
+    def get_property_gradient(self, int1e: np.ndarray, int2e: np.ndarray | None = None, spin: bool = False) -> np.ndarray:
         """Calculate property gradient.
 
         Args:
             int1e: one-electron property integrals in MO basis.
             int2e: two-electron property integrals in MO basis.
+            spin: if the operator generated from the integrals contains spin.
 
         Returns:
             Property gradient.
@@ -538,7 +539,7 @@ class quantumLR(quantumLRBaseClass):
         idx_shift_q = len(self.q_ops)
         V = np.zeros((len(self.q_ops + self.G_ops), len(int1e)))
 
-        if len(self.q_ops) != 0:
+        if len(self.q_ops) != 0 and spin == self.triplet:
             # Orbital response part
             V[:idx_shift_q, :] = get_orbital_response_property_gradient_1e(
                 int1e,
@@ -561,7 +562,7 @@ class quantumLR(quantumLRBaseClass):
         # Excitation response part
         for mu, int1e_mu in enumerate(int1e):
             if int2e is None:
-                op = one_elec_op_0i_0a(int1e_mu, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.triplet)
+                op = one_elec_op_0i_0a(int1e_mu, self.wf.num_inactive_orbs, self.wf.num_active_orbs, spin)
             else:
                 op = hamiltonian_0i_0a(int1e_mu, int2e[mu], self.wf.num_inactive_orbs, self.wf.num_active_orbs)
             for idx, G in enumerate(self.G_ops):

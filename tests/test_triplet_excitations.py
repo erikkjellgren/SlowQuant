@@ -49,27 +49,27 @@ def test_H2_sto3g_triplet():
     # Linear Response
     print("\nNaive")
     prop = Properties(WF, "naive")
-    excita_naive = prop.get_excitation_energies(triplet=True)
+    excita_naive, _ = prop.get_excitation_energies(triplet=True, osc_strs=True)
 
     # with qLR
     prop = Properties(qWF, "naive")
-    excita_qnaive = prop.get_excitation_energies(triplet=True)
+    excita_qnaive, _ = prop.get_excitation_energies(triplet=True, osc_strs=True)
 
     print("\nProjected")
     prop = Properties(WF, "proj")
-    excita_proj = prop.get_excitation_energies(triplet=True)    
+    excita_proj, _ = prop.get_excitation_energies(triplet=True, osc_strs=True)    
 
     # with qLR
     prop = Properties(qWF, "proj")
-    excita_qproj = prop.get_excitation_energies(triplet=True) 
+    excita_qproj, _ = prop.get_excitation_energies(triplet=True, osc_strs=True) 
 
     print("\nSelfconsistent")
     prop = Properties(WF, "sc")
-    excita_sc = prop.get_excitation_energies(triplet=True)
+    excita_sc, _ = prop.get_excitation_energies(triplet=True, osc_strs=True)
 
     print("\nStatetransfer")
     prop = Properties(WF, "st")
-    excita_st = prop.get_excitation_energies(triplet=True)
+    excita_st, _ = prop.get_excitation_energies(triplet=True, osc_strs=True)
 
     excita = np.array([excita_naive, excita_qnaive, excita_proj, excita_qproj, excita_sc, excita_st])
 
@@ -121,27 +121,27 @@ def test_LiH_sto3g_triplet():
     # Linear Response
     print("\nNaive")
     prop = Properties(WF, "naive")
-    excita_naive = prop.get_excitation_energies(triplet=True)
+    excita_naive, _ = prop.get_excitation_energies(triplet=True, osc_strs=True)
 
     # with qLR
     prop = Properties(qWF, "naive")
-    excita_qnaive = prop.get_excitation_energies(triplet=True)
+    excita_qnaive, _ = prop.get_excitation_energies(triplet=True, osc_strs=True)
 
     print("\nProjected")
     prop = Properties(WF, "proj")
-    excita_proj = prop.get_excitation_energies(triplet=True)   
+    excita_proj, _ = prop.get_excitation_energies(triplet=True, osc_strs=True)   
 
     # with qLR
     prop = Properties(qWF, "proj")
-    excita_qproj = prop.get_excitation_energies(triplet=True)  
+    excita_qproj, _ = prop.get_excitation_energies(triplet=True, osc_strs=True)  
 
     print("\nSelfconsistent")
     prop = Properties(WF, "sc")
-    excita_sc = prop.get_excitation_energies(triplet=True)
+    excita_sc, _ = prop.get_excitation_energies(triplet=True, osc_strs=True)
 
     print("\nStatetransfer")
     prop = Properties(WF, "st")
-    excita_st = prop.get_excitation_energies(triplet=True)
+    excita_st, _ = prop.get_excitation_energies(triplet=True, osc_strs=True)
 
     excita = np.array([excita_naive, excita_qnaive, excita_proj, excita_qproj, excita_sc, excita_st])
 
@@ -204,15 +204,15 @@ def test_LiH_sto3g_triplet_proj_q():
     # Linear Response
     print("\nAllprojected")
     prop = Properties(WF, "allproj")
-    excita_allproj = prop.get_excitation_energies(triplet=True)
+    excita_allproj, _ = prop.get_excitation_energies(triplet=True, osc_strs=True)
 
     # with qLR
     prop = Properties(qWF, "allproj")
-    excita_qallproj = prop.get_excitation_energies(triplet=True)
+    excita_qallproj, _ = prop.get_excitation_energies(triplet=True, osc_strs=True)
 
     print("\nProjected-statetransfer")
     prop = Properties(WF, "projst")
-    excita_projst = prop.get_excitation_energies(triplet=True)
+    excita_projst, _ = prop.get_excitation_energies(triplet=True, osc_strs=True)
 
     excita = np.array([excita_allproj, excita_qallproj, excita_projst])
 

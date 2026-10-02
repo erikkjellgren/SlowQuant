@@ -216,7 +216,8 @@ class Properties():
             one_electron_integral_transform(
                 self.wf.c_mo,
                 self.wf.int_gen.electric_dipole,
-            )
+            ),
+            spin = False
         )
         
         if freq == 0:
@@ -277,7 +278,8 @@ class Properties():
                 one_electron_integral_transform(
                     self.wf.c_mo,
                     self.wf.int_gen.orbital_paramagnetic(origin),
-                )
+                ),
+                spin = False
             )
             response_vector = scipy.linalg.solve(self.LR_singlet.hessian, property_gradient)
 
@@ -286,7 +288,8 @@ class Properties():
                 one_electron_integral_transform(
                     self.wf.c_mo,
                     self.wf.int_gen.angular_momentum(origin),
-                )
+                ),
+                spin = False
             )
             # Paramagnetic shielding tensor
             para_shield[i,:,:] -= np.einsum('ix,iy->xy', response_vector, property_gradient)
@@ -351,7 +354,7 @@ class Properties():
             dia_shield[i,:,:] = np.array(dia_i).reshape((3,3))
             
             # PSO
-            property_gradient = self.LR_singlet.get_property_gradient(pso_mo)
+            property_gradient = self.LR_singlet.get_property_gradient(pso_mo, spin = False)
             response_vector = scipy.linalg.solve(self.LR_singlet.hessian, property_gradient)
 
             # Anguar Momentum
@@ -370,6 +373,7 @@ class Properties():
             property_gradient = self.LR_singlet.get_property_gradient(
                 int1e = h1mo,
                 int2e = g1mo,
+                spin = False,
             )
             # Paramagnetic shielding tensor
             para_shield[i,:,:] -= np.einsum('ix,iy->xy', response_vector, property_gradient)
@@ -432,7 +436,8 @@ class Properties():
                     one_electron_integral_transform(
                         self.wf.c_mo,
                         self.wf.int_gen.orbital_paramagnetic(atoms[i,:]),
-                    )
+                    ),
+                    spin = False
                 )
             )
 
@@ -460,7 +465,8 @@ class Properties():
                     one_electron_integral_transform(
                         self.wf.c_mo,
                         self.wf.int_gen.fermi_contact(atoms[i,:]),
-                    )
+                    ),
+                    spin = True
                 )
             )
 
@@ -490,7 +496,8 @@ class Properties():
                     one_electron_integral_transform(
                         self.wf.c_mo,
                         self.wf.int_gen.spin_dipolar_fermi_contact(atoms[i,:]),
-                    )
+                    ),
+                    spin = True
                 ).reshape(-1, 3, 3)
             )
 
