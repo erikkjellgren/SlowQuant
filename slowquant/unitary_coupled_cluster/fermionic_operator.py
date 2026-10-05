@@ -373,8 +373,25 @@ class FermionicOperator:
                 remapping[2 * i + 1 - 2 * num_orbs] = i
         for op_key in self.operators.keys():
             qiskit_str = operator_to_qiskit_key(op_key, remapping)
-            qiskit_form[qiskit_str] = self.operators[op_key]
+            qiskit_form[qiskit_str] = float((self.operators[op_key]).real)
         return qiskit_form
+    
+    def get_qiskit_form_real(self, num_orbs: int) -> dict[str, float | complex]: 
+        """Get fermionic operator on qiskit form. 
+        
+        Args: num_orbs: Number of spatial orbitals. 
+        
+        Returns: Fermionic operators on qiskit form. """
+
+        qiskit_form = {} 
+        remapping = {} #  Map indices from alpha,beta,alpha,beta to alpha,alpha,beta,beta. 
+        for i in range(2 * num_orbs): 
+            if i < num_orbs: remapping[2 * i] = i 
+            else: remapping[2 * i + 1 - 2 * num_orbs] = i 
+        for op_key in self.operators.keys(): 
+            qiskit_str = operator_to_qiskit_key(op_key, remapping) 
+            qiskit_form[qiskit_str] = float((self.operators[op_key]).real) 
+            return qiskit_form    
 
     def get_folded_operator(
         self, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int
