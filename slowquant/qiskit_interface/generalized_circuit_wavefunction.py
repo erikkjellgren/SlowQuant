@@ -15,6 +15,7 @@ from qiskit.quantum_info import SparsePauliOp
 from slowquant.molecularintegrals.integralfunctions import (
     generalized_one_electron_transform,
     generalized_two_electron_transform,
+    DHF_one_electron_transform,
 )
 from slowquant.qiskit_interface.generalized_interface import QuantumInterface
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
@@ -173,12 +174,13 @@ class GeneralizedWaveFunctionCircuit:
                             self.kappa_redundant_spin_idx.append((P, Q))
                             continue
                     if P in self.active_unocc_spin_idx and Q in self.active_unocc_spin_idx:
-                        self._kappa_real_redundant.append(0.0)
-                        self._kappa_imag_redundant.append(0.0)
-                        self._kappa_real_redundant_old.append(0.0)
-                        self._kappa_imag_redundant_old.append(0.0)
-                        self.kappa_redundant_spin_idx.append((P, Q))
-                        continue
+                        if P != Q:
+                            self._kappa_real_redundant.append(0.0)
+                            self._kappa_imag_redundant.append(0.0)
+                            self._kappa_real_redundant_old.append(0.0)
+                            self._kappa_imag_redundant_old.append(0.0)
+                            self.kappa_redundant_spin_idx.append((P, Q))
+                            continue
                 if not (P in self.active_spin_idx and Q in self.active_spin_idx):
                     self.kappa_no_activeactive_spin_idx.append((P, Q))
                     self.kappa_no_activeactive_spin_idx_dagger.append((Q, P))
@@ -272,7 +274,8 @@ class GeneralizedWaveFunctionCircuit:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._h_mo is None:
-            self._h_mo = generalized_one_electron_transform(self.c_mo, self._h_ao)
+            #self._h_mo = generalized_one_electron_transform(self.c_mo, self._h_ao)
+            self._h_mo = DHF_one_electron_transform(self.c_mo, self._h_ao)
         return self._h_mo
 
     @property

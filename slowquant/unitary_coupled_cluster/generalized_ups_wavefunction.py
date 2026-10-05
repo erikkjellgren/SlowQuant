@@ -65,9 +65,11 @@ class GeneralizedWaveFunctionUPS:
         integral_generator: SlowQuant | pyscf.gto.mole.Mole,
         ansatz: str,
         do_x2c: bool = False,
-        ecp : bool = False,
         ansatz_options: dict[str, Any] | None = None,
         include_active_kappa: bool = False,
+        ecp : bool = False,
+        B : list = None,
+        orig : tuple = None,
     ) -> None:
         """Initialize for UPS wave function.
 
@@ -99,9 +101,14 @@ class GeneralizedWaveFunctionUPS:
         #         f"More active electrons than total electrons. Got {np.sum(cas[0])} active electrons, and {num_elec} total electrons."
         #     )
         # Init stuff
-        self.x2c=do_x2c #AE added this
+        self.x2c = do_x2c #AE added this
         self.ecp = ecp
-        self.int_gen: IntegralManager = IntegralManager(integral_generator, x2c=do_x2c, ecp = ecp)
+        # Magnetic field Hamiltonian:
+        if B:
+            B = np.array(B) * 4.254e-6
+        self.B = B
+        self.orig = orig
+        self.int_gen: IntegralManager = IntegralManager(integral_generator, x2c=self.x2c, ecp = self.ecp, B = self.B, orig = self.orig)
         self._c_mo = np.copy(mo_coeffs).astype(np.complex128)
         # self._h_ao = h_ao
         # self._g_ao = g_ao
@@ -208,7 +215,6 @@ class GeneralizedWaveFunctionUPS:
                             self._kappa_imag_old.append(0.0)
                             self.kappa_spin_idx.append((P, Q))
                         continue
-
                 if include_active_kappa: #AE  correction..
                     if P in self.active_unocc_spin_idx and Q in self.active_unocc_spin_idx:
                         if P != Q:
@@ -349,6 +355,7 @@ class GeneralizedWaveFunctionUPS:
             self._thetas_real = np.zeros(self.ups_layout.n_params, dtype=float).tolist()
             self._thetas_imag = np.zeros(self.ups_layout.n_params, dtype=float).tolist()
 
+
     @property
     def kappa_real(self) -> list[float]:
         """Get real orbital rotation parameters."""
@@ -475,8 +482,10 @@ class GeneralizedWaveFunctionUPS:
         """
         if self._h_mo is None:
 
-
-            self._h_mo = generalized_one_electron_transform(self.c_mo, self.int_gen.h_ao, x2c=self.int_gen.x2c) #AE self._h_ao
+            if self.B:
+                self._h_mo = DHF_one_electron_transform(self.c_mo, self.int_gen.magnetic_field_H)
+            else:
+                self._h_mo = generalized_one_electron_transform(self.c_mo, self.int_gen.h_ao, x2c=self.int_gen.x2c) #AE self._h_ao
             #self._h_mo = DHF_one_electron_transform(self.c_mo, self._h_ao)
             #self._h_mo = generalized_one_electron_transform(self.c_mo, self._h_ao)
         return self._h_mo
@@ -970,6 +979,8 @@ class GeneralizedWaveFunctionUPS:
         maxiter: int = 1000,
         grad_threshold: float = 1e-5,
         orbital_optimization: bool = False,
+        maxiter_1step: int = 1000,
+        tol: float = 1e-10,
     ) -> None:
         """Do ADAPT optimization.
 
@@ -1054,6 +1065,8 @@ class GeneralizedWaveFunctionUPS:
             if np.max(np.abs(grad)) < grad_threshold:
                 break
             max_arg = np.argmax(np.abs(grad))
+            #print("gradient element", grad[max_arg])
+            #print("absolute value of gradient element", np.abs(grad[max_arg]))
             self.ups_layout.excitation_indices.append(excitation_pool[max_arg])
             self.ups_layout.excitation_operator_type.append(excitation_pool_type[max_arg])
             self.ups_layout.n_params += 1
@@ -1062,8 +1075,9 @@ class GeneralizedWaveFunctionUPS:
             self._thetas_imag.append(0.0)
             # print("running 1step")
             self.run_wf_optimization_1step(
-                "l-bfgs-b", orbital_optimization=orbital_optimization, is_silent=False
+                "l-bfgs-b", orbital_optimization=orbital_optimization, tol = tol, maxiter = maxiter_1step, is_silent=False
             )
+            #print("thetas", self.thetas)
             time_str = f"{time.time() - start:7.2f}"
             e_str = f"{self.energy_elec:3.12f}"
             grad_str = f"{np.abs(grad[max_arg]):3.12f}"

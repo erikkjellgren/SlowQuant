@@ -470,7 +470,6 @@ def fUCC(
     for _ in range(n_layers):
         if do_S:
             for a, i in iterate_t1(occ_spin_idx, unocc_spin_idx, is_spin_conserving=is_spin_conserving):
-                #print(i,a)
                 qc = single_excitation_generalized(i, a, num_spin_orbs, qc, Parameter(f"norm{idx:09d}"), Parameter(f"phi{idx:09d}"), mapper)
                 grad_param_R_r[f"norm{idx:09d}"] = 2
                 grad_param_R_phi[f"phi{idx:09d}"] = 2

@@ -252,3 +252,88 @@ def generalized_one_elec_op_0i_0a(ints_mo: np.ndarray, num_inactive_orbs: int, n
     return one_elec_op
 
 
+
+
+# Modify hcore for PySCF GHF to include an external magnetic field:
+def get_HcoreB(mf, mol, B, orig = None):
+    # Building the magnetic field Hamiltonian: 
+    nao = mol.nao
+
+    if orig == None:
+        orig = (0, 0, 0)
+
+    B = np.array(B) * 4.254e-6
+
+    mol.set_common_origin(orig)
+
+    L = mol.intor('int1e_cg_irxp')
+
+    L_spinor = np.zeros((3, 2 * nao, 2 * nao), dtype=complex)
+    L_spinor[:, :nao, :nao] = L
+    L_spinor[:, nao:, nao:] = L
+
+    rr = mol.intor('int1e_rr').reshape(3, 3, nao, nao)
+    dia_ao = 1/8 * (  (B[1]**2 + B[2]**2) * rr[0, 0]  + (B[0]**2 + B[2]**2) * rr[1, 1] 
+                    + (B[0]**2 + B[1]**2) * rr[2, 2] 
+                    - 2 * B[0]*B[1] * rr[0,1] - 2 * B[1]*B[2] * rr[1,2] - 2 * B[0]*B[2] * rr[0,2]) 
+
+    H_dia = np.zeros((2 * nao, 2 * nao), dtype=complex)
+    H_dia[:nao, :nao] = dia_ao
+    H_dia[nao:, nao:] = dia_ao
+
+    ovlp = mol.intor("int1e_ovlp")
+
+    sigmaSB = np.zeros((2 * nao, 2 * nao), dtype=complex)
+    sigmaSB[:nao, :nao] =  ovlp * B[2]
+    sigmaSB[nao:, nao:] = -ovlp * B[2]
+    sigmaSB[:nao, nao:] =  ovlp * B[0] - 1j * ovlp * B[1]
+    sigmaSB[nao:, :nao] =  ovlp * B[0] + 1j * ovlp * B[1]
+
+    g_e = 2.00231930436256            # Electronic g-factor
+
+    hcoreB = - 0.5 * 1j * np.einsum('k,kij->ij', B, L_spinor)   # Correct
+    hcoreB += H_dia                                             # Correct 
+    hcoreB += 0.5 * g_e/2 * sigmaSB                                     # Correct
+
+    return hcoreB
+
+
+def get_HcoreB_z(mf, mol, Bz, orig = None):
+        # Building the magnetic field Hamiltonian: 
+        nao = mol.nao
+
+        if orig == None:
+            orig = (0.0, 0.0, 0.0)
+
+        mol.set_common_origin(orig)
+
+        Bz *= 4.254e-6
+
+        Lz_ao = mol.intor('int1e_cg_irxp')[2]
+
+        Lz_spinor = np.zeros((2 * nao, 2 * nao), dtype=complex)
+        Lz_spinor[:nao, :nao] = Lz_ao
+        Lz_spinor[nao:, nao:] = Lz_ao
+
+        rr = mol.intor('int1e_rr').reshape(3, 3, nao, nao)
+        dia_ao = (Bz**2 / 8.0) * (rr[0, 0] + rr[1, 1]) 
+
+        H_dia = np.zeros((2 * nao, 2 * nao), dtype=complex)
+        H_dia[:nao, :nao] = dia_ao
+        H_dia[nao:, nao:] = dia_ao
+
+        sigmaS = np.zeros((2 * nao, 2 * nao), dtype=complex)
+        sigmaS[:nao, :nao] =  mol.intor("int1e_ovlp")
+        sigmaS[nao:, nao:] = -mol.intor("int1e_ovlp")
+
+        # g_e = 2.00231930436256            # Electronic g-factor, Do I need this?
+
+        hcoreB = -0.5 * Bz * 1j * Lz_spinor       # Correct for field in the z direction
+        hcoreB += H_dia                           # Correct for field in the z direction
+        hcoreB += 0.5 * Bz * sigmaS               # Correct for field in the z direction? Should there be a spin exchange contribution for cGHF?
+
+        return hcoreB
+
+
+
+

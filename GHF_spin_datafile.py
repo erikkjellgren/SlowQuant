@@ -52,16 +52,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     method = "fUCCSD"
     spin_consv = False
     active_k = True
-    orb_opt = True
-    optimizer = "l-bfgs-b"
-    rd_seed = 42
-    bounds = [-0.5,0.5]
-    tolerance = 1e-10
     nl = 1
-    max_iter = 10000
 
 
-    data = np.load("data_N3_UCCSD_04.npz")
+    data = np.load("data_H7_UCCSD_03.npz")
 
     c_mo, thetas_real, thetas_imag = data["c_mo"], data["thetas_real"], data["thetas_imag"]
 
@@ -80,8 +74,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Largest imaginary element of thetas:",np.max(np.abs(WF.thetas_imag)))
 
 
-    # print("Final electronic energy:", WF.energy_elec)
-    # WF.spin_analysis()
+    print("Final electronic energy:", WF.energy_elec)
+    WF.spin_analysis()
 
 
 
@@ -182,4 +176,4 @@ def h8():
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
 
-N3()
+h7()
