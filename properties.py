@@ -10,12 +10,8 @@ from scipy.linalg import expm
 from pathlib import Path
 import os
 
-
-
-# from pyscf.x2c.x2c import dip_moment
-
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
-from slowquant.unitary_coupled_cluster.generalized_ucc_wavefunction import GeneralizedWaveFunctionUCC
+# from slowquant.unitary_coupled_cluster.generalized_ucc_wavefunction import GeneralizedWaveFunctionUCC
 from slowquant.unitary_coupled_cluster.linear_response import generalized_naive, naive
 from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import generalized_expectation_value, generalized_propagate_state
 from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a, generalized_hamiltonian_1i_1a, generalized_one_elec_op_0i_0a
@@ -37,7 +33,6 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     mf = scf.GHF(mol)
 
 
-
     mf.conv_tol = 1e-10 #energy tolerance from PYSCF
     mf.conv_tol_grad = 1e-8 #gradient tolerance form PYSCF
 
@@ -49,6 +44,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     coeff=np.array(mf.mo_coeff, dtype=complex)
     e_nuc=mf.energy_nuc()
 
+
+    # # load data
+    # data = np.load("HF_oogtups2_6e8o_0_gtups_00.npz")
+    # c_mo, thetas_real, thetas_imag = data["c_mo"], data["thetas_real"], data["thetas_imag"]
+    # coeff=np.array(c_mo, dtype=complex)
 
 
     WF =GeneralizedWaveFunctionUPS(
@@ -62,43 +62,43 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         include_active_kappa=True,
     )
 
-    ny_theta_real = np.random.uniform(-0.05, 0.05, len(WF.thetas))
-    ny_theta_imag = [0.0] * len(WF.thetas)
+    # ny_theta_real = np.random.uniform(-0.05, 0.05, len(WF.thetas))
+    # ny_theta_imag = [0.0] * len(WF.thetas)
 
-    WF.set_thetas(ny_theta_real, ny_theta_imag)
+    # WF.set_thetas(ny_theta_real, ny_theta_imag)
 
-    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
+    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=False, tol=1e-10, maxiter = 2000)
 
-    #Saving the data:
-    directory = os.getcwd()
-    name = "HF_oofuccsd_6e8o_NR" #Rememember to give the run a name
+    # #Saving the data:
+    # directory = os.getcwd()
+    # name = "HF_gtups_6e8o_NR" #Rememember to give the run a name
 
-    # Saving the data:
-    j,k = 0,0
-    while j < 100:
-        if j < 10:
-            if os.path.exists("%s/%s_UCCSD_0%s.npz" % (directory, name, j)):
-                k = j + 1
-        else:
-            if os.path.exists("%s/%s_UCCSD_%s.npz" % (directory, name, j)):
-                k = j +1
-        j += 1
+    # # Saving the data:
+    # j,k = 0,0
+    # while j < 100:
+    #     if j < 10:
+    #         if os.path.exists("%s/%s_UCCSD_0%s.npz" % (directory, name, j)):
+    #             k = j + 1
+    #     else:
+    #         if os.path.exists("%s/%s_UCCSD_%s.npz" % (directory, name, j)):
+    #             k = j +1
+    #     j += 1
 
-    if k < 10:
-        k = f"0{k}"
+    # if k < 10:
+    #     k = f"0{k}"
 
-    data_file_UCCSD = Path("%s_UCCSD_%s.npz" % (name, k))
+    # data_file_UCCSD = Path("%s_UCCSD_%s.npz" % (name, k))
 
-    print("\nName of the fUCCSD data file:", data_file_UCCSD)
+    # print("\nName of the fUCCSD data file:", data_file_UCCSD)
 
-    np.savez(
-        data_file_UCCSD,
-        c_mo=WF.c_mo,
-        thetas_real=WF.thetas_real,
-        thetas_imag=WF.thetas_imag
-        )
+    # np.savez(
+    #     data_file_UCCSD,
+    #     c_mo=WF.c_mo,
+    #     thetas_real=WF.thetas_real,
+    #     thetas_imag=WF.thetas_imag
+    #     )
 
-    print('Calc energy',WF._energy_elec)
+    # print('Calc energy',WF._energy_elec)
     print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
 
     # print('Optimized thetas', WF.thetas)
@@ -406,19 +406,18 @@ def build_x2c_pc_operator_efg(mf, mol, atom_idx, c, x2c=False, picture_change=Fa
                     efg_ao = (
                         xmol.intor("int1e_ipiprinv")
                         + xmol.intor("int1e_ipiprinv").transpose(0, 2, 1)
-                        + 2 * xmol.intor("int1e_iprinvip")
+                        + 2 * xmol.intor("int1e_iprinvip")  ### Da LL komponenten er reel kan vi bare tage den transponerede af xmol.intor("int1e_ipiprinv")
                     )  # (9, nao_x, nao_x)
                     f2_LL_spinor = np.array([block_diagonal_matrix(x) for x in efg_ao])  # (9, 2*nao_x, 2*nao_x)
-                    # f2_SS = xmol.intor("int1e_ipsprinvspip").reshape(9, 4, nao_x, nao_x)
 
                     # ÆNDRET: transponeringen lægges til EFTER _sigma_dot2 (A + A†),
                     # så spin-bane-komponenterne får korrekt fortegn
-                    efg_ao_ss= (xmol.intor("int1e_ipipsprinvsp") + xmol.intor("int1e_ipsprinvspip")).reshape(9, 4, nao_x, nao_x)
+                    efg_ao_ss= (xmol.intor("int1e_ipipsprinvsp") + xmol.intor("int1e_ipsprinvspip")).reshape(9, 4, nao_x, nao_x) #4 reelle matricer, qx,qy,qz,q0 for hvor efg komponent (der er 9). Fortæller hvor meget af hver pauli matrix er tilstede. De virker på basis funktionerne.
                     
                     f2_SS_spinor = []
                     for k in range(9):
-                        A = _sigma_dot2(efg_ao_ss[k])
-                        f2_SS_spinor.append((A + A.conj().T) * (0.5/c)**2)
+                        A = _sigma_dot2(efg_ao_ss[k]) #sætter de 4 reelle integraler og i på plads
+                        f2_SS_spinor.append((A + A.conj().T) * (0.5/c)**2) #tager den complex konjugerede + adding 1/2c * 1/2c for hver small component basis func.
                     f2_SS_spinor = np.array(f2_SS_spinor)
 
                     ao_efg = mf.with_x2c.picture_change((f2_LL_spinor, f2_SS_spinor)) 
@@ -469,9 +468,9 @@ def HCl():
 def HF():
     geometry = """F  0.0   0.0  0.0;
         H  0.0  0.0  0.91680 """
-    # basis = {'H': gto.uncontract(load('x2c-SVPall.nw', 'H')),
-    #             'F': gto.uncontract(load('x2c-SVPall.nw', 'F'))}
-    basis = "x2c-SVPall.nw"
+    basis = {'H': gto.uncontract(load('x2c-SVPall.nw', 'H')),
+                'F': gto.uncontract(load('x2c-SVPall.nw', 'F'))}
+    # basis = "x2c-SVPall.nw"
     active_space = ((3,3), 8) #spin orbitaler or spinor basis
     charge = 0
     spin = 0
@@ -495,18 +494,34 @@ def h2():
 
 # h2()
 # HCl()
-# HF()
+HF()
 
 def HBr():
     geometry = """H  0.0   0.0  1.41443;
         Br  0.0  0.0  0.0 """
     basis = {'H': gto.uncontract(load('x2c-SVPall.nw', 'H')),
                 'Br': gto.uncontract(load('x2c-SVPall.nw', 'Br'))}
-    active_space = ((4,4), 8) #spin orbitaler or spinor basis
+    active_space = ((3,3), 8) #spin orbitaler or spinor basis
     charge = 0
     spin = 0
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
 
-HCl()
+# HBr()
+# h2()
+
+
+def HI():
+    geometry = """H  0.0   0.0  1.60916;
+        I  0.0  0.0  0.0 """
+    basis = {'H': gto.uncontract(load('x2c-SVPall.nw', 'H')),
+                'I': gto.uncontract(load('x2c-SVPall.nw', 'I'))}
+    active_space = ((3,3), 8) #spin orbitaler or spinor basis
+    charge = 0
+    spin = 0
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+
+# HI()
