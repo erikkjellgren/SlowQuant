@@ -104,7 +104,7 @@ class GeneralizedWaveFunctionUPS:
         self.x2c = do_x2c #AE added this
         self.ecp = ecp
         # Magnetic field Hamiltonian:
-        if B:
+        if B is not None:
             B = np.array(B) * 4.254e-6
         self.B = B
         self.orig = orig
@@ -482,7 +482,7 @@ class GeneralizedWaveFunctionUPS:
         """
         if self._h_mo is None:
 
-            if self.B:
+            if self.B is not None:
                 self._h_mo = DHF_one_electron_transform(self.c_mo, self.int_gen.magnetic_field_H)
             else:
                 self._h_mo = generalized_one_electron_transform(self.c_mo, self.int_gen.h_ao, x2c=self.int_gen.x2c) #AE self._h_ao
