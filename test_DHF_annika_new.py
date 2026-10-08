@@ -81,8 +81,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # Shieldings PySCF:
     nmr = nmr_dhf.NMR(mf)
     nmr.cphf = True
-    nmr.mb = 'RKB'      # or 'RKB'
-    nmr.gauge_orig = [0,0,0]  # GIAO vs. # [0,0,0]
+    nmr.mb = 'RMB'      # or 'RKB'
+    nmr.gauge_orig = None  # GIAO vs. # [0,0,0]
 
     shielding = nmr.kernel()
 
@@ -132,10 +132,20 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
             M_values.append(np.max(abs(M[p,:])))
 
 
-    # WF object:
-    # WF = GeneralizedWaveFunctionUPS(
+    # small random anti-Hermitian
+    eps = 0.07  # controls "step size"
+    X_anti = np.random.randn(C_MO.shape[0],C_MO.shape[0]) + 1j*np.random.randn(C_MO.shape[0],C_MO.shape[0])
+    A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian
+
+    U_step = expm(A_mat)
+
+    C_U = C_MO @ U_step
+
+
+    # # WF object:
+    # DHF = GeneralizedWaveFunctionUPS(
     #     active_space,
-    #     C_MO,
+    #     C_U,
     #     mol, 
     #     K_pairs,
     #     False,
@@ -144,34 +154,35 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #     include_active_kappa=True,
     # )
 
-    # np.random.seed(20)
-    # if len(WF.thetas) > 0:
-    #     real = np.random.uniform(-0.05,0.05,len(WF.thetas_real))
-    #     #imag = np.zeros_like(WF.thetas_imag)
-    #     imag = np.random.uniform(-0.05,0.05,len(WF.thetas_real))
-    #     WF.set_thetas(real, imag)
+    # # # Optimization:
+    # DHF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-10, maxiter = 1000)
+
+    #data = np.load("H2-dyallv2z((1,1),6).npz")
 
 
-    # data = np.load("LiH((1,1),4).npz") 
-    # data = np.load("HF((5,5),12).npz") 
-    # data = np.load("LiH((2,2),6).npz") 
-    # data = np.load("HF((1,1),4).npz")
-    # data = np.load("H2-6-31g-J((1,1),4).npz")
-    # data = np.load("HF((2,2),6).npz")
-    data = np.load("H2-dyallv2z((1,1),6).npz")
-
+    # WF object:
     WF = GeneralizedWaveFunctionUPS(
         active_space,
-        data["c_mo"],
-        #C_MO,
-        mol,
+        C_U,
+        mol, 
         K_pairs,
         False,
         "fUCCSD",
-        {"n_layers": 1, "is_spin_conserving" : False},
+        {"n_layers": 0, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
-    WF.set_thetas(data["thetas_real"], data["thetas_imag"])
+
+
+    #WF.set_thetas(data["thetas_real"], data["thetas_imag"])
+
+    
+    # if len(WF.thetas) > 0:
+    #     np.random.seed(20)
+    #     real = np.random.uniform(-0.05,0.05,len(WF.thetas_real))
+    #     #imag = np.zeros_like(WF.thetas_imag)
+    #     np.random.seed(40)
+    #     imag = np.random.uniform(-0.05,0.05,len(WF.thetas_real))
+    #     WF.set_thetas(real, imag)
 
 
     print("DHF", mf.energy_elec()[0])
@@ -189,26 +200,29 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Active unoccupied:", WF.active_unocc_spin_idx)
     #print("qs: ", WF2.kappa_no_activeactive_spin_idx_resp)
 
+    # Optimization:
+    WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-10, maxiter = 1000)
 
-    #Optimization:
-    #WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-10, maxiter = 1000)
+    #  WF:
+    np.savez(
+        "H2_dyall_v2z_new",
+        c_mo=WF.c_mo,
+        thetas_real=WF.thetas_real,
+        thetas_imag=WF.thetas_imag
+        )
 
-    # Save WF:
-    # np.savez(
-    #     "HF-6-31g_pp",
-    #     c_mo=WF.c_mo,
-    #     thetas_real=WF.thetas_real,
-    #     thetas_imag=WF.thetas_imag
-    #     )
+    print("Electronic energy:", WF.energy_elec)
+
+
 
     LR = generalized_naive_DHF.LinearResponse(WF, excitations="SD", screen = True)
     LR.calc_excitation_energies()
 
     print("PySCF:", sigma_iso)
 
-    LR.get_shieldings_4comp_iso(RMB_GIAO = False)
+    LR.get_shieldings_4comp_iso(RMB_GIAO = True)
 
-    LR.get_SSCC_4comp_iso()
+    #LR.get_SSCC_4comp_iso()
 
 
 
@@ -239,7 +253,8 @@ def H2():
     #basis = J_6_31g
     #basis = J_6_311g_pp_ss
     #active_space = ((1, 1), 8)
-    active_space = ((1, 1), 6)
+    #active_space = ((1, 1), 4)
+    active_space = ((1,1),6)
     #active_space = ((1,1),2)
     #active_space = ((1,1),4)
     #active_space = (2, 4)
@@ -300,7 +315,7 @@ def H3():
     basis = "631-g"
     #basis = "sto-3g"
     #basis = "def-2-svp"
-    active_space = ((2, 1), 3)
+    active_space = ((2, 1), 6)
     #active_space = (2, 4)
     charge = 0
     spin = 1

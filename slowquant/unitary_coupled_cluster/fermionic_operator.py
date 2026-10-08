@@ -377,7 +377,7 @@ class FermionicOperator:
         return qiskit_form
 
     def get_folded_operator(
-        self, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int
+        self, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int, num_positronic_orbs = 0
     ) -> FermionicOperator:
         r"""Get folded operator.
 
@@ -414,12 +414,15 @@ class FermionicOperator:
         virtual_idx = []
         # Get indices of spaces
         for i in range(2 * num_inactive_orbs + 2 * num_active_orbs + 2 * num_virtual_orbs):
-            if i < 2 * num_inactive_orbs:
+            if i < 2 * num_positronic_orbs:
+                virtual_idx.append(i)
+            elif i < 2 * num_inactive_orbs:
                 inactive_idx.append(i)
             elif i < 2 * num_inactive_orbs + 2 * num_active_orbs:
                 active_idx.append(i)
             else:
                 virtual_idx.append(i)
+
 
         # Loop over string of annihilation operators
         for op_key in self.operators.keys():

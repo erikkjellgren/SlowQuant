@@ -236,14 +236,16 @@ def generalized_one_electron_transform(C: np.ndarray, int_1e_inp: np.ndarray) ->
 def DHF_one_electron_transform(C: np.ndarray, int_1e_inp: np.ndarray) -> np.ndarray:
     """h_core transformed"""
 
-    cont = np.einsum(
-        "aP,ab,bQ->PQ",
-        C.conj(),
-        int_1e_inp,
-        C,
-    )
+    # cont = np.einsum(
+    #     "aP,ab,bQ->PQ",
+    #     C.conj(),
+    #     int_1e_inp,
+    #     C,
+    # )
 
-    return cont
+    # return cont
+
+    return C.conj().T @ int_1e_inp @ C
 
 
 

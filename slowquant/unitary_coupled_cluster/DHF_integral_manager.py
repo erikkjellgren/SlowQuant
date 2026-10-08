@@ -397,9 +397,10 @@ class IntegralManager:
                 self.int_obj.set_rinv_origin(self.int_obj.atom_coord(I))
                 a01int = self.int_obj.intor('int1e_sa01sp_spinor', 3)
 
-                tm = a01int[I] + a01int[I].conj().T
+                for i in range(3):
+                    tm = a01int[i] + a01int[i].conj().T
 
-                S_m[I][n2c:, n2c:] = tm * (.25/c**2)  # sign? and complex conjugate contribution? factors?
+                    S_m[I][i][n2c:, n2c:] = tm * (.25/c**2)  # sign? and complex conjugate contribution? factors?
 
         else:
             raise ValueError(f"Got unknown integral object, {type(self.int_obj)}")

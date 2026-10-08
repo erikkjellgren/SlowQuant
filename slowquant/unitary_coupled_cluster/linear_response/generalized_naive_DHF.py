@@ -74,8 +74,8 @@ class LinearResponse(LinearResponseBaseClass):
                 A = get_orbital_response_hessian_block(
                     self.wf.h_mo,
                     self.wf.g_mo,
-                    self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
                     self.wf.kappa_no_activeactive_spin_idx_resp,
+                    self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
                     self.wf.num_spin_orbs_NES,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
@@ -620,7 +620,7 @@ class LinearResponse(LinearResponseBaseClass):
         if len(self.q_ops) != 0:
             V[:idx_shift_q, :] = get_orbital_response_static_property_gradient_DHF(
                 mo,
-                self.wf.kappa_no_activeactive_spin_idx_resp,
+                self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
                 self.wf.num_spin_orbs_NES,
                 self.wf.num_inactive_spin_orbs,
                 self.wf.num_active_spin_orbs,
@@ -631,15 +631,15 @@ class LinearResponse(LinearResponseBaseClass):
             Gd_ket = generalized_propagate_state([G.dagger], self.wf.ci_coeffs, *self.index_info)
             for i in range(self.wf.num_spin_orbs_NES, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs):
                 E_ket = generalized_propagate_state([a_op_spin(i,True), a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
-                val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                val -= generalized_expectation_value(E_ket, [], G_ket, *self.index_info)
+                val = generalized_expectation_value(G_ket, [], E_ket, *self.index_info)
+                val -= generalized_expectation_value(E_ket, [], Gd_ket, *self.index_info)
                 V[idx + idx_shift_q, :] += mo[:, i, i] * val
             for p in range(self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
                 for q in range(self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
                     E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(q,False)], self.wf.ci_coeffs, *self.index_info)
                     Ed_ket = generalized_propagate_state([a_op_spin(q,True)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
-                    val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                    val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+                    val = generalized_expectation_value(G_ket, [], E_ket, *self.index_info)
+                    val -= generalized_expectation_value(Ed_ket, [], Gd_ket, *self.index_info)
                     V[idx + idx_shift_q, :] += mo[:, p, q] * val
 
         # Determine hermiticity per component to set correct sign of lower block
@@ -695,7 +695,7 @@ class LinearResponse(LinearResponseBaseClass):
             V[:idx_shift_q, :] = get_orbital_response_static_property_gradient_DHF_RMB_GIAO(
                 mo_trans,
                 mo2e_trans,
-                self.wf.kappa_no_activeactive_spin_idx_resp,
+                self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
                 self.wf.num_spin_orbs_NES,
                 self.wf.num_inactive_spin_orbs,
                 self.wf.num_active_spin_orbs,
@@ -710,21 +710,21 @@ class LinearResponse(LinearResponseBaseClass):
             for i in range(self.wf.num_spin_orbs_NES, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs):
                 # 1e contribution to the G part of the property gradient:
                 E_ket = generalized_propagate_state([a_op_spin(i,True), a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
-                val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                val -= generalized_expectation_value(E_ket, [], G_ket, *self.index_info)
+                val = generalized_expectation_value(G_ket, [], E_ket, *self.index_info)
+                val -= generalized_expectation_value(E_ket, [], Gd_ket, *self.index_info)
                 V[idx + idx_shift_q, :] += mo_trans[:, i, i] * val
 
                 for j in range(self.wf.num_spin_orbs_NES, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs):
                     # 2e contribution to the G part of the property gradient:
                     E_ket = generalized_propagate_state([a_op_spin(i,True)*a_op_spin(j,True)*a_op_spin(j,False)*a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
                     Ed_ket = generalized_propagate_state([a_op_spin(i,True)*a_op_spin(j,True)*a_op_spin(j,False)*a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
-                    val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                    val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+                    val = generalized_expectation_value(G_ket, [], E_ket, *self.index_info)
+                    val -= generalized_expectation_value(Ed_ket, [], Gd_ket, *self.index_info)
                     V[idx + idx_shift_q, :] += mo2e_trans[:, i, i, j, j] * val *.5
                     E_ket = generalized_propagate_state([a_op_spin(j,True)*a_op_spin(i,True)*a_op_spin(j,False)*a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
                     Ed_ket = generalized_propagate_state([a_op_spin(i,True)*a_op_spin(j,True)*a_op_spin(i,False)*a_op_spin(j,False)], self.wf.ci_coeffs, *self.index_info)
-                    val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                    val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+                    val = generalized_expectation_value(G_ket, [], E_ket, *self.index_info)
+                    val -= generalized_expectation_value(Ed_ket, [], Gd_ket, *self.index_info)
                     V[idx + idx_shift_q, :] += mo2e_trans[:, i, j, j, i] * val * .5
 
                 for p in range(self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
@@ -732,23 +732,23 @@ class LinearResponse(LinearResponseBaseClass):
                         # 2e contribution to the G part of the property gradient:
                         E_ket = generalized_propagate_state([a_op_spin(i,True)*a_op_spin(p,True)*a_op_spin(q,False)*a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
                         Ed_ket = generalized_propagate_state([a_op_spin(i,True)*a_op_spin(q,True)*a_op_spin(p,False)*a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
-                        val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                        val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+                        val = generalized_expectation_value(G_ket, [], E_ket, *self.index_info)
+                        val -= generalized_expectation_value(Ed_ket, [], Gd_ket, *self.index_info)
                         V[idx + idx_shift_q, :] += mo2e_trans[:, i, i, p, q] * val * .5
                         E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(i,True)*a_op_spin(i,False)*a_op_spin(q,False)], self.wf.ci_coeffs, *self.index_info)
                         Ed_ket = generalized_propagate_state([a_op_spin(q,True)*a_op_spin(i,True)*a_op_spin(i,False)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
-                        val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                        val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+                        val = generalized_expectation_value(G_ket, [], E_ket, *self.index_info)
+                        val -= generalized_expectation_value(Ed_ket, [], Gd_ket, *self.index_info)
                         V[idx + idx_shift_q, :] += mo2e_trans[:, p, q, i, i] * val * .5
                         E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(i,True)*a_op_spin(q,False)*a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
                         Ed_ket = generalized_propagate_state([a_op_spin(i,True)*a_op_spin(q,True)*a_op_spin(i,False)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
-                        val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                        val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+                        val = generalized_expectation_value(G_ket, [], E_ket, *self.index_info)
+                        val -= generalized_expectation_value(Ed_ket, [], Gd_ket, *self.index_info)
                         V[idx + idx_shift_q, :] += mo2e_trans[:, p, i, i, q] * val * .5
                         E_ket = generalized_propagate_state([a_op_spin(i,True)*a_op_spin(q,True)*a_op_spin(i,False)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
                         Ed_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(i,True)*a_op_spin(q,False)*a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info)
-                        val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                        val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+                        val = generalized_expectation_value(G_ket, [], E_ket, *self.index_info)
+                        val -= generalized_expectation_value(Ed_ket, [], Gd_ket, *self.index_info)
                         V[idx + idx_shift_q, :] += mo2e_trans[:, i, p, q, i] * val * .5
 
             for p in range(self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
@@ -756,8 +756,8 @@ class LinearResponse(LinearResponseBaseClass):
                     # 1e contribution to the G part of the property gradient:
                     E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(q,False)], self.wf.ci_coeffs, *self.index_info)
                     Ed_ket = generalized_propagate_state([a_op_spin(q,True)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
-                    val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                    val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+                    val = generalized_expectation_value(G_ket, [], E_ket, *self.index_info)
+                    val -= generalized_expectation_value(Ed_ket, [], Gd_ket, *self.index_info)
                     V[idx + idx_shift_q, :] += mo_trans[:, p, q] * val
 
                     for r in range(self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs, self.wf.num_spin_orbs_NES + self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
@@ -765,8 +765,8 @@ class LinearResponse(LinearResponseBaseClass):
                             # 2e contribution to the G part of the property gradient:
                             E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(r,True)*a_op_spin(s,False)*a_op_spin(q,False)], self.wf.ci_coeffs, *self.index_info)
                             Ed_ket = generalized_propagate_state([a_op_spin(q,True)*a_op_spin(s,True)*a_op_spin(r,False)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
-                            val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                            val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+                            val = generalized_expectation_value(G_ket, [], E_ket, *self.index_info)
+                            val -= generalized_expectation_value(Ed_ket, [], Gd_ket, *self.index_info)
                             V[idx + idx_shift_q, :] += mo2e_trans[:, p, q, r, s] * val * .5
 
             # Naive

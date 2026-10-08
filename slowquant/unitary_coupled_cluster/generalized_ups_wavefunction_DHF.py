@@ -133,9 +133,7 @@ class GeneralizedWaveFunctionUPS:
         self._rdm1 = None
         self._rdm2 = None
         self._h_mo = None
-        self._h_mo_ep = None
         self._g_mo = None
-        self._g_mo_ep = None
         self._energy_elec: float | None = None
         self.ansatz_options = ansatz_options
         self.num_energy_evals = 0
@@ -544,8 +542,8 @@ class GeneralizedWaveFunctionUPS:
         Args:
             k: orbital rotation parameters.
         """
-        self._h_mo_ep = None
-        self._g_mo_ep = None
+        self._h_mo = None
+        self._g_mo = None
         self._energy_elec = None
         self._kappa_real_ep = k_real_ep.copy()
         self._kappa_imag_ep = k_imag_ep.copy()
@@ -614,36 +612,7 @@ class GeneralizedWaveFunctionUPS:
             self.thetas,
             self.ups_layout,
         )
-    @property
-    def c_mo_int(self) -> np.ndarray:
-        """Get molecular orbital coefficients.
-
-        Returns:
-            Molecular orbital coefficients.
-        """
-        # Construct anti-hermitian kappa matrix
-        kappa_mat = np.zeros_like(self._c_mo)
-        if len(self.kappa_real) != 0:
-            # The MO transformation is calculated as a difference between current kappa and kappa old.
-            # This is to make the moving of the expansion point to work with SciPy optimization algorithms.
-            # Resetting kappa to zero would mess with any algorithm that has any memory f.x. BFGS.
-            if np.max(np.abs(np.array(self.kappa_real) - np.array(self._kappa_real_old))) > 0.0:
-                for kappa_val, kappa_old, (p, q) in zip(
-                    self.kappa_real, self._kappa_real_old, self.kappa_spin_idx
-                ):
-                    if p == q:
-                        continue
-                    kappa_mat[p, q] = kappa_val - kappa_old
-                    kappa_mat[q, p] = -(kappa_val - kappa_old)
-            if np.max(np.abs(np.array(self.kappa_imag) - np.array(self._kappa_imag_old))) > 0.0:
-                for kappa_val, kappa_old, (p, q) in zip(
-                    self.kappa_imag, self._kappa_imag_old, self.kappa_spin_idx
-                ):
-                    kappa_mat[p, q] += (kappa_val - kappa_old) * 1.0j
-                    kappa_mat[q, p] += (kappa_val - kappa_old) * 1.0j
-        # Apply orbital rotation unitary to MO coefficients
-        return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
-
+   
     @property
     def c_mo(self) -> np.ndarray:
         """Get molecular orbital coefficients.
@@ -702,36 +671,37 @@ class GeneralizedWaveFunctionUPS:
                         kappa_mat[qb, pb] = -np.conj(partner_delta)
 
 
-        if np.max(np.abs(np.array(self.kappa_imag) -
-                        np.array(self._kappa_imag_old))) > 0.0:
+            if np.max(np.abs(np.array(self.kappa_imag) -
+                            np.array(self._kappa_imag_old))) > 0.0:
 
-            for kappa_val, kappa_old, (p, q) in zip(
-                self.kappa_imag,
-                self._kappa_imag_old,
-                self.kappa_spin_idx
-            ):
+                for kappa_val, kappa_old, (p, q) in zip(
+                    self.kappa_imag,
+                    self._kappa_imag_old,
+                    self.kappa_spin_idx
+                ):
 
-                delta = 1.0j * (kappa_val - kappa_old)
+                    delta = 1.0j * (kappa_val - kappa_old)
 
-                # Original rotation
-                kappa_mat[p, q] += delta
-                kappa_mat[q, p] -= np.conj(delta)
-
-
-                if self._Kp:
-
-                    pb = self._kpartner[p]
-                    qb = self._kpartner[q]
-
-                    phase_factor = kphase[p] * np.conj(kphase[q])
-
-                    partner_delta = phase_factor * np.conj(delta)
-
-                    kappa_mat[pb, qb] += partner_delta
-                    kappa_mat[qb, pb] -= np.conj(partner_delta)
+                    # Original rotation
+                    kappa_mat[p, q] += delta
+                    kappa_mat[q, p] -= np.conj(delta)
 
 
-        return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
+                    if self._Kp:
+
+                        pb = self._kpartner[p]
+                        qb = self._kpartner[q]
+
+                        phase_factor = kphase[p] * np.conj(kphase[q])
+
+                        partner_delta = phase_factor * np.conj(delta)
+
+                        kappa_mat[pb, qb] += partner_delta
+                        kappa_mat[qb, pb] -= np.conj(partner_delta)
+
+            return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
+
+        return self._c_mo
 
 
     @property
@@ -794,152 +764,41 @@ class GeneralizedWaveFunctionUPS:
                         kappa_mat[pb, qb] = partner_delta
                         kappa_mat[qb, pb] = -np.conj(partner_delta)
 
+            if np.max(
+                np.abs(np.array(self.kappa_imag_ep)
+                    - np.array(self._kappa_imag_old_ep))
+            ) > 0.0:
 
-        if np.max(
-            np.abs(np.array(self.kappa_imag_ep)
-                - np.array(self._kappa_imag_old_ep))
-        ) > 0.0:
-
-            for kappa_val, kappa_old, (p, q) in zip(
-                self.kappa_imag_ep,
-                self._kappa_imag_old_ep,
-                self.kappa_spin_idx_ep
-            ):
-
-                delta = 1.0j * (kappa_val - kappa_old)
-
-                # Original rotation
-                kappa_mat[p, q] += delta
-                kappa_mat[q, p] -= np.conj(delta)
-
-
-                # Kramers partner rotation
-                if self._Kp:
-
-                    pb = self._kpartner[p]
-                    qb = self._kpartner[q]
-
-                    phase_factor = kphase[p] * np.conj(kphase[q])
-
-                    partner_delta = phase_factor * np.conj(delta)
-
-                    kappa_mat[pb, qb] += partner_delta
-                    kappa_mat[qb, pb] -= np.conj(partner_delta)
-
-        return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
-    
-    @property
-    def c_mo_old(self) -> np.ndarray:
-        """Get molecular orbital coefficients.
-
-        Returns:
-            Molecular orbital coefficients.
-        """
-
-        M = self.c_mo.conj().T @ self._S_int @ Trev(self.c_mo)
-
-        # Construct anti-hermitian kappa matrix
-        kappa_mat = np.zeros_like(self._c_mo)
-        if len(self.kappa_real) != 0:
-            # The MO transformation is calculated as a difference between current kappa and kappa old.
-            # This is to make the moving of the expansion point to work with SciPy optimization algorithms.
-            # Resetting kappa to zero would mess with any algorithm that has any memory f.x. BFGS.
-            if np.max(np.abs(np.array(self.kappa_real) - np.array(self._kappa_real_old))) > 0.0:
                 for kappa_val, kappa_old, (p, q) in zip(
-                    self.kappa_real, self._kappa_real_old, self.kappa_spin_idx
+                    self.kappa_imag_ep,
+                    self._kappa_imag_old_ep,
+                    self.kappa_spin_idx_ep
                 ):
-                    if p == q:
-                        continue
 
-                    delta = kappa_val - kappa_old
-
-                    # Original rotation
-                    kappa_mat[p, q] = delta
-                    kappa_mat[q, p] = -delta
-
-                    # Kramers partner rotation
-                    if self._Kp:
-                        pb = self._kpartner[p]
-                        qb = self._kpartner[q]
-
-                        kappa_mat[pb, qb] = delta
-                        kappa_mat[qb, pb] = -delta
-
-
-            if np.max(np.abs(np.array(self.kappa_imag) - np.array(self._kappa_imag_old))) > 0.0:
-                for kappa_val, kappa_old, (p, q) in zip(
-                    self.kappa_imag, self._kappa_imag_old, self.kappa_spin_idx
-                ):
-                    delta = (kappa_val - kappa_old) * 1.0j
+                    delta = 1.0j * (kappa_val - kappa_old)
 
                     # Original rotation
                     kappa_mat[p, q] += delta
-                    kappa_mat[q, p] += delta
+                    kappa_mat[q, p] -= np.conj(delta)
+
 
                     # Kramers partner rotation
                     if self._Kp:
+
                         pb = self._kpartner[p]
                         qb = self._kpartner[q]
 
-                        kappa_mat[pb, qb] -= delta
-                        kappa_mat[qb, pb] -= delta
+                        phase_factor = kphase[p] * np.conj(kphase[q])
 
-        # Apply orbital rotation unitary to MO coefficients
-        return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
+                        partner_delta = phase_factor * np.conj(delta)
 
-    @property
-    def c_mo_ep_old(self) -> np.ndarray:  # Positronic
-        """Get molecular orbital coefficients.
+                        kappa_mat[pb, qb] += partner_delta
+                        kappa_mat[qb, pb] -= np.conj(partner_delta)
 
-        Returns:
-            Molecular orbital coefficients.
-        """
-        # Construct anti-hermitian kappa matrix
-        kappa_mat = np.zeros_like(self._c_mo)
-        if len(self.kappa_real_ep) != 0:
-            # The MO transformation is calculated as a difference between current kappa and kappa old.
-            # This is to make the moving of the expansion point to work with SciPy optimization algorithms.
-            # Resetting kappa to zero would mess with any algorithm that has any memory f.x. BFGS.
-            if np.max(np.abs(np.array(self.kappa_real_ep) - np.array(self._kappa_real_old_ep))) > 0.0:
-                for kappa_val, kappa_old, (p, q) in zip(
-                    self.kappa_real_ep, self._kappa_real_old_ep, self.kappa_spin_idx_ep
-                ):
-                    if p == q:
-                        continue
+            return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
 
-                    delta = kappa_val - kappa_old
-
-                    # Original rotation
-                    kappa_mat[p, q] = delta
-                    kappa_mat[q, p] = -delta
-
-                    # Kramers partner rotation
-                    if self._Kp:
-                        pb = self._kpartner[p]
-                        qb = self._kpartner[q]
-
-                        kappa_mat[pb, qb] = delta
-                        kappa_mat[qb, pb] = -delta
-
-            if np.max(np.abs(np.array(self.kappa_imag_ep) - np.array(self._kappa_imag_old_ep))) > 0.0:
-                for kappa_val, kappa_old, (p, q) in zip(
-                    self.kappa_imag_ep, self._kappa_imag_old_ep, self.kappa_spin_idx_ep
-                ):
-                    delta = (kappa_val - kappa_old) * 1.0j
-
-                    # Original rotation
-                    kappa_mat[p, q] += delta
-                    kappa_mat[q, p] += delta
-
-                    # Kramers partner rotation
-                    if self._Kp:
-                        pb = self._kpartner[p]
-                        qb = self._kpartner[q]
-
-                        kappa_mat[pb, qb] -= delta
-                        kappa_mat[qb, pb] -= delta
-        # Apply orbital rotation unitary to MO coefficients
-        return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
+        return self._c_mo
+        
 
 
     @property
@@ -949,8 +808,8 @@ class GeneralizedWaveFunctionUPS:
         Returns:
             One-electron Hamiltonian integrals in MO basis.
         """
-        #if self._h_mo is None:
-        self._h_mo = DHF_one_electron_transform(self.c_mo, self.int_gen.h_ao) #DHF
+        if self._h_mo is None:
+            self._h_mo = DHF_one_electron_transform(self.c_mo, self.int_gen.h_ao) #DHF
         return self._h_mo
 
     @property
@@ -960,8 +819,8 @@ class GeneralizedWaveFunctionUPS:
         Returns:
             Two-electron Hamiltonian integrals in MO basis.
         """
-        #if self._g_mo is None:
-        self._g_mo = DHF_two_electron_transform(self.c_mo, self.int_gen.electron_electron_repulsion) #DHF
+        if self._g_mo is None:
+            self._g_mo = DHF_two_electron_transform(self.c_mo, self.int_gen.electron_electron_repulsion) #DHF
         return self._g_mo
 
     @property
@@ -971,9 +830,9 @@ class GeneralizedWaveFunctionUPS:
         Returns:
             One-electron Hamiltonian integrals in MO basis.
         """
-        #if self._h_mo_ep is None:
-        self._h_mo_ep = DHF_one_electron_transform(self.c_mo_ep, self.int_gen.h_ao) #DHF
-        return self._h_mo_ep
+        if self._h_mo is None:
+            self._h_mo = DHF_one_electron_transform(self.c_mo_ep, self.int_gen.h_ao) #DHF
+        return self._h_mo
 
     @property
     def g_mo_ep(self) -> np.ndarray:
@@ -982,9 +841,9 @@ class GeneralizedWaveFunctionUPS:
         Returns:
             Two-electron Hamiltonian integrals in MO basis.
         """
-        #if self._g_mo_ep is None:
-        self._g_mo_ep = DHF_two_electron_transform(self.c_mo_ep, self.int_gen.electron_electron_repulsion) #DHF
-        return self._g_mo_ep
+        if self._g_mo is None:
+            self._g_mo = DHF_two_electron_transform(self.c_mo_ep, self.int_gen.electron_electron_repulsion) #DHF
+        return self._g_mo
 
     @property
     def rdm1(self) -> np.ndarray:
@@ -1547,7 +1406,7 @@ class GeneralizedWaveFunctionUPS:
             if abs(e_new - e_old) < tol:
                 break
             e_old = e_new
-        self._energy_elec = e_new
+        self._energy_elec = -e_new
 
 
     def run_wf_optimization_1step(

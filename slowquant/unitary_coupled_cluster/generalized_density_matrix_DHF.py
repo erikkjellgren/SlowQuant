@@ -1356,8 +1356,8 @@ def get_orbital_response_hessian_block(
     # A1e_eq1 = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)), dtype=np.complex128)
     # A1e_eq2 = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)), dtype=np.complex128)
 
-    for idx1, (T, U) in enumerate(kappa_spin_idx1):
-        for idx2, (M, N) in enumerate(kappa_spin_idx2):
+    for idx1, (U, T) in enumerate(kappa_spin_idx1):
+        for idx2, (N, M) in enumerate(kappa_spin_idx2):
             # 1e contribution
             A1e[idx1, idx2] += h[N, T] * RDM1(M, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             A1e[idx1, idx2] += h[U, M] * RDM1(T, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
