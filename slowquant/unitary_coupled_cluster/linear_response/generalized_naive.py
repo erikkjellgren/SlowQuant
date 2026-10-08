@@ -861,7 +861,7 @@ class LinearResponse(LinearResponseBaseClass):
             if len(self.q_ops) != 0:
                 V[:idx_shift_q, :] = get_orbital_response_static_property_gradient(
                     mo,
-                    self.wf.kappa_no_activeactive_spin_idx,
+                    self.wf.kappa_no_activeactive_spin_idx_dagger,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
                     self.wf.rdm1,
@@ -872,16 +872,16 @@ class LinearResponse(LinearResponseBaseClass):
                 # Inactive part
                 for i in range(self.wf.num_inactive_spin_orbs):
                     E_ket = generalized_propagate_state([a_op_spin(i, True), a_op_spin(i, False)], self.wf.ci_coeffs, *self.index_info)
-                    val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                    val -= generalized_expectation_value(E_ket, [], G_ket, *self.index_info)
+                    val = generalized_expectation_value(G_ket, [], E_ket, *self.index_info)
+                    val -= generalized_expectation_value(E_ket, [], Gd_ket, *self.index_info)
                     V[idx + idx_shift_q, :] += mo[:, i, i] * val
                 # Active part
                 for p in range(self.wf.num_inactive_spin_orbs, self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
                     for q in range(self.wf.num_inactive_spin_orbs, self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
                         E_ket = generalized_propagate_state([a_op_spin(p, True) * a_op_spin(q, False)], self.wf.ci_coeffs, *self.index_info)
                         Ed_ket = generalized_propagate_state([a_op_spin(q, True) * a_op_spin(p, False)], self.wf.ci_coeffs, *self.index_info)
-                        val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                        val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+                        val = generalized_expectation_value(G_ket, [], E_ket, *self.index_info)
+                        val -= generalized_expectation_value(Ed_ket, [], Gd_ket, *self.index_info)
                         V[idx + idx_shift_q, :] += mo[:, p, q] * val
 
 

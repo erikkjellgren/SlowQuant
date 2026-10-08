@@ -44,7 +44,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # Modyfing the Hcore
     # B in T
-    B = np.array([.2, .5, .3]) ; B = (B * (2.3505 * 1e5 * .07) / np.linalg.norm(B).tolist()).tolist() ; orig = (0, 0, 0)
+    B = np.array([.2, .5, .3]) ; B = (B * (2.3505 * 1e5) / np.linalg.norm(B).tolist()).tolist() ; orig = (0, 0, 0)
 
     hcore = mf.get_hcore().astype(complex)
     hcoreB_corr = get_HcoreB(mf, mol, B = B, orig = orig)
@@ -70,7 +70,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     c_MO_nofield=np.array(mf_nofield.mo_coeff,dtype=complex)
     print("MAX imag component in C_MO directly from pyscf without field", np.max(c_MO_nofield.imag))
 
+    ghf_seed = 42
+
     # Small step
+    np.random.seed(ghf_seed)
     eps = 0.07
     X_anti = np.random.randn(c_MO.shape[0],c_MO.shape[0]) + 1j*np.random.randn(c_MO.shape[0],c_MO.shape[0])
     A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian
@@ -80,7 +83,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     pyscf_GHF = GeneralizedWaveFunctionUPS(
         active_space,
-        c_u,
+        c_MO,
         mol,
         "fuccsd",
         ansatz_options = {"n_layers": 0, "is_spin_conserving" : False},
@@ -132,19 +135,20 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Nr. of virtual spin orbitals:", WF.num_virtual_spin_orbs)
 
     bounds = [-0.05,0.05]
-    rd_seed = 42
-    rd_seed2 = 20
+    rd_seed = 70
+    rd_seed2 = 50
     np.random.seed(rd_seed)
     new_thetas_real = np.random.uniform(bounds[0], bounds[1], len(WF.thetas_real)).tolist()
     np.random.seed(rd_seed2)
-    #new_thetas_imag = np.random.uniform(bounds[0], bounds[1], len(WF.thetas_real)).tolist()
-    new_thetas_imag = np.zeros_like(WF.thetas_imag)
+    new_thetas_imag = np.random.uniform(bounds[0], bounds[1], len(WF.thetas_real)).tolist()
+    #new_thetas_imag = np.zeros_like(WF.thetas_imag)
     WF.set_thetas(new_thetas_real, new_thetas_imag)
 
 
     # Printing settings:
     print("Tolerance GHF:", tol_GHF)
     print("Tolerance for the gradient GHF:", tol_GHF_g)
+    print("Random seed for GHF")
     print("Randsom seed for thetas real component:", rd_seed)
     print("Randsom seed for thetas imag component:", rd_seed2)
     print("Bounds for thetas:", bounds)
@@ -165,7 +169,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # Saving the data:
     directory = os.getcwd()
-    name = "data_mfield_H3_def2svp_2_1_6"
+    name = "data_mfield_H3_def2svp_2_1_6_imag"
     j,k = 0,0
     while j < 100:
         if j < 10:
