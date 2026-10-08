@@ -264,11 +264,11 @@ class LinearResponseBaseClass:
         # self.Y_G_normed = np.zeros_like(self.Y_G, dtype=complex) #AE
 
 
-        norms = self.get_excited_state_norm()
-        for state_number, norm in enumerate(norms):
-            if abs(norm) < 10**-10: #AE change to abs
-                print(f"WARNING: State number {state_number} could not be normalized. Norm of {norm}.")
-                continue
+        # norms = self.get_excited_state_norm()
+        # for state_number, norm in enumerate(norms):
+        #     if abs(norm) < 10**-10: #AE change to abs
+        #         print(f"WARNING: State number {state_number} could not be normalized. Norm of {norm}.")
+        #         continue
             # self.Z_q_normed[:, state_number] = self.Z_q[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real) # AE added abs and np.sign
             # self.Z_G_normed[:, state_number] = self.Z_G[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real)
             # self.Y_q_normed[:, state_number] = self.Y_q[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real)
@@ -285,26 +285,17 @@ class LinearResponseBaseClass:
 
 
             #Claude
-            for state_number, norm in enumerate(norms):
-                norm = norm.real
-                if abs(norm) < 10**-10:
-                    print(f"WARNING: State number {state_number} could not be normalized. Norm of {norm}.")
-                    continue
-                factor = 1 / np.sqrt(abs(norm))
-                self.Z_qG_normed[:, state_number] = self.Z_qG[:, state_number] * factor
-                self.Y_qG_normed[:, state_number] = self.Y_qG[:, state_number] * factor
-                self.normed_response_vectors[:, state_number] = self.response_vectors[:, state_number] * factor
+        norms = self.get_excited_state_norm()
+        for state_number, norm in enumerate(norms):
+            norm = norm.real
+            if abs(norm) < 10**-10:
+                print(f"WARNING: State number {state_number} could not be normalized. Norm of {norm}.")
+                continue
+            factor = 1 / np.sqrt(abs(norm))
+            self.Z_qG_normed[:, state_number] = self.Z_qG[:, state_number] * factor
+            self.Y_qG_normed[:, state_number] = self.Y_qG[:, state_number] * factor
+            self.normed_response_vectors[:, state_number] = self.response_vectors[:, state_number] * factor
 
-            #Claude..
-            ZZqG = np.outer(self.Z_qG[:, state_number], self.Z_qG[:, state_number].conj().transpose())
-            YYqG = np.outer(self.Y_qG[:, state_number], self.Y_qG[:, state_number].conj().transpose())
-            norms[state_number] = np.sum(self.metric[: self.num_qG, : self.num_qG] * (ZZqG - YYqG))
-            # <0|[O, O^+]|0> = v^+ S v = Z^+ Sigma Z + Z^+ Delta Y - Y^+ Delta* Z - Y^+ Sigma* Y
-            # (the old outer-product form gave Z^T Sigma Z*, which is wrong for complex Sigma)
-            vec = self.response_vectors[:, state_number]
-            norms[state_number] = vec.conj() @ self.metric @ vec
-             
-            return norms
 
     def get_excited_state_norm(self) -> np.ndarray:
         """Calculate the norm of excited states.
@@ -333,7 +324,7 @@ class LinearResponseBaseClass:
             ZZqG = np.outer(self.Z_qG[:, state_number].conj(), self.Z_qG[:, state_number])   # <- conj flyttet
             YYqG = np.outer(self.Y_qG[:, state_number], self.Y_qG[:, state_number].conj())   # uændret
             norms[state_number] = np.sum(self.metric[: self.num_qG, : self.num_qG] * (ZZqG - YYqG))
-                        
+
         return norms
 
 
