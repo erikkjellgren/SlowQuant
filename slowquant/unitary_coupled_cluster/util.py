@@ -753,7 +753,7 @@ class UpsStructure:
         num_active_orbs=num_active_spin_orbs//2
         print(num_active_orbs)
         # Options
-        valid_options = ("n_layers", "do_qnp", "skip_last_singles", "do_gtups", "do_tups", "do_gqnp", "is_spin_conserving")
+        valid_options = ("n_layers", "do_qnp", "skip_last_singles", "do_gtups", "do_tups", "do_gqnp", "is_spin_conserving", "do_pp")
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(f"Got unknown option for tUPS, {option}. Valid options are: {valid_options}")

@@ -216,17 +216,17 @@ class LinearResponseBaseClass:
             vec=eigvec[:,i]
             absvec = np.abs(vec)
         
-            print('Eigenvalue', eigval[i],'Max value eigvec', np.max(abs(vec)), 'Max value eigvec index', np.argmax(abs(vec)))
-            # k = np.argmax(np.abs(vec))
-            # print("dominant operator:", operator_labels[k])
+            # print('Eigenvalue', eigval[i],'Max value eigvec', np.max(abs(vec)), 'Max value eigvec index', np.argmax(abs(vec)))
+            # # k = np.argmax(np.abs(vec))
+            # # print("dominant operator:", operator_labels[k])
 
-            # top 3 contributors
-            top3 = np.argsort(absvec)[-3:][::-1]
-            # print(len(top3))
-            for j in top3:
-                print(
-                "  operator:", operator_labels[j],
-                " weight:", absvec[j])
+            # # top 3 contributors
+            # top3 = np.argsort(absvec)[-3:][::-1]
+            # # print(len(top3))
+            # for j in top3:
+            #     print(
+            #     "  operator:", operator_labels[j],
+            #     " weight:", absvec[j])
 
 
         #     # print(self.operator_labels[k])
@@ -274,15 +274,37 @@ class LinearResponseBaseClass:
             # self.Y_q_normed[:, state_number] = self.Y_q[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real)
             # self.Y_G_normed[:, state_number] = self.Y_G[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real)
             
-            # #Pernille
-            self.Z_qG_normed[:, state_number] = self.Z_qG[:, state_number] * (1 / norm) ** 0.5 * np.sign(norm.real)
-            self.Y_qG_normed[:, state_number] = self.Y_qG[:, state_number] * (1 / norm) ** 0.5 * np.sign(norm.real)
+            # # # #Pernille before claude
+            # self.Z_qG_normed[:, state_number] = self.Z_qG[:, state_number] * (1 / norm) ** 0.5 * np.sign(norm.real)
+            # self.Y_qG_normed[:, state_number] = self.Y_qG[:, state_number] * (1 / norm) ** 0.5 * np.sign(norm.real)
         
             
-            self.normed_response_vectors[:, state_number] = (
-                self.response_vectors[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real)  #AE added abs
-            )
+            # # self.normed_response_vectors[:, state_number] = (
+            # #     self.response_vectors[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real)  #AE added abs
+            # # )
 
+
+            #Claude
+            for state_number, norm in enumerate(norms):
+                norm = norm.real
+                if abs(norm) < 10**-10:
+                    print(f"WARNING: State number {state_number} could not be normalized. Norm of {norm}.")
+                    continue
+                factor = 1 / np.sqrt(abs(norm))
+                self.Z_qG_normed[:, state_number] = self.Z_qG[:, state_number] * factor
+                self.Y_qG_normed[:, state_number] = self.Y_qG[:, state_number] * factor
+                self.normed_response_vectors[:, state_number] = self.response_vectors[:, state_number] * factor
+
+            #Claude..
+            ZZqG = np.outer(self.Z_qG[:, state_number], self.Z_qG[:, state_number].conj().transpose())
+            YYqG = np.outer(self.Y_qG[:, state_number], self.Y_qG[:, state_number].conj().transpose())
+            norms[state_number] = np.sum(self.metric[: self.num_qG, : self.num_qG] * (ZZqG - YYqG))
+            # <0|[O, O^+]|0> = v^+ S v = Z^+ Sigma Z + Z^+ Delta Y - Y^+ Delta* Z - Y^+ Sigma* Y
+            # (the old outer-product form gave Z^T Sigma Z*, which is wrong for complex Sigma)
+            vec = self.response_vectors[:, state_number]
+            norms[state_number] = vec.conj() @ self.metric @ vec
+             
+            return norms
 
     def get_excited_state_norm(self) -> np.ndarray:
         """Calculate the norm of excited states.
@@ -308,10 +330,10 @@ class LinearResponseBaseClass:
 
             
             #Pernille
-            ZZqG = np.outer(self.Z_qG[:, state_number], self.Z_qG[:, state_number].conj().transpose())
-            YYqG = np.outer(self.Y_qG[:, state_number], self.Y_qG[:, state_number].conj().transpose())
+            ZZqG = np.outer(self.Z_qG[:, state_number].conj(), self.Z_qG[:, state_number])   # <- conj flyttet
+            YYqG = np.outer(self.Y_qG[:, state_number], self.Y_qG[:, state_number].conj())   # uændret
             norms[state_number] = np.sum(self.metric[: self.num_qG, : self.num_qG] * (ZZqG - YYqG))
-            
+                        
         return norms
 
 

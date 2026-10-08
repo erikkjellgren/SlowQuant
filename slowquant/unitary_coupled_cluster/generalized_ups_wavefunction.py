@@ -244,20 +244,89 @@ class GeneralizedWaveFunctionUPS:
         )
         self.num_det = len(self.ci_info.idx2det)
         self.csf_coeffs = np.zeros(self.num_det, dtype=np.complex128)
-        hf_string = ""
-        for i in range(self.num_active_spin_orbs // 2):
-            if i < self.num_active_elec_alpha:
-                hf_string += "1"
-            else:
-                hf_string += "0"
-            if i < self.num_active_elec_beta:
-                hf_string += "1"
-            else:
-                hf_string += "0"
+        # hf_string = ""
+        # for i in range(self.num_active_spin_orbs // 2):
+        #     if i < self.num_active_elec_alpha:
+        #         hf_string += "1"
+        #     else:
+        #         hf_string += "0"
+        #     if i < self.num_active_elec_beta:
+        #         hf_string += "1"
+        #     else:
+        #         hf_string += "0"
 
-        hf_det = int(hf_string, 2)
-        self.csf_coeffs[self.ci_info.det2idx[hf_det]] = 1
+        # hf_det = int(hf_string, 2)
+        # self.csf_coeffs[self.ci_info.det2idx[hf_det]] = 1
+        # self.ci_coeffs = np.copy(self.csf_coeffs)
+
+
+
+
+
+        # hf_string = "1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec)
+        
+        # if ansatz.lower() == "gtups":
+        #     # perfect pairing of the reference determinant
+        #     hf1 = hf_string[: int(len(hf_string) / 2)]
+        #     hf2 = hf_string[int(len(hf_string) / 2) :]
+        #     hf_string = "".join(hf1[i : i + 2] + hf2[i : i + 2] for i in range(0, len(hf1), 2))
+        #     print("hf_string", hf_string)
+        #     hf_det = int(hf_string, 2)
+        #     print("hf_det", hf_det)
+        #     self.csf_coeffs[self.ci_info.det2idx[hf_det]] = 1
+        #     self.ci_coeffs = np.copy(self.csf_coeffs)
+
+        hf_det = "1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec)
+        self._pp = False
+        if (
+            ansatz.lower() == "gtups"
+            and "do_pp" in self.ansatz_options.keys()
+            and self.ansatz_options["do_pp"]
+        ):
+            # Obtain pp determinant
+            print('test')
+            pp_det = ""
+            spin_orb = 0
+            elec_count = self.num_active_elec
+            while spin_orb < self.num_active_spin_orbs:
+                if (
+                    elec_count >= 2
+                    and (self.num_active_spin_orbs - spin_orb) >= 4
+                    and elec_count <= (self.num_active_spin_orbs - spin_orb - 2)
+                ):
+                    pp_det += "1100"
+                    elec_count -= 2
+                    spin_orb += 4
+                elif elec_count == 0:
+                    pp_det += "0"
+                    spin_orb += 1
+                elif elec_count != 0:
+                    pp_det += "1"
+                    spin_orb += 1
+                    elec_count -= 1
+            print("perfect-pairing determinant found as:", pp_det)
+            if len(pp_det) != self.num_active_spin_orbs or pp_det.count("1") != self.num_active_elec:
+                raise ValueError("Perfect pairing determinant violates orbital or electron numbers")
+
+            # Swap mo coefficients (spin orbitals) to resemble pp layout
+            hole = [i + self.num_inactive_spin_orbs for i, (h, p) in enumerate(zip(hf_det, pp_det)) if h == "1" and p == "0"]
+            part = [i + self.num_inactive_spin_orbs for i, (h, p) in enumerate(zip(hf_det, pp_det)) if h == "0" and p == "1"]
+            pp_mo_coeffs = mo_coeffs.copy()
+            pp_mo_coeffs[:, hole + part] = mo_coeffs[:, part + hole]
+            self._c_mo = pp_mo_coeffs
+
+            # Assign weight to reference
+            self.csf_coeffs[self.ci_info.det2idx[int(pp_det, 2)]] = 1
+            self._pp = True
+        else:
+            self.csf_coeffs[self.ci_info.det2idx[int(hf_det, 2)]] = 1
+            self._c_mo = mo_coeffs
+
         self.ci_coeffs = np.copy(self.csf_coeffs)
+
+        # self.ci_coeffs = np.copy(self.csf_coeffs)
+
+
         # Construct UPS Structure
         self.ups_layout = UpsStructure()
         # Do the ansatz setup

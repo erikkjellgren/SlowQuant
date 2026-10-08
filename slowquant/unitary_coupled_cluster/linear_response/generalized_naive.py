@@ -94,11 +94,7 @@ class LinearResponse(LinearResponseBaseClass):
                 finite_excitations.append(False)
         self.G_ops_finite = sum(bool(x) for x in finite_excitations[len(self.q_ops):])
         finite_excitations_idx = np.array(finite_excitations)
-        self.finite_excitations_idx = finite_excitations_idx
-        
-              
-              
-              
+        self.finite_excitations_idx = finite_excitations_idx         
               
                 
         if len(self.q_ops) != 0:
@@ -123,7 +119,7 @@ class LinearResponse(LinearResponseBaseClass):
             # )
             # print(np.array2string(grad2, precision=8, suppress_small=True))
             print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-            if np.max(np.abs(grad)) > 10**3:
+            if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
 
         grad = np.zeros(2 * len(self.G_ops), dtype=complex) #AE complex
@@ -664,20 +660,34 @@ class LinearResponse(LinearResponseBaseClass):
         transition_dipole_z = 0.0 + 0.0j
         transition_dipoles = np.zeros((number_excitations, 3), dtype=np.complex128)
         shift = self.q_ops_finite #AE
+        nq = len(self.q_ops)
+        q_mask = self.finite_excitations_idx[:nq]
+
+        print(len(self.q_ops))
+        print(len(q_mask))
+
+        kappa_fin = [kappa for kappa, keep in zip(self.wf.kappa_no_activeactive_spin_idx, q_mask) if keep]
+        assert len(kappa_fin) == shift
+        
         for state_number in range(number_excitations):
             transfer_op = FermionicOperator({})
-            for i, G in enumerate(self.G_ops):
-                transfer_op += (
-                    # self.Z_G_normed[i+shift, state_number] * G.dagger + self.Y_G_normed[i, state_number] * G
-                    self.Z_qG_normed[i+shift, state_number] * G.dagger + self.Y_qG_normed[i+shift, state_number] * G #AE
-                ) #AE added + shift
+            #Claude
+            G_kept = [G for G, keep in zip(self.G_ops, self.finite_excitations_idx[nq:]) if keep] 
+            for i, G in enumerate(G_kept):
+                transfer_op += self.Z_qG_normed[i+shift, state_number] * G + self.Y_qG_normed[i+shift, state_number] * G.dagger
+
+            # for i, G in enumerate(self.G_ops):
+            #     transfer_op += (
+            #         # self.Z_G_normed[i+shift, state_number] * G.dagger + self.Y_G_normed[i, state_number] * G
+            #         self.Z_qG_normed[i+shift, state_number] * G.dagger + self.Y_qG_normed[i+shift, state_number] * G #AE
+            #     ) #AE added + shift
             q_part_x = 0.0
             q_part_y = 0.0
             q_part_z = 0.0
-            if len(self.q_ops) != 0:
+            if len(kappa_fin) != 0:
                 q_part_x = get_orbital_response_property_gradient_annika(
                     mux,
-                    self.wf.kappa_no_activeactive_spin_idx,
+                    kappa_fin,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
                     self.wf.rdm1,
@@ -687,7 +697,7 @@ class LinearResponse(LinearResponseBaseClass):
                 )
                 q_part_y = get_orbital_response_property_gradient_annika(
                     muy,
-                    self.wf.kappa_no_activeactive_spin_idx,
+                    kappa_fin,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
                     self.wf.rdm1,
@@ -697,7 +707,7 @@ class LinearResponse(LinearResponseBaseClass):
                 )
                 q_part_z = get_orbital_response_property_gradient_annika(
                     muz,
-                    self.wf.kappa_no_activeactive_spin_idx,
+                    kappa_fin,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
                     self.wf.rdm1,
