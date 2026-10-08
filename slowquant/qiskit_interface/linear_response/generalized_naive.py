@@ -253,21 +253,27 @@ class quantumLR(quantumLRBaseClass):
         for j, GJ in enumerate(self.G_ops):
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
-                self.A[i + idx_shift, j + idx_shift] =  (
-                    self.wf.QI.quantum_expectation_value_complex(
-                        double_commutator(
-                            GI.dagger,self.H_0i_0a, GJ, do_symmetrized=True
-                        ).get_folded_operator(*self.orbs)
-                    )
-                )
 
-                self.A[j + idx_shift, i + idx_shift] = (
-                    self.wf.QI.quantum_expectation_value_complex(
-                        double_commutator(
-                            GI.dagger, self.H_0i_0a, GJ, do_symmetrized=True
-                        ).get_folded_operator(*self.orbs)
-                    )
-                ).conj()
+                val = self.wf.QI.quantum_expectation_value_complex(double_commutator(GI.dagger, self.H_0i_0a, GJ, do_symmetrized=True).get_folded_operator(*self.orbs))
+                self.A[i + idx_shift, j + idx_shift] = val
+                self.A[j + idx_shift, i + idx_shift] = val.conj()
+
+                #AE
+                # self.A[i + idx_shift, j + idx_shift] =  (
+                #     self.wf.QI.quantum_expectation_value_complex(
+                #         double_commutator(
+                #             GI.dagger,self.H_0i_0a, GJ, do_symmetrized=True
+                #         ).get_folded_operator(*self.orbs)
+                #     )
+                # )
+
+                # self.A[j + idx_shift, i + idx_shift] = (
+                #     self.wf.QI.quantum_expectation_value_complex(
+                #         double_commutator(
+                #             GI.dagger, self.H_0i_0a, GJ, do_symmetrized=True
+                #         ).get_folded_operator(*self.orbs)
+                #     )
+                # ).conj()
 
                 # Make B
                 self.B[i + idx_shift, j + idx_shift]  = self.B[j + idx_shift, i + idx_shift] = (
@@ -276,16 +282,13 @@ class quantumLR(quantumLRBaseClass):
                     )
                 )
                 # Make Sigma
-                self.Sigma[i + idx_shift, j + idx_shift] =  (
+                val=(
                     self.wf.QI.quantum_expectation_value_complex(
                         commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)
                     )
                 )
-                self.Sigma[j + idx_shift, i + idx_shift] = (
-                    self.wf.QI.quantum_expectation_value_complex(
-                        commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)
-                    )
-                ).conj()
+                self.Sigma[i + idx_shift, j + idx_shift] = val  
+                self.Sigma[j + idx_shift, i + idx_shift] = val.conj()
 
         # Check hermiticity of the Hessian:
         size = len(self.A)
@@ -672,23 +675,39 @@ class quantumLR(quantumLRBaseClass):
         transition_dipole_z = 0.0 + 0.0j
         transition_dipoles = np.zeros((number_excitations, 3), dtype=np.complex128)
         shift = self.q_ops_finite #AE
+        
+        nq = len(self.q_ops)
+        q_mask = self.finite_excitations_idx[:nq]
+
+        kappa_fin = [kappa for kappa, keep in zip(self.wf.kappa_no_activeactive_spin_idx, q_mask) if keep]
+        assert len(kappa_fin) == shift
+
         for state_number in range(number_excitations):
             transfer_op = FermionicOperator({})
-            for i, G in enumerate(self.G_ops):
-                transfer_op += (
-                    # self._Z_G_normed[i, state_number] * G.dagger + self._Y_G_normed[i, state_number] * G #Pernille
-                    # self._Z_qG_normed[i, state_number] * G.dagger + self._Y_qG_normed[i, state_number] * G
-                    self._Z_qG_normed[i+shift, state_number] * G.dagger + self._Y_qG_normed[i+shift, state_number] * G #AE SHIFT MANGLER
+            # for i, G in enumerate(self.G_ops):
+            #     transfer_op += (
+            #         # self._Z_G_normed[i, state_number] * G.dagger + self._Y_G_normed[i, state_number] * G #Pernille
+            #         # self._Z_qG_normed[i, state_number] * G.dagger + self._Y_qG_normed[i, state_number] * G
 
 
-                )
+
+            #         # self._Z_qG_normed[i+shift, state_number] * G.dagger + self._Y_qG_normed[i+shift, state_number] * G #AE SHIFT MANGLER
+            #         self._Z_qG_normed[i+shift, state_number] * G + self._Y_qG_normed[i+shift, state_number] * G.dagger #AE SHIFT MANGLER
+
+
+
+            #     )
+            G_kept = [G for G, keep in zip(self.G_ops, self.finite_excitations_idx[nq:]) if keep] 
+            for i, G in enumerate(G_kept):
+                transfer_op += self.Z_qG_normed[i+shift, state_number] * G + self.Y_qG_normed[i+shift, state_number] * G.dagger
+
             q_part_x = 0.0
             q_part_y = 0.0
             q_part_z = 0.0
             if self.num_q != 0:
                 q_part_x = get_orbital_response_property_gradient_annika(
                     mux,
-                    self.wf.kappa_no_activeactive_spin_idx,
+                    kappa_fin,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
                     self.wf.rdm1,
@@ -698,7 +717,7 @@ class quantumLR(quantumLRBaseClass):
                 )
                 q_part_y = get_orbital_response_property_gradient_annika(
                     muy,
-                    self.wf.kappa_no_activeactive_spin_idx,
+                    kappa_fin,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
                     self.wf.rdm1,
@@ -708,7 +727,7 @@ class quantumLR(quantumLRBaseClass):
                 )
                 q_part_z = get_orbital_response_property_gradient_annika(
                     muz,
-                    self.wf.kappa_no_activeactive_spin_idx,
+                    kappa_fin,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
                     self.wf.rdm1,
@@ -726,8 +745,8 @@ class quantumLR(quantumLRBaseClass):
                 transition_dipole_z = self.wf.QI.quantum_expectation_value_complex(
                     commutator(muz_op, transfer_op).get_folded_operator(*self.orbs)
                 )
-            transition_dipoles[state_number, 0] = q_part_x + transition_dipole_x
-            transition_dipoles[state_number, 1] = q_part_y + transition_dipole_y
-            transition_dipoles[state_number, 2] = q_part_z + transition_dipole_z
+            transition_dipoles[state_number, 0] = q_part_x - transition_dipole_x
+            transition_dipoles[state_number, 1] = q_part_y - transition_dipole_y
+            transition_dipoles[state_number, 2] = q_part_z - transition_dipole_z
 
         return transition_dipoles

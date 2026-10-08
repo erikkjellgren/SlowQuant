@@ -663,9 +663,6 @@ class LinearResponse(LinearResponseBaseClass):
         nq = len(self.q_ops)
         q_mask = self.finite_excitations_idx[:nq]
 
-        print(len(self.q_ops))
-        print(len(q_mask))
-
         kappa_fin = [kappa for kappa, keep in zip(self.wf.kappa_no_activeactive_spin_idx, q_mask) if keep]
         assert len(kappa_fin) == shift
         

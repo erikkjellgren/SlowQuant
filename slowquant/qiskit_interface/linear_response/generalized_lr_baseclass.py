@@ -434,8 +434,8 @@ class quantumLRBaseClass:
             # )
 
             # Pernille 
-            self._Z_qG_normed[:, state_number] = self._Z_qG[:, state_number] * (1 / norm) ** 0.5 #AE skal rettes??
-            self._Y_qG_normed[:, state_number] = self._Y_qG[:, state_number] * (1 / norm) ** 0.5 #AE skal rettes??
+            self._Z_qG_normed[:, state_number] = self._Z_qG[:, state_number] * (1 / np.real(norm)) ** 0.5 #AE skal rettes??
+            self._Y_qG_normed[:, state_number] = self._Y_qG[:, state_number] * (1 / np.real(norm)) ** 0.5 #AE skal rettes??
             
             self.normed_excitation_vectors[:, state_number] = (
                 self.excitation_vectors[:, state_number] * (1 / norm) ** 0.5 #AE skal rettes??
@@ -452,7 +452,7 @@ class quantumLRBaseClass:
         # for state_number in range(len(self._Z_G[0])): #Pernille
         for state_number in range(len(self.excitation_vectors[0])):
             # Pernille 
-            ZZqG = np.outer(self._Z_qG[:, state_number], self._Z_qG[:, state_number].conj().transpose())
+            ZZqG = np.outer(self._Z_qG[:, state_number].conj(), self._Z_qG[:, state_number])
             YYqG = np.outer(self._Y_qG[:, state_number], self._Y_qG[:, state_number].conj().transpose())
             norms[state_number] = np.sum(self.metric[: self.num_qG, : self.num_qG] * (ZZqG - YYqG))
             # # Get Z_q Z_G Y_q and Y_G matrices
