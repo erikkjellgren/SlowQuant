@@ -100,7 +100,7 @@ class quantumLR(quantumLRBaseClass):
                         self.wf.rdm2,
                     )
             elif do_gradients:
-                grad = np.zeros(2 * self.num_q)
+                grad = np.zeros(2 * self.num_q, dtype=complex)
                 for i, op in enumerate(self.q_ops):
                     grad[i] = self.wf.QI.quantum_expectation_value_complex(
                         (self.H_1i_1a * op).get_folded_operator(*self.orbs)
@@ -114,7 +114,7 @@ class quantumLR(quantumLRBaseClass):
                 if np.max(np.abs(grad)) > 10**-3:
                     print("WARNING: Large Gradient detected in q of ", np.max(np.abs(grad)))
 
-            grad = np.zeros(2 * self.num_G)
+            grad = np.zeros(2 * self.num_G, dtype=complex)
             for i, op in enumerate(self.G_ops):
                 grad[i] = self.wf.QI.quantum_expectation_value_complex(
                     commutator(self.H_0i_0a, op).get_folded_operator(*self.orbs)
@@ -699,8 +699,7 @@ class quantumLR(quantumLRBaseClass):
             #     )
             G_kept = [G for G, keep in zip(self.G_ops, self.finite_excitations_idx[nq:]) if keep] 
             for i, G in enumerate(G_kept):
-                transfer_op += self.Z_qG_normed[i+shift, state_number] * G + self.Y_qG_normed[i+shift, state_number] * G.dagger
-
+                transfer_op += self._Z_qG_normed[i+shift, state_number] * G + self._Y_qG_normed[i+shift, state_number] * G.dagger
             q_part_x = 0.0
             q_part_y = 0.0
             q_part_z = 0.0

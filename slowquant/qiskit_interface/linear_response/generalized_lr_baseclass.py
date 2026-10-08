@@ -422,9 +422,11 @@ class quantumLRBaseClass:
 
         norms = self._get_excited_state_norm()
         for state_number, norm in enumerate(norms):
+            norm = norm.real
             if norm < 10**-10:
                 print(f"WARNING: State number {state_number} could not be normalized. Norm of {norm}.")
                 continue
+            factor = 1 / np.sqrt(abs(norm))
             # self._Z_q_normed[:, state_number] = self._Z_q[:, state_number] * (1 / norm) ** 0.5
             # self._Z_G_normed[:, state_number] = self._Z_G[:, state_number] * (1 / norm) ** 0.5
             # self._Y_q_normed[:, state_number] = self._Y_q[:, state_number] * (1 / norm) ** 0.5
@@ -434,11 +436,11 @@ class quantumLRBaseClass:
             # )
 
             # Pernille 
-            self._Z_qG_normed[:, state_number] = self._Z_qG[:, state_number] * (1 / np.real(norm)) ** 0.5 #AE skal rettes??
-            self._Y_qG_normed[:, state_number] = self._Y_qG[:, state_number] * (1 / np.real(norm)) ** 0.5 #AE skal rettes??
+            self._Z_qG_normed[:, state_number] = self._Z_qG[:, state_number] * factor #AE skal rettes??
+            self._Y_qG_normed[:, state_number] = self._Y_qG[:, state_number] * factor  #AE skal rettes??
             
             self.normed_excitation_vectors[:, state_number] = (
-                self.excitation_vectors[:, state_number] * (1 / norm) ** 0.5 #AE skal rettes??
+                self.excitation_vectors[:, state_number] * factor #AE skal rettes??
             )
 
     def _get_excited_state_norm(self) -> np.ndarray:
