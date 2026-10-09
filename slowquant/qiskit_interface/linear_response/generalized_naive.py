@@ -183,17 +183,14 @@ class quantumLR(quantumLRBaseClass):
                 for j, qJ in enumerate(self.q_ops):
                     for i, qI in enumerate(self.q_ops[j:], j):
                         # Make A
-                        self.A[i, j] = self.wf.QI.quantum_expectation_value_complex(
+                        val = self.wf.QI.quantum_expectation_value_complex(
                             (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs)
                         ) - self.wf.QI.quantum_expectation_value_complex(
                             (qI.dagger * qJ * self.H_2i_2a).get_folded_operator(*self.orbs)
                         )
+                        self.A[i, j] = val
 
-                        self.A[j, i] = (self.wf.QI.quantum_expectation_value_complex(
-                            (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs)
-                        ) - self.wf.QI.quantum_expectation_value_complex(
-                            (qI.dagger * qJ * self.H_2i_2a).get_folded_operator(*self.orbs)
-                        )).conj()
+                        self.A[j, i] = val.conj()
 
                         # Make B
                         self.B[i, j] = self.B[j, i] = -(
@@ -202,12 +199,12 @@ class quantumLR(quantumLRBaseClass):
                             )
                         )
                         # Make Sigma
-                        self.Sigma[i, j] = self.wf.QI.quantum_expectation_value_complex(
+                        val = self.wf.QI.quantum_expectation_value_complex(
                             (qI.dagger * qJ).get_folded_operator(*self.orbs)
                         )
+                        self.Sigma[i, j] = val
 
-                        self.Sigma[j, i] = (self.wf.QI.quantum_expectation_value_complex(
-                            (qI.dagger * qJ).get_folded_operator(*self.orbs))).conj()
+                        self.Sigma[j, i] = val.conj()
 
             # Gq
             for j, qJ in enumerate(self.q_ops):
@@ -744,8 +741,8 @@ class quantumLR(quantumLRBaseClass):
                 transition_dipole_z = self.wf.QI.quantum_expectation_value_complex(
                     commutator(muz_op, transfer_op).get_folded_operator(*self.orbs)
                 )
-            transition_dipoles[state_number, 0] = q_part_x - transition_dipole_x
-            transition_dipoles[state_number, 1] = q_part_y - transition_dipole_y
-            transition_dipoles[state_number, 2] = q_part_z - transition_dipole_z
+            transition_dipoles[state_number, 0] = - q_part_x + transition_dipole_x
+            transition_dipoles[state_number, 1] = - q_part_y + transition_dipole_y
+            transition_dipoles[state_number, 2] = - q_part_z + transition_dipole_z
 
         return transition_dipoles

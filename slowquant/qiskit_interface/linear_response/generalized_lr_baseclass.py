@@ -455,7 +455,7 @@ class quantumLRBaseClass:
         for state_number in range(len(self.excitation_vectors[0])):
             # Pernille 
             ZZqG = np.outer(self._Z_qG[:, state_number].conj(), self._Z_qG[:, state_number])
-            YYqG = np.outer(self._Y_qG[:, state_number], self._Y_qG[:, state_number].conj().transpose())
+            YYqG = np.outer(self._Y_qG[:, state_number], self._Y_qG[:, state_number].conj())
             norms[state_number] = np.sum(self.metric[: self.num_qG, : self.num_qG] * (ZZqG - YYqG))
             # # Get Z_q Z_G Y_q and Y_G matrices
             # ZZq = np.outer(self._Z_q[:, state_number], self._Z_q[:, state_number].transpose())

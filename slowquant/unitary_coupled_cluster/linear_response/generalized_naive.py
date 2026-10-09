@@ -756,9 +756,9 @@ class LinearResponse(LinearResponseBaseClass):
                 muz_ket,
                 *self.index_info,
             )
-            transition_dipoles[state_number, 0] = q_part_x - transition_dipole_x
-            transition_dipoles[state_number, 1] = q_part_y - transition_dipole_y
-            transition_dipoles[state_number, 2] = q_part_z - transition_dipole_z
+            transition_dipoles[state_number, 0] = -q_part_x + transition_dipole_x
+            transition_dipoles[state_number, 1] = -q_part_y + transition_dipole_y
+            transition_dipoles[state_number, 2] = -q_part_z + transition_dipole_z
         return transition_dipoles
     
     # def get_oscillator_strengths(self, dipole_integrals):
