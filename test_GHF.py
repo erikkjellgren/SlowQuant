@@ -443,7 +443,7 @@ def h3():
                   H  1.000000   0.000000       0.000000;
                   H  0.500000   0.8660254038   0.000000"""
     # basis = "def2SVP"
-    basis = "631-g"
+    basis = "sto-3g"
     #active_space = ((2, 1), 6)
     active_space = ((2,1), 6)
     #active_space = (2, 4)

@@ -315,7 +315,7 @@ class FermionicOperator:
                 else:
                     new_op.append((op[0], True))
             new_op_key = tuple(new_op)
-            operators[new_op_key] = self.operators[op_key]
+            operators[new_op_key] = self.operators[op_key].conjuagte() #AE Claude (.conj for complex coefficients)
         # Do normal ordering of comlex conjugated operator.
         operators_ordered = do_extended_normal_ordering(FermionicOperator(operators))
         return FermionicOperator(operators_ordered)
