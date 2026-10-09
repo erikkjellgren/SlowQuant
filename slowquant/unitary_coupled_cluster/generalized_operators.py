@@ -128,21 +128,21 @@ def DHF_hamiltonian_1i_1a(
     Returns:
         Modified Hamiltonian fermionic operator.
     """
-    num_spin_orbs = num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs
+    num_spin_orbs = num_NES + num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs
     hamiltonian_operator = FermionicOperator({})
     virtual_start = num_NES + num_inactive_spin_orbs + num_active_spin_orbs
-    for P in range(num_NES, num_NES + num_spin_orbs):
-        for Q in range(num_NES, num_NES + num_spin_orbs):
+    for P in range(num_spin_orbs):
+        for Q in range(num_spin_orbs):
             if P >= virtual_start and Q >= virtual_start:
                 continue
             if P < num_inactive_spin_orbs and Q < num_inactive_spin_orbs and P != Q:
                 continue
             if abs(h_mo[P, Q]) > 10**-14:
                 hamiltonian_operator += h_mo[P, Q] * a_op_spin(P,dagger=True)*a_op_spin(Q,dagger=False)
-    for P in range(num_NES, num_NES + num_spin_orbs):
-        for Q in range(num_NES, num_NES + num_spin_orbs):
-            for R in range(num_NES, num_NES + num_spin_orbs):
-                for S in range(num_NES, num_NES + num_spin_orbs):
+    for P in range(num_spin_orbs):
+        for Q in range(num_spin_orbs):
+            for R in range(num_spin_orbs):
+                for S in range(num_spin_orbs):
                     num_virt, num_act = (0,0)
                     for item in [P,Q,R,S]:
                         if item >= virtual_start:

@@ -91,6 +91,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     C_MO=np.array(mf.mo_coeff,dtype=complex)
 
+    print("Max imag c_mo:",np.max(np.abs(C_MO.imag)))
+
    
     # Kramers restricted operators?
     S_ovlp = mf.get_ovlp()
@@ -133,7 +135,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
     # small random anti-Hermitian
-    eps = 0.07  # controls "step size"
+    eps = 0.001  # controls "step size"
     X_anti = np.random.randn(C_MO.shape[0],C_MO.shape[0]) + 1j*np.random.randn(C_MO.shape[0],C_MO.shape[0])
     A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian
 
@@ -157,23 +159,23 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # # # Optimization:
     # DHF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-10, maxiter = 1000)
 
-    #data = np.load("H2-dyallv2z((1,1),6).npz")
+    data = np.load("H2_dyall_v2z_new_116.npz")
 
 
     # WF object:
     WF = GeneralizedWaveFunctionUPS(
         active_space,
-        C_U,
+        data["c_mo"],
         mol, 
         K_pairs,
         False,
         "fUCCSD",
-        {"n_layers": 0, "is_spin_conserving" : False},
+        {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
 
-    #WF.set_thetas(data["thetas_real"], data["thetas_imag"])
+    WF.set_thetas(data["thetas_real"], data["thetas_imag"])
 
     
     # if len(WF.thetas) > 0:
@@ -201,15 +203,23 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #print("qs: ", WF2.kappa_no_activeactive_spin_idx_resp)
 
     # Optimization:
-    WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-10, maxiter = 1000)
+    #WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-10, maxiter = 1000)
+
+    print("Max imag c_mo:",np.max(np.abs(WF.c_mo.imag)))
 
     #  WF:
-    np.savez(
-        "H2_dyall_v2z_new",
-        c_mo=WF.c_mo,
-        thetas_real=WF.thetas_real,
-        thetas_imag=WF.thetas_imag
-        )
+    # np.savez(
+    #     "H2_dyall_v2z_new_116",
+    #     c_mo=WF.c_mo,
+    #     thetas_real=WF.thetas_real,
+    #     thetas_imag=WF.thetas_imag
+    #     )
+
+    #  WF:
+    # np.savez(
+    #     "H2_dyall_v2z_DHF",
+    #     c_mo=WF.c_mo,
+    #     )
 
     print("Electronic energy:", WF.energy_elec)
 

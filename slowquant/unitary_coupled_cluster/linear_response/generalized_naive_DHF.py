@@ -74,8 +74,8 @@ class LinearResponse(LinearResponseBaseClass):
                 A = get_orbital_response_hessian_block(
                     self.wf.h_mo,
                     self.wf.g_mo,
-                    self.wf.kappa_no_activeactive_spin_idx_resp,
                     self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
+                    self.wf.kappa_no_activeactive_spin_idx_resp,
                     self.wf.num_spin_orbs_NES,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
@@ -108,8 +108,8 @@ class LinearResponse(LinearResponseBaseClass):
 
             self.finite_excitations_idx = finite_excitations
 
-            self.q_ops_finite = finite_excitations[:self.num_q_ops_finite]
-            self.G_ops_finite = finite_excitations[self.num_q_ops_finite:]
+            self.q_ops_finite = finite_excitations[:len(self.q_ops)]
+            self.G_ops_finite = finite_excitations[len(self.q_ops):]
 
             # Removing operators:
             self.q_ops = [q for q, finite in zip(self.q_ops, self.q_ops_finite) if finite]
@@ -620,7 +620,7 @@ class LinearResponse(LinearResponseBaseClass):
         if len(self.q_ops) != 0:
             V[:idx_shift_q, :] = get_orbital_response_static_property_gradient_DHF(
                 mo,
-                self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
+                self.wf.kappa_no_activeactive_spin_idx_resp,
                 self.wf.num_spin_orbs_NES,
                 self.wf.num_inactive_spin_orbs,
                 self.wf.num_active_spin_orbs,
@@ -785,7 +785,8 @@ class LinearResponse(LinearResponseBaseClass):
         # Determine hermiticity per component to set correct sign of lower block
         lower_V = np.zeros_like(V)
         for i in range(num_mo):
-            if np.allclose(mo_trans[i], mo_trans[i].conj().T, atol=1e-10):
+            #if np.allclose(mo_trans[i], mo_trans[i].conj().T, atol=1e-10):
+            if np.abs(mo_trans[i] - mo_trans[i].conj().T).max() < 1e-8 * np.abs(mo_trans[i]).max():
                 # Hermitian operator: lower block is -V*
                 lower_V[:, i] = -V[:, i].conj()
             else:
