@@ -6,6 +6,7 @@ from scipy.linalg import solve
 from pyscf.x2c import sfx2c1e
 from pyscf import cc
 import scipy.linalg
+from scipy.linalg import expm
 
 # from pyscf.x2c.x2c import dip_moment
 
@@ -32,8 +33,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     mf = scf.GHF(mol)
 
-    mf.conv_tol_grad = 1e-10 #gradient tolerance form PYSCF
-
+    mf.conv_tol_grad = 1e-8 #gradient tolerance form PYSCF
+    mf.conv_tol =1e-10
     mf.max_cycle = 50000
 
     # mf.scf()
@@ -45,48 +46,37 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     e_nuc=mf.energy_nuc()
     print(e_nuc)
-    # "Non-relativistic integrals"
-    # h_1e = mol.intor("int1e_kin")  
-    # h_nuc=mol.intor("int1e_nuc")
-    # h_core=mol.intor("int1e_kin")+mol.intor("int1e_nuc")
-    # g_eri = mol.intor("int2e")
-    # print('Non-relativistic her',h_core)
-
-
- 
-    # "Relativistic integrals"
-    # h_core=mf.get_hcore()
-    # g_eri = mol.intor("int2e")
-
-    # mc = mcscf.CASCI(mf, active_space[1], active_space[0])
-
-    #make a random unitary transformation
-    # u = unitary_group.rvs(c.shape[0]) 
-    # print(np.dot(u, u.conj().T))
-    # C_u = c @ u[0] 
-    # mc = mcscf.CASCI(mf, active_space[1], active_space[0])
     
+    # Small step
+    # eps = 0.07
+    # X_anti = np.random.randn(coeff.shape[0],coeff.shape[0]) + 1j*np.random.randn(coeff.shape[0],coeff.shape[0])
+    # A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian
+
+    # # Small real step
+    # # X = np.random.randn(c_mo.shape[0], c_mo.shape[0])
+    # # A_mat = eps * (X - X.T) / 2   # real antisymmetric
+
+    # step = expm(A_mat)            # orthogonal (= unitary for real matrices)
+    # c_u = coeff @ step
+
+    # print(c_u)
     # # Slowquant
     
     WF =GeneralizedWaveFunctionUPS(
         # mol.nelectron,
         active_space,
         coeff,
-        #C_u,
         mol,
-        "fUCCSDTQ",
+        "fUCCSD",
         False, #Do x2c
         {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
-    # ny_theta_real = np.random.uniform(-0.05, 0.05, len(WF.thetas))
-    # # print(ny_theta_real)
-    # ny_theta_imag = np.random.uniform(-0.05,0.05,len(WF.thetas)) 
-    # # ny_theta_imag = [0.0] * len(WF.thetas)
-    # # print(ny_theta_imag)
-    # WF.set_thetas(ny_theta_real, ny_theta_imag)
-    # # print('Theats noisy',WF.thetas)
+    ny_theta_real = np.random.uniform(-0.05, 0.05, len(WF.thetas))
+    ny_theta_imag = [0.0] * len(WF.thetas)
+
+    WF.set_thetas(ny_theta_real, ny_theta_imag)
 
     # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
 
@@ -94,7 +84,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # print(WF.c_mo)
 
-    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
+    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
 
     # print("E_opt:", WF._energy_elec)
     print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
@@ -106,11 +96,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # dip_ao = build_x2c_pc_operator(mf, mol, "int1e_r", 'int1e_sprsp', c, x2c=False, picture_change=True)
 
 
-    # "Calculate Excitation energies"
-    # LR = generalized_naive.LinearResponse(WF, excitations="sd")
-    # LR.calc_excitation_energies()
-    # print(LR.excitation_energies)
-    # print(LR.get_oscillator_strength(mol.intor("int1e_r")))
+    "Calculate Excitation energies"
+    LR = generalized_naive.LinearResponse(WF, excitations="sd")
+    LR.calc_excitation_energies()
+    print(LR.excitation_energies)
+    print(LR.get_oscillator_strength(mol.intor("int1e_r")))
 
 
     # print(dip_ao.shape)
@@ -452,8 +442,8 @@ def h3():
     geometry = """H  0.000000   0.000000       0.000000;
                   H  1.000000   0.000000       0.000000;
                   H  0.500000   0.8660254038   0.000000"""
-    basis = "def2SVP"
-    # basis = "631-g"
+    # basis = "def2SVP"
+    basis = "631-g"
     #active_space = ((2, 1), 6)
     active_space = ((2,1), 6)
     #active_space = (2, 4)
@@ -544,7 +534,7 @@ def O2():
     )
 
 # O2() 
-# h3()
+h3()
 # h2()
 # h4_rektangle()
 # HI()
@@ -554,7 +544,7 @@ def O2():
 # h2o()
 # LiH()
 # HCl()
-HF()
+# HF()
 # h5()
 
 

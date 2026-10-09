@@ -373,7 +373,7 @@ class FermionicOperator:
                 remapping[2 * i + 1 - 2 * num_orbs] = i
         for op_key in self.operators.keys():
             qiskit_str = operator_to_qiskit_key(op_key, remapping)
-            qiskit_form[qiskit_str] = float((self.operators[op_key]).real)
+            qiskit_form[qiskit_str] = (self.operators[op_key])
         return qiskit_form
     
     def get_qiskit_form_real(self, num_orbs: int) -> dict[str, float | complex]: 

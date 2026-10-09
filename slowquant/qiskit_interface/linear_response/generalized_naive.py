@@ -513,7 +513,7 @@ class quantumLR(quantumLRBaseClass):
             Array of standard deviations for A, B and Sigma
         """
 
-        print('Renarto is batsman')
+        print('Renarto is batman')
         idx_shift = self.num_q
         print("Gs", self.num_G)
         print("qs", self.num_q)
