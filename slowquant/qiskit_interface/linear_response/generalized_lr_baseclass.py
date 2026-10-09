@@ -423,7 +423,7 @@ class quantumLRBaseClass:
         norms = self._get_excited_state_norm()
         for state_number, norm in enumerate(norms):
             norm = norm.real
-            if norm < 10**-10:
+            if abs(norm) < 10**-10:
                 print(f"WARNING: State number {state_number} could not be normalized. Norm of {norm}.")
                 continue
             factor = 1 / np.sqrt(abs(norm))
