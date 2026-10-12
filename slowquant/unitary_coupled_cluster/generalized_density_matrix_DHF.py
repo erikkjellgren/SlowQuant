@@ -1746,7 +1746,7 @@ def get_exp_val_RMB_GIAO(rdm1, num_spin_orbs_NES, num_inactive_spin_orbs, num_ac
                     
                 for P in range(num_spin_orbs_NES + num_inactive_spin_orbs, num_spin_orbs_NES + num_inactive_spin_orbs + num_active_spin_orbs):
                     for Q in range(num_spin_orbs_NES + num_inactive_spin_orbs, num_spin_orbs_NES + num_inactive_spin_orbs + num_active_spin_orbs):
-                        dia[ATM, a, b] += mo[ATM, a, b, P, Q] * RDM1(Q, P, num_spin_orbs_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+                        dia[ATM, a, b] += mo[ATM, a, b, P, Q] * RDM1(P, Q, num_spin_orbs_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
 
     return dia
 

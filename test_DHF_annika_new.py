@@ -166,6 +166,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF = GeneralizedWaveFunctionUPS(
         active_space,
         data["c_mo"],
+        #C_MO,
         mol, 
         K_pairs,
         False,
@@ -203,17 +204,17 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #print("qs: ", WF2.kappa_no_activeactive_spin_idx_resp)
 
     # Optimization:
-    #WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-10, maxiter = 1000)
+    WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True, tol = 1e-14, maxiter = 1000)
 
     print("Max imag c_mo:",np.max(np.abs(WF.c_mo.imag)))
 
     #  WF:
-    # np.savez(
-    #     "H2_dyall_v2z_new_116",
-    #     c_mo=WF.c_mo,
-    #     thetas_real=WF.thetas_real,
-    #     thetas_imag=WF.thetas_imag
-    #     )
+    np.savez(
+        "H2_dyall_v2z_116_1e-14",
+        c_mo=WF.c_mo,
+        thetas_real=WF.thetas_real,
+        thetas_imag=WF.thetas_imag
+        )
 
     #  WF:
     # np.savez(
@@ -222,7 +223,6 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #     )
 
     print("Electronic energy:", WF.energy_elec)
-
 
 
     LR = generalized_naive_DHF.LinearResponse(WF, excitations="SD", screen = True)
@@ -325,6 +325,8 @@ def H3():
     basis = "631-g"
     #basis = "sto-3g"
     #basis = "def-2-svp"
+    dyall_v2z = bse.get_basis('dyall-v2z', elements=['H'], fmt='nwchem')
+    basis = dyall_v2z
     active_space = ((2, 1), 6)
     #active_space = (2, 4)
     charge = 0
@@ -382,8 +384,8 @@ def HF():
     #     'H': '6-31g**',
     #     'F': L_atom,
     # }
-    #active_space = ((2, 2), 6)
-    active_space = ((5, 5), 10)
+    active_space = ((2, 2), 6)
+    #active_space = ((5, 5), 10)
     #active_space = ((1,1), 4)
     #active_space = ((5,5), 12)
     charge = 0

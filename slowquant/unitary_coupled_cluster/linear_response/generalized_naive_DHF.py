@@ -620,7 +620,7 @@ class LinearResponse(LinearResponseBaseClass):
         if len(self.q_ops) != 0:
             V[:idx_shift_q, :] = get_orbital_response_static_property_gradient_DHF(
                 mo,
-                self.wf.kappa_no_activeactive_spin_idx_resp,
+                self.wf.kappa_no_activeactive_spin_idx_dagger_resp,
                 self.wf.num_spin_orbs_NES,
                 self.wf.num_inactive_spin_orbs,
                 self.wf.num_active_spin_orbs,
