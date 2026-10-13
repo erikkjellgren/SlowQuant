@@ -326,8 +326,38 @@ class CliqueHead:
         self.distr = CliqueSaver()
 
 
+def labels_to_masks(paulis: list[str]) -> tuple[np.ndarray, np.ndarray]:
+    """Pauli labels (qN...q0) to integer x and z masks (bit j = qubit j)."""
+    if len(paulis) == 0:
+        return np.zeros(0, np.int64), np.zeros(0, np.int64)
+    n = len(paulis[0])
+    a = np.frombuffer("".join(paulis).encode(), dtype=np.uint8).reshape(len(paulis), n)[:, ::-1]
+    w = np.left_shift(np.int64(1), np.arange(n, dtype=np.int64))
+    x = ((a == ord("X")) | (a == ord("Y"))) @ w
+    z = ((a == ord("Z")) | (a == ord("Y"))) @ w
+    return x.astype(np.int64), z.astype(np.int64)
+
+
+def masks_to_label(x: int, z: int, n: int) -> str:
+    """Integer x and z masks to Pauli label (qN...q0)."""
+    letters = "IXZY"
+    return "".join(letters[((x >> j) & 1) | (((z >> j) & 1) << 1)] for j in range(n - 1, -1, -1))
+
+
+def pauli_values_from_distr(
+    distr: dict[int, float], x: np.ndarray, z: np.ndarray
+) -> np.ndarray:
+    """Expectation values of Hermitian Paulis (masks x, z) measured in one clique basis from its distribution."""
+    if len(distr) == 0:
+        return np.zeros(len(x))
+    k = np.fromiter(distr.keys(), dtype=np.int64, count=len(distr))
+    p = np.fromiter(distr.values(), dtype=float, count=len(distr))
+    par = (np.bitwise_count(k[None, :] & (np.asarray(x) | np.asarray(z))[:, None]) & 1).astype(np.float64)
+    return (1.0 - 2.0 * par) @ p
+
+
 class Clique:
-    """Clique class.
+    """Clique class (qubit-wise commuting groups, integer bitmask implementation).
 
     #. 10.1109/TQE.2020.3035814, Sec. IV. A, IV. B, and VIII.
     """
@@ -336,6 +366,16 @@ class Clique:
         """Initialize clique class."""
         self.cliques: list[CliqueHead] = []
         self.csfs_option = csfs_option
+        self._hx = np.zeros(0, np.int64)
+        self._hz = np.zeros(0, np.int64)
+        self._n = 0
+
+    def _fit(self, x: int, z: int) -> np.ndarray:
+        hx, hz = self._hx, self._hz
+        return np.flatnonzero(((hx ^ x) | (hz ^ z)) & (x | z) & (hx | hz) == 0)
+
+    def _cover(self, x: int, z: int) -> np.ndarray:
+        return np.flatnonzero(((self._hx ^ x) | (self._hz ^ z)) & (x | z) == 0)
 
     def add_paulis(self, paulis: list[str]) -> list[str]:
         """Add list of Pauli strings to cliques and return clique heads to be simulated.
@@ -346,33 +386,35 @@ class Clique:
         Returns:
             List of clique heads to be calculated.
         """
-        # The special case of computational basis
-        # should always be the first clique.
+        if len(paulis) == 0:
+            return [c.head for c in self.cliques if c.distr.is_empty()]
+        self._n = len(paulis[0])
         if len(self.cliques) == 0:
-            self.cliques.append(CliqueHead("Z" * len(paulis[0])))
-
-        # Loop over Pauli strings (passed via observable) in reverse sorted order
-        for pauli in sorted(paulis, reverse=True):
-            # Loop over Clique heads simulated so far
-            for clique_head in self.cliques:
-                # Check if Pauli string belongs to any already simulated Clique head.
-                do_fit, head_fit = fit_in_clique(pauli, clique_head.head)
-                if do_fit:
-                    if head_fit != clique_head.head:
-                        # Update Clique head by resetting distr (= to be simulated)
-                        clique_head.distr.reset()
-                    clique_head.head = head_fit
-                    break
-            else:  # no break
-                # Pauli String does not fit any simulated Clique head and has to be simulated
-                self.cliques.append(CliqueHead(pauli))
-
-        # Find new Paulis that need to be measured
-        new_heads = []
-        for clique_head in self.cliques:
-            if clique_head.distr.is_empty():
-                new_heads.append(clique_head.head)
-        return new_heads
+            self.cliques.append(CliqueHead("Z" * self._n))
+            self._hx = np.zeros(1, np.int64)
+            self._hz = np.array([(1 << self._n) - 1], np.int64)
+        srt = sorted(set(paulis), reverse=True)
+        xs, zs = labels_to_masks(srt)
+        changed = set()
+        for x, z in zip(xs.tolist(), zs.tolist()):
+            if len(self._cover(x, z)):
+                continue
+            ok = self._fit(x, z)
+            if len(ok):
+                j = int(ok[0])
+                self._hx[j] |= x
+                self._hz[j] |= z
+                if not self.cliques[j].distr.is_empty():
+                    self.cliques[j].distr.reset()
+                changed.add(j)
+            else:
+                self._hx = np.append(self._hx, x)
+                self._hz = np.append(self._hz, z)
+                self.cliques.append(CliqueHead(""))
+                changed.add(len(self.cliques) - 1)
+        for j in changed:
+            self.cliques[j].head = masks_to_label(int(self._hx[j]), int(self._hz[j]), self._n)
+        return [c.head for c in self.cliques if c.distr.is_empty()]
 
     def update_distr(
         self,
@@ -387,21 +429,28 @@ class Clique:
             new_distr: List of sample state distributions.
             mitigation_flags: Mitigation flags object, default is None.
         """
+        pos = {c.head: c for c in self.cliques}
         for head, distr in zip(new_heads, new_distr):
-            for clique_head in self.cliques:
-                if head == clique_head.head:
-                    if not clique_head.distr.is_empty(mitigation_flags):
-                        raise ValueError(
-                            f"Trying to update head distr that is not None. Head; {clique_head.head}; mitigation; {mitigation_flags}"
-                        )
-                    clique_head.distr.add_distr(distr, mitigation_flags)
-
-        # Check that all heads have a distr
+            clique_head = pos[head]
+            if not clique_head.distr.is_empty(mitigation_flags):
+                raise ValueError(
+                    f"Trying to update head distr that is not None. Head; {clique_head.head}; mitigation; {mitigation_flags}"
+                )
+            clique_head.distr.add_distr(distr, mitigation_flags)
         for clique_head in self.cliques:
             if clique_head.distr.is_empty(mitigation_flags):
-                raise ValueError(
-                    f"Head, {clique_head.head}, has not been allocated for mitigation; {mitigation_flags}"
-                )
+                clique_head.distr.add_distr({}, mitigation_flags)
+
+    def head_index(self, paulis: list[str]) -> np.ndarray:
+        """Index of the clique that covers each Pauli string."""
+        xs, zs = labels_to_masks(paulis)
+        idx = np.empty(len(paulis), dtype=np.int64)
+        for i, (x, z) in enumerate(zip(xs.tolist(), zs.tolist())):
+            ok = self._cover(x, z)
+            if len(ok) == 0:
+                raise ValueError(f"Could not find matching clique for Pauli, {paulis[i]}")
+            idx[i] = ok[0]
+        return idx
 
     def get_distr(self, pauli: str, mitigation_flags: MitigationFlags | None = None) -> dict[int, float]:
         """Get sample state distribution for a Pauli string.
@@ -413,59 +462,51 @@ class Clique:
         Returns:
             Sample state distribution.
         """
-        for clique_head in self.cliques:
-            do_fit, head_fit = fit_in_clique(pauli, clique_head.head)
-            if do_fit:
-                if clique_head.head != head_fit:
-                    raise ValueError(
-                        f"Found matching clique, but head will be mutated. Head; {clique_head.head}, Pauli; {pauli}"
-                    )
-                if clique_head.distr.is_empty(mitigation_flags):
-                    raise ValueError(
-                        f"Head, {clique_head.head}, has no distribution for mitigation; {mitigation_flags}"
-                    )
-                return clique_head.distr.get_distr(mitigation_flags)
-        raise ValueError(f"Could not find matching clique for Pauli, {pauli}")
+        clique_head = self.cliques[self.head_index([pauli])[0]]
+        if clique_head.distr.is_empty(mitigation_flags):
+            return {}
+        return clique_head.distr.get_distr(mitigation_flags)
 
-    def get_empty_heads(self, mitigation_int) -> list[str]:
-        """Return all heads that do not have any data for a specific mitigation int.
+    def expectation_values(
+        self, paulis: list[str], mitigation_flags: MitigationFlags | None = None
+    ) -> np.ndarray:
+        """Expectation values of Hermitian Pauli strings from the stored clique distributions (vectorized)."""
+        idx = self.head_index(paulis)
+        xs, zs = labels_to_masks(paulis)
+        out = np.zeros(len(paulis))
+        for h in np.unique(idx):
+            sel = np.flatnonzero(idx == h)
+            ch = self.cliques[h]
+            d = {} if ch.distr.is_empty(mitigation_flags) else ch.distr.get_distr(mitigation_flags)
+            out[sel] = pauli_values_from_distr(d, xs[sel], zs[sel])
+        return out
+
+    def get_empty_heads(self, mitigation_flags: MitigationFlags | None = None) -> list[str]:
+        """Return all heads that do not have data for a mitigation configuration.
 
         Args:
-            mitigation_int: Mitigation integer, default is 0.
+            mitigation_flags: Mitigation flags object, default is None.
 
         Returns:
-            List of heads that have no data for the given mitigation integer.
+            List of heads that have no data for the given mitigation configuration.
         """
-        empties = []
-        for clique_head in self.cliques:
-            if clique_head.distr.is_empty(mitigation_int):
-                empties.append(clique_head.head)
-        return empties
+        return [c.head for c in self.cliques if c.distr.is_empty(mitigation_flags)]
 
-    def get_distr_heads(self, heads: list[str], mitigation_int: int = 0) -> list[dict[int, float]]:
+    def get_distr_heads(
+        self, heads: list[str], mitigation_flags: MitigationFlags | None = None
+    ) -> list[dict[int, float]]:
         """Return the distribution data for a list of heads and for a given mitigation int (default 0).
-
-        This function looks only for the specific heads given, not trying to find pauli strings in commuting heads.
-        The latter would be the function get_distr.
 
         Args:
             heads: List of clique heads.
-            mitigation_int: Mitigation integer, default is 0.
+            mitigation_flags: Mitigation flags object, default is None.
 
         Returns:
             List of distributions for the given heads and mitigation integer.
         """
-        distr = []
-        # This needs looping many times over all cliques.
-        # To avoid this one would need to re-write the whole clique structure into dictionaries.
-        # But this might make the other clique operations slower.
-        for head in heads:
-            for clique_heads in self.cliques:
-                if clique_heads.head == head:
-                    distr.append(clique_heads.distr.data[mitigation_int])
-                    break
-
-        return distr
+        pos = {c.head: c for c in self.cliques}
+        m = mitigation_flags.to_int() if mitigation_flags is not None else 0
+        return [pos[h].distr.data[m] for h in heads]
 
     def get_empty_heads_distr(
         self, mitigation_flags: MitigationFlags
@@ -484,7 +525,7 @@ class Clique:
         for clique_head in self.cliques:
             if clique_head.distr.is_empty(mitigation_flags):
                 heads.append(clique_head.head)
-                distr.append(clique_head.distr.data[0].copy())  # raw data
+                distr.append(clique_head.distr.data[0].copy())
         return heads, distr
 
     def print_cliques(self) -> None:
@@ -496,10 +537,7 @@ class Clique:
     def print_clique_heads(self) -> None:
         """Print all clique heads."""
         print("Clique heads:")
-        heads = []
-        for clique_head in self.cliques:
-            heads.append(clique_head.head)
-        print(heads)
+        print([c.head for c in self.cliques])
 
 
 def fit_in_clique(pauli: str, head: str) -> tuple[bool, str]:
@@ -805,6 +843,7 @@ def postselection(
     mapper: FermionicMapper,
     num_elec: tuple[int, int],
     num_qubits: int,
+    ansatz_options,
 ) -> dict[int, float]:
     r"""Perform post-selection on distribution in computational basis.
 
@@ -837,9 +876,21 @@ def postselection(
     Returns:
         Post-selected distribution.
     """
+    if "is_spin_conserving" in ansatz_options.keys():
+        is_spin_conserving = ansatz_options["is_spin_conserving"]
+        if not is_spin_conserving:
+            print("WARNING: Operators are not spin conserving.")  # AWE
+
     new_dist = {}
     prob_sum = 0.0
-    if isinstance(mapper, JordanWignerMapper):
+    if isinstance(mapper, JordanWignerMapper) and is_spin_conserving == False:
+        for bitint, val in dist.items():
+            bitstr = format(bitint, f"0{num_qubits}b")
+            if bitstr.count("1") == np.sum(num_elec):
+                new_dist[int(bitstr, 2)] = val
+                prob_sum += val
+
+    elif isinstance(mapper, JordanWignerMapper):
         for bitint, val in dist.items():
             bitstr = format(bitint, f"0{num_qubits}b")
             num_a = len(bitstr) // 2
@@ -849,6 +900,7 @@ def postselection(
             if bitstr_a.count("1") == num_elec[0] and bitstr_b.count("1") == num_elec[1]:
                 new_dist[int(bitstr, 2)] = val
                 prob_sum += val
+
     elif isinstance(mapper, ParityMapper):
         for bitint, val in dist.items():
             bitstr = format(bitint, f"0{num_qubits}b")

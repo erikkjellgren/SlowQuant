@@ -16,7 +16,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     generalized_one_electron_transform,
     generalized_two_electron_transform,
 )
-from slowquant.qiskit_interface.interface import QuantumInterface
+from slowquant.qiskit_interface.generalized_interface import QuantumInterface
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_electronic_energy_generalized,
@@ -29,7 +29,7 @@ from slowquant.unitary_coupled_cluster.generalized_operators import (
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 
 
-class WaveFunctionCircuit:
+class GeneralizedWaveFunctionCircuit:
     def __init__(
         self,
         num_elec: int,
@@ -91,8 +91,8 @@ class WaveFunctionCircuit:
         self.active_unocc_spin_idx_shifted = []
         self.num_energy_evals = 0  # number of energy measurements on quanutm
         self.num_elec = num_elec
-        self.num_spin_orbs = 2 * len(h_ao)
-        self.num_orbs = len(h_ao)
+        self.num_spin_orbs = len(mo_coeffs)
+        self.num_orbs = self.num_spin_orbs // 2
         self.num_active_elec_alpha = cas[0][0]
         self.num_active_elec_beta = cas[0][1]
         self.num_active_elec = self.num_active_elec_alpha + self.num_active_elec_beta
@@ -173,12 +173,13 @@ class WaveFunctionCircuit:
                             self.kappa_redundant_spin_idx.append((P, Q))
                             continue
                     if P in self.active_unocc_spin_idx and Q in self.active_unocc_spin_idx:
-                        self._kappa_real_redundant.append(0.0)
-                        self._kappa_imag_redundant.append(0.0)
-                        self._kappa_real_redundant_old.append(0.0)
-                        self._kappa_imag_redundant_old.append(0.0)
-                        self.kappa_redundant_spin_idx.append((P, Q))
-                        continue
+                        if P != Q:
+                            self._kappa_real_redundant.append(0.0)
+                            self._kappa_imag_redundant.append(0.0)
+                            self._kappa_real_redundant_old.append(0.0)
+                            self._kappa_imag_redundant_old.append(0.0)
+                            self.kappa_redundant_spin_idx.append((P, Q))
+                            continue
                 if not (P in self.active_spin_idx and Q in self.active_spin_idx):
                     self.kappa_no_activeactive_spin_idx.append((P, Q))
                     self.kappa_no_activeactive_spin_idx_dagger.append((Q, P))
@@ -189,9 +190,20 @@ class WaveFunctionCircuit:
                 self.kappa_spin_idx.append((P, Q))
         # Setup Qiskit stuff
         self.QI = quantum_interface
-        self.QI.construct_circuit(
-            2 * self.num_active_spin_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta)
+        self.QI.construct_circuit(self.active_occ_spin_idx_shifted,
+            self.active_unocc_spin_idx_shifted,
+            self.num_active_spin_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta) #AE
         )
+
+        self._thetas_real = [0.0] * (self.QI.circuit.num_parameters // 2) #AE
+        self._thetas_imag = [0.0] * (self.QI.circuit.num_parameters // 2) #AE
+
+        # self.QI.construct_circuit(occ_spin_idx=self.active_occ_spin_idx, unocc_spin_idx= self.active_unocc_spin_idx, 
+        #                           num_orbs=self.num_orbs, num_elec=(self.num_active_elec_alpha, self.num_active_elec_beta),
+        #                         ) 
+        
+        # Merge conflict AWE
+
 
     @property
     def kappa_real(self) -> list[float]:
@@ -217,7 +229,7 @@ class WaveFunctionCircuit:
         if isinstance(self._kappa_real, np.ndarray):
             self._kappa_real = self._kappa_real.tolist()
         if isinstance(self._kappa_imag, np.ndarray):
-            self._kappa_img = self._kappa_imag.tolist()
+            self._kappa_imag = self._kappa_imag.tolist() #AE img ændret til imag??
         # Move current expansion point.
         self._c_mo = self.c_mo
         self._kappa_real_old = self.kappa_real
@@ -262,6 +274,7 @@ class WaveFunctionCircuit:
         """
         if self._h_mo is None:
             self._h_mo = generalized_one_electron_transform(self.c_mo, self._h_ao)
+            # self._h_mo = DHF_one_electron_transform(self.c_mo, self._h_ao)
         return self._h_mo
 
     @property
@@ -302,7 +315,41 @@ class WaveFunctionCircuit:
         """
         return self.QI.parameters
 
-    def set_thetas(self, theta_real: list[float], theta_imag: list[float]) -> None:
+    def set_thetas(self, theta_r: list[float], theta_phi: list[float]) -> None:
+        """Set theta values.
+
+        Args:
+            theta_vals: theta values.
+        """
+        if len(theta_r) != len(self._thetas_real):
+            raise ValueError(f"Expected {len(self._thetas_real)} real theta values got {len(theta_r)}")
+        # Remove this warning for running with real valued thetas:
+        if len(theta_phi) != len(self._thetas_imag):
+            raise ValueError(
+                f"Expected {len(self._thetas_imag)} imaginary theta values got {len(theta_phi)}"
+            )
+        self._rdm1 = None
+        self._rdm2 = None
+        self._energy_elec = None
+
+        self._thetas_real = theta_r.copy()
+        self._thetas_imag = theta_phi.copy()
+
+        if isinstance(self._thetas_real, np.ndarray):
+            self._thetas_real = self._thetas_real.tolist()
+        if isinstance(self._thetas_imag, np.ndarray):
+            self._thetas_imag = self._thetas_imag.tolist() #AE ændret img to imag??
+
+        # self.QI.parameters = (np.array(self.thetas_real) + 1.0j * np.array(self.thetas_imag)).tolist() #AE
+        self.QI.parameters = np.concatenate([np.array(self.thetas_real), np.array(self.thetas_imag)]
+                                         ).tolist() #AE added + AE real+imag attempt
+        
+        #print(theta_r)
+        #print(theta_phi)
+        #print(self.QI.parameters)
+        # self.QI.parameters = np.asarray(self.thetas_real).tolist() #Test only real AE
+
+    def set_thetas_initial(self, theta_real: list[float], theta_imag: list[float]) -> None:
         """Set theta values.
 
         Args:
@@ -318,13 +365,28 @@ class WaveFunctionCircuit:
         self._rdm1 = None
         self._rdm2 = None
         self._energy_elec = None
-        self._thetas_real = theta_real.copy()
-        self._thetas_imag = theta_imag.copy()
+
+        theta_r = np.sqrt(np.power(theta_real,2) + np.power(theta_imag,2))
+        theta_phi = np.arctan2(theta_imag, theta_real)
+
+        self._thetas_real = theta_r.copy()
+        self._thetas_imag = theta_phi.copy()
+
         if isinstance(self._thetas_real, np.ndarray):
             self._thetas_real = self._thetas_real.tolist()
         if isinstance(self._thetas_imag, np.ndarray):
-            self._thetas_img = self._thetas_imag.tolist()
-        self.QI.parameters = (np.array(self.thetas_real) + 1.0j * np.array(self.thetas_imag)).tolist()
+            self._thetas_imag = self._thetas_imag.tolist() #AE ændret img to imag??
+
+        #print(np.round(theta_real,3))
+        #print(np.round(self.thetas_real,3))
+        #print(np.round(self.thetas_imag,3))
+
+        # self.QI.parameters = (np.array(self.thetas_real) + 1.0j * np.array(self.thetas_imag)).tolist() #AE
+        self.QI.parameters = np.concatenate([np.array(self.thetas_real), np.array(self.thetas_imag)]
+                                         ).tolist() #AE added + AE real+imag attempt
+        # self.QI.parameters = np.asarray(self.thetas_real).tolist() #Test only real AE
+
+        #self._calc_gradient_optimization(self.QI.parameters, theta_optimization = True, kappa_optimization=False)
 
     def change_primitive(self, primitive: BaseSamplerV1 | BaseSamplerV2, verbose: bool = True) -> None:
         """Change the primitive expectation value calculator.
@@ -592,7 +654,7 @@ class WaveFunctionCircuit:
         print("### Parameters information:")
         if orbital_optimization:
             print(f"### Number kappa: {len(self.kappa_real)}")
-        print(f"### Number theta: {len(self.thetas)}")
+        print(f"### Number theta: {len(self.thetas)//2}")
         e_old = 1e12
         print("Full optimization")
         print("Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #")
@@ -627,13 +689,13 @@ class WaveFunctionCircuit:
             thetas = self.thetas_real + self.thetas_imag
             res = optimizer.minimize(
                 thetas,
-                extra_options={"R": self.QI.grad_param_R, "param_names": self.QI.param_names},
+                extra_options={"R": self.QI.grad_param_R_r, "param_names": self.QI.param_names},
             )
             thetas_r = []
             thetas_i = []
-            for i in range(len(self.thetas)):
+            for i in range(len(self.thetas)//2):
                 thetas_r.append(res.x[i])
-                thetas_i.append(res.x[i + len(self.thetas)])
+                thetas_i.append(res.x[i + len(self.thetas)//2])
             self.set_thetas(thetas_r, thetas_i)
 
             if orbital_optimization and len(self.kappa_real) != 0:
@@ -706,7 +768,7 @@ class WaveFunctionCircuit:
         print("### Parameters information:")
         if orbital_optimization:
             print(f"### Number kappa: {len(self.kappa_real)}")
-        print(f"### Number theta: {len(self.thetas)}")
+        print(f"### Number theta: {len(self.thetas)//2}")
         if optimizer_name.lower() == "rotosolve":
             if orbital_optimization and len(self.kappa_real) != 0:
                 raise ValueError(
@@ -750,12 +812,11 @@ class WaveFunctionCircuit:
             )
         if orbital_optimization:
             if len(self.thetas) > 0:
-                thetas = self.thetas_real + self.thetas_imag
-                parameters = np.zeros(2 * len(self.kappa_real), dtype=float).tolist() + thetas
+                parameters = self.kappa_real + self.kappa_imag + self.thetas
             else:
-                parameters = np.zeros(2 * len(self.kappa_real), dtype=float).tolist()
+                parameters = self.kappa_real + self.kappa_imag
         else:
-            parameters = self.thetas_real + self.thetas_imag
+            parameters = self.thetas.tolist()
         optimizer = Optimizers(
             energy,
             optimizer_name,
@@ -765,15 +826,16 @@ class WaveFunctionCircuit:
             energy_eval_callback=lambda: self.num_energy_evals,
         )
         res = optimizer.minimize(
-            parameters, extra_options={"R": self.QI.grad_param_R, "param_names": self.QI.param_names}
+            parameters, extra_options={"R": self.QI.grad_param_R_r, "param_names": self.QI.param_names}
         )
+        # AWE two R lists
         if orbital_optimization:
             if len(self.thetas) > 0:
                 thetas_r = []
                 thetas_i = []
-                for i in range(len(self.thetas)):
+                for i in range(len(self.thetas)//2):
                     thetas_r.append(res.x[i + 2 * len(self.kappa_real)])
-                    thetas_i.append(res.x[i + 2 * len(self.kappa_real) + len(self.thetas)])
+                    thetas_i.append(res.x[i + 2 * len(self.kappa_real) + (len(self.thetas) // 2)])
                 self.set_thetas(thetas_r, thetas_i)
             for i in range(len(self.kappa_real)):
                 self._kappa_real[i] = 0.0
@@ -783,11 +845,11 @@ class WaveFunctionCircuit:
         else:
             thetas_r = []
             thetas_i = []
-            for i in range(len(self.thetas)):
+            for i in range(len(self.thetas)//2):
                 thetas_r.append(res.x[i])
-                thetas_i.append(res.x[i + len(self.thetas)])
+                thetas_i.append(res.x[i + (len(self.thetas)//2)])
             self.set_thetas(thetas_r, thetas_i)
-        self._energy_elec = res.fun
+        #self._energy_elec = res.fun AWE og AE har udkommenteret
         self._energy_elec = res.fun
 
     def _calc_energy_optimization(
@@ -816,9 +878,9 @@ class WaveFunctionCircuit:
         if theta_optimization:
             thetas_r = []
             thetas_i = []
-            for i in range(len(self.thetas)):
+            for i in range(len(self.thetas)//2):
                 thetas_r.append(parameters[i + num_kappa])
-                thetas_i.append(parameters[i + num_kappa + len(self.thetas)])
+                thetas_i.append(parameters[i + num_kappa + (len(self.thetas) // 2)])
             self.set_thetas(thetas_r, thetas_i)
         if kappa_optimization:
             # RDM is more expensive than evaluation of the Hamiltonian.
@@ -849,7 +911,7 @@ class WaveFunctionCircuit:
                 self.num_inactive_spin_orbs // 2,
                 self.num_active_spin_orbs // 2,
                 self.num_virtual_spin_orbs // 2,
-            )
+            )  # Skal det deles med 2? Ser fishy ud AWE
             # Hermitian so expecation value should be real
             E = self.QI.quantum_expectation_value_complex(H)
         # Hermitian so expecation value should be real
@@ -870,6 +932,7 @@ class WaveFunctionCircuit:
         """
         num_kappa = 0
         gradient = np.zeros(len(parameters))
+        #gradient_finite_diff = np.zeros(len(parameters))
         num_kappa = 0
         if kappa_optimization:
             num_kappa = 2 * len(self.kappa_spin_idx)
@@ -882,10 +945,10 @@ class WaveFunctionCircuit:
         if theta_optimization:
             thetas_r = []
             thetas_i = []
-            for i in range(len(self.thetas)):
+            for i in range(len(self.thetas) // 2):
                 thetas_r.append(parameters[i + num_kappa])
                 # Silence the imaginary part if you wish to run with real-valued thetas:
-                thetas_i.append(parameters[i + num_kappa + len(self.thetas)])
+                thetas_i.append(parameters[i + num_kappa + (len(self.thetas) // 2)])
             self.set_thetas(thetas_r, thetas_i)
         if kappa_optimization:
             gradient[:num_kappa] = get_orbital_gradient_generalized_real_imag(
@@ -897,6 +960,15 @@ class WaveFunctionCircuit:
                 self.rdm1,
                 self.rdm2,
             )
+            # gradient_finite_diff[:num_kappa] = get_orbital_gradient_generalized_real_imag(
+            #     self.h_mo,
+            #     self.g_mo,
+            #     self.kappa_spin_idx,
+            #     self.num_inactive_spin_orbs,
+            #     self.num_active_spin_orbs,
+            #     self.rdm1,
+            #     self.rdm2,
+            # )
         if theta_optimization:
             # H = generalized_hamiltonian_0i_0a(
             #     self.h_mo,
@@ -915,20 +987,72 @@ class WaveFunctionCircuit:
                 self.num_virtual_spin_orbs // 2,
             )
             #
-            # Here we need to implement parameter-shift for complex.
-            #
-            # for i in range(len(parameters[num_kappa:])):
-            #    R = self.QI.grad_param_R[self.QI.param_names[i]]
-            #    e_vals_grad = _get_energy_evals_for_grad(H, self.QI, parameters, i, R)
-            #    grad = 0.0
-            #    for j, mu in enumerate(list(range(1, 2 * R + 1))):
-            #        x_mu = (2 * mu - 1) / (2 * R) * np.pi
-            #        grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R * (np.sin(1 / 2 * x_mu)) ** 2)
-            #    gradient[num_kappa + i] = grad
-            # self.num_energy_evals += 2 * np.sum(
-            #    list(self.QI.grad_param_R.values())
-            # )  # Count energy measurements for all gradients
+            # Here we need to implement parameter-shift for complex WF
+            
+            for i in range(len(self.thetas) // 2):
+
+                #print("parameters:", parameters[num_kappa:])
+                #print("thetas    :", self.thetas)
+
+
+                i_phi = len(self.thetas) // 2 + i
+
+                R_r = self.QI.grad_param_R_r[self.QI.param_names[i]]
+                R_phi = self.QI.grad_param_R_phi[self.QI.param_names[i_phi]]
+
+                e_vals_grad_r   = _get_energy_evals_for_grad(H, self.QI, parameters[num_kappa:], i, R_r,   "r"  )
+                e_vals_grad_phi = _get_energy_evals_for_grad(H, self.QI, parameters[num_kappa:], i_phi, R_phi, "phi" )
+
+                grad_r = 0.0
+                for j, mu in enumerate(list(range(1, 2 * R_r + 1))):
+                    x_mu = (2 * mu - 1) / (2 * R_r) * np.pi 
+                    grad_r += e_vals_grad_r[j] * (-1) ** (mu - 1) / (4 * R_r * (np.sin(1 / 2 * x_mu)) ** 2)
+                gradient[num_kappa + i] = grad_r
+
+                grad_phi = 0.0
+                for j, mu in enumerate(list(range(1, 2 * R_phi + 1))):
+                    x_mu = (2 * mu - 1) / (2 * R_phi) * np.pi  
+                    grad_phi += e_vals_grad_phi[j] * (-1) ** (mu - 1) / (4 * R_phi * (np.sin(1 / 2 * x_mu)) ** 2) 
+                gradient[num_kappa + i_phi] = grad_phi
+
+
+                
+                
+                # # finite diff gradient
+                # step = 1e-3
+
+                # norm_high, norm_low = parameters[num_kappa + i] + step, parameters[num_kappa + i] - step
+                # phi_high, phi_low = parameters[num_kappa + i_phi] + step, parameters[num_kappa + i_phi] - step
+
+                # # norm_high, norm_low = self.thetas[i] + step, self.thetas[i] - step
+                # # phi_high, phi_low = self.thetas[i_phi] + step,self.thetas[i_phi] - step
+
+                # x_high_norm, x_low_norm, x_high_phi, x_low_phi = parameters[num_kappa:].copy(), parameters[num_kappa:].copy(), parameters[num_kappa:].copy(), parameters[num_kappa:].copy()
+                
+                # x_high_norm[i], x_low_norm[i] = norm_high, norm_low
+                # x_high_phi[i_phi], x_low_phi[i_phi] = phi_high, phi_low
+
+                # gradient_finite_diff[num_kappa + i] =  (self.QI.quantum_expectation_value_complex(H, custom_parameters=x_high_norm).real 
+                #             -   self.QI.quantum_expectation_value_complex(H, custom_parameters=x_low_norm).real) / (2*step)
+                
+                # gradient_finite_diff[num_kappa + i_phi] =  (self.QI.quantum_expectation_value_complex(H, custom_parameters=x_high_phi).real 
+                #             -   self.QI.quantum_expectation_value_complex(H, custom_parameters=x_low_phi).real) / (2*step)
+
+
+
+
+            self.num_energy_evals += 2 * np.sum(
+               list(self.QI.grad_param_R_r.values())
+            )  # Count energy measurements for all gradients
+            # This count has not been updated AWE
+
+        #print("Gradient theta      :", np.round(gradient[num_kappa:],3))
+        #print("Gradient finite diff:", np.round(gradient_finite_diff[num_kappa:],3))
+
+        #return gradient_finite_diff
         return gradient
+
+    
 
 
 def _get_energy_evals_for_grad(
@@ -937,6 +1061,8 @@ def _get_energy_evals_for_grad(
     parameters: list[complex],
     idx: int,
     R: int,
+    var: str,
+
 ) -> list[float]:
     """Get energy evaluations needed for the gradient calculation.
 
@@ -955,10 +1081,13 @@ def _get_energy_evals_for_grad(
     """
     e_vals = []
     x = parameters.copy()
-    x_shift = x[idx]
+
+    x_0 = x[idx]
+
     for mu in range(1, 2 * R + 1):
         x_mu = (2 * mu - 1) / (2 * R) * np.pi
-        x[idx] = x_mu + x_shift
-        # Real? because Hermitian?
+        x[idx] = x_0 + x_mu 
         e_vals.append(quantum_interface.quantum_expectation_value_complex(operator, custom_parameters=x).real)
+
     return e_vals
+
