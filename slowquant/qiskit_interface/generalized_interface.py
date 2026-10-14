@@ -29,6 +29,8 @@ from slowquant.qiskit_interface.util import (
     correct_distribution,
     correct_distribution_with_layout_v2,
     get_bitstring_sign,
+    labels_to_masks,
+    pauli_values_from_distr,
     get_determinant_reference,
     get_determinant_superposition_reference,
     get_reordering_sign,
@@ -37,6 +39,7 @@ from slowquant.qiskit_interface.util import (
     to_CBS_measurement,
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
+from slowquant.qiskit_interface.fast_pauli import fermionic_to_sparse_pauli
 
 
 class QuantumInterface:
@@ -448,6 +451,7 @@ class QuantumInterface:
             ansatz_circuit: Ansatz circuit
         """
         # Check if ISA is selected. If yes, pre-transpile circuit for later use.
+        self._meas_circuits: dict[str, QuantumCircuit] = {}
         if self.ISA:
             self._ansatz_circuit_raw = ansatz_circuit  # needed for csfs functionality
             self.ansatz_circuit: QuantumCircuit = self._transpile_circuit(ansatz_circuit)
@@ -631,6 +635,8 @@ class QuantumInterface:
         Returns:
             Qubit representation of operator.
         """
+        if type(self.mapper) is JordanWignerMapper:
+            return fermionic_to_sparse_pauli(op, self.num_orbs, self.num_qubits)
         mapped_op = self.mapper.map(FermionicOp(op.get_qiskit_form(self.num_orbs), self.num_spin_orbs))
         if not isinstance(mapped_op, SparsePauliOp):
             raise TypeError(f"The qubit form of the operator is not SparsePauliOp got, {type(mapped_op)}")
@@ -1031,7 +1037,6 @@ class QuantumInterface:
         det_int = int(det, 2)
         if run_circuit is None:
             run_circuit = self.circuit
-        values = 0.0
         # Map Fermionic to Qubit
         if isinstance(op, FermionicOperator):
             observables = self.op_to_qbit(op)
@@ -1092,16 +1097,7 @@ class QuantumInterface:
                 # save mitigated results
                 self.saver[det_int].update_distr(head_mit, distr_raw, self.mitigation_flags)
 
-        # Loop over all Pauli strings in observable and build final result with coefficients
-        for pauli, coeff in zip(paulis_str, observables.coeffs):
-            result = 0.0
-            for key, value in (
-                self.saver[det_int].get_distr(pauli, self.mitigation_flags).items()
-            ):  # build result from quasi-distribution
-                result += value * get_bitstring_sign(pauli, key)
-            values += result * coeff
-
-        return values
+        return self.saver[det_int].expectation_values(paulis_str, self.mitigation_flags) @ observables.coeffs
 
     def _sampler_quantum_expectation_value_nosave(
         self,
@@ -1158,16 +1154,11 @@ class QuantumInterface:
                 self._apply_M_mitigation(distr, run_circuit, circuit_M)
 
             if self.mitigation_flags.do_postselection:  # apply post-selection if requested
-                self._apply_postselection(distr, new_heads)
+                self._apply_postselection(distr, new_heads, self.ansatz_options)
 
             cliques.update_distr(new_heads, distr)
 
-            # Loop over all Pauli strings in observable and build final result with coefficients
-            for pauli, coeff in zip(paulis_str, observables.coeffs):
-                result = 0.0
-                for key, value in cliques.get_distr(pauli).items():  # build result from quasi-distribution
-                    result += value * get_bitstring_sign(pauli, key)
-                values += result * coeff
+            values = cliques.expectation_values(paulis_str) @ observables.coeffs
         else:
             # Simulate each Pauli string with one combined device call
             distr = self._one_call_sampler_distributions(paulis_str, run_parameters, run_circuit)
@@ -1175,14 +1166,11 @@ class QuantumInterface:
                 self._apply_M_mitigation(distr, run_circuit, circuit_M)
 
             if self.mitigation_flags.do_postselection:  # apply post-selection if requested
-                self._apply_postselection(distr, paulis_str)
+                self._apply_postselection(distr, paulis_str, self.ansatz_options)
 
-            # Loop over all Pauli strings in observable and build final result with coefficients
-            for pauli, coeff, dist in zip(paulis_str, observables.coeffs, distr):
-                result = 0.0
-                for key, value in dist.items():  # build result from quasi-distribution
-                    result += value * get_bitstring_sign(pauli, key)
-                values += result * coeff
+            xs, zs = labels_to_masks(paulis_str)
+            for i, (coeff, dist) in enumerate(zip(observables.coeffs, distr)):
+                values += coeff * pauli_values_from_distr(dist, xs[i : i + 1], zs[i : i + 1])[0]
 
         return values
 
@@ -1438,6 +1426,63 @@ class QuantumInterface:
             for key in dist:
                 dist[key] /= self._circuit_multipl
         return dist_combined
+
+    def _measurement_circuit(self, pauli: str) -> QuantumCircuit:
+        """Ansatz circuit with basis change and measurement for one Pauli (clique head), built once and cached."""
+        if pauli not in self._meas_circuits:
+            circuit = self.circuit
+            if self.ISA:
+                measurement_indices = (
+                    circuit.layout.final_index_layout() if circuit.layout is not None else np.arange(self.num_qubits)
+                )
+                qc = circuit.compose(to_CBS_measurement(pauli, self._transp_xy), qubits=measurement_indices)
+                qc.add_register(ClassicalRegister(self.num_qubits, name="meas"))
+                qc.measure(measurement_indices, np.arange(self.num_qubits))
+            else:
+                qc = circuit.compose(to_CBS_measurement(pauli))
+                qc.measure_all()
+            self._meas_circuits[pauli] = qc
+        return self._meas_circuits[pauli]
+
+    def sampler_distributions(
+        self, paulis: list[str], parameters_list: list[list[float]]
+    ) -> list[dict[int, float]]:
+        """Distributions of the ansatz circuit measured in the bases of several Paulis for several parameter sets.
+
+        One device call. Measurement circuits are cached and parameter sets are passed as sweeps (no circuit
+        copies per parameter set). Returns distributions ordered Pauli-major: [P0 p0, P0 p1, ..., P1 p0, ...].
+        """
+        shots = self.max_shots_per_run if self._circuit_multipl > 1 else self.shots
+        circuits = [self._measurement_circuit(p) for p in paulis]
+        npar = len(parameters_list)
+        if isinstance(self._primitive, BaseSamplerV2):
+            pubs = [(qc, np.array(parameters_list, dtype=float)) for qc in circuits] * self._circuit_multipl
+            result = self._primitive.run(pubs, shots=shots).result()
+            distr = []
+            for pub in result:
+                meas = pub.data.meas
+                for i in range(npar):
+                    counts = meas.get_counts(i) if npar > 1 or meas.ndim else meas.get_counts()
+                    distr.append({int(k, 2): v / shots for k, v in counts.items()})
+        else:
+            run_circuits = [qc for qc in circuits for _ in range(npar)] * self._circuit_multipl
+            values = [list(p) for _ in circuits for p in parameters_list] * self._circuit_multipl
+            distr = list(self._primitive.run(run_circuits, parameter_values=values, shots=shots).result().quasi_dists)
+        if self.shots is not None:
+            self.total_shots_used += self.shots * len(paulis) * npar
+        self.total_device_calls += 1
+        self.total_paulis_evaluated += len(paulis) * npar
+        if self._circuit_multipl == 1:
+            return distr
+        length = len(paulis) * npar
+        combined = [dict(d) for d in distr[:length]]
+        for nr, d in enumerate(distr[length:]):
+            for key, value in d.items():
+                combined[nr % length][key] = value + combined[nr % length].get(key, 0)
+        for d in combined:
+            for key in d:
+                d[key] /= self._circuit_multipl
+        return combined
 
     def _sampler_distributions(
         self,

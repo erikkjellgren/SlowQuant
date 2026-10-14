@@ -162,9 +162,11 @@ class IntegralManager:
     @property
     def magnetic_field_H(self) -> np.ndarray:
         # Building the magnetic field Hamiltonian: 
+        if self._magnetic_field_H is not None:
+            return self._magnetic_field_H
         nao = self.int_obj.nao
 
-        if self.orig == None:
+        if self.orig is None:
             self.orig = (0.0, 0.0, 0.0)
 
         self.int_obj.set_common_origin(self.orig)
@@ -200,7 +202,7 @@ class IntegralManager:
         hcoreB -= 0.5 * 1j * np.einsum('k,kij->ij', self.B, L_spinor)   # Correct
         hcoreB += H_dia                                                 # Correct 
         hcoreB += 0.5 * g_e/2 * sigmaSB                                         # Correct
-    
+        self._magnetic_field_H = hcoreB
         return hcoreB
 
 
@@ -209,7 +211,7 @@ class IntegralManager:
         # Building the magnetic field Hamiltonian: 
         nao = self.int_obj.nao
 
-        if self.orig == None:
+        if self.orig is None:
             self.orig = (0.0, 0.0, 0.0)
 
         self.int_obj.set_common_origin(self.orig)
