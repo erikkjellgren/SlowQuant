@@ -193,12 +193,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     print("\nName of the ADAPT data file:", data_file)
 
-    # np.savez(
-    #     data_file,
-    #     c_mo=WF.c_mo,
-    #     thetas_real=WF.thetas_real,
-    #     thetas_imag=WF.thetas_imag
-    #     )
+    np.savez(
+        data_file,
+        c_mo=WF.c_mo,
+        thetas_real=WF.thetas_real,
+        thetas_imag=WF.thetas_imag
+        )
 
 
 

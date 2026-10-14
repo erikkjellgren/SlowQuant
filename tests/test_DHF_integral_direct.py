@@ -214,3 +214,13 @@ def test_symmetrize_qG_matches_naive():
     assert np.abs(E2 - lr0.hessian).max() < 1e-8
     assert np.abs(S - lr0.metric).max() < 1e-10
     assert np.abs(E2p - lr0.hessian).max() > 1e-3
+
+
+def test_onestep_oo_matches_twostep():
+    e = []
+    for name in ("run_wf_optimization_direct_DHF", "run_wf_optimization_onestep_direct_DHF"):
+        _, wf = make_wf(((2, 2), 6), scale=0.0)
+        wf.set_thetas([0.0] * len(wf.thetas), [0.0] * len(wf.thetas))
+        getattr(wf, name)(tol=1e-7)
+        e.append(wf.energy_elec)
+    assert abs(e[0] - e[1]) < 1e-10

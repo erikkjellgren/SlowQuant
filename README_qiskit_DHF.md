@@ -81,3 +81,33 @@ The GG block scales as 256 n_G^2 n_Pauli(H) classical work and needs 4-body Paul
   - With `True`, the circuit LR measures the extra Pauli expectation values ⟨a†_u [a_t,G†]⟩, ⟨a†_u a†_w a_x [a_t,G†]⟩ (and the analogues with a_u, a†_t). This costs extra measurements on hardware.
 - **Davidson** returns its current roots, with a warning, when the subspace cannot be extended (exactly degenerate Kramers roots at very tight tolerance).
 - **Example** `example_qiskit_DHF_H2_paramshift_hessian.py`: ideal simulator with the parameter-shift θ Hessian (`theta_method="trust-exact"`).
+
+## v6 (speed update)
+
+- **Classical UPS** (`ci_sparse_DHF.UPSEngine`): each UPS factor is applied in closed form, U = I + (sin r/r)A + ((1−cos r)/r²)A², on sparse CI vectors (no expm). The θ gradient uses one state build and adjoint differentiation; L-BFGS-B gets the energy and gradient together (`jac=True`). F^A is built lazily.
+- **One-step OO** `run_wf_optimization_onestep_direct_DHF(tol, maxiter, ...)`:
+  - One L-BFGS run over the e–e κ and θ together; e–p κ take a diagonal Newton step (maximized), as in the 2-step driver.
+  - Each point costs one J/K pass with 2 densities (inactive + active) plus one (N a|a a). The 2-step needs a separate J/K for F^A after every θ relaxation.
+  - θ start: optimized at the initial orbitals (no J/K). θ preconditioner: h_k = 2(⟨V_k0|H|V_k0⟩ − E⟨V_k0|V_k0⟩).
+  - Same energy as the 2-step (≤1.3e-9 at tol 1e-6). `run_4c_calculation.py` uses it by default (`oo_method="1step"`).
+- **J/K**: `hermi=1` for density-matrix builds. Orbital rotations use `expm_antihermitian` (one `eigh`).
+- **Circuit, exact path**:
+  - `fast_pauli.FermionSimulator` simulates the fUCC circuit directly in the determinant space with JW signs. It is checked against qiskit at 2 random points.
+  - `energy_gradient` returns E and the exact θ gradient by adjoint differentiation. The Hessian applies the first-order shift rule to these gradients.
+  - Set `WF.parameter_shift = True` to force the parameter-shift rules (hardware-style), e.g. for testing.
+- **Sampler**: counts are vectorized (`BitArray` → `np.unique`).
+- **Bug fix** in `operators_circuits._double_excitation_efficient_generalized`. When `l<j` or `k<i`, creation and annihilation indices were swapped, which gave a different operator. Those orderings now use an exact Pauli-rotation circuit, validated against the fermionic exp(θT − θ*T†) to 1e-13. **Circuit results for affected excitations change.**
+- **`run_4c_calculation.py`** runs the full workflow with all settings printed, timings and an npz with `c_mo` + θ. It runs:
+  - PySCF DHF, NMR (RMB-GIAO), SSC (RKB) and TDA;
+  - this code's OO-UPS, LR excitation energies, RMB-GIAO shieldings and RKB SSCC;
+  - a final comparison table.
+
+| Timing (2 cores) | v5 | v6 |
+|---|---|---|
+| HF (4c) OO | 68 s | 44 s |
+| LiH 6-31G ((2,2),8) OO, 2-step → 1-step | 22.5 s, 71 J/K | 2.9 s, 39 J/K |
+| H4 6-31G ((2,2),8) OO, 2-step → 1-step | 33.5 s, 138 J/K | 4.6 s, 84 J/K |
+| H2 dyall-v2z circuit OO (exact) | 6.7 s | 2.4 s |
+| Exact θ gradient, 10 qubits, 168 parameters | 29 s | 0.013 s |
+
+**Output format (v6).** All iterative steps print aligned, fixed-width tables with a title, the settings, columns with units, and a summary. This covers the OO drivers (1-step, 2-step, circuit), the Davidson and response solvers, excitation energies, shieldings, SSCC and the run-script comparisons and timings. The formatting lives in `slowquant/unitary_coupled_cluster/printing.py` (`IterationTable`, `value_table`, `roots_table`, `info_block`).

@@ -13,6 +13,7 @@ from slowquant.qiskit_interface.fast_pauli import (
 from slowquant.unitary_coupled_cluster.linear_response.generalized_direct_DHF import LinearResponseDirect
 from slowquant.unitary_coupled_cluster.operators import G1, G2
 from slowquant.unitary_coupled_cluster.util import iterate_t1, iterate_t2
+from slowquant.unitary_coupled_cluster.printing import key_value, timing_line
 
 
 def _commutator_xz(ka, ca, kb, cb, nq):
@@ -62,7 +63,7 @@ class LinearResponseCircuitDirect(LinearResponseDirect):
         ds = self.ds = wf.ds
         ds.set_rdms(wf.rdm1, wf.rdm2)
         ds.response_tensors()
-        print(f"Response integrals: {time.time() - t0:.1f} s")
+        timing_line("Response integrals", time.time() - t0)
         self.N = ds.C.shape[1]
         self.pos = -np.ones(self.N, dtype=int)
         self.pos[ds.occ] = np.arange(len(ds.occ))
@@ -75,7 +76,7 @@ class LinearResponseCircuitDirect(LinearResponseDirect):
         self.q_idx = self.q_idx[(np.abs(a_q) > screen) | (np.abs(s_q) > screen)]
         self.nq, self.nG = len(self.q_idx), len(G_ops)
         self.n = self.nq + self.nG
-        print(f"Operators: {self.nq} orbital, {self.nG} active-space")
+        print(key_value("LR operators", f"{self.nq} orbital, {self.nG} active-space"))
         self._chunk = chunk
         shift = wf.active_spin_idx[0]
         self.pairs = (
@@ -85,7 +86,7 @@ class LinearResponseCircuitDirect(LinearResponseDirect):
         )
         self._measure_active_space()
         self.DA, self.DB = self._cross_terms_measured()
-        print(f"Linear response setup: {time.time() - t0:.1f} s")
+        timing_line("Linear response setup", time.time() - t0)
 
     def _terms(self):
         """Yield (target, flat index, keys, coefficients): target.flat[index] += coefficients * <keys>."""
@@ -196,7 +197,7 @@ class LinearResponseCircuitDirect(LinearResponseDirect):
                     acc = 0
             keys = np.unique(np.concatenate(keys))
             vals = est(keys)
-            print(f"Active-space LR quantities: {len(keys)} Paulis measured ({time.time() - t0:.1f} s)")
+            print(key_value("Active-space LR quantities", f"{len(keys)} Paulis measured, {time.time() - t0:.1f} s"))
             for name, idx, k, c in self._terms():
                 add(name, idx, c * vals[np.searchsorted(keys, k)])
         self.K1 = out["K1"].reshape(nG, na, na)
@@ -211,7 +212,7 @@ class LinearResponseCircuitDirect(LinearResponseDirect):
         self.S_GG, self.A_GG, self.B_GG = (out[x].reshape(nG, nG) for x in ("S", "A", "B"))
         npair = len(self.pairs)
         self._ext = {k: out[k].reshape(npair, -1) for k in out if k[0] in "LM"} if npair else {}
-        print(f"Active-space LR setup: {time.time() - t0:.1f} s")
+        timing_line("Active-space LR setup", time.time() - t0)
 
     def _cross_terms_measured(self) -> tuple[np.ndarray, np.ndarray]:
         """DA_Gq = 1/2<0|H[q, G^+]|0>, DB_Gq = 1/2<0|H[q, G]|0>^* from the measured extended transition tensors."""

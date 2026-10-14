@@ -152,6 +152,8 @@ class QuantumInterface:
         self.num_orbs = num_orbs
         self.num_spin_orbs = num_spin_orbs
         self.num_elec = num_elec
+        self.occ_spin_idx = [int(x) for x in occ_spin_idx]
+        self.unocc_spin_idx = [int(x) for x in unocc_spin_idx]
         self.grad_param_R_r: dict[
             str, int
         ] = {}  # Contains information about the parameterization needed for gradient evaluations.
@@ -1461,9 +1463,13 @@ class QuantumInterface:
             distr = []
             for pub in result:
                 meas = pub.data.meas
-                for i in range(npar):
-                    counts = meas.get_counts(i) if npar > 1 or meas.ndim else meas.get_counts()
-                    distr.append({int(k, 2): v / shots for k, v in counts.items()})
+                arr = meas.array.reshape(-1, meas.num_shots, meas.array.shape[-1]).astype(np.int64)
+                ints = np.zeros(arr.shape[:2], dtype=np.int64)
+                for b in range(arr.shape[-1]):
+                    ints = (ints << 8) | arr[..., b]
+                for i in range(len(ints)):
+                    k, c = np.unique(ints[i], return_counts=True)
+                    distr.append(dict(zip(k.tolist(), (c / meas.num_shots).tolist())))
         else:
             run_circuits = [qc for qc in circuits for _ in range(npar)] * self._circuit_multipl
             values = [list(p) for _ in circuits for p in parameters_list] * self._circuit_multipl

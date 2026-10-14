@@ -37,7 +37,7 @@ QI = QuantumInterface(
     shots=None,
 )
 WF = GeneralizedWaveFunctionCircuitDHF(
-    ((1, 1), 6), np.array(mf.mo_coeff, dtype=complex), mol, QI, include_active_kappa=True
+    ((1, 1), 4), np.array(mf.mo_coeff, dtype=complex), mol, QI, include_active_kappa=True
 )
 WF.set_integral_backend(DHFCholesky(mol, tol=1e-8, cd_jk=False, screen_tol=1e-10))
 rng = np.random.default_rng(42)

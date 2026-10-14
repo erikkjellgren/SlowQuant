@@ -81,16 +81,16 @@ class DHFDirect:
         self.ssss = ssss
         self.ssss_ground, self.ssss_resp, self.ssss_eri, self.ssss_giao_jk, self.ssss_giao_g = _SSSS_MODES[ssss]
 
-    def _jk_exact(self, dms, ssss):
+    def _jk_exact(self, dms, ssss, hermi=0):
         opt_ssll = self.opt[1] if len(dms) == 1 else None
-        return scf.dhf.get_jk_coulomb(self.mol, dms, 0, "SSSS" if ssss else "SSLL", self.opt[0], opt_ssll, self.opt[2])
+        return scf.dhf.get_jk_coulomb(self.mol, dms, hermi, "SSSS" if ssss else "SSLL", self.opt[0], opt_ssll, self.opt[2])
 
-    def jk(self, dms: np.ndarray, response: bool = False) -> tuple[np.ndarray, np.ndarray]:
-        """J and K for a batch of general (non-Hermitian) AO densities, one integral pass."""
-        return self._jk_exact(np.asarray(dms), self.ssss_resp if response else self.ssss_ground)
+    def jk(self, dms: np.ndarray, response: bool = False, hermi: int = 0) -> tuple[np.ndarray, np.ndarray]:
+        """J and K for a batch of AO densities (hermi=1: all Hermitian), one integral pass."""
+        return self._jk_exact(np.asarray(dms), self.ssss_resp if response else self.ssss_ground, hermi)
 
-    def veff(self, dms: np.ndarray, response: bool = False) -> np.ndarray:
-        vj, vk = self.jk(dms, response)
+    def veff(self, dms: np.ndarray, response: bool = False, hermi: int = 0) -> np.ndarray:
+        vj, vk = self.jk(dms, response, hermi)
         return vj - vk
 
     def eri(self, c1, c2, c3, c4) -> np.ndarray:
@@ -241,14 +241,14 @@ class DHFCholesky(DHFDirect):
                         self._sub(vk, X, Y)[i] += Vc[:, x].reshape(m * n, n).T @ A
         return vj, vk
 
-    def jk(self, dms: np.ndarray, response: bool = False) -> tuple[np.ndarray, np.ndarray]:
+    def jk(self, dms: np.ndarray, response: bool = False, hermi: int = 0) -> tuple[np.ndarray, np.ndarray]:
         dms = np.asarray(dms)
         if not self.cd_jk:
-            return super().jk(dms, response)
+            return super().jk(dms, response, hermi)
         if self.blocks == "LS":
             return self._jk_cd(dms)
         ssss = self.ssss_resp if response else self.ssss_ground
-        vj, vk = self._jk_exact(dms, False)
+        vj, vk = self._jk_exact(dms, False, hermi)
         if ssss:
             j, k = self._jk_cd(dms)
             vj += j
@@ -447,7 +447,7 @@ class DirectState:
         dms = [self.dI]
         if rdm1 is not None:
             dms.append(CA @ rdm1.T @ CA.conj().T)
-        v = direct.veff(np.array(dms))
+        v = direct.veff(np.array(dms), hermi=1)
         self.e_core = np.einsum("ij,ji->", direct.h_ao + 0.5 * v[0], self.dI).real
         self.h = Cd @ direct.h_ao @ C
         self.FI = self.h + Cd @ v[0] @ C
@@ -464,7 +464,7 @@ class DirectState:
     def set_rdms(self, rdm1: np.ndarray, rdm2: np.ndarray) -> None:
         if self._rdm1 is None or not np.array_equal(rdm1, self._rdm1):
             CA = self.C[:, self.A]
-            self.FA = self.C.conj().T @ self.direct.veff((CA @ rdm1.T @ CA.conj().T)[None])[0] @ self.C
+            self.FA = self.C.conj().T @ self.direct.veff((CA @ rdm1.T @ CA.conj().T)[None], hermi=1)[0] @ self.C
             self._rdm1 = rdm1.copy()
         self.rdm1 = rdm1
         self.rdm2 = rdm2
@@ -595,3 +595,9 @@ def orbital_gradient(F: np.ndarray, kappa_idx: list[tuple[int, int]]) -> np.ndar
     gr = 2 * (F[N, M] - F[M, N]).real
     gi = -2 * (F[N, M] + F[M, N]).imag
     return np.concatenate((gr, gi))
+
+
+def expm_antihermitian(K: np.ndarray) -> np.ndarray:
+    """exp(K) for anti-Hermitian K via eigh of the Hermitian iK (faster than scipy expm)."""
+    w, V = np.linalg.eigh(1j * K)
+    return (V * np.exp(-1j * w)) @ V.conj().T

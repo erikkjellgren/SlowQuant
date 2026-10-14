@@ -11,6 +11,7 @@ from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction_DHF import G
 from slowquant.unitary_coupled_cluster.linear_response.solvers_DHF import davidson_eig, davidson_solve
 from slowquant.unitary_coupled_cluster.operators import G1, G2, G3, G4, G5, G6
 from slowquant.unitary_coupled_cluster.util import iterate_t1, iterate_t2, iterate_t3, iterate_t4, iterate_t5, iterate_t6
+from slowquant.unitary_coupled_cluster.printing import key_value, value_table, roots_table, timing_line
 
 
 def _dag(rho):
@@ -61,7 +62,7 @@ class LinearResponseDirect:
         ds = self.ds = wf.ds
         ds.set_rdms(wf.rdm1, wf.rdm2)
         ds.response_tensors()
-        print(f"Response integrals: {time.time() - t0:.1f} s")
+        timing_line("Response integrals", time.time() - t0)
         self.N = ds.C.shape[1]
         self.pos = -np.ones(self.N, dtype=int)
         self.pos[ds.occ] = np.arange(len(ds.occ))
@@ -74,7 +75,7 @@ class LinearResponseDirect:
         self.q_idx = self.q_idx[(np.abs(a_q) > screen) | (np.abs(s_q) > screen)]
         self.nq, self.nG = len(self.q_idx), len(G_ops)
         self.n = self.nq + self.nG
-        print(f"Operators: {self.nq} orbital, {self.nG} active-space")
+        print(key_value("LR operators", f"{self.nq} orbital, {self.nG} active-space"))
 
         ci = self.ci = ActiveCI(wf.ci_info)
         c0 = self.c0 = wf.ci_coeffs
@@ -93,7 +94,7 @@ class LinearResponseDirect:
         self.Gh = np.array([prop(G, h0) for G in G_ops]).reshape(-1, ndet)
         self.Gdh = np.array([prop(G.dagger, h0) for G in G_ops]).reshape(-1, ndet)
         self.DA, self.DB = self._cross_terms(G_ops) if symmetrize_qG else (np.zeros((self.nG, self.nq)),) * 2
-        print(f"Linear response setup: {time.time() - t0:.1f} s")
+        timing_line("Linear response setup", time.time() - t0)
 
     def _cross_terms(self, G_ops) -> tuple[np.ndarray, np.ndarray]:
         r"""Symmetrization corrections DA_Gq = 1/2<0|H[q, G^\dagger]|0>, DB_Gq = 1/2<0|H[q, G]|0>^* (zero without an active index in q; virtual includes positronic).
@@ -292,8 +293,7 @@ class LinearResponseDirect:
         self.excitation_energies, self.response_vectors = davidson_eig(
             self.sigma, *self.diagonal(), n_roots, tol=tol, max_iter=max_iter
         )
-        with np.printoptions(precision=6, suppress=True):
-            print("Excitation energies:", self.excitation_energies)
+        roots_table("Excitation energies (linear response)", self.excitation_energies)
         return self.excitation_energies
 
     def solve_response(self, V: np.ndarray, omega: float = 0.0, tol: float = 1e-6, max_iter: int = 100) -> np.ndarray:
@@ -345,7 +345,7 @@ class LinearResponseDirect:
         nI, N = len(I), self.N
         dA = CA @ wf.rdm1.T @ CA.conj().T
         W, gB = giao_integrals(direct, C, CA, np.array([ds.dI, dA]))
-        print(f"GIAO two-electron integrals: {time.time() - t0:.1f} s")
+        timing_line("GIAO two-electron integrals", time.time() - t0)
         ts, dms = [], []
         for x in range(3):
             t = -0.5 * Cd @ ig.S_B[x] @ C
@@ -360,7 +360,7 @@ class LinearResponseDirect:
             F[:, nI:] = FIB[:, A] @ wf.rdm1.T + np.einsum("nuvw,tuvw->nt", gB[x], wf.rdm2)
             Fc, fc, gc = ds.transformed_operator(ts[x], ts[x], vc[2 * x], vc[2 * x + 1])
             ops.append((F + Fc, FIB[np.ix_(A, A)] + fc, gB[x][A] + gc))
-        print(f"GIAO operators: {time.time() - t0:.1f} s")
+        timing_line("GIAO operators", time.time() - t0)
         return ops
 
     def giao_expectation(self) -> np.ndarray:
@@ -412,8 +412,15 @@ class LinearResponseDirect:
             self.shielding_tensors = (resp + self.giao_expectation()) * nist.ALPHA**2 * 1e6
             self.shieldings = np.trace(self.shielding_tensors, axis1=1, axis2=2) / 3
             res["shieldings"] = self.shieldings
-            with np.printoptions(precision=7, suppress=True):
-                print("Shieldings (RMB-GIAO, ppm):", self.shieldings)
+            mol = self.wf.int_gen.int_obj
+            value_table(
+                "Isotropic nuclear shieldings (RMB-GIAO)",
+                [("Nucleus", 8, ""), ("sigma_iso [ppm]", 16, ".6f"), ("span [ppm]", 14, ".6f")],
+                [
+                    (f"{mol.atom_symbol(i)}{i + 1}", self.shieldings[i], np.ptp(np.linalg.eigvalsh(0.5 * (t + t.T))))
+                    for i, t in enumerate(self.shielding_tensors)
+                ],
+            )
         if sscc:
             K = np.full((natm * 3, natm * 3), np.nan)
             K[:, sel] = -(Vm.conj().T @ Xm).real
@@ -425,9 +432,12 @@ class LinearResponseDirect:
             np.fill_diagonal(k, 0.0)
             self.sscc = k
             res["sscc"] = k
-            with np.printoptions(precision=7, suppress=True):
-                print("Reduced spin-spin coupling constants (RKB, Hz):")
-                print(k)
+            mol = self.wf.int_gen.int_obj
+            value_table(
+                "Isotropic reduced spin-spin couplings (RKB)",
+                [("Pair", 12, ""), ("K_iso [Hz]", 16, ".6f")],
+                [(f"{mol.atom_symbol(i)}{i + 1}-{mol.atom_symbol(j)}{j + 1}", k[i, j]) for i in range(natm) for j in range(i + 1, natm) if np.isfinite(k[i, j])],
+            )
         return res
 
     def get_shieldings_4comp_iso(self, tol: float = 1e-5) -> np.ndarray:

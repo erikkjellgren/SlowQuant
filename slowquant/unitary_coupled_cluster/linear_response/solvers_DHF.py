@@ -1,6 +1,8 @@
 import numpy as np
 import scipy
 
+from slowquant.unitary_coupled_cluster.printing import IterationTable
+
 
 def _pair(V: np.ndarray) -> np.ndarray:
     """[x; y] -> [y*; x*]. E2 pair(v) = pair(E2 v), S pair(v) = -pair(S v)."""
@@ -53,41 +55,51 @@ def _precondition(R, dA, dS, omega):
     return R / den
 
 
-def davidson_eig(sigma, dA, dS, n_roots, tol=1e-6, max_iter=100, max_batch=16, max_space=400, shift=0.0):
+def davidson_eig(sigma, dA, dS, n_roots, tol=1e-6, max_iter=100, max_batch=16, max_space=400, shift=0.0, n_extra=4):
     """Lowest positive roots of E2 v = omega S v (paired Davidson, matrix-free).
 
     E2 is indefinite (electron-positron rotations), so Rayleigh-Ritz gives spurious interior Ritz values.
     Harmonic Ritz extraction around `shift` is used instead: with (E2 - shift S) V = Q R,
     solve R u = nu Q^H S V u, and take omega as the Rayleigh quotient of X = V u.
+    n_extra buffer roots are iterated but not required to converge (avoids stagnation when n_roots cuts
+    through a (near-)degenerate multiplet).
     """
     ratio = np.where((dS > 1e-8) & (dA > shift), dA / np.where(dS > 1e-8, dS, 1.0), np.inf)
-    start = np.argsort(ratio)[:n_roots]
-    R = np.zeros((2 * len(dA), n_roots), dtype=complex)
-    R[start, np.arange(n_roots)] = 1.0
+    k = min(n_roots + n_extra, int(np.isfinite(ratio).sum()))
+    start = np.argsort(ratio)[:k]
+    R = np.zeros((2 * len(dA), k), dtype=complex)
+    R[start, np.arange(k)] = 1.0
     space = _Subspace(sigma, max_batch)
+    tab = IterationTable(
+        "Davidson eigenvalue solver (paired, harmonic Ritz)",
+        [("Iter", 4, "d"), ("Time [s]", 9, ".2f"), ("Subspace", 8, "d"), ("Converged", 9, ">"), ("max residual", 12, ".3e"), ("lowest omega [Eh]", 17, ".8f")],
+        [("Roots (+ buffer)", f"{n_roots} (+{k - n_roots})"), ("Convergence", f"max residual < {tol:.1e}")],
+    )
     for it in range(max_iter):
         if space.add(R) == 0:
             if it == 0:
                 raise RuntimeError("Davidson (eigenvalues): no new trial vectors")
-            print(f"WARNING: Davidson stopped (no new trial vectors), max residual {res.max():.3e}")
-            return w, X
+            tab.close(f"WARNING: stopped (no new trial vectors), max residual {res[:n_roots].max():.3e}")
+            return w[:n_roots], X[:, :n_roots]
         Qw, Rw = np.linalg.qr(space.EV - shift * space.SV)
         _, u = scipy.linalg.eig(Rw, Qw.conj().T @ space.SV)
         X, EX, SX = space.V @ u, space.EV @ u, space.SV @ u
         norm = np.einsum("ij,ij->j", X.conj(), SX).real
         w = np.einsum("ij,ij->j", X.conj(), EX).real / np.where(np.abs(norm) > 1e-300, norm, 1.0)
         ok = np.all(np.isfinite(u), axis=0) & (w > 1e-8) & (norm > 1e-6 * np.linalg.norm(X, axis=0) ** 2)
-        idx = np.where(ok)[0][np.argsort(w[ok])][:n_roots]
+        idx = np.where(ok)[0][np.argsort(w[ok])][:k]
         w, sc = w[idx], 1 / np.sqrt(norm[idx])
         X, R = X[:, idx] * sc, (EX[:, idx] - SX[:, idx] * w) * sc
         res = np.linalg.norm(R, axis=0)
-        print(f"Davidson {it + 1:3d} | subspace {space.V.shape[1]:4d} | max residual {res.max():.3e}")
-        if res.max() < tol and len(w) == n_roots:
-            return w, X
+        tab.row(it + 1, tab.lap(), space.V.shape[1], f"{int((res[:n_roots] < tol).sum())}/{n_roots}", res[:n_roots].max(), w[0])
+        if len(w) >= n_roots and res[:n_roots].max() < tol:
+            tab.close(f"Converged in {it + 1} iterations")
+            return w[:n_roots], X[:, :n_roots]
         R = _precondition(R[:, res >= tol], dA, dS, w[res >= tol])
         if space.V.shape[1] + 2 * R.shape[1] > max_space:
             space = _Subspace(sigma, max_batch)
             R = np.hstack((X, R))
+    tab.close(f"WARNING: not converged in {max_iter} iterations")
     raise RuntimeError("Davidson (eigenvalues) did not converge")
 
 
@@ -104,6 +116,11 @@ def davidson_solve(sigma, dA, dS, V, omega=0.0, tol=1e-6, max_iter=100, max_batc
     vnorm = np.maximum(np.linalg.norm(w[:, None] * V, axis=0), 1e-300)
     R = _precondition(V, dA, dS, np.full(V.shape[1], omega))
     space = _Subspace(sigma, max_batch)
+    tab = IterationTable(
+        f"Linear response solver, omega = {omega:.6f} Eh",
+        [("Iter", 4, "d"), ("Time [s]", 9, ".2f"), ("Subspace", 8, "d"), ("Converged", 9, ">"), ("max rel. residual", 17, ".3e")],
+        [("Right-hand sides", V.shape[1]), ("Convergence", f"max rel. residual < {tol:.1e}")],
+    )
     for it in range(max_iter):
         space.add(R)
         Wm = space.EV - omega * space.SV
@@ -111,8 +128,10 @@ def davidson_solve(sigma, dA, dS, V, omega=0.0, tol=1e-6, max_iter=100, max_batc
         X = space.V @ u
         Rfull = Wm @ u - V
         res = np.linalg.norm(w[:, None] * Rfull, axis=0) / vnorm
-        print(f"Response {it + 1:3d} | subspace {space.V.shape[1]:4d} | max rel. residual {res.max():.3e}")
+        tab.row(it + 1, tab.lap(), space.V.shape[1], f"{int((res < tol).sum())}/{len(res)}", res.max())
         if res.max() < tol:
+            tab.close(f"Converged in {it + 1} iterations")
             return (X, space.EV @ u - omega * (space.SV @ u)) if return_ex else X
         R = _precondition(Rfull[:, res >= tol], dA, dS, np.full(int((res >= tol).sum()), omega))
+    tab.close(f"WARNING: not converged in {max_iter} iterations")
     raise RuntimeError("Davidson (linear response) did not converge")

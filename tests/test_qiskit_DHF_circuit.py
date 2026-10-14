@@ -165,3 +165,12 @@ def test_circuit_lr_symmetrize_qG_matches_classical():
         w0 = r0.calc_excitation_energies(4, tol=1e-6)
         w1 = r1.calc_excitation_energies(4, tol=1e-6)
         assert np.abs(w0 - w1).max() < 1e-6
+
+
+def test_adjoint_gradient_and_hessian_match_parameter_shift():
+    wf = random_wf(True)
+    p = np.array(wf.thetas)
+    g, H = wf.theta_gradient(p), wf.theta_hessian(p)
+    wf.parameter_shift = True
+    assert np.abs(g - wf.theta_gradient(p)).max() < 1e-12
+    assert np.abs(H - wf.theta_hessian(p)).max() < 1e-10
