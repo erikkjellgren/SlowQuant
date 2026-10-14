@@ -541,6 +541,54 @@ def _double_excitation_efficient(
     qc.cx(j, i)
     return qc
 
+def _pauli_rotation(qc: QuantumCircuit, ops: dict[int, str], angle) -> None:
+    """exp(-i angle/2 P) for the Pauli string P = prod_q ops[q] (basis change, CNOT ladder, rz)."""
+    qs = sorted(ops)
+    for q in qs:
+        if ops[q] == "X":
+            qc.h(q)
+        elif ops[q] == "Y":
+            qc.sdg(q)
+            qc.h(q)
+    for a, b in zip(qs[:-1], qs[1:]):
+        qc.cx(a, b)
+    qc.rz(angle, qs[-1])
+    for a, b in reversed(list(zip(qs[:-1], qs[1:]))):
+        qc.cx(a, b)
+    for q in qs:
+        if ops[q] == "X":
+            qc.h(q)
+        elif ops[q] == "Y":
+            qc.h(q)
+            qc.s(q)
+
+
+def _double_excitation_pauli_generalized(
+    k: int, l: int, i: int, j: int, num_spin_orbs: int, qc: QuantumCircuit, theta, phi
+) -> QuantumCircuit:
+    r"""Exact circuit for exp(theta (e^{i phi} T - e^{-i phi} T^\dagger)), T = a^+_k a^+_l a_j a_i (fermionic indices).
+
+    The 8 Jordan-Wigner Pauli strings of T - T^\dagger commute, so exp(theta (T - T^\dagger)) is a product of
+    Pauli rotations; the phase uses the same rz conjugation as the efficient circuit.
+    """
+    num_orbs = num_spin_orbs // 2
+    kq, lq, iq, jq = (f2q(x, num_orbs) for x in (k, l, i, j))
+    op = a_op_spin(k, True) * a_op_spin(l, True) * a_op_spin(j, False) * a_op_spin(i, False)
+    mapped = JordanWignerMapper().map(FermionicOp((op - op.dagger).get_qiskit_form(num_orbs), num_spin_orbs))
+    qc.rz(-phi / 4, kq)
+    qc.rz(-phi / 4, lq)
+    qc.rz(phi / 4, iq)
+    qc.rz(phi / 4, jq)
+    for label, c in zip(mapped.paulis.to_labels(), mapped.coeffs):
+        ops = {q: ch for q, ch in enumerate(reversed(label)) if ch != "I"}
+        _pauli_rotation(qc, ops, 2 * (1j * c).real * theta)
+    qc.rz(phi / 4, kq)
+    qc.rz(phi / 4, lq)
+    qc.rz(-phi / 4, iq)
+    qc.rz(-phi / 4, jq)
+    return qc
+
+
 def _double_excitation_efficient_generalized(
     k: int, l: int, i: int, j: int, num_spin_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression, phi: Parameter | ParameterExpression
 ) -> QuantumCircuit:
@@ -567,11 +615,12 @@ def _double_excitation_efficient_generalized(
         Double excitation circuit.
     """
     num_orbs = num_spin_orbs // 2
-
-    k = f2q(k, num_orbs)
-    l = f2q(l, num_orbs)
-    i = f2q(i, num_orbs)
-    j = f2q(j, num_orbs)
+    kq, lq, iq, jq = (f2q(x, num_orbs) for x in (k, l, i, j))
+    if max(kq, lq) < max(iq, jq) or min(kq, lq) < min(iq, jq):
+        # The efficient circuit needs min(i, j) < min(k, l) and max(i, j) < max(k, l) (qubit order); otherwise
+        # creation and annihilation indices would have to be swapped, which changes the operator.
+        return _double_excitation_pauli_generalized(k, l, i, j, num_spin_orbs, qc, theta, phi)
+    k, l, i, j = kq, lq, iq, jq
 
     # Saving original idx:
     k_o, l_o, i_o, j_o = k, l, i, j
@@ -591,12 +640,6 @@ def _double_excitation_efficient_generalized(
         fac *= -1
     if i > j:
         j, i = i, j
-        fac *= -1
-    if l < j:
-        l, j = j, l
-        fac *= -1
-    if k < i:
-        k, i = i, k
         fac *= -1
 
 

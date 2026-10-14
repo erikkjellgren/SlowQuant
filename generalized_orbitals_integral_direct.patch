@@ -1,9 +1,9 @@
 diff --git a/README_integral_direct_generalized.md b/README_integral_direct_generalized.md
 new file mode 100644
-index 0000000..c4da731
+index 0000000..7b374a7
 --- /dev/null
 +++ b/README_integral_direct_generalized.md
-@@ -0,0 +1,111 @@
+@@ -0,0 +1,140 @@
 +# Integral-direct, hardware-compatible generalized (GHF) OO-UPS and linear response
 +
 +Base: `generalized_orbitals` @ b132e1f. Same structure, approximations and options as the 4c v3/v4 code.
@@ -115,9 +115,38 @@ index 0000000..c4da731
 +| `LinearResponseDirect` (symmetrized): E2/S, excitation energies, oscillator strengths, polarizability | `generalized_naive` | 1e-14 (38 s → 3.4 s) |
 +| Circuit OO | classical OO | 1e-13 |
 +| Circuit LR, E2 | classical direct LR | 1e-8, limited by θ convergence |
++
++## Speed update and run script
++
++- **Classical UPS** (`ci_sparse.UPSEngine`): closed-form UPS factors on sparse CI vectors and an adjoint θ gradient. L-BFGS-B uses `jac=True`, and F^A is built lazily.
++- **One-step OO** `run_wf_optimization_onestep_direct(tol, maxiter, ..., e_scf=None)`:
++  - Joint L-BFGS on (κ, θ). Each point costs one J/K with 2 densities plus one (N a|a a). The 2-step needs an extra J/K for F^A after each θ relaxation.
++  - Same energy as the 2-step (≤1.5e-9 at tol 1e-6). `run_generalized_calculation.py` uses it by default (`oo_method="1step"`).
++- **`GHFDirect` in-core**: in-core AO integrals are used when they need less than `incore_memory` MB.
++- **Exact circuit path**:
++  - `fast_pauli.FermionSimulator` gives the fUCC state and exact adjoint gradients, and is checked against qiskit.
++  - The Hessian is computed as shift rule ∘ gradient.
++  - `WF.parameter_shift = True` forces the hardware-style rules.
++- **Sampler**: counts are vectorized.
++- **Bug fix** in `operators_circuits._double_excitation_efficient_generalized`: creation and annihilation indices were swapped for `l<j` or `k<i`. These orderings now use exact Pauli rotations, validated to 1e-13. **Circuit results for these excitations change.**
++- **`print_info`**: prints a header (PySCF energy, basis, AOs, active space) and checks the reference-determinant energy. It warns if the orbitals do not match the Hamiltonian, e.g. non-X2C orbitals with `do_x2c=True`.
++- **`run_generalized_calculation.py`** runs the full workflow with all settings printed, timings, an npz with `c_mo` + θ, and a comparison of the first 10 excitation energies and oscillator strengths. The workflow is:
++  1. PySCF GHF(.x2c) and TDA/TDHF;
++  2. OO-UPS (classical or circuit);
++  3. LR.
++  - The PySCF oscillator strengths are computed in the script, because PySCF does not implement them for GHF.
++  - Use `pyscf_td="TDA"`. TDHF on GHF-X2C can fail to converge (near-zero roots).
++
++| Timing (2 cores) | before | now |
++|---|---|---|
++| HI x2c-SVPall OO-UPS | 37.5 s | 4.0 s (1-step, 48 J/K) |
++| H2O 6-31G ((2,2),8) OO-UPS, 2-step → 1-step | 22.2 s, 178 J/K | 3.4 s, 102 J/K |
++| Exact θ gradient, 10 qubits, 168 parameters | 29 s | 0.013 s |
++
++**Output format.** All iterative steps print aligned, fixed-width tables with a title, the settings, columns with units, and a summary. This covers the OO drivers (1-step, 2-step, circuit), the Davidson and response solvers, excitation energies, the polarizability and the run-script comparisons and timings. The formatting lives in `slowquant/unitary_coupled_cluster/printing.py`. `run_wf_optimization_direct` now returns the number of iterations; `print_iterations=False` silences its table (used inside the circuit 2-step).
 diff --git a/example_generalized_integral_direct.py b/example_generalized_integral_direct.py
 new file mode 100644
-index 0000000..51e0c57
+index 0000000..450f2ae
 --- /dev/null
 +++ b/example_generalized_integral_direct.py
 @@ -0,0 +1,35 @@
@@ -146,7 +175,7 @@ index 0000000..51e0c57
 +)
 +WF.set_integral_backend(GHFCholesky(mol, tol=1e-8, cd_jk=False, screen_tol=1e-10))
 +t = time.time()
-+WF.run_wf_optimization_direct(tol=1e-6)
++WF.run_wf_optimization_direct(tol=1e-6, e_scf=mf.e_tot)
 +print(f"OO {time.time() - t:.1f} s  E_tot = {WF.energy_elec + mol.energy_nuc():.10f}")
 +
 +t = time.time()
@@ -158,7 +187,7 @@ index 0000000..51e0c57
 +print(f"LR {time.time() - t:.1f} s")
 diff --git a/example_qiskit_generalized_direct.py b/example_qiskit_generalized_direct.py
 new file mode 100644
-index 0000000..a38ac20
+index 0000000..12fdce5
 --- /dev/null
 +++ b/example_qiskit_generalized_direct.py
 @@ -0,0 +1,46 @@
@@ -199,7 +228,7 @@ index 0000000..a38ac20
 +WF.set_thetas_initial(rng.uniform(-0.05, 0.05, n), rng.uniform(-0.05, 0.05, n))
 +
 +t = time.time()
-+WF.run_wf_optimization_2step_direct(tol=1e-6, theta_method="l-bfgs-b")
++WF.run_wf_optimization_2step_direct(tol=1e-6, theta_method="l-bfgs-b", e_scf=mf.e_tot)
 +print(f"OO {time.time() - t:.1f} s  E_tot = {WF.energy_elec + mol.energy_nuc():.10f}  circuits: {WF.num_energy_evals}")
 +
 +t = time.time()
@@ -208,12 +237,267 @@ index 0000000..a38ac20
 +LR.get_oscillator_strength()
 +print(LR.get_formatted_oscillator_strength())
 +print(f"LR {time.time() - t:.1f} s")
+diff --git a/run_generalized_calculation.py b/run_generalized_calculation.py
+new file mode 100644
+index 0000000..0ed1405
+--- /dev/null
++++ b/run_generalized_calculation.py
+@@ -0,0 +1,249 @@
++import json
++import resource
++import time
++from contextlib import contextmanager
++
++import basis_set_exchange as bse
++import numpy as np
++from pyscf import gto, scf, tdscf
++
++from slowquant.unitary_coupled_cluster.generalized_integral_manager import IntegralManager
++from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
++from slowquant.unitary_coupled_cluster.integral_direct import GHFCholesky, GHFDirect
++from slowquant.unitary_coupled_cluster.linear_response.generalized_direct import LinearResponseDirect
++from slowquant.unitary_coupled_cluster.printing import info_block, key_value, roots_table, value_table
++
++settings = {
++    "atom": "H 0 0 0; I 0 0 1.61",
++    "unit": "angstrom",
++    "basis": "x2c-SVPall",
++    "charge": 0,
++    "spin": 0,
++    "max_memory_MB": 4000,
++    "x2c": True,
++    "ecp": False,
++    "B_tesla": None,
++    "gauge_origin": None,
++    "scf_conv_tol": 1e-10,
++    "scf_max_cycle": 100,
++    "pyscf_td": "TDA",
++    "pyscf_td_max_cycle": 100,
++    "mode": "classical",
++    "cas": ((1, 1), 4),
++    "ansatz": "fUCCSD",
++    "ansatz_options": {"n_layers": 1, "is_spin_conserving": False},
++    "include_active_kappa": True,
++    "restart_npz": None,
++    "initial_theta_amplitude": 0.0,
++    "seed": 42,
++    "backend": "cholesky",
++    "screen_tol": 1e-10,
++    "incore_memory_MB": 256,
++    "cd_tol": 1e-8,
++    "cd_span": 1e-2,
++    "cd_jk": False,
++    "oo_method": "1step",
++    "oo_tol": 1e-6,
++    "oo_maxiter": 100,
++    "theta_gtol": 1e-9,
++    "theta_maxiter": 1000,
++    "circuit_shots": None,
++    "circuit_exact": None,
++    "circuit_theta_method": "l-bfgs-b",
++    "circuit_orbital_maxiter": 50,
++    "lr_excitations": "SD",
++    "lr_symmetrize_qG": True,
++    "lr_n_roots": 10,
++    "lr_tol": 1e-6,
++    "lr_max_iter": 100,
++    "lr_max_space": 400,
++    "polarizability": True,
++    "polarizability_omega": 0.0,
++    "output_npz": "wf_generalized.npz",
++}
++
++timings = {}
++
++
++@contextmanager
++def timed(label):
++    t0 = time.time()
++    yield
++    timings[label] = time.time() - t0
++    print(key_value(f"Done: {label}", f"{timings[label]:20.1f} s"), flush=True)
++
++
++s = settings
++info_block("Settings", [(k, str(v)) for k, v in s.items()])
++elements = sorted({a.split()[0] for a in s["atom"].split(";") if a.strip()})
++with timed("molecule"):
++    mol = gto.M(
++        atom=s["atom"],
++        basis=bse.get_basis(s["basis"], elements=elements, fmt="nwchem"),
++        unit=s["unit"],
++        charge=s["charge"],
++        spin=s["spin"],
++        max_memory=s["max_memory_MB"],
++        verbose=0,
++    )
++info_block(
++    "Molecule",
++    [
++        ("Basis set", s["basis"]),
++        ("Basis functions", f"{mol.nao} spatial AOs, {2 * mol.nao} spin AOs"),
++        ("Electrons / charge / spin", f"{mol.nelectron} / {mol.charge} / {mol.spin}"),
++        ("Nuclear repulsion [Eh]", f"{mol.energy_nuc():20.10f}"),
++    ],
++)
++
++with timed("PySCF GHF"):
++    mf = scf.GHF(mol).x2c() if s["x2c"] else scf.GHF(mol)
++    if s["B_tesla"] is not None:
++        hB = IntegralManager(mol, B=np.array(s["B_tesla"]) * 4.254e-6, orig=s["gauge_origin"]).magnetic_field_H
++        mf.get_hcore = lambda *args: hB
++    mf.conv_tol = s["scf_conv_tol"]
++    mf.max_cycle = s["scf_max_cycle"]
++    mf.kernel()
++print(key_value(f"PySCF GHF{'-X2C' if s['x2c'] else ''} energy [Eh]", f"{mf.e_tot:20.10f}  (converged: {mf.converged})"))
++
++if s["pyscf_td"]:
++    with timed(f"PySCF {s['pyscf_td']}"):
++        td = getattr(tdscf.ghf, s["pyscf_td"])(mf)
++        td.nstates = s["lr_n_roots"]
++        td.max_cycle = s["pyscf_td_max_cycle"]
++        td.kernel()
++        nocc = mol.nelectron
++        Co, Cv = mf.mo_coeff[:, :nocc], mf.mo_coeff[:, nocc:]
++        r = mol.intor("int1e_r", comp=3)
++        mu = np.array([np.kron(np.eye(2), x) for x in r])
++        mu_ov = np.einsum("pi,xpq,qa->xia", Co.conj(), mu, Cv)
++        t = np.array([np.einsum("xia,ia->x", mu_ov, x + (y if isinstance(y, np.ndarray) else 0)) for x, y in td.xy])
++        f_td = 2 / 3 * td.e * np.sum(np.abs(t) ** 2, axis=1)
++    roots_table(f"PySCF GHF {s['pyscf_td']} excitation energies", td.e, [("f", f_td, ".6f")])
++    if not np.all(td.converged):
++        print(f" WARNING: PySCF {s['pyscf_td']} not converged for roots {np.where(~np.asarray(td.converged))[0]}")
++
++C = np.array(mf.mo_coeff, dtype=complex)
++restart = np.load(s["restart_npz"]) if s["restart_npz"] else None
++if restart is not None:
++    C = restart["c_mo"]
++
++with timed("integral backend"):
++    if s["backend"] == "cholesky":
++        direct = GHFCholesky(
++            mol, tol=s["cd_tol"], span=s["cd_span"], cd_jk=s["cd_jk"], screen_tol=s["screen_tol"],
++            incore_memory=s["incore_memory_MB"],
++        )
++    else:
++        direct = GHFDirect(mol, screen_tol=s["screen_tol"], incore_memory=s["incore_memory_MB"])
++
++rng = np.random.default_rng(s["seed"])
++ham = dict(do_x2c=s["x2c"], ecp=s["ecp"], B=s["B_tesla"], orig=s["gauge_origin"])
++with timed("wave function setup"):
++    if s["mode"] == "circuit":
++        from qiskit_aer.primitives import Sampler
++        from qiskit_nature.second_q.mappers import JordanWignerMapper
++
++        from slowquant.qiskit_interface.generalized_circuit_wavefunction_direct import (
++            GeneralizedWaveFunctionCircuitDirect,
++        )
++        from slowquant.qiskit_interface.generalized_interface import QuantumInterface
++        from slowquant.qiskit_interface.linear_response.generalized_direct_circuit import (
++            LinearResponseCircuitDirect,
++        )
++
++        QI = QuantumInterface(
++            Sampler(), s["ansatz"], JordanWignerMapper(), ansatz_options=dict(s["ansatz_options"]), shots=s["circuit_shots"]
++        )
++        WF = GeneralizedWaveFunctionCircuitDirect(
++            s["cas"], C, mol, QI, include_active_kappa=s["include_active_kappa"], direct=direct,
++            exact=s["circuit_exact"], **ham,
++        )
++        n = len(WF.thetas) // 2
++        if restart is not None:
++            WF.set_thetas(restart["circuit_parameters"][:n], restart["circuit_parameters"][n:])
++        elif s["initial_theta_amplitude"] > 0:
++            a = s["initial_theta_amplitude"]
++            WF.set_thetas_initial(rng.uniform(-a, a, n), rng.uniform(-a, a, n))
++    else:
++        WF = GeneralizedWaveFunctionUPS(
++            s["cas"], C, mol, s["ansatz"], ansatz_options=dict(s["ansatz_options"]),
++            include_active_kappa=s["include_active_kappa"], **ham,
++        )
++        WF.set_integral_backend(direct)
++        n = len(WF.thetas)
++        if restart is not None:
++            WF.set_thetas(list(restart["thetas_real"]), list(restart["thetas_imag"]))
++        elif s["initial_theta_amplitude"] > 0:
++            a = s["initial_theta_amplitude"]
++            WF.set_thetas(list(rng.uniform(-a, a, n)), list(rng.uniform(-a, a, n)))
++
++with timed("wave function optimization"):
++    if s["mode"] == "circuit":
++        WF.run_wf_optimization_2step_direct(
++            tol=s["oo_tol"],
++            maxiter=s["oo_maxiter"],
++            theta_method=s["circuit_theta_method"],
++            theta_gtol=s["theta_gtol"],
++            theta_maxiter=s["theta_maxiter"],
++            orbital_maxiter=s["circuit_orbital_maxiter"],
++            e_scf=mf.e_tot,
++        )
++    else:
++        oo = WF.run_wf_optimization_onestep_direct if s["oo_method"] == "1step" else WF.run_wf_optimization_direct
++        oo(
++            tol=s["oo_tol"], maxiter=s["oo_maxiter"], theta_gtol=s["theta_gtol"], theta_maxiter=s["theta_maxiter"],
++            e_scf=mf.e_tot,
++        )
++e_tot = WF.energy_elec + mol.energy_nuc()
++out = {"c_mo": WF.c_mo, "energy": e_tot, "settings": json.dumps(s, default=str)}
++if s["mode"] == "circuit":
++    out["circuit_parameters"] = np.array(WF.thetas)
++else:
++    out["thetas_real"] = np.array(WF.thetas_real)
++    out["thetas_imag"] = np.array(WF.thetas_imag)
++np.savez(s["output_npz"], **out)
++print(key_value("MO coefficients and thetas saved", s["output_npz"]))
++
++if s["lr_n_roots"] > 0 or s["polarizability"]:
++    with timed("linear response setup"):
++        if s["mode"] == "circuit":
++            LR = LinearResponseCircuitDirect(WF, s["lr_excitations"], symmetrize_qG=s["lr_symmetrize_qG"])
++        else:
++            LR = LinearResponseDirect(WF, s["lr_excitations"], symmetrize_qG=s["lr_symmetrize_qG"])
++    if s["lr_n_roots"] > 0:
++        with timed("excitation energies"):
++            LR.calc_excitation_energies(
++                s["lr_n_roots"], tol=s["lr_tol"], max_iter=s["lr_max_iter"], max_space=s["lr_max_space"]
++            )
++        with timed("oscillator strengths"):
++            LR.get_oscillator_strength()
++        roots_table("Excitation energies and oscillator strengths (this WF)", LR.excitation_energies, [("f", LR.oscillator_strengths, ".6f")])
++    if s["polarizability"]:
++        with timed("polarizability"):
++            LR.get_polarizability(omega=s["polarizability_omega"], tol=s["lr_tol"], max_iter=s["lr_max_iter"])
++
++if s["lr_n_roots"] > 0:
++    value_table(
++        f"Comparison: excitation energies (first {s['lr_n_roots']})",
++        [("Root", 4, "d"), (f"PySCF GHF {s['pyscf_td']} [Eh]", 20, ".8f"), ("This WF, LR [Eh]", 18, ".8f"),
++         ("f PySCF", 10, ".6f"), ("f WF", 10, ".6f")],
++        [
++            (
++                i + 1,
++                td.e[i] if s["pyscf_td"] and i < len(td.e) else np.nan,
++                LR.excitation_energies[i],
++                f_td[i] if s["pyscf_td"] and i < len(f_td) else np.nan,
++                LR.oscillator_strengths[i],
++            )
++            for i in range(s["lr_n_roots"])
++        ],
++    )
++
++total = sum(timings.values())
++value_table(
++    "Timings",
++    [("Step", 34, ""), ("Time [s]", 12, ".1f"), ("Share [%]", 10, ".1f")],
++    [(k, v, 100 * v / total) for k, v in timings.items()] + [("total", total, 100.0)],
++    f"Peak memory: {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6:.2f} GB (max_memory {s['max_memory_MB']} MB)",
++)
 diff --git a/slowquant/qiskit_interface/fast_pauli.py b/slowquant/qiskit_interface/fast_pauli.py
 new file mode 100644
-index 0000000..d26ccdd
+index 0000000..970db64
 --- /dev/null
 +++ b/slowquant/qiskit_interface/fast_pauli.py
-@@ -0,0 +1,543 @@
+@@ -0,0 +1,765 @@
 +"""Fast Pauli-level measurement layer (hardware compatible).
 +
 +Paulis are stored as integer key x * 2**n + z for the operator X^x Z^z (X^x Z^z = (-i)^{n_Y} P_label).
@@ -227,8 +511,15 @@ index 0000000..d26ccdd
 +from qiskit.quantum_info import PauliList, SparsePauliOp, Statevector
 +from qiskit_nature.second_q.mappers import JordanWignerMapper
 +
++from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_generalized
 +from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
-+from slowquant.unitary_coupled_cluster.operators import a_op_spin
++from slowquant.unitary_coupled_cluster.operators import G1_generalized, G2_generalized, a_op_spin
++from slowquant.unitary_coupled_cluster.util import iterate_t1, iterate_t2
++
++try:
++    from slowquant.unitary_coupled_cluster.ci_sparse import UPSEngine, ups_theta_gradient
++except ImportError:
++    from slowquant.unitary_coupled_cluster.ci_sparse_DHF import UPSEngine, ups_theta_gradient
 +
 +
 +def _popcount_parity(a):
@@ -412,6 +703,113 @@ index 0000000..d26ccdd
 +        return c
 +
 +
++class _Layout:
++    def __init__(self):
++        self.excitation_indices = []
++        self.excitation_operator_type = []
++
++
++class FermionSimulator:
++    """Exact simulation of fUCC circuits (QI ansatz fUCCSD / fUCCD, JW) in the N-electron determinant space.
++
++    Each circuit block (norm r_k, phase phi_k) is exp(theta_k T_k - theta_k^* T_k^dagger), theta_k = r_k e^{i phi_k};
++    states and gradients come from the sparse UPS engine (cost ~ n_params x n_det instead of n_gates x 2^n_qubits).
++    The equivalence with the circuit is checked against qiskit at construction (ValueError if it does not hold).
++    """
++
++    def __init__(self, QI):
++        if type(QI.mapper) is not JordanWignerMapper or QI.ansatz not in ("fUCCSD", "fUCCD"):
++            raise ValueError("FermionSimulator: only fUCCSD / fUCCD with JW")
++        n, el = QI.num_spin_orbs, QI.num_elec
++        self.n = n
++        opt = QI.ansatz_options
++        isc = opt.get("is_spin_conserving", True)
++        lay = _Layout()
++        for _ in range(opt.get("n_layers", 1)):
++            if opt.get("S", False):
++                for a, i in iterate_t1(QI.occ_spin_idx, QI.unocc_spin_idx, is_spin_conserving=isc):
++                    lay.excitation_indices.append((i, a))
++                    lay.excitation_operator_type.append("single")
++            if opt.get("D", False):
++                for a, i, b, j in iterate_t2(QI.occ_spin_idx, QI.unocc_spin_idx, is_spin_conserving=isc):
++                    lay.excitation_indices.append((i, j, a, b))
++                    lay.excitation_operator_type.append("double")
++        nk = len(lay.excitation_indices)
++        names = [str(p) for p in QI.circuit.parameters]
++        if len(names) != 2 * nk:
++            raise ValueError("FermionSimulator: parameter count mismatch")
++        self.ir = np.array([names.index(f"norm{k:09d}") for k in range(nk)])
++        self.ip = np.array([names.index(f"phi{k:09d}") for k in range(nk)])
++        ci = get_indexing_generalized(0, n, 0, el[0], el[1])
++        dets = np.asarray(ci.idx2det, dtype=np.int64)
++        occ = np.array([[t for t in range(n) if (d >> (n - 1 - t)) & 1] for d in dets], dtype=np.int64)
++        num_orbs = n // 2
++        q = occ // 2 + (occ % 2) * num_orbs
++        self.mask = np.sum(np.left_shift(np.int64(1), q), axis=1)
++        x, _, c = _jw_ladder_product(occ, (True,) * occ.shape[1], num_orbs)
++        self.sign = np.sum(np.where(x == self.mask[:, None], c, 0.0), axis=1)
++        ops = {"single": G1_generalized, "double": G2_generalized}
++        self.engine = UPSEngine(ci, lay, lambda t, idx: ops[t](*[int(v) for v in idx]))
++        self.index = -np.ones(1 << n, dtype=np.int64)
++        self.index[self.mask] = np.arange(len(dets))
++        sv0 = Statevector(QI.circuit.assign_parameters(np.zeros(len(names)))).data
++        self.ref = sv0[self.mask] / self.sign
++        if abs(np.linalg.norm(self.ref) - 1) > 1e-10:
++            raise ValueError("FermionSimulator: reference state outside the N-electron space")
++        self._hcache = None
++        rng = np.random.default_rng(11)
++        for _ in range(2):
++            p = rng.uniform(-0.8, 0.8, len(names))
++            a = Statevector(QI.circuit.assign_parameters(p)).data
++            b = self.qubit(self.state(p))
++            ov = np.vdot(b, a)
++            if abs(abs(ov) - 1) > 1e-10 or np.abs(b * ov / abs(ov) - a).max() > 1e-10:
++                raise ValueError("FermionSimulator: circuit is not the fermionic fUCC product")
++
++    def thetas(self, p):
++        p = np.asarray(p, dtype=float)
++        return p[self.ir] * np.exp(1j * p[self.ip])
++
++    def state(self, p):
++        return self.engine.state(self.ref, self.thetas(p))
++
++    def qubit(self, c):
++        out = np.zeros(1 << self.n, complex)
++        out[self.mask] = self.sign * c
++        return out
++
++    def hamiltonian(self, keys, coeffs, xs, W):
++        """Sparse N-electron matrix of sum_k coeffs_k X^x Z^z (cached for the last keys/coeffs)."""
++        h = self._hcache
++        if h is not None and np.array_equal(h[0], keys) and np.array_equal(h[1], coeffs):
++            return h[2]
++        rows, cols, vals = [], [], []
++        for x, w in zip(xs, W):
++            t = self.index[self.mask ^ x]
++            ok = t >= 0
++            rows.append(t[ok])
++            cols.append(np.nonzero(ok)[0])
++            vals.append(self.sign[t[ok]] * self.sign[ok] * w[self.mask[ok]])
++        nd = len(self.mask)
++        H = sp.csr_matrix((np.concatenate(vals), (np.concatenate(rows), np.concatenate(cols))), shape=(nd, nd))
++        self._hcache = (keys.copy(), np.array(coeffs).copy(), H)
++        return H
++
++    def energy_gradient(self, H, p):
++        p = np.asarray(p, dtype=float)
++        th = self.thetas(p)
++        c = self.engine.state(self.ref, th)
++        hc = H @ c
++        g = ups_theta_gradient(self.engine, th, self.ref, hc)
++        nk = len(th)
++        gR, gI = g[:nk], g[nk:]
++        grad = np.zeros(len(p))
++        ph = p[self.ip]
++        grad[self.ir] = gR * np.cos(ph) + gI * np.sin(ph)
++        grad[self.ip] = -gR * th.imag + gI * th.real
++        return np.vdot(c, hc).real, grad
++
++
 +class PauliEstimator:
 +    """Expectation values <X^x Z^z> of the QI circuit.
 +
@@ -430,6 +828,8 @@ index 0000000..d26ccdd
 +        self._psi = None
 +        self._sim = None
 +        self._sim_circuit = None
++        self._fsim = None
++        self._fsim_circuit = None
 +        self._wcache = None
 +
 +    def _reset(self, params):
@@ -453,6 +853,11 @@ index 0000000..d26ccdd
 +        """sum_k coeffs_k <P_k> for each parameter set (independent of the cache); sampler: batched device calls."""
 +        keys = np.asarray(keys, dtype=np.int64)
 +        if self.exact:
++            fs = self._fermion()
++            if fs is not None:
++                H = fs.hamiltonian(keys, coeffs, *self._weights(keys, coeffs))
++                cs = [fs.state(p) for p in params_list]
++                return np.array([np.vdot(c, H @ c) for c in cs])
 +            xs, W = self._weights(keys, coeffs)
 +            b = np.arange(1 << self.n, dtype=np.int64)
 +            out = np.empty(len(params_list), complex)
@@ -518,13 +923,49 @@ index 0000000..d26ccdd
 +                self._sim = None
 +        return self._sim
 +
++    def _fermion(self):
++        qc = self.QI.circuit
++        if self._fsim_circuit is not qc:
++            self._fsim_circuit = qc
++            try:
++                self._fsim = FermionSimulator(self.QI)
++            except (ValueError, AttributeError, KeyError):
++                self._fsim = None
++        return self._fsim
++
++    def energy_gradient(self, keys, coeffs, params):
++        """Exact (E, dE/dparams) of sum_k coeffs_k X^x Z^z (exact path only): fermionic fUCC simulation if
++        possible, else adjoint differentiation of the gate-level circuit. None if neither applies."""
++        fs = self._fermion()
++        if fs is not None:
++            return fs.energy_gradient(fs.hamiltonian(keys, coeffs, *self._weights(keys, coeffs)), params)
++        sim = self._simulator()
++        if sim is None:
++            return None
++        xs, W = self._weights(keys, coeffs)
++        b = np.arange(1 << self.n, dtype=np.int64)
++
++        def apply_h(psi):
++            out = np.zeros_like(psi)
++            for x, w in zip(xs, W):
++                out += (w * psi)[b ^ x]
++            return out
++
++        return sim.energy_gradient(params, apply_h)
++
 +    def _svs(self, params_list):
++        fs = self._fermion()
++        if fs is not None:
++            return np.array([fs.qubit(fs.state(p)) for p in params_list])
 +        sim = self._simulator()
 +        if sim is None:
 +            return np.array([self._sv(p) for p in params_list])
 +        return sim.statevectors(params_list)
 +
 +    def _sv(self, params):
++        fs = self._fermion()
++        if fs is not None:
++            return fs.qubit(fs.state(params))
 +        sim = self._simulator()
 +        if sim is not None:
 +            return sim.statevectors(params)[0]
@@ -599,23 +1040,34 @@ index 0000000..d26ccdd
 +class CircuitSimulator:
 +    """Batched statevector simulation of a parameterized circuit (many parameter sets per numpy pass).
 +
-+    Gate list compiled once; consecutive one-qubit gates are fused per qubit. Supports one- and two-qubit gates
-+    with angles linear in one parameter. Raises ValueError for anything else (caller falls back to qiskit).
++    Gate list compiled once; consecutive one-qubit gates are fused per qubit (constant parts pre-multiplied).
++    Supports one- and two-qubit gates with angles linear in one parameter. Raises ValueError for anything else
++    (caller falls back to qiskit). energy_gradient: exact gradient by adjoint differentiation (two sweeps).
 +    """
 +
 +    _fixed2 = {"cx", "cz"}
 +
 +    def __init__(self, qc):
-+        self.n = n = qc.num_qubits
++        self.n = qc.num_qubits
 +        self.params = list(qc.parameters)
 +        pidx = {p: i for i, p in enumerate(self.params)}
 +        self.gphase = self._lin(qc.global_phase, pidx)
 +        self.ops = []
++        self.gates = []
 +        pend = {}
 +
 +        def flush(q):
-+            if pend.get(q):
-+                self.ops.append(("1q", q, pend.pop(q)))
++            items = pend.pop(q, [])
++            merged = []
++            for it in items:
++                if it[0] == "m" and merged and merged[-1][0] == "m":
++                    merged[-1] = ("m", it[1] @ merged[-1][1])
++                else:
++                    merged.append(it)
++            if len(merged) == 1 and merged[0][0] == "m":
++                self.ops.append(("1c", q, merged[0][1]))
++            elif merged:
++                self.ops.append(("1q", q, merged))
 +
 +        for ins in qc.data:
 +            op, qs = ins.operation, [qc.find_bit(q).index for q in ins.qubits]
@@ -624,18 +1076,22 @@ index 0000000..d26ccdd
 +                continue
 +            if len(qs) == 1:
 +                if op.params and name in ("rx", "ry", "rz", "p", "u1"):
-+                    pend.setdefault(qs[0], []).append((name, self._lin(op.params[0], pidx)))
++                    item = ("p" if name == "u1" else name, self._lin(op.params[0], pidx))
 +                elif not any(hasattr(x, "parameters") for x in op.params):
-+                    pend.setdefault(qs[0], []).append(("m", np.asarray(op.to_matrix(), dtype=complex)))
++                    item = ("m", np.asarray(op.to_matrix(), dtype=complex))
 +                else:
 +                    raise ValueError(f"unsupported parameterized gate {name}")
++                pend.setdefault(qs[0], []).append(item)
++                self.gates.append(("1", qs[0], item))
 +            elif len(qs) == 2 and not any(hasattr(x, "parameters") for x in op.params):
 +                flush(qs[0])
 +                flush(qs[1])
 +                if name in self._fixed2:
-+                    self.ops.append((name, qs[0], qs[1]))
++                    g = (name, qs[0], qs[1])
 +                else:
-+                    self.ops.append(("2q", qs, np.asarray(op.to_matrix(), dtype=complex).reshape(2, 2, 2, 2)))
++                    g = ("2q", qs, np.asarray(op.to_matrix(), dtype=complex).reshape(2, 2, 2, 2))
++                self.ops.append(g)
++                self.gates.append(g)
 +            else:
 +                raise ValueError(f"unsupported gate {name}")
 +        for q in list(pend):
@@ -659,28 +1115,69 @@ index 0000000..d26ccdd
 +        i, a, b = lin
 +        return np.full(len(P), b) if i < 0 else a * P[:, i] + b
 +
++    @staticmethod
++    def _rot(kind, t):
++        """Rotation matrices (m, 2, 2) and their angle derivatives."""
++        m = len(t)
++        G = np.zeros((m, 2, 2), complex)
++        D = np.zeros((m, 2, 2), complex)
++        c, s = np.cos(t / 2), np.sin(t / 2)
++        if kind == "rx":
++            G[:, 0, 0] = G[:, 1, 1] = c
++            G[:, 0, 1] = G[:, 1, 0] = -1j * s
++            D[:, 0, 0] = D[:, 1, 1] = -0.5 * s
++            D[:, 0, 1] = D[:, 1, 0] = -0.5j * c
++        elif kind == "ry":
++            G[:, 0, 0] = G[:, 1, 1] = c
++            G[:, 0, 1], G[:, 1, 0] = -s, s
++            D[:, 0, 0] = D[:, 1, 1] = -0.5 * s
++            D[:, 0, 1], D[:, 1, 0] = -0.5 * c, 0.5 * c
++        elif kind == "rz":
++            G[:, 0, 0], G[:, 1, 1] = np.exp(-0.5j * t), np.exp(0.5j * t)
++            D[:, 0, 0], D[:, 1, 1] = -0.5j * np.exp(-0.5j * t), 0.5j * np.exp(0.5j * t)
++        else:
++            G[:, 0, 0], G[:, 1, 1] = 1.0, np.exp(1j * t)
++            D[:, 1, 1] = 1j * np.exp(1j * t)
++        return G, D
++
 +    def _mat(self, items, P):
-+        m = len(P)
-+        M = np.broadcast_to(np.eye(2, dtype=complex), (m, 2, 2)).copy()
++        M = None
 +        for kind, val in items:
-+            if kind == "m":
-+                M = val @ M
-+                continue
-+            t = self._angle(val, P)
-+            G = np.zeros((m, 2, 2), complex)
-+            c, s = np.cos(t / 2), np.sin(t / 2)
-+            if kind == "rx":
-+                G[:, 0, 0] = G[:, 1, 1] = c
-+                G[:, 0, 1] = G[:, 1, 0] = -1j * s
-+            elif kind == "ry":
-+                G[:, 0, 0] = G[:, 1, 1] = c
-+                G[:, 0, 1], G[:, 1, 0] = -s, s
-+            elif kind == "rz":
-+                G[:, 0, 0], G[:, 1, 1] = np.exp(-0.5j * t), np.exp(0.5j * t)
++            G = val if kind == "m" else self._rot(kind, self._angle(val, P))[0]
++            M = G if M is None else G @ M
++        return np.broadcast_to(M, (len(P), 2, 2)) if M.ndim == 2 else M
++
++    def _apply1(self, psi, q, M):
++        m = psi.shape[0]
++        v = psi.reshape(m, -1, 2, 1 << q)
++        a0, a1 = v[:, :, 0], v[:, :, 1]
++        if M.ndim == 2:
++            return np.stack((M[0, 0] * a0 + M[0, 1] * a1, M[1, 0] * a0 + M[1, 1] * a1), axis=2).reshape(m, -1)
++        M = M[:, :, :, None, None]
++        return np.stack((M[:, 0, 0] * a0 + M[:, 0, 1] * a1, M[:, 1, 0] * a0 + M[:, 1, 1] * a1), axis=2).reshape(m, -1)
++
++    def _apply2(self, psi, g, adjoint=False):
++        m, n = psi.shape[0], self.n
++        if g[0] in ("cx", "cz"):
++            c, t = g[1], g[2]
++            hi, lo = max(c, t), min(c, t)
++            v = psi.reshape(m, 1 << (n - 1 - hi), 2, 1 << (hi - lo - 1), 2, 1 << lo)
++            if g[0] == "cz":
++                v[:, :, 1, :, 1] *= -1
++            elif c == hi:
++                x = v[:, :, 1]
++                x[...] = x[:, :, :, ::-1].copy()
 +            else:
-+                G[:, 0, 0], G[:, 1, 1] = 1.0, np.exp(1j * t)
-+            M = G @ M
-+        return M
++                x = v[:, :, :, :, 1]
++                x[...] = x[:, :, ::-1].copy()
++            return psi
++        (q0, q1), U = g[1], g[2]
++        if adjoint:
++            U = U.reshape(4, 4).conj().T.reshape(2, 2, 2, 2)
++        x = np.moveaxis(psi.reshape((m,) + (2,) * n), (n - q1, n - q0), (-2, -1))
++        return np.ascontiguousarray(
++            np.moveaxis(np.einsum("p...cd,abcd->p...ab", x, U), (-2, -1), (n - q1, n - q0))
++        ).reshape(m, -1)
 +
 +    def statevectors(self, params) -> np.ndarray:
 +        P = np.atleast_2d(np.asarray(params, dtype=float))
@@ -688,31 +1185,40 @@ index 0000000..d26ccdd
 +        psi = np.zeros((m, 1 << n), complex)
 +        psi[:, 0] = 1.0
 +        for op in self.ops:
-+            if op[0] == "1q":
-+                q = op[1]
-+                M = self._mat(op[2], P)
-+                v = psi.reshape(m, -1, 2, 1 << q)
-+                a0, a1 = v[:, :, 0], v[:, :, 1]
-+                M = M[:, :, :, None, None]
-+                psi = np.stack((M[:, 0, 0] * a0 + M[:, 0, 1] * a1, M[:, 1, 0] * a0 + M[:, 1, 1] * a1), axis=2).reshape(m, -1)
-+            elif op[0] in ("cx", "cz"):
-+                c, t = op[1], op[2]
-+                hi, lo = max(c, t), min(c, t)
-+                v = psi.reshape(m, 1 << (n - 1 - hi), 2, 1 << (hi - lo - 1), 2, 1 << lo)
-+                if op[0] == "cz":
-+                    v[:, :, 1, :, 1] *= -1
-+                elif c == hi:
-+                    x = v[:, :, 1]
-+                    x[...] = x[:, :, :, ::-1].copy()
-+                else:
-+                    x = v[:, :, :, :, 1]
-+                    x[...] = x[:, :, ::-1].copy()
++            if op[0] == "1c":
++                psi = self._apply1(psi, op[1], op[2])
++            elif op[0] == "1q":
++                psi = self._apply1(psi, op[1], self._mat(op[2], P))
 +            else:
-+                (q0, q1), U = op[1], op[2]
-+                x = psi.reshape((m,) + (2,) * n)
-+                x = np.moveaxis(x, (n - q1, n - q0), (-2, -1))
-+                psi = np.ascontiguousarray(np.moveaxis(np.einsum("p...cd,abcd->p...ab", x, U), (-2, -1), (n - q1, n - q0))).reshape(m, -1)
++                psi = self._apply2(psi, op)
 +        return psi * np.exp(1j * self._angle(self.gphase, P))[:, None]
++
++    def energy_gradient(self, params, apply_h):
++        """E = <psi|H|psi> and dE/dparams by adjoint differentiation; apply_h(psi) returns H psi (1-D)."""
++        p = np.asarray(params, dtype=float)
++        P = p[None]
++        psi = self.statevectors(P)
++        lam = apply_h(psi[0])[None]
++        e = np.vdot(psi[0], lam[0]).real
++        grad = np.zeros(len(p))
++        for g in reversed(self.gates):
++            if g[0] != "1":
++                psi = self._apply2(psi, g, adjoint=True)
++                lam = self._apply2(lam, g, adjoint=True)
++                continue
++            q, (kind, val) = g[1], g[2]
++            if kind == "m":
++                Md = val.conj().T
++                psi = self._apply1(psi, q, Md)
++                lam = self._apply1(lam, q, Md)
++                continue
++            G, D = self._rot(kind, self._angle(val, P))
++            Gd = G[0].conj().T
++            psi = self._apply1(psi, q, Gd)
++            if val[0] >= 0:
++                grad[val[0]] += 2 * val[1] * np.vdot(lam[0], self._apply1(psi, q, D[0])[0]).real
++            lam = self._apply1(lam, q, Gd)
++        return e, grad
 +
 +def pauli_product(k1, k2, nq):
 +    """Keys and signs of X^x1 Z^z1 X^x2 Z^z2 = sign X^(x1^x2) Z^(z1^z2) (broadcasting)."""
@@ -759,10 +1265,10 @@ index 0000000..d26ccdd
 +    return np.concatenate(out_a), np.concatenate(out_b), np.concatenate(out_k), np.concatenate(out_c)
 diff --git a/slowquant/qiskit_interface/generalized_circuit_wavefunction_direct.py b/slowquant/qiskit_interface/generalized_circuit_wavefunction_direct.py
 new file mode 100644
-index 0000000..f76072c
+index 0000000..6b5745c
 --- /dev/null
 +++ b/slowquant/qiskit_interface/generalized_circuit_wavefunction_direct.py
-@@ -0,0 +1,253 @@
+@@ -0,0 +1,282 @@
 +import time
 +
 +import numpy as np
@@ -771,6 +1277,7 @@ index 0000000..f76072c
 +from slowquant.qiskit_interface.fast_pauli import FermionPauliMap, PauliEstimator
 +from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
 +from slowquant.unitary_coupled_cluster.integral_direct import orbital_gradient
++from slowquant.unitary_coupled_cluster.printing import IterationTable
 +
 +
 +def shift_rule(R: int, order: int) -> tuple[np.ndarray, np.ndarray]:
@@ -840,6 +1347,7 @@ index 0000000..f76072c
 +        self._hk = None
 +        self._fixed_rdms = False
 +        self.num_energy_evals = 0
++        self.parameter_shift = False
 +
 +    @property
 +    def thetas(self) -> list[float]:
@@ -894,8 +1402,14 @@ index 0000000..f76072c
 +        return self.estimator.expectation_multi(keys, c, points).real
 +
 +    def theta_gradient(self, p=None) -> np.ndarray:
-+        """Parameter-shift gradient (all shifted circuits in one batch)."""
++        """Parameter-shift gradient (all shifted circuits in one batch). On the exact (statevector) path the same
++        gradient is obtained by adjoint differentiation (two sweeps) unless self.parameter_shift is True."""
 +        p = np.array(self.thetas if p is None else p, dtype=float)
++        if self.estimator.exact and not self.parameter_shift:
++            res = self.estimator.energy_gradient(*self._hamiltonian_paulis(), p)
++            if res is not None:
++                self.num_energy_evals += 2
++                return res[1]
 +        pts, w, idx = [], [], []
 +        for i, R in enumerate(self.R):
 +            for x, wt in zip(*shift_rule(R, 1)):
@@ -909,9 +1423,18 @@ index 0000000..f76072c
 +        return g
 +
 +    def theta_hessian(self, p=None) -> np.ndarray:
-+        """Parameter-shift Hessian: second-derivative rule on the diagonal, product of first-derivative rules off it."""
++        """Parameter-shift Hessian: second-derivative rule on the diagonal, product of first-derivative rules off it.
++        Exact path (unless self.parameter_shift): first-derivative shift rule applied to adjoint gradients (exact)."""
 +        p = np.array(self.thetas if p is None else p, dtype=float)
 +        n = len(p)
++        if self.estimator.exact and not self.parameter_shift and self.estimator._simulator() is not None:
++            H = np.zeros((n, n))
++            for i in range(n):
++                for x, wt in zip(*shift_rule(self.R[i], 1)):
++                    q = p.copy()
++                    q[i] += x
++                    H[i] += wt * self.theta_gradient(q)
++            return 0.5 * (H + H.T)
 +        pts, w, ij = [], [], []
 +        for i in range(n):
 +            for x, wt in zip(*shift_rule(self.R[i], 2)):
@@ -983,41 +1506,53 @@ index 0000000..f76072c
 +        theta_gtol: float = 1e-8,
 +        theta_maxiter: int = 500,
 +        orbital_maxiter: int = 50,
++        e_scf: float | None = None,
 +        **orbital_options,
 +    ) -> None:
 +        """Hardware-friendly two-step OO: theta optimization (quantum) then orbital optimization at fixed measured
 +        RDMs (classical, integral-direct L-BFGS, see run_wf_optimization_direct).
-+        Quantum cost per macro iteration: theta optimization + one RDM measurement."""
-+        print(
-+            f"### Circuit OO: {len(self.kappa_spin_idx)} orbital rotations, {len(self.thetas)} circuit parameters"
++        Quantum cost per macro iteration: theta optimization + one RDM measurement. e_scf: PySCF energy (printed)."""
++        t_start = time.time()
++        e_ref = self.print_info(e_scf)
++        timing = {"theta optimization + RDMs": 0.0, "orbital optimization": 0.0}
++        evals0 = self.num_energy_evals
++        tab = IterationTable(
++            "Circuit two-step orbital optimization (theta on device, orbitals classical)",
++            [("Macro", 5, "d"), ("Time [s]", 9, ".2f"), ("E after theta [Eh]", 20, ".12f"), ("max|g_orb|", 10, ".2e"),
++             ("E after orbitals [Eh]", 21, ".12f"), ("Orb.it", 6, "d"), ("Circuits", 9, "d")],
++            [("Orbital rotations (complex)", len(self.kappa_spin_idx)), ("Circuit parameters", len(self.thetas)),
++             ("Theta optimizer", theta_method), ("Convergence", f"max|g_orb| < {tol:.1e}")],
 +        )
-+        print(
-+            "Macro | Time [s] | E after theta opt. [Hartree] | max |orbital grad| | E after orbital opt. | energy evals"
-+        )
++        conv = False
 +        for it in range(maxiter):
 +            t0 = time.time()
 +            e_theta = self._optimize_thetas(theta_gtol, theta_maxiter, theta_method)
 +            gmax = self.orbital_gradient_max()
++            timing["theta optimization + RDMs"] += time.time() - t0
 +            if gmax < tol:
-+                print(
-+                    f"{it + 1:^5} | {time.time() - t0:^8.2f} | {e_theta:^29.12f} | {gmax:^18.3e} | converged"
-+                )
++                tab.row(it + 1, tab.lap(), e_theta, gmax, None, None, self.num_energy_evals - evals0)
++                conv = True
 +                break
++            t1 = time.time()
 +            self._fixed_rdms = True
 +            try:
-+                self.run_wf_optimization_direct(tol=tol, maxiter=orbital_maxiter, **orbital_options)
++                n_orb = self.run_wf_optimization_direct(
++                    tol=tol, maxiter=orbital_maxiter, verbose=False, print_iterations=False, **orbital_options
++                )
 +            finally:
 +                self._fixed_rdms = False
++            timing["orbital optimization"] += time.time() - t1
 +            self._energy_elec = None
 +            e_orb = self.ds.energy(self.rdm1, self.rdm2)
-+            print(
-+                f"{it + 1:^5} | {time.time() - t0:^8.2f} | {e_theta:^29.12f} | {gmax:^18.3e} | {e_orb:^20.12f} | {self.num_energy_evals}"
-+            )
-+        else:
-+            print("WARNING: circuit OO did not converge")
++            tab.row(it + 1, tab.lap(), e_theta, gmax, e_orb, n_orb, self.num_energy_evals - evals0)
 +        self._energy_elec = None
++        e = self.energy_elec
++        status = f"Converged in {it + 1} macro iterations" if conv else f"WARNING: not converged in {maxiter} macro iterations"
++        info = self._oo_summary(t_start, e, e_ref, e_scf, timing)
++        info.insert(len(timing) + 1, ("Circuits evaluated", f"{self.num_energy_evals - evals0:20d}"))
++        tab.close(status, info)
 diff --git a/slowquant/qiskit_interface/generalized_interface.py b/slowquant/qiskit_interface/generalized_interface.py
-index b536b45..6e7837d 100644
+index b536b45..9156de7 100644
 --- a/slowquant/qiskit_interface/generalized_interface.py
 +++ b/slowquant/qiskit_interface/generalized_interface.py
 @@ -29,6 +29,8 @@ from slowquant.qiskit_interface.util import (
@@ -1037,7 +1572,16 @@ index b536b45..6e7837d 100644
  
  
  class QuantumInterface:
-@@ -448,6 +451,7 @@ class QuantumInterface:
+@@ -149,6 +152,8 @@ class QuantumInterface:
+         self.num_orbs = num_orbs
+         self.num_spin_orbs = num_spin_orbs
+         self.num_elec = num_elec
++        self.occ_spin_idx = [int(x) for x in occ_spin_idx]
++        self.unocc_spin_idx = [int(x) for x in unocc_spin_idx]
+         self.grad_param_R_r: dict[
+             str, int
+         ] = {}  # Contains information about the parameterization needed for gradient evaluations.
+@@ -448,6 +453,7 @@ class QuantumInterface:
              ansatz_circuit: Ansatz circuit
          """
          # Check if ISA is selected. If yes, pre-transpile circuit for later use.
@@ -1045,7 +1589,7 @@ index b536b45..6e7837d 100644
          if self.ISA:
              self._ansatz_circuit_raw = ansatz_circuit  # needed for csfs functionality
              self.ansatz_circuit: QuantumCircuit = self._transpile_circuit(ansatz_circuit)
-@@ -631,6 +635,8 @@ class QuantumInterface:
+@@ -631,6 +637,8 @@ class QuantumInterface:
          Returns:
              Qubit representation of operator.
          """
@@ -1054,7 +1598,7 @@ index b536b45..6e7837d 100644
          mapped_op = self.mapper.map(FermionicOp(op.get_qiskit_form(self.num_orbs), self.num_spin_orbs))
          if not isinstance(mapped_op, SparsePauliOp):
              raise TypeError(f"The qubit form of the operator is not SparsePauliOp got, {type(mapped_op)}")
-@@ -1031,7 +1037,6 @@ class QuantumInterface:
+@@ -1031,7 +1039,6 @@ class QuantumInterface:
          det_int = int(det, 2)
          if run_circuit is None:
              run_circuit = self.circuit
@@ -1062,7 +1606,7 @@ index b536b45..6e7837d 100644
          # Map Fermionic to Qubit
          if isinstance(op, FermionicOperator):
              observables = self.op_to_qbit(op)
-@@ -1092,16 +1097,7 @@ class QuantumInterface:
+@@ -1092,16 +1099,7 @@ class QuantumInterface:
                  # save mitigated results
                  self.saver[det_int].update_distr(head_mit, distr_raw, self.mitigation_flags)
  
@@ -1080,7 +1624,7 @@ index b536b45..6e7837d 100644
  
      def _sampler_quantum_expectation_value_nosave(
          self,
-@@ -1158,16 +1154,11 @@ class QuantumInterface:
+@@ -1158,16 +1156,11 @@ class QuantumInterface:
                  self._apply_M_mitigation(distr, run_circuit, circuit_M)
  
              if self.mitigation_flags.do_postselection:  # apply post-selection if requested
@@ -1099,7 +1643,7 @@ index b536b45..6e7837d 100644
          else:
              # Simulate each Pauli string with one combined device call
              distr = self._one_call_sampler_distributions(paulis_str, run_parameters, run_circuit)
-@@ -1175,14 +1166,11 @@ class QuantumInterface:
+@@ -1175,14 +1168,11 @@ class QuantumInterface:
                  self._apply_M_mitigation(distr, run_circuit, circuit_M)
  
              if self.mitigation_flags.do_postselection:  # apply post-selection if requested
@@ -1118,7 +1662,7 @@ index b536b45..6e7837d 100644
  
          return values
  
-@@ -1439,6 +1427,63 @@ class QuantumInterface:
+@@ -1439,6 +1429,67 @@ class QuantumInterface:
                  dist[key] /= self._circuit_multipl
          return dist_combined
  
@@ -1156,9 +1700,13 @@ index b536b45..6e7837d 100644
 +            distr = []
 +            for pub in result:
 +                meas = pub.data.meas
-+                for i in range(npar):
-+                    counts = meas.get_counts(i) if npar > 1 or meas.ndim else meas.get_counts()
-+                    distr.append({int(k, 2): v / shots for k, v in counts.items()})
++                arr = meas.array.reshape(-1, meas.num_shots, meas.array.shape[-1]).astype(np.int64)
++                ints = np.zeros(arr.shape[:2], dtype=np.int64)
++                for b in range(arr.shape[-1]):
++                    ints = (ints << 8) | arr[..., b]
++                for i in range(len(ints)):
++                    k, c = np.unique(ints[i], return_counts=True)
++                    distr.append(dict(zip(k.tolist(), (c / meas.num_shots).tolist())))
 +        else:
 +            run_circuits = [qc for qc in circuits for _ in range(npar)] * self._circuit_multipl
 +            values = [list(p) for _ in circuits for p in parameters_list] * self._circuit_multipl
@@ -1184,10 +1732,10 @@ index b536b45..6e7837d 100644
          pauli: str,
 diff --git a/slowquant/qiskit_interface/linear_response/generalized_direct_circuit.py b/slowquant/qiskit_interface/linear_response/generalized_direct_circuit.py
 new file mode 100644
-index 0000000..8ceafb8
+index 0000000..7239af8
 --- /dev/null
 +++ b/slowquant/qiskit_interface/linear_response/generalized_direct_circuit.py
-@@ -0,0 +1,350 @@
+@@ -0,0 +1,351 @@
 +import time
 +
 +import numpy as np
@@ -1203,6 +1751,7 @@ index 0000000..8ceafb8
 +from slowquant.unitary_coupled_cluster.linear_response.generalized_direct import LinearResponseDirect
 +from slowquant.unitary_coupled_cluster.operators import G1, G2
 +from slowquant.unitary_coupled_cluster.util import iterate_t1, iterate_t2
++from slowquant.unitary_coupled_cluster.printing import key_value, timing_line
 +
 +
 +def _commutator_xz(ka, ca, kb, cb, nq):
@@ -1252,7 +1801,7 @@ index 0000000..8ceafb8
 +        ds = self.ds = wf.ds
 +        ds.set_rdms(wf.rdm1, wf.rdm2)
 +        ds.response_tensors()
-+        print(f"Response integrals: {time.time() - t0:.1f} s")
++        timing_line("Response integrals", time.time() - t0)
 +        self.N = ds.C.shape[1]
 +        self.pos = -np.ones(self.N, dtype=int)
 +        self.pos[ds.occ] = np.arange(len(ds.occ))
@@ -1265,7 +1814,7 @@ index 0000000..8ceafb8
 +        self.q_idx = self.q_idx[(np.abs(a_q) > screen) | (np.abs(s_q) > screen)]
 +        self.nq, self.nG = len(self.q_idx), len(G_ops)
 +        self.n = self.nq + self.nG
-+        print(f"Operators: {self.nq} orbital, {self.nG} active-space")
++        print(key_value("LR operators", f"{self.nq} orbital, {self.nG} active-space"))
 +        self._chunk = chunk
 +        shift = wf.active_spin_idx[0]
 +        self.pairs = (
@@ -1275,7 +1824,7 @@ index 0000000..8ceafb8
 +        )
 +        self._measure_active_space()
 +        self.DA, self.DB = self._cross_terms_measured()
-+        print(f"Linear response setup: {time.time() - t0:.1f} s")
++        timing_line("Linear response setup", time.time() - t0)
 +
 +    def _terms(self):
 +        """Yield (target, flat index, keys, coefficients): target.flat[index] += coefficients * <keys>."""
@@ -1386,7 +1935,7 @@ index 0000000..8ceafb8
 +                    acc = 0
 +            keys = np.unique(np.concatenate(keys))
 +            vals = est(keys)
-+            print(f"Active-space LR quantities: {len(keys)} Paulis measured ({time.time() - t0:.1f} s)")
++            print(key_value("Active-space LR quantities", f"{len(keys)} Paulis measured, {time.time() - t0:.1f} s"))
 +            for name, idx, k, c in self._terms():
 +                add(name, idx, c * vals[np.searchsorted(keys, k)])
 +        self.K1 = out["K1"].reshape(nG, na, na)
@@ -1401,7 +1950,7 @@ index 0000000..8ceafb8
 +        self.S_GG, self.A_GG, self.B_GG = (out[x].reshape(nG, nG) for x in ("S", "A", "B"))
 +        npair = len(self.pairs)
 +        self._ext = {k: out[k].reshape(npair, -1) for k in out if k[0] in "LM"} if npair else {}
-+        print(f"Active-space LR setup: {time.time() - t0:.1f} s")
++        timing_line("Active-space LR setup", time.time() - t0)
 +
 +    def _cross_terms_measured(self) -> tuple[np.ndarray, np.ndarray]:
 +        """DA_Gq = 1/2<0|H[q, G^+]|0>, DB_Gq = 1/2<0|H[q, G]|0>^* from the measured extended transition tensors."""
@@ -1538,6 +2087,96 @@ index 0000000..8ceafb8
 +            out[nq:n] = cd
 +            out[n + nq :] = cg
 +        return out
+diff --git a/slowquant/qiskit_interface/operators_circuits.py b/slowquant/qiskit_interface/operators_circuits.py
+index a8e99c7..1111b74 100644
+--- a/slowquant/qiskit_interface/operators_circuits.py
++++ b/slowquant/qiskit_interface/operators_circuits.py
+@@ -541,6 +541,54 @@ def _double_excitation_efficient(
+     qc.cx(j, i)
+     return qc
+ 
++def _pauli_rotation(qc: QuantumCircuit, ops: dict[int, str], angle) -> None:
++    """exp(-i angle/2 P) for the Pauli string P = prod_q ops[q] (basis change, CNOT ladder, rz)."""
++    qs = sorted(ops)
++    for q in qs:
++        if ops[q] == "X":
++            qc.h(q)
++        elif ops[q] == "Y":
++            qc.sdg(q)
++            qc.h(q)
++    for a, b in zip(qs[:-1], qs[1:]):
++        qc.cx(a, b)
++    qc.rz(angle, qs[-1])
++    for a, b in reversed(list(zip(qs[:-1], qs[1:]))):
++        qc.cx(a, b)
++    for q in qs:
++        if ops[q] == "X":
++            qc.h(q)
++        elif ops[q] == "Y":
++            qc.h(q)
++            qc.s(q)
++
++
++def _double_excitation_pauli_generalized(
++    k: int, l: int, i: int, j: int, num_spin_orbs: int, qc: QuantumCircuit, theta, phi
++) -> QuantumCircuit:
++    r"""Exact circuit for exp(theta (e^{i phi} T - e^{-i phi} T^\dagger)), T = a^+_k a^+_l a_j a_i (fermionic indices).
++
++    The 8 Jordan-Wigner Pauli strings of T - T^\dagger commute, so exp(theta (T - T^\dagger)) is a product of
++    Pauli rotations; the phase uses the same rz conjugation as the efficient circuit.
++    """
++    num_orbs = num_spin_orbs // 2
++    kq, lq, iq, jq = (f2q(x, num_orbs) for x in (k, l, i, j))
++    op = a_op_spin(k, True) * a_op_spin(l, True) * a_op_spin(j, False) * a_op_spin(i, False)
++    mapped = JordanWignerMapper().map(FermionicOp((op - op.dagger).get_qiskit_form(num_orbs), num_spin_orbs))
++    qc.rz(-phi / 4, kq)
++    qc.rz(-phi / 4, lq)
++    qc.rz(phi / 4, iq)
++    qc.rz(phi / 4, jq)
++    for label, c in zip(mapped.paulis.to_labels(), mapped.coeffs):
++        ops = {q: ch for q, ch in enumerate(reversed(label)) if ch != "I"}
++        _pauli_rotation(qc, ops, 2 * (1j * c).real * theta)
++    qc.rz(phi / 4, kq)
++    qc.rz(phi / 4, lq)
++    qc.rz(-phi / 4, iq)
++    qc.rz(-phi / 4, jq)
++    return qc
++
++
+ def _double_excitation_efficient_generalized(
+     k: int, l: int, i: int, j: int, num_spin_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression, phi: Parameter | ParameterExpression
+ ) -> QuantumCircuit:
+@@ -567,11 +615,12 @@ def _double_excitation_efficient_generalized(
+         Double excitation circuit.
+     """
+     num_orbs = num_spin_orbs // 2
+-
+-    k = f2q(k, num_orbs)
+-    l = f2q(l, num_orbs)
+-    i = f2q(i, num_orbs)
+-    j = f2q(j, num_orbs)
++    kq, lq, iq, jq = (f2q(x, num_orbs) for x in (k, l, i, j))
++    if max(kq, lq) < max(iq, jq) or min(kq, lq) < min(iq, jq):
++        # The efficient circuit needs min(i, j) < min(k, l) and max(i, j) < max(k, l) (qubit order); otherwise
++        # creation and annihilation indices would have to be swapped, which changes the operator.
++        return _double_excitation_pauli_generalized(k, l, i, j, num_spin_orbs, qc, theta, phi)
++    k, l, i, j = kq, lq, iq, jq
+ 
+     # Saving original idx:
+     k_o, l_o, i_o, j_o = k, l, i, j
+@@ -592,12 +641,6 @@ def _double_excitation_efficient_generalized(
+     if i > j:
+         j, i = i, j
+         fac *= -1
+-    if l < j:
+-        l, j = j, l
+-        fac *= -1
+-    if k < i:
+-        k, i = i, k
+-        fac *= -1
+ 
+ 
+     # cnot ladder is easier to implement if the indices are sorted.
 diff --git a/slowquant/qiskit_interface/util.py b/slowquant/qiskit_interface/util.py
 index 2d605c7..cc64a16 100644
 --- a/slowquant/qiskit_interface/util.py
@@ -1813,10 +2452,10 @@ index 2d605c7..cc64a16 100644
  def fit_in_clique(pauli: str, head: str) -> tuple[bool, str]:
 diff --git a/slowquant/unitary_coupled_cluster/ci_sparse.py b/slowquant/unitary_coupled_cluster/ci_sparse.py
 new file mode 100644
-index 0000000..d7d662a
+index 0000000..da74caa
 --- /dev/null
 +++ b/slowquant/unitary_coupled_cluster/ci_sparse.py
-@@ -0,0 +1,98 @@
+@@ -0,0 +1,217 @@
 +import numpy as np
 +import scipy.sparse as sp
 +
@@ -1915,6 +2554,125 @@ index 0000000..d7d662a
 +    rows = order[np.searchsorted(ddets[order], new)]
 +    vals = 1.0 - 2.0 * (np.bitwise_count(dets[ok] & below) % 2)
 +    return sp.csr_matrix((vals.astype(complex), (rows, cols)), shape=(len(ddets), len(dets)))
++
++
++def operator_matrix(ci_info, op) -> sp.csr_matrix:
++    """Sparse matrix of a number-conserving FermionicOperator with active-space (unfolded) spin-orbital indices."""
++    n = 2 * ci_info.num_active_orbs
++    dets = np.asarray(ci_info.idx2det, dtype=np.int64)
++    order = np.argsort(dets)
++    sdets = dets[order]
++    full = (1 << n) - 1
++    rows, cols, vals = [], [], []
++    for key, c in op.operators.items():
++        d = dets.copy()
++        ok = np.ones(len(d), dtype=bool)
++        sign = np.ones(len(d))
++        for orb, dag in reversed(key):
++            b = np.int64(1 << (n - 1 - orb))
++            occ = (d & b) != 0
++            ok &= ~occ if dag else occ
++            sign *= 1.0 - 2.0 * (np.bitwise_count(d & np.int64(full ^ ((1 << (n - orb)) - 1))) % 2)
++            d = d ^ b
++        j = np.nonzero(ok)[0]
++        pos = np.searchsorted(sdets, d[j])
++        keep = (pos < len(sdets)) & (sdets[np.minimum(pos, len(sdets) - 1)] == d[j])
++        rows.append(order[pos[keep]])
++        cols.append(j[keep])
++        vals.append(c * sign[j[keep]])
++    nd = len(dets)
++    if not rows:
++        return sp.csr_matrix((nd, nd), dtype=complex)
++    return sp.csr_matrix(
++        (np.concatenate(vals).astype(complex), (np.concatenate(rows), np.concatenate(cols))), shape=(nd, nd)
++    )
++
++
++class UPSEngine:
++    r"""Fast unitary product state: U_k = exp(theta_k T_k - theta_k^* T_k^\dagger) with sparse T_k.
++
++    U_k v = v + sin(r)/r A v + (1 - cos r)/r^2 A^2 v, r = |theta_k|, A^2 = -r^2 (T T^\dagger + T^\dagger T) (diagonal)
++    when T_k^2 = 0. Same conventions as generalized_construct_ups_state_test_erik / generalized_get_grad_action.
++    """
++
++    def __init__(self, ci_info, ups_struct, op_builder):
++        self.ci_info = ci_info
++        self.ups = ups_struct
++        self.build = op_builder
++        self.T, self.Td, self.P = [], [], []
++        self.update()
++
++    def update(self):
++        for k in range(len(self.T), len(self.ups.excitation_indices)):
++            T = operator_matrix(self.ci_info, self.build(self.ups.excitation_operator_type[k], self.ups.excitation_indices[k]))
++            Td = T.conj().T.tocsr()
++            P = None
++            if (T @ T).count_nonzero() == 0:
++                P = np.real((T @ Td + Td @ T).diagonal())
++            self.T.append(T)
++            self.Td.append(Td)
++            self.P.append(P)
++
++    def _A(self, k, theta, v):
++        return theta * (self.T[k] @ v) - np.conj(theta) * (self.Td[k] @ v)
++
++    def _A2(self, k, theta, v, Av=None):
++        if self.P[k] is not None:
++            return -abs(theta) ** 2 * (self.P[k][:, None] if v.ndim == 2 else self.P[k]) * v
++        return self._A(k, theta, self._A(k, theta, v) if Av is None else Av)
++
++    def apply(self, k, theta, v, dagger=False):
++        r = abs(theta)
++        if r < 1e-28:
++            return v.copy()
++        th = -theta if dagger else theta
++        Av = self._A(k, th, v)
++        return v + np.sin(r) / r * Av + (1 - np.cos(r)) / r**2 * self._A2(k, th, v, Av)
++
++    def state(self, v, thetas, dagger=False):
++        self.update()
++        out = np.array(v, dtype=complex)
++        ks = range(len(thetas))
++        for k in (reversed(ks) if dagger else ks):
++            out = self.apply(k, thetas[k], out, dagger)
++        return out
++
++    def grad_action(self, k, theta, v):
++        """(dU_k/dRe(theta) v, dU_k/dIm(theta) v)."""
++        VR, VI = self._V(k, True, v), self._V(k, False, v)
++        Av = theta.real * VR + theta.imag * VI
++        A2v = self._A2(k, theta, v, Av)
++        r = abs(theta)
++        if r < 1e-8:
++            f, g, c1, c2 = 1 - r**2 / 6, 0.5 - r**2 / 24, -1 / 3 + r**2 / 30, -1 / 12 + r**2 / 180
++        else:
++            f, g = np.sin(r) / r, (1 - np.cos(r)) / r**2
++            c1, c2 = (r * np.cos(r) - np.sin(r)) / r**3, (r * np.sin(r) - 2 + 2 * np.cos(r)) / r**4
++        out = []
++        for real, V, x in ((True, VR, theta.real), (False, VI, theta.imag)):
++            VAv = self._V(k, real, Av)
++            out.append(f * V + g * (VAv + self._A(k, theta, V)) + x * c1 * Av + x * c2 * A2v)
++        return out[0], out[1]
++
++    def _V(self, k, real, w):
++        Tw, Tdw = self.T[k] @ w, self.Td[k] @ w
++        return Tw - Tdw if real else 1j * (Tw + Tdw)
++
++
++def ups_theta_gradient(engine: UPSEngine, thetas: np.ndarray, ref: np.ndarray, hc: np.ndarray) -> np.ndarray:
++    """dE/d(Re theta, Im theta) for |0> = U(theta)|ref> from hc = H|0> (one unitary peeled off per parameter,
++    arXiv:2303.10825, Eq. 20)."""
++    nt = len(thetas)
++    g = np.zeros(2 * nt)
++    bra = engine.state(hc, thetas, dagger=True)
++    ket = np.array(ref, dtype=complex)
++    for i in range(nt):
++        bra = engine.apply(i, thetas[i], bra)
++        dR, dI = engine.grad_action(i, thetas[i], ket)
++        g[i] = 2 * np.vdot(bra, dR).real
++        g[i + nt] = 2 * np.vdot(bra, dI).real
++        ket = engine.apply(i, thetas[i], ket)
++    return g
 diff --git a/slowquant/unitary_coupled_cluster/generalized_integral_manager.py b/slowquant/unitary_coupled_cluster/generalized_integral_manager.py
 index 44984ed..a07cf74 100644
 --- a/slowquant/unitary_coupled_cluster/generalized_integral_manager.py
@@ -1951,19 +2709,29 @@ index 44984ed..a07cf74 100644
  
          self.int_obj.set_common_origin(self.orig)
 diff --git a/slowquant/unitary_coupled_cluster/generalized_ups_wavefunction.py b/slowquant/unitary_coupled_cluster/generalized_ups_wavefunction.py
-index 7c86867..2c0d32f 100644
+index 7c86867..dff1ad7 100644
 --- a/slowquant/unitary_coupled_cluster/generalized_ups_wavefunction.py
 +++ b/slowquant/unitary_coupled_cluster/generalized_ups_wavefunction.py
-@@ -17,6 +17,8 @@ from slowquant.molecularintegrals.integralfunctions import (
+@@ -17,6 +17,9 @@ from slowquant.molecularintegrals.integralfunctions import (
      generalized_1e_transform_spin_separated,
  )
  from slowquant.unitary_coupled_cluster.generalized_integral_manager import IntegralManager
-+from slowquant.unitary_coupled_cluster.integral_direct import GHFDirect, DirectState, orbital_gradient
-+from slowquant.unitary_coupled_cluster.ci_sparse import ActiveCI
++from slowquant.unitary_coupled_cluster.integral_direct import GHFDirect, DirectState, orbital_gradient, expm_antihermitian
++from slowquant.unitary_coupled_cluster.ci_sparse import ActiveCI, UPSEngine, ups_theta_gradient
++from slowquant.unitary_coupled_cluster.printing import IterationTable, key_value
  
  from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_generalized
  from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
-@@ -109,6 +111,9 @@ class GeneralizedWaveFunctionUPS:
+@@ -43,7 +46,7 @@ from slowquant.unitary_coupled_cluster.generalized_operators import (
+     a_op_spin,
+     generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a
+ )
+-from slowquant.unitary_coupled_cluster.operators import G1, G2
++from slowquant.unitary_coupled_cluster.operators import G1, G1_generalized, G2, G2_generalized, G3, G4
+ from slowquant.unitary_coupled_cluster.optimizers import Optimizers
+ from slowquant.unitary_coupled_cluster.util import (
+     UpsStructure,
+@@ -109,6 +112,9 @@ class GeneralizedWaveFunctionUPS:
          self.B = B
          self.orig = orig
          self.int_gen: IntegralManager = IntegralManager(integral_generator, x2c=self.x2c, ecp = self.ecp, B = self.B, orig = self.orig)
@@ -1973,7 +2741,7 @@ index 7c86867..2c0d32f 100644
          self._c_mo = np.copy(mo_coeffs).astype(np.complex128)
          # self._h_ao = h_ao
          # self._g_ao = g_ao
-@@ -181,17 +186,18 @@ class GeneralizedWaveFunctionUPS:
+@@ -181,17 +187,18 @@ class GeneralizedWaveFunctionUPS:
          self._kappa_real_redundant_old = []
          self._kappa_imag_redundant_old = []
          # Annika has modified this, since non-redundant orbital rotations had been left out!
@@ -1995,7 +2763,7 @@ index 7c86867..2c0d32f 100644
                      self._kappa_real_redundant.append(0.0)
                      self._kappa_imag_redundant.append(0.0)
                      self._kappa_real_redundant_old.append(0.0)
-@@ -199,7 +205,7 @@ class GeneralizedWaveFunctionUPS:
+@@ -199,7 +206,7 @@ class GeneralizedWaveFunctionUPS:
                      self.kappa_redundant_spin_idx.append((P, Q))
                      continue
                  if not include_active_kappa:
@@ -2004,7 +2772,7 @@ index 7c86867..2c0d32f 100644
                          self._kappa_real_redundant.append(0.0)
                          self._kappa_imag_redundant.append(0.0)
                          self._kappa_real_redundant_old.append(0.0)
-@@ -207,7 +213,7 @@ class GeneralizedWaveFunctionUPS:
+@@ -207,7 +214,7 @@ class GeneralizedWaveFunctionUPS:
                          self.kappa_redundant_spin_idx.append((P, Q))
                          continue
                  if include_active_kappa:
@@ -2013,7 +2781,7 @@ index 7c86867..2c0d32f 100644
                          if P != Q:
                              self._kappa_real.append(0.0)
                              self._kappa_imag.append(0.0)
-@@ -216,7 +222,7 @@ class GeneralizedWaveFunctionUPS:
+@@ -216,7 +223,7 @@ class GeneralizedWaveFunctionUPS:
                              self.kappa_spin_idx.append((P, Q))
                          continue
                  if include_active_kappa: #AE  correction..
@@ -2022,7 +2790,7 @@ index 7c86867..2c0d32f 100644
                          if P != Q:
                              self._kappa_real.append(0.0)
                              self._kappa_imag.append(0.0)
-@@ -225,7 +231,7 @@ class GeneralizedWaveFunctionUPS:
+@@ -225,7 +232,7 @@ class GeneralizedWaveFunctionUPS:
                              self.kappa_spin_idx.append((P, Q))
                          continue
                  
@@ -2031,7 +2799,21 @@ index 7c86867..2c0d32f 100644
                      self.kappa_no_activeactive_spin_idx.append((P, Q))
                      self.kappa_no_activeactive_spin_idx_dagger.append((Q, P))
                  self._kappa_real.append(0.0)
-@@ -519,28 +525,64 @@ class GeneralizedWaveFunctionUPS:
+@@ -505,12 +512,7 @@ class GeneralizedWaveFunctionUPS:
+         if isinstance(self._thetas_imag, np.ndarray):
+             self._thetas_imag = self._thetas_imag.tolist()
+ 
+-        self.ci_coeffs = generalized_construct_ups_state_test_erik(
+-            self.csf_coeffs,
+-            self.ci_info,
+-            self.thetas,
+-            self.ups_layout,
+-        )
++        self.ci_coeffs = self.ups_engine.state(self.csf_coeffs, np.array(self.thetas))
+ 
+     @property
+     def c_mo(self) -> np.ndarray:
+@@ -519,28 +521,76 @@ class GeneralizedWaveFunctionUPS:
          Returns:
              Molecular orbital coefficients.
          """
@@ -2066,7 +2848,7 @@ index 7c86867..2c0d32f 100644
 -        return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
 +        kappa_mat[P, Q] = d
 +        kappa_mat[Q, P] = -d.conj()
-+        return self._c_mo @ scipy.linalg.expm(-kappa_mat)
++        return self._c_mo @ expm_antihermitian(-kappa_mat)
 +
 +    def h_ao_spin(self) -> np.ndarray:
 +        """One-electron Hamiltonian in the 2nao spin-AO basis (alpha AOs, beta AOs): T + V (+ ECP), X2C or finite field."""
@@ -2095,7 +2877,8 @@ index 7c86867..2c0d32f 100644
 +
 +    def _get_direct_state(self, C: np.ndarray) -> DirectState:
 +        if self._ds is None or not np.array_equal(self._ds.C, C):
-+            self._ds = DirectState(self.direct, C, self.inactive_spin_idx, self.active_spin_idx, self.rdm1)
++            rdm1 = self.rdm1 if getattr(self, "_fixed_rdms", False) or len(self.thetas) == 0 else None
++            self._ds = DirectState(self.direct, C, self.inactive_spin_idx, self.active_spin_idx, rdm1)
 +        return self._ds
 +
 +    @property
@@ -2110,6 +2893,17 @@ index 7c86867..2c0d32f 100644
 +            self._ci_engine = ActiveCI(self.ci_info)
 +        return self._ci_engine
 +
++    @property
++    def ups_engine(self) -> UPSEngine:
++        """Sparse-matrix UPS state and gradient engine (built once, extended when the ansatz grows)."""
++        if getattr(self, "_ups_engine", None) is None:
++            off = 2 * self.ci_info.space_extension_offset
++            ops = {"single": G1_generalized, "double": G2_generalized, "triple": G3, "quadruple": G4}
++            self._ups_engine = UPSEngine(
++                self.ci_info, self.ups_layout, lambda typ, idx: ops[typ](*[int(i) + off for i in idx])
++            )
++        return self._ups_engine
++
 +    def _make_rdms(self) -> None:
 +        c = self.ci_coeffs
 +        _, d, G = self.ci_engine.transition_rdms(c[None], c)
@@ -2117,7 +2911,7 @@ index 7c86867..2c0d32f 100644
  
      @property
      def h_mo(self) -> np.ndarray:
-@@ -573,88 +615,16 @@ class GeneralizedWaveFunctionUPS:
+@@ -573,88 +623,16 @@ class GeneralizedWaveFunctionUPS:
  
      @property
      def rdm1(self) -> np.ndarray:
@@ -2210,7 +3004,7 @@ index 7c86867..2c0d32f 100644
          return self._rdm2
  
      @property
-@@ -798,18 +768,8 @@ class GeneralizedWaveFunctionUPS:
+@@ -798,18 +776,8 @@ class GeneralizedWaveFunctionUPS:
              Electronic energy.
          """
          if self._energy_elec is None:
@@ -2231,20 +3025,28 @@ index 7c86867..2c0d32f 100644
          return self._energy_elec
  
      def run_wf_optimization_2step(
-@@ -934,6 +894,136 @@ class GeneralizedWaveFunctionUPS:
+@@ -934,6 +902,379 @@ class GeneralizedWaveFunctionUPS:
              e_old = e_new
          self._energy_elec = e_new
  
++    def _ups_theta_gradient(self, hc: np.ndarray) -> np.ndarray:
++        """dE/d(Re theta, Im theta) from hc = H|0>."""
++        return ups_theta_gradient(self.ups_engine, np.array(self.thetas), self.csf_coeffs, hc)
++
++    def _theta_energy_gradient(self, x: np.ndarray) -> tuple[float, np.ndarray]:
++        nt = len(x) // 2
++        self.set_thetas(x[:nt], x[nt:])
++        c = self.ci_coeffs
++        hc = self.ds.ci_hamiltonian(self.ci_engine) @ c
++        self.num_energy_evals += 1
++        return np.vdot(c, hc).real, self._ups_theta_gradient(hc)
++
 +    def _optimize_thetas(self, gtol: float, maxiter: int) -> float:
-+        """Theta optimization at fixed orbitals (L-BFGS-B, converged on the gradient)."""
-+        energy_theta = partial(self._calc_energy_optimization, theta_optimization=True, kappa_optimization=False)
-+        gradient_theta = partial(self._calc_gradient_optimization, theta_optimization=True, kappa_optimization=False)
-+        self._old_opt_parameters = np.zeros(2 * len(self.thetas), dtype=np.float64) + 10**20
-+        self._E_opt_old = 0.0
++        """Theta optimization at fixed orbitals (L-BFGS-B on energy and gradient from one state build)."""
 +        res = scipy.optimize.minimize(
-+            energy_theta,
++            self._theta_energy_gradient,
 +            np.array(self.thetas_real + self.thetas_imag),
-+            jac=gradient_theta,
++            jac=True,
 +            method="L-BFGS-B",
 +            options={"maxiter": maxiter, "ftol": 1e-16, "gtol": gtol, "maxcor": 30},
 +        )
@@ -2260,6 +3062,84 @@ index 7c86867..2c0d32f 100644
 +        self._g_mo = None
 +        self._energy_elec = None
 +
++    def print_info(self, e_scf: float | None = None) -> float:
++        """Print system, Hamiltonian, active space and integral backend, and check the initial orbitals.
++
++        The reference determinant energy with the current orbitals equals the SCF energy when the orbitals are
++        converged SCF orbitals of this Hamiltonian (e.g. PySCF GHF(mol).x2c() for do_x2c=True). Returns it.
++        """
++        t0 = time.time()
++        mol = self.int_gen.int_obj
++
++        def name(b):
++            if not isinstance(b, str):
++                return "custom"
++            if "\n" not in b:
++                return b
++            tag = [l.split(":", 1)[1].strip() for l in b.splitlines() if "Basis set:" in l]
++            return tag[0] if tag else "custom"
++
++        basis = name(mol.basis) if not isinstance(mol.basis, dict) else ", ".join(f"{k}: {name(v)}" for k, v in mol.basis.items())
++        if self.B is not None:
++            ham = f"non-relativistic + B = {np.round(self.B / 4.254e-6, 6)} T (gauge origin {self.orig})"
++        elif self.x2c:
++            ham = "X2C one-electron with spin-orbit (PySCF GHF(mol).x2c())"
++        else:
++            ham = "non-relativistic" + (" + scalar ECP" if self.ecp else "")
++        c = self.csf_coeffs
++        _, d1, d2 = self.ci_engine.transition_rdms(c[None], c)
++        ds = DirectState(self.direct, self.c_mo, self.inactive_spin_idx, self.active_spin_idx, d1[0])
++        ds.set_rdms(d1[0], d2[0])
++        e_nuc = mol.energy_nuc()
++        e_ref = ds.energy(d1[0], d2[0]) + e_nuc
++        g = orbital_gradient(ds.gen_fock(), [tuple(i) for i in self.kappa_spin_idx]) if len(self.kappa_spin_idx) else np.zeros(1)
++        W = 86
++        print("=" * W)
++        print(" System and wave function")
++        print("-" * W)
++        for k, v in (
++            ("Molecule", f"{mol.natm} atoms, {mol.nelectron} electrons, charge {mol.charge}, spin {mol.spin}"),
++            ("Basis set", basis),
++            ("Basis functions", f"{mol.nao} spatial AOs, {2 * mol.nao} spin AOs, {self.num_spin_orbs} spin MOs"),
++            ("Hamiltonian", ham),
++            ("Integral backend", self.direct.describe()),
++            ("Active space", f"({self.num_active_elec_alpha}, {self.num_active_elec_beta}) electrons in {self.num_active_spin_orbs} spin orbitals"),
++            ("Inactive / virtual", f"{self.num_inactive_spin_orbs} / {self.num_virtual_spin_orbs} spin orbitals"),
++            ("Determinants / thetas", f"{self.num_det} / {len(self.thetas)}"),
++            ("Orbital rotations", f"{len(self.kappa_spin_idx)} (complex)"),
++        ):
++            print(key_value(k, v))
++        print("-" * W)
++        print(key_value("Nuclear repulsion [Eh]", f"{e_nuc:20.10f}"))
++        if e_scf is not None:
++            print(key_value("PySCF SCF energy [Eh]", f"{e_scf:20.10f}"))
++        print(key_value("Reference determinant [Eh]", f"{e_ref:20.10f}"))
++        print(key_value("max|g_orb| of reference", f"{np.abs(g).max():20.3e}"))
++        print(key_value("Setup time [s]", f"{time.time() - t0:20.1f}"))
++        if e_scf is not None and abs(e_ref - e_scf) > 1e-6:
++            print(f" WARNING: reference energy differs from the PySCF energy by {e_ref - e_scf:.3e} Eh.")
++        if np.abs(g).max() > 1e-3:
++            print(
++                " WARNING: the initial orbitals are not SCF orbitals of this Hamiltonian. Check that the PySCF calculation\n"
++                "          matches do_x2c/ecp/B (do_x2c=True <-> scf.GHF(mol).x2c(); not sfx2c1e, RHF.x2c or scf.X2C),\n"
++                "          and that it converged."
++            )
++        if not self.ecp and self.B is None and not self.x2c and mol.has_ecp():
++            print(" WARNING: the molecule has an ECP but ecp=False; the ECP is not in the Hamiltonian.")
++        print("=" * W, flush=True)
++        return e_ref
++
++    def _oo_summary(self, t_start, e, e_ref, e_scf, timing):
++        e_nuc = self.int_gen.int_obj.energy_nuc()
++        out = [("Total time [s]", f"{time.time() - t_start:20.1f}")]
++        out += [(f"  {k} [s]", f"{v:20.1f}") for k, v in timing.items()]
++        out += [("Electronic energy [Eh]", f"{e:20.10f}"), ("Total energy [Eh]", f"{e + e_nuc:20.10f}")]
++        if e_ref is not None:
++            out.append(("E(OO) - E(reference) [Eh]", f"{e + e_nuc - e_ref:20.10f}"))
++        if e_scf is not None:
++            out.append(("E(OO) - E(PySCF) [Eh]", f"{e + e_nuc - e_scf:20.10f}"))
++        return out
++
 +    def run_wf_optimization_direct(
 +        self,
 +        tol: float = 1e-5,
@@ -2269,29 +3149,33 @@ index 7c86867..2c0d32f 100644
 +        max_step: float = 1.0,
 +        h_min: float = 1e-3,
 +        memory: int = 10,
-+    ) -> None:
++        e_scf: float | None = None,
++        verbose: bool = True,
++        print_iterations: bool = True,
++    ) -> int:
 +        r"""Integral-direct two-step orbital-optimization.
 +
 +        Each macro iteration: full theta optimization at fixed orbitals (sparse CI Hamiltonian), then one
 +        orbital step C -> C exp(-K): L-BFGS direction with the diagonal Hessian
 +        h = 2(D_M F_NN + D_N F_MM - F^gen_MM - F^gen_NN) as initial inverse Hessian and Armijo backtracking.
-+        One J/K pass (2 densities) and one (N a|a a) transformation per orbital point.
-+        Converged when max |orbital gradient| < tol.
++        Converged when max |orbital gradient| < tol. e_scf: PySCF energy, printed and compared with the reference.
++        Returns the number of iterations.
 +        """
++        t_start = time.time()
++        e_ref = self.print_info(e_scf) if verbose else None
 +        idx = [tuple(i) for i in self.kappa_spin_idx]
 +        nk = len(idx)
-+        print(f"### Integral-direct OO: {nk} orbital rotations (complex), {len(self.thetas)} thetas")
++        timing = {"theta optimization": 0.0, "Fock/integrals": 0.0}
 +        if nk == 0:
 +            if len(self.thetas) != 0:
 +                self._optimize_thetas(theta_gtol, theta_maxiter)
-+            print(f"No non-redundant orbital rotations. E_elec = {self.energy_elec:.12f}")
-+            return
++            print(f" No non-redundant orbital rotations. E_elec = {self.energy_elec:.12f} Eh")
++            return 0
 +        M, N_ = np.array(idx, dtype=int).T
 +        space = np.empty(self._c_mo.shape[1], dtype="<U1")
 +        space[self.inactive_spin_idx] = "i"
 +        space[self.active_spin_idx] = "a"
 +        space[self.virtual_spin_idx] = "v"
-+        print("Iteration | Time [s] | Electronic energy [Hartree] | max |orbital grad| (type) | step scale")
 +
 +        def kappa(x):
 +            K = np.zeros_like(self._c_mo)
@@ -2300,11 +3184,15 @@ index 7c86867..2c0d32f 100644
 +            return K
 +
 +        def relax_thetas():
++            t = time.time()
 +            if len(self.thetas) != 0:
 +                self._optimize_thetas(theta_gtol, theta_maxiter)
-+            return self.energy_elec
++            e = self.energy_elec
++            timing["theta optimization"] += time.time() - t
++            return e
 +
 +        def point():
++            t = time.time()
 +            ds = self.ds
 +            ds.set_rdms(self.rdm1, self.rdm2)
 +            F = ds.gen_fock()
@@ -2314,17 +3202,27 @@ index 7c86867..2c0d32f 100644
 +            Fd = (ds.FI + ds.FA).diagonal().real
 +            Fg = F.diagonal().real
 +            h = np.tile(2 * (D[M] * Fd[N_] + D[N_] * Fd[M] - Fg[M] - Fg[N_]), 2)
++            timing["Fock/integrals"] += time.time() - t
 +            return orbital_gradient(F, idx), np.maximum(h, h_min)
 +
++        def gtype(g):
++            j = np.argmax(np.abs(g)) % nk
++            return space[M[j]] + space[N_[j]]
++
++        tab = IterationTable(
++            "Two-step orbital optimization (integral-direct)",
++            [("Iter", 4, "d"), ("Time [s]", 9, ".2f"), ("E_elec [Eh]", 20, ".12f"), ("dE [Eh]", 10, ".2e"),
++             ("max|g_orb|", 10, ".2e"), ("Type", 4, ""), ("Step", 6, ".3f")],
++            [("Orbital rotations (complex)", nk), ("Thetas", len(self.thetas)), ("Convergence", f"max|g_orb| < {tol:.1e}")],
++            show=print_iterations,
++        )
 +        e = relax_thetas()
 +        g, h = point()
++        tab.row(0, tab.lap(), e, None, np.abs(g).max(), gtype(g), None)
 +        S, Y = [], []
-+        for it in range(maxiter):
-+            t0 = time.time()
-+            gmax = np.abs(g).max()
-+            if gmax < tol:
-+                print(f"{it + 1:^9} | {time.time() - t0:^8.2f} | {e:^27.12f} | {gmax:^18.3e}      | converged")
-+                break
++        n_iter = 0
++        while np.abs(g).max() >= tol and n_iter < maxiter:
++            n_iter += 1
 +            q = g.copy()
 +            al = []
 +            for s_, y_ in zip(S[::-1], Y[::-1]):
@@ -2345,7 +3243,7 @@ index 7c86867..2c0d32f 100644
 +            C, thetas = self._c_mo.copy(), (self.thetas_real, self.thetas_imag)
 +            a = 1.0
 +            for _ in range(15):
-+                self._set_orbitals(C @ scipy.linalg.expm(-kappa(a * step)))
++                self._set_orbitals(C @ expm_antihermitian(-kappa(a * step)))
 +                e_new = relax_thetas()
 +                if e_new - e <= 1e-4 * a * slope + 1e-10:
 +                    break
@@ -2359,16 +3257,155 @@ index 7c86867..2c0d32f 100644
 +                if len(S) > memory:
 +                    S.pop(0)
 +                    Y.pop(0)
-+            j = np.argmax(np.abs(g)) % nk
-+            print(f"{it + 1:^9} | {time.time() - t0:^8.2f} | {e_new:^27.12f} | {gmax:^11.3e} ({space[M[j]]}{space[N_[j]]}) | {a:.3f}")
++            tab.row(n_iter, tab.lap(), e_new, e_new - e, np.abs(g_new).max(), gtype(g_new), a)
 +            e, g = e_new, g_new
-+        else:
-+            print("WARNING: integral-direct OO did not converge")
++        conv = np.abs(g).max() < tol
++        status = f"Converged in {n_iter} iterations" if conv else f"WARNING: not converged in {maxiter} iterations"
++        tab.close(status, self._oo_summary(t_start, e, e_ref, e_scf, timing) if verbose else ())
++        if not conv and not print_iterations:
++            print(f" WARNING: orbital optimization not converged in {maxiter} iterations (max|g_orb| = {np.abs(g).max():.2e})")
++        return n_iter
++
++    def _theta_diag_hessian(self, c: np.ndarray, Hc_mat, e: float) -> np.ndarray:
++        eng = self.ups_engine
++        W = np.empty((len(c), 2 * len(eng.T)), dtype=complex)
++        for k in range(len(eng.T)):
++            Tc, Tdc = eng.T[k] @ c, eng.Td[k] @ c
++            W[:, k] = Tc - Tdc
++            W[:, k + len(eng.T)] = 1j * (Tc + Tdc)
++        return 2 * (np.sum(W.conj() * (Hc_mat @ W), axis=0) - e * np.sum(np.abs(W) ** 2, axis=0)).real
++
++    def run_wf_optimization_onestep_direct(
++        self,
++        tol: float = 1e-5,
++        maxiter: int = 200,
++        theta_gtol: float = 1e-9,
++        theta_maxiter: int = 1000,
++        max_step: float = 0.5,
++        h_min: float = 1e-3,
++        h_theta_min: float = 0.05,
++        memory: int = 20,
++        e_scf: float | None = None,
++        verbose: bool = True,
++    ) -> int:
++        r"""Integral-direct one-step OO: joint L-BFGS on (kappa, theta).
++
++        Each point costs one J/K pass with 2 densities (inactive + active) and one (N a|a a) transformation;
++        energy, orbital and theta gradients follow from it. Initial inverse Hessian: diagonal orbital Hessian
++        (as in run_wf_optimization_direct) and h_k = 2(<V_k 0|H|V_k 0> - E <V_k 0|V_k 0>) for the thetas.
++        Thetas are first optimized at the initial orbitals (no extra J/K). Converged when max |gradient| < tol.
++        Returns the number of iterations.
++        """
++        t_start = time.time()
++        e_ref = self.print_info(e_scf) if verbose else None
++        idx = [tuple(i) for i in self.kappa_spin_idx]
++        nk, nt = len(idx), len(self.thetas)
++        if nk == 0 or nt == 0:
++            return self.run_wf_optimization_direct(tol, maxiter, theta_gtol, theta_maxiter, 1.0, h_min, memory, e_scf, False)
++        M, N_ = np.array(idx, dtype=int).T
++        timing = {"initial thetas": 0.0, "J/K + integrals": 0.0, "CI + gradients": 0.0}
++        n_points = 0
++
++        def evaluate(C, th):
++            nonlocal n_points
++            t = time.time()
++            self._set_orbitals(C)
++            self.set_thetas(th[:nt], th[nt:])
++            rdm1 = self.rdm1
++            timing["CI + gradients"] += time.time() - t
++            t = time.time()
++            self._ds = DirectState(self.direct, C, self.inactive_spin_idx, self.active_spin_idx, rdm1)
++            timing["J/K + integrals"] += time.time() - t
++            n_points += 1
++            t = time.time()
++            Hm = self._ds.ci_hamiltonian(self.ci_engine)
++            hc = Hm @ self.ci_coeffs
++            self._energy_elec = np.vdot(self.ci_coeffs, hc).real
++            timing["CI + gradients"] += time.time() - t
++            return self._energy_elec, Hm, hc
++
++        def gradient(Hm, hc, e):
++            t = time.time()
++            ds = self._ds
++            ds.set_rdms(self.rdm1, self.rdm2)
++            F = ds.gen_fock()
++            D = np.zeros(F.shape[0])
++            D[ds.I] = 1.0
++            D[ds.A] = self.rdm1.diagonal().real
++            Fd = (ds.FI + ds.FA).diagonal().real
++            Fg = F.diagonal().real
++            hk = np.maximum(np.tile(2 * (D[M] * Fd[N_] + D[N_] * Fd[M] - Fg[M] - Fg[N_]), 2), h_min)
++            ht = np.maximum(self._theta_diag_hessian(self.ci_coeffs, Hm, e), h_theta_min)
++            g = np.concatenate((orbital_gradient(F, idx), self._ups_theta_gradient(hc)))
++            timing["CI + gradients"] += time.time() - t
++            return g, np.concatenate((hk, ht))
++
++        tab = IterationTable(
++            "One-step orbital optimization (integral-direct)",
++            [("Iter", 4, "d"), ("Time [s]", 9, ".2f"), ("E_elec [Eh]", 20, ".12f"), ("dE [Eh]", 10, ".2e"),
++             ("max|g_orb|", 10, ".2e"), ("max|g_theta|", 12, ".2e"), ("Step", 6, ".3f"), ("J/K", 4, "d")],
++            [("Orbital rotations (complex)", nk), ("Thetas", nt), ("Convergence", f"max|g| < {tol:.1e}")],
++        )
++        t = time.time()
++        self._optimize_thetas(theta_gtol, theta_maxiter)
++        timing["initial thetas"] = time.time() - t
++        th = np.array(self.thetas_real + self.thetas_imag)
++        e, Hm, hc = evaluate(self._c_mo, th)
++        g, h = gradient(Hm, hc, e)
++        gmax = lambda g: (np.abs(g[: 2 * nk]).max(), np.abs(g[2 * nk :]).max())
++        tab.row(0, tab.lap(), e, None, *gmax(g), None, n_points)
++        S, Y = [], []
++        n_iter = 0
++        while max(gmax(g)) >= tol and n_iter < maxiter:
++            n_iter += 1
++            q = g.copy()
++            al = []
++            for s_, y_ in zip(S[::-1], Y[::-1]):
++                a_ = (s_ @ q) / (y_ @ s_)
++                al.append(a_)
++                q = q - a_ * y_
++            r = q / h
++            for (s_, y_), a_ in zip(zip(S, Y), al[::-1]):
++                r = r + s_ * (a_ - (y_ @ r) / (y_ @ s_))
++            step = -r
++            if np.abs(step).max() > max_step:
++                step *= max_step / np.abs(step).max()
++            slope = g @ step
++            if slope >= 0:
++                S, Y = [], []
++                step = -g / h
++                slope = g @ step
++            C = self._c_mo.copy()
++            a = 1.0
++            for _ in range(20):
++                s_ = a * step
++                K = np.zeros_like(C)
++                K[M, N_] = s_[:nk] + 1j * s_[nk : 2 * nk]
++                K[N_, M] = -(s_[:nk] - 1j * s_[nk : 2 * nk])
++                e_new, Hm, hc = evaluate(C @ expm_antihermitian(-K), th + s_[2 * nk :])
++                if e_new - e <= 1e-4 * a * slope + 1e-11:
++                    break
++                a *= 0.5
++            th = th + s_[2 * nk :]
++            g_new, h = gradient(Hm, hc, e_new)
++            y_ = g_new - g
++            if s_ @ y_ > 1e-12 * np.linalg.norm(s_) * np.linalg.norm(y_):
++                S.append(s_)
++                Y.append(y_)
++                if len(S) > memory:
++                    S.pop(0)
++                    Y.pop(0)
++            tab.row(n_iter, tab.lap(), e_new, e_new - e, *gmax(g_new), a, n_points)
++            e, g = e_new, g_new
++        conv = max(gmax(g)) < tol
++        status = f"Converged in {n_iter} iterations ({n_points} J/K evaluations)" if conv else f"WARNING: not converged in {maxiter} iterations"
++        tab.close(status, self._oo_summary(t_start, e, e_ref, e_scf, timing) if verbose else ())
++        return n_iter
 +
      def run_wf_optimization_1step(
          self,
          optimizer_name: str,
-@@ -1099,22 +1189,7 @@ class GeneralizedWaveFunctionUPS:
+@@ -1099,22 +1440,7 @@ class GeneralizedWaveFunctionUPS:
          )
          start = time.time()
          for iteration in range(maxiter):
@@ -2392,7 +3429,7 @@ index 7c86867..2c0d32f 100644
              grad = []
  
              for idx, exc_type in enumerate(excitation_pool_type):
-@@ -1191,22 +1266,10 @@ class GeneralizedWaveFunctionUPS:
+@@ -1191,22 +1517,10 @@ class GeneralizedWaveFunctionUPS:
              # RDM is more expensive than evaluation of the Hamiltonian.
              # Thus only construct these if orbital-optimization is turned on,
              # since the RDMs will be reused in the oo gradient calculation.
@@ -2418,7 +3455,7 @@ index 7c86867..2c0d32f 100644
          self._E_opt_old = E.real
          self._old_opt_parameters = np.copy(parameters)
          self.num_energy_evals += 1  # count one measurement
-@@ -1243,33 +1306,12 @@ class GeneralizedWaveFunctionUPS:
+@@ -1243,76 +1557,11 @@ class GeneralizedWaveFunctionUPS:
                  thetas_i.append(parameters[i + num_kappa + len(self.thetas)])
              self.set_thetas(thetas_r, thetas_i)
          if kappa_optimization:
@@ -2446,24 +3483,68 @@ index 7c86867..2c0d32f 100644
 -            #     self.g_mo,
 -            #     self.num_spin_orbs,
 -            # )
-             # Reference bra state (no differentiations)
+-            # Reference bra state (no differentiations)
 -            bra_vec = generalized_propagate_state(
 -                [Hamiltonian],
 -                self.ci_coeffs,
 -                self.ci_info,
 -            )
-+            bra_vec = self.ds.ci_hamiltonian(self.ci_engine) @ self.ci_coeffs
-             # Reference ket state (no differentiations)
-             bra_vec = generalized_construct_ups_state_test_erik(
-                 bra_vec,
+-            # Reference ket state (no differentiations)
+-            bra_vec = generalized_construct_ups_state_test_erik(
+-                bra_vec,
+-                self.ci_info,
+-                self.thetas,
+-                self.ups_layout,
+-                dagger=True,
+-            )
+-            # CSF reference state on ket
+-            ket_vec = np.copy(self.csf_coeffs)
+-            # Calculate analytical derivative w.r.t. each theta using gradient_action function
+-            for i in range(len(self.thetas)):
+-                # Remove the i-th U^dagger from bra_vec.
+-                # The effect of this unitary will be included from the derivative added to ket_vec.
+-                bra_vec = generalized_propagate_unitary_test_anna(
+-                    bra_vec,
+-                    i,
+-                    self.ci_info,
+-                    self.thetas,
+-                    self.ups_layout,
+-                )
+-                # Derivative action w.r.t. i-th theta on CSF ket
+-                ket_vec_tmp_R, ket_vec_tmp_I = generalized_get_grad_action(
+-                    ket_vec,
+-                    i,
+-                    self.ci_info,
+-                    self.thetas,
+-                    self.ups_layout,
+-                )
+-                gradient[i + num_kappa] += 2 * np.matmul(bra_vec.conj(), ket_vec_tmp_R).real
+-                gradient[i + num_kappa + len(self.thetas)] += (
+-                    2 * np.matmul(bra_vec.conj(), ket_vec_tmp_I).real
+-                )
+-
+-                # Product rule implications on reference bra and CSF ket
+-                # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
+-                ket_vec = generalized_propagate_unitary_test_anna(
+-                    ket_vec,
+-                    i,
+-                    self.ci_info,
+-                    self.thetas,
+-                    self.ups_layout,
+-                )
++            gradient[num_kappa:] += self._ups_theta_gradient(self.ds.ci_hamiltonian(self.ci_engine) @ self.ci_coeffs)
+             self.num_energy_evals += 2 * np.sum(
+                 list(self.ups_layout.grad_param_R.values())
+             )  # Count energy measurements for all gradients
 diff --git a/slowquant/unitary_coupled_cluster/integral_direct.py b/slowquant/unitary_coupled_cluster/integral_direct.py
 new file mode 100644
-index 0000000..02e6054
+index 0000000..9a39929
 --- /dev/null
 +++ b/slowquant/unitary_coupled_cluster/integral_direct.py
-@@ -0,0 +1,386 @@
+@@ -0,0 +1,408 @@
 +import os
 +import tempfile
++import time
 +
 +import h5py
 +import numpy as np
@@ -2482,7 +3563,8 @@ index 0000000..02e6054
 +    (non-relativistic, X2C, ECP or finite field); default T + V.
 +    Conventions: (pq|rs) = sum C*_mp C_nq C*_ls C_sr (mn|ls), J[D]_pq = sum (pq|rs) D_sr, K[D]_pq = sum (ps|rq) D_sr.
 +    screen_tol: Schwarz/density screening threshold of the J/K builds (PySCF direct_scf_tol).
-+    incore_memory: MO transformations use in-memory 8-fold AO integrals if they fit in this many MB (0: always out-of-core).
++    incore_memory: J/K and MO transformations use in-memory 8-fold AO integrals if they fit in this many MB
++    (0: always integral-direct J/K and out-of-core MO transformations).
 +    """
 +
 +    def __init__(
@@ -2502,14 +3584,21 @@ index 0000000..02e6054
 +        self.h_ao = np.asarray(h_ao, dtype=complex)
 +        mf = scf.RHF(mol)
 +        mf.direct_scf_tol = screen_tol
++        self.screen_tol = screen_tol
 +        self.opt = mf.init_direct_scf(mol)
 +        self.max_memory = mol.max_memory if max_memory is None else max_memory
 +        self.incore_memory = incore_memory
 +        self._eri_ao = None
 +        self.tmpdir = lib.param.TMPDIR if tmpdir is None else tmpdir
 +
++    def describe(self) -> str:
++        mode = "in-core AO integrals" if self._incore() else f"direct, screen_tol = {self.screen_tol:.0e}"
++        return f"GHFDirect (exact), {mode}"
++
 +    def _jk_exact(self, dms):
 +        def build(mol, dm, hermi, with_j, with_k, omega=None):
++            if self._incore():
++                return hf.dot_eri_dm(self._eri_ao, dm, hermi, with_j, with_k)
 +            return hf.get_jk(mol, dm, hermi, self.opt, with_j, with_k, omega)
 +
 +        return ghf.get_jk(self.mol, dms, hermi=0, jkbuild=build)
@@ -2583,7 +3672,14 @@ index 0000000..02e6054
 +    def __init__(self, mol, tol: float = 1e-6, span: float = 1e-2, cd_jk: bool = True, **kwargs):
 +        super().__init__(mol, **kwargs)
 +        self.cd_jk = cd_jk
++        self.tol = tol
++        t0 = time.time()
 +        self.V = self._decompose(tol, span)
++        print(f"Cholesky decomposition: {len(self.V)} vectors (tol {tol:.0e}), {time.time() - t0:.1f} s")
++
++    def describe(self) -> str:
++        jk = "CD" if self.cd_jk else ("exact, in-core" if self._incore() else f"exact, screen_tol = {self.screen_tol:.0e}")
++        return f"GHFCholesky, tol = {self.tol:.0e}, {len(self.V)} vectors, J/K: {jk}"
 +
 +    def _decompose(self, tol, span):
 +        mol, n = self.mol, self.nao
@@ -2848,12 +3944,18 @@ index 0000000..02e6054
 +    gr = 2 * (F[N, M] - F[M, N]).real
 +    gi = -2 * (F[N, M] + F[M, N]).imag
 +    return np.concatenate((gr, gi))
++
++
++def expm_antihermitian(K: np.ndarray) -> np.ndarray:
++    """exp(K) for anti-Hermitian K via eigh of the Hermitian iK (faster than scipy expm)."""
++    w, V = np.linalg.eigh(1j * K)
++    return (V * np.exp(-1j * w)) @ V.conj().T
 diff --git a/slowquant/unitary_coupled_cluster/linear_response/generalized_direct.py b/slowquant/unitary_coupled_cluster/linear_response/generalized_direct.py
 new file mode 100644
-index 0000000..0f8fc5c
+index 0000000..870b56b
 --- /dev/null
 +++ b/slowquant/unitary_coupled_cluster/linear_response/generalized_direct.py
-@@ -0,0 +1,378 @@
+@@ -0,0 +1,392 @@
 +import time
 +
 +import numpy as np
@@ -2865,6 +3967,7 @@ index 0000000..0f8fc5c
 +from slowquant.unitary_coupled_cluster.linear_response.solvers import davidson_eig, davidson_solve
 +from slowquant.unitary_coupled_cluster.operators import G1, G2, G3, G4, G5, G6
 +from slowquant.unitary_coupled_cluster.util import iterate_t1, iterate_t2, iterate_t3, iterate_t4, iterate_t5, iterate_t6
++from slowquant.unitary_coupled_cluster.printing import key_value, value_table, roots_table, timing_line, HARTREE_EV
 +
 +
 +def _dag(rho):
@@ -2916,7 +4019,7 @@ index 0000000..0f8fc5c
 +        ds = self.ds = wf.ds
 +        ds.set_rdms(wf.rdm1, wf.rdm2)
 +        ds.response_tensors()
-+        print(f"Response integrals: {time.time() - t0:.1f} s")
++        timing_line("Response integrals", time.time() - t0)
 +        self.N = ds.C.shape[1]
 +        self.pos = -np.ones(self.N, dtype=int)
 +        self.pos[ds.occ] = np.arange(len(ds.occ))
@@ -2929,7 +4032,7 @@ index 0000000..0f8fc5c
 +        self.q_idx = self.q_idx[(np.abs(a_q) > screen) | (np.abs(s_q) > screen)]
 +        self.nq, self.nG = len(self.q_idx), len(G_ops)
 +        self.n = self.nq + self.nG
-+        print(f"Operators: {self.nq} orbital, {self.nG} active-space")
++        print(key_value("LR operators", f"{self.nq} orbital, {self.nG} active-space"))
 +
 +        ci = self.ci = ActiveCI(wf.ci_info)
 +        c0 = self.c0 = wf.ci_coeffs
@@ -2948,7 +4051,7 @@ index 0000000..0f8fc5c
 +        self.Gh = np.array([prop(G, h0) for G in G_ops]).reshape(-1, ndet)
 +        self.Gdh = np.array([prop(G.dagger, h0) for G in G_ops]).reshape(-1, ndet)
 +        self.DA, self.DB = self._cross_terms(G_ops) if symmetrize_qG else (np.zeros((self.nG, self.nq)),) * 2
-+        print(f"Linear response setup: {time.time() - t0:.1f} s")
++        timing_line("Linear response setup", time.time() - t0)
 +
 +    def _cross_terms(self, G_ops) -> tuple[np.ndarray, np.ndarray]:
 +        r"""Symmetrization corrections DA_Gq = 1/2<0|H[q, G^\dagger]|0>, DB_Gq = 1/2<0|H[q, G]|0>^* (zero for inactive-virtual q).
@@ -3142,13 +4245,16 @@ index 0000000..0f8fc5c
 +        """Full E2 and S by applying sigma to unit vectors (testing/small systems only)."""
 +        return self.sigma(np.eye(2 * self.n, dtype=complex))
 +
-+    def calc_excitation_energies(self, n_roots: int = 5, tol: float = 1e-6, max_iter: int = 100) -> np.ndarray:
-+        """Lowest positive excitation energies via paired Davidson."""
++    def calc_excitation_energies(
++        self, n_roots: int = 5, tol: float = 1e-6, max_iter: int = 100, max_space: int = 400, n_extra: int = 4
++    ) -> np.ndarray:
++        """Lowest positive excitation energies via paired Davidson (n_extra unconverged buffer roots, subspace <= max_space)."""
++        t0 = time.time()
 +        self.excitation_energies, self.response_vectors = davidson_eig(
-+            self.sigma, *self.diagonal(), n_roots, tol=tol, max_iter=max_iter
++            self.sigma, *self.diagonal(), n_roots, tol=tol, max_iter=max_iter, max_space=max_space, n_extra=n_extra
 +        )
-+        with np.printoptions(precision=6, suppress=True):
-+            print("Excitation energies:", self.excitation_energies)
++        roots_table("Excitation energies (linear response)", self.excitation_energies)
++        timing_line("Excitation energies", time.time() - t0)
 +        return self.excitation_energies
 +
 +    def solve_response(self, V: np.ndarray, omega: float = 0.0, tol: float = 1e-6, max_iter: int = 100) -> np.ndarray:
@@ -3211,14 +4317,16 @@ index 0000000..0f8fc5c
 +
 +    def get_oscillator_strength(self, dipole_integrals=None, x2c: bool = False) -> np.ndarray:
 +        r"""f_n = 2/3 omega_n |<0|mu|n>|^2."""
++        t0 = time.time()
 +        t = self.get_transition_dipole(dipole_integrals, x2c)
 +        self.oscillator_strengths = 2 / 3 * self.excitation_energies * np.sum(np.abs(t) ** 2, axis=1)
++        timing_line("Oscillator strengths", time.time() - t0)
 +        return self.oscillator_strengths
 +
 +    def get_formatted_oscillator_strength(self) -> str:
-+        output = "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n"
++        output = f" {'Root':>4}  {'omega [Eh]':>14}  {'omega [eV]':>12}  {'f':>12}\n"
 +        for i, (e, f) in enumerate(zip(self.excitation_energies, self.oscillator_strengths)):
-+            output += f"{str(i + 1).center(12)} | {f'{e:2.6f}'.center(27)} | {f'{e * 27.2114079527:3.6f}'.center(22)} | {f'{f:1.6f}'.center(20)}\n"
++            output += f" {i + 1:>4d}  {e:>14.8f}  {e * HARTREE_EV:>12.6f}  {f:>12.6f}\n"
 +        return output
 +
 +    def get_polarizability(self, omega: float = 0.0, dipole_integrals=None, tol: float = 1e-6, max_iter: int = 100) -> np.ndarray:
@@ -3226,20 +4334,30 @@ index 0000000..0f8fc5c
 +
 +        Uses the error-cancelling expression V_a^H X_b + X_a^H V_b - X_a^H (E2 - omega S) X_b (error quadratic in the residual).
 +        """
++        t0 = time.time()
 +        if dipole_integrals is None:
 +            dipole_integrals = self.wf.int_gen.int_obj.intor("int1e_r", comp=3)
 +        V = self.property_gradient(dipole_integrals)
 +        X, EX = davidson_solve(self.sigma, *self.diagonal(), V, omega, tol=tol, max_iter=max_iter, return_ex=True)
 +        self.polarizability = (V.conj().T @ X + X.conj().T @ V - X.conj().T @ EX).real
++        value_table(
++            f"Polarizability tensor, omega = {omega} Eh [a.u.]",
++            [("", 3, ""), ("x", 14, ".6f"), ("y", 14, ".6f"), ("z", 14, ".6f")],
++            [(c, *r) for c, r in zip("xyz", self.polarizability)],
++            f"isotropic alpha = {np.trace(self.polarizability) / 3:.6f} a.u.",
++        )
++        timing_line("Polarizability", time.time() - t0)
 +        return self.polarizability
 diff --git a/slowquant/unitary_coupled_cluster/linear_response/solvers.py b/slowquant/unitary_coupled_cluster/linear_response/solvers.py
 new file mode 100644
-index 0000000..a408a9f
+index 0000000..dcc412e
 --- /dev/null
 +++ b/slowquant/unitary_coupled_cluster/linear_response/solvers.py
-@@ -0,0 +1,118 @@
+@@ -0,0 +1,137 @@
 +import numpy as np
 +import scipy
++
++from slowquant.unitary_coupled_cluster.printing import IterationTable
 +
 +
 +def _pair(V: np.ndarray) -> np.ndarray:
@@ -3293,41 +4411,51 @@ index 0000000..a408a9f
 +    return R / den
 +
 +
-+def davidson_eig(sigma, dA, dS, n_roots, tol=1e-6, max_iter=100, max_batch=16, max_space=400, shift=0.0):
++def davidson_eig(sigma, dA, dS, n_roots, tol=1e-6, max_iter=100, max_batch=16, max_space=400, shift=0.0, n_extra=4):
 +    """Lowest positive roots of E2 v = omega S v (paired Davidson, matrix-free).
 +
 +    If E2 is indefinite (saddle points), Rayleigh-Ritz gives spurious interior Ritz values.
 +    Harmonic Ritz extraction around `shift` is used instead: with (E2 - shift S) V = Q R,
 +    solve R u = nu Q^H S V u, and take omega as the Rayleigh quotient of X = V u.
++    n_extra buffer roots are iterated but not required to converge (avoids stagnation when n_roots cuts
++    through a (near-)degenerate multiplet).
 +    """
 +    ratio = np.where((dS > 1e-8) & (dA > shift), dA / np.where(dS > 1e-8, dS, 1.0), np.inf)
-+    start = np.argsort(ratio)[:n_roots]
-+    R = np.zeros((2 * len(dA), n_roots), dtype=complex)
-+    R[start, np.arange(n_roots)] = 1.0
++    k = min(n_roots + n_extra, int(np.isfinite(ratio).sum()))
++    start = np.argsort(ratio)[:k]
++    R = np.zeros((2 * len(dA), k), dtype=complex)
++    R[start, np.arange(k)] = 1.0
 +    space = _Subspace(sigma, max_batch)
++    tab = IterationTable(
++        "Davidson eigenvalue solver (paired, harmonic Ritz)",
++        [("Iter", 4, "d"), ("Time [s]", 9, ".2f"), ("Subspace", 8, "d"), ("Converged", 9, ">"), ("max residual", 12, ".3e"), ("lowest omega [Eh]", 17, ".8f")],
++        [("Roots (+ buffer)", f"{n_roots} (+{k - n_roots})"), ("Convergence", f"max residual < {tol:.1e}")],
++    )
 +    for it in range(max_iter):
 +        if space.add(R) == 0:
 +            if it == 0:
 +                raise RuntimeError("Davidson (eigenvalues): no new trial vectors")
-+            print(f"WARNING: Davidson stopped (no new trial vectors), max residual {res.max():.3e}")
-+            return w, X
++            tab.close(f"WARNING: stopped (no new trial vectors), max residual {res[:n_roots].max():.3e}")
++            return w[:n_roots], X[:, :n_roots]
 +        Qw, Rw = np.linalg.qr(space.EV - shift * space.SV)
 +        _, u = scipy.linalg.eig(Rw, Qw.conj().T @ space.SV)
 +        X, EX, SX = space.V @ u, space.EV @ u, space.SV @ u
 +        norm = np.einsum("ij,ij->j", X.conj(), SX).real
 +        w = np.einsum("ij,ij->j", X.conj(), EX).real / np.where(np.abs(norm) > 1e-300, norm, 1.0)
 +        ok = np.all(np.isfinite(u), axis=0) & (w > 1e-8) & (norm > 1e-6 * np.linalg.norm(X, axis=0) ** 2)
-+        idx = np.where(ok)[0][np.argsort(w[ok])][:n_roots]
++        idx = np.where(ok)[0][np.argsort(w[ok])][:k]
 +        w, sc = w[idx], 1 / np.sqrt(norm[idx])
 +        X, R = X[:, idx] * sc, (EX[:, idx] - SX[:, idx] * w) * sc
 +        res = np.linalg.norm(R, axis=0)
-+        print(f"Davidson {it + 1:3d} | subspace {space.V.shape[1]:4d} | max residual {res.max():.3e}")
-+        if res.max() < tol and len(w) == n_roots:
-+            return w, X
++        tab.row(it + 1, tab.lap(), space.V.shape[1], f"{int((res[:n_roots] < tol).sum())}/{n_roots}", res[:n_roots].max(), w[0])
++        if len(w) >= n_roots and res[:n_roots].max() < tol:
++            tab.close(f"Converged in {it + 1} iterations")
++            return w[:n_roots], X[:, :n_roots]
 +        R = _precondition(R[:, res >= tol], dA, dS, w[res >= tol])
 +        if space.V.shape[1] + 2 * R.shape[1] > max_space:
 +            space = _Subspace(sigma, max_batch)
 +            R = np.hstack((X, R))
++    tab.close(f"WARNING: not converged in {max_iter} iterations")
 +    raise RuntimeError("Davidson (eigenvalues) did not converge")
 +
 +
@@ -3344,6 +4472,11 @@ index 0000000..a408a9f
 +    vnorm = np.maximum(np.linalg.norm(w[:, None] * V, axis=0), 1e-300)
 +    R = _precondition(V, dA, dS, np.full(V.shape[1], omega))
 +    space = _Subspace(sigma, max_batch)
++    tab = IterationTable(
++        f"Linear response solver, omega = {omega:.6f} Eh",
++        [("Iter", 4, "d"), ("Time [s]", 9, ".2f"), ("Subspace", 8, "d"), ("Converged", 9, ">"), ("max rel. residual", 17, ".3e")],
++        [("Right-hand sides", V.shape[1]), ("Convergence", f"max rel. residual < {tol:.1e}")],
++    )
 +    for it in range(max_iter):
 +        space.add(R)
 +        Wm = space.EV - omega * space.SV
@@ -3351,17 +4484,108 @@ index 0000000..a408a9f
 +        X = space.V @ u
 +        Rfull = Wm @ u - V
 +        res = np.linalg.norm(w[:, None] * Rfull, axis=0) / vnorm
-+        print(f"Response {it + 1:3d} | subspace {space.V.shape[1]:4d} | max rel. residual {res.max():.3e}")
++        tab.row(it + 1, tab.lap(), space.V.shape[1], f"{int((res < tol).sum())}/{len(res)}", res.max())
 +        if res.max() < tol:
++            tab.close(f"Converged in {it + 1} iterations")
 +            return (X, space.EV @ u - omega * (space.SV @ u)) if return_ex else X
 +        R = _precondition(Rfull[:, res >= tol], dA, dS, np.full(int((res >= tol).sum()), omega))
++    tab.close(f"WARNING: not converged in {max_iter} iterations")
 +    raise RuntimeError("Davidson (linear response) did not converge")
+diff --git a/slowquant/unitary_coupled_cluster/printing.py b/slowquant/unitary_coupled_cluster/printing.py
+new file mode 100644
+index 0000000..1460dca
+--- /dev/null
++++ b/slowquant/unitary_coupled_cluster/printing.py
+@@ -0,0 +1,83 @@
++import time
++
++KEY_WIDTH = 34
++
++
++def key_value(key: str, value) -> str:
++    return f"   {key:<{KEY_WIDTH}}{value}"
++
++
++class IterationTable:
++    """Fixed-width iteration table: title, settings, aligned columns (name, width, format), summary."""
++
++    def __init__(self, title: str, columns: list[tuple[str, int, str]], info=(), show: bool = True):
++        self.cols = columns
++        self.show = show
++        self.width = max(1 + sum(w for _, w, _ in columns) + 2 * (len(columns) - 1), 72)
++        self.t = time.time()
++        if show:
++            print()
++            print("=" * self.width)
++            print(f" {title}")
++            for k, v in info:
++                print(key_value(k, v))
++            print("-" * self.width)
++            print(" " + "  ".join(f"{n:{'<' if f == '' else '>'}{w}}" for n, w, f in columns))
++            print("-" * self.width, flush=True)
++
++    def lap(self) -> float:
++        t, self.t = self.t, time.time()
++        return self.t - t
++
++    def row(self, *values) -> None:
++        if not self.show:
++            return
++        cells = [
++            f"{'-' if v is None else v:{'<' if f == '' else '>'}{w}}" if v is None or isinstance(v, str) else f"{v:>{w}{f}}"
++            for v, (_, w, f) in zip(values, self.cols)
++        ]
++        print(" " + "  ".join(cells), flush=True)
++
++    def close(self, status: str, info=()) -> None:
++        if not self.show:
++            return
++        if status or info:
++            print("-" * self.width)
++        if status:
++            print(f" {status}")
++        for k, v in info:
++            print(key_value(k, v))
++        print("=" * self.width, flush=True)
++
++
++HARTREE_EV = 27.211386245988
++
++
++def value_table(title: str, columns: list[tuple[str, int, str]], rows, status: str = "", info=()) -> None:
++    """Print a finished table (no timing)."""
++    tab = IterationTable(title, columns, info)
++    for r in rows:
++        tab.row(*r)
++    tab.close(status)
++
++
++def roots_table(title: str, energies, extra=()) -> None:
++    """Excitation energies in Eh and eV, plus extra columns (name, values, format)."""
++    cols = [("Root", 4, "d"), ("omega [Eh]", 14, ".8f"), ("omega [eV]", 12, ".6f")] + [(n, max(len(n), 12), f) for n, _, f in extra]
++    rows = [(i + 1, w, w * HARTREE_EV, *[v[i] for _, v, _ in extra]) for i, w in enumerate(energies)]
++    value_table(title, cols, rows, f"{len(energies)} roots")
++
++
++def timing_line(label: str, seconds: float) -> None:
++    print(key_value(f"{label} [s]", f"{seconds:20.1f}"), flush=True)
++
++
++def info_block(title: str, items, width: int = 86) -> None:
++    """Key-value block: (key, value) pairs."""
++    print()
++    print("=" * width)
++    print(f" {title}")
++    print("-" * width)
++    for k, v in items:
++        print(key_value(k, v))
++    print("=" * width, flush=True)
 diff --git a/tests/test_generalized_integral_direct.py b/tests/test_generalized_integral_direct.py
 new file mode 100644
-index 0000000..2ee3a19
+index 0000000..ffe0a90
 --- /dev/null
 +++ b/tests/test_generalized_integral_direct.py
-@@ -0,0 +1,102 @@
+@@ -0,0 +1,138 @@
 +import numpy as np
 +import pytest
 +from pyscf import gto, scf
@@ -3464,12 +4688,48 @@ index 0000000..2ee3a19
 +    assert np.abs(lr.get_polarizability(tol=1e-10) - a0).max() < 1e-6
 +    lr_plain = LinearResponseDirect(wf, "SD", symmetrize_qG=False)
 +    assert np.abs(lr_plain.DA).max() == 0.0
++
++
++def test_ups_engine_matches_reference_algebra():
++    from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import (
++        generalized_construct_ups_state_test_erik,
++        generalized_get_grad_action,
++    )
++
++    mol, C = h3()
++    for ans in ("fUCCSD", "fUCCSDT", "gtups"):
++        wf = GeneralizedWaveFunctionUPS(((2, 1), 6), C, mol, ans, ansatz_options={"n_layers": 1, "is_spin_conserving": False}, include_active_kappa=True)
++        rng = np.random.default_rng(1)
++        n = len(wf.thetas)
++        th = rng.uniform(-0.5, 0.5, n) + 1j * rng.uniform(-0.5, 0.5, n)
++        s0 = generalized_construct_ups_state_test_erik(wf.csf_coeffs, wf.ci_info, list(th), wf.ups_layout)
++        assert np.abs(wf.ups_engine.state(wf.csf_coeffs, th) - s0).max() < 1e-12
++        for k in (0, n // 2, n - 1):
++            a = generalized_get_grad_action(s0, k, wf.ci_info, list(th), wf.ups_layout)
++            b = wf.ups_engine.grad_action(k, th[k], s0)
++            assert max(np.abs(a[0] - b[0]).max(), np.abs(a[1] - b[1]).max()) < 1e-12
++
++
++def test_onestep_oo_matches_twostep():
++    mol = gto.M(atom="H 0 0 0; H 0 0 1.5; H 0 0 3.0; H 0 0 4.5", basis="6-31g", verbose=0)
++    mf = scf.GHF(mol)
++    mf.conv_tol = 1e-11
++    mf.kernel()
++    e = []
++    for name in ("run_wf_optimization_direct", "run_wf_optimization_onestep_direct"):
++        wf = GeneralizedWaveFunctionUPS(
++            ((2, 2), 8), np.array(mf.mo_coeff, dtype=complex), mol, "fUCCSD", ansatz_options=dict(OPTS),
++            include_active_kappa=True,
++        )
++        getattr(wf, name)(tol=1e-7, verbose=False)
++        e.append(wf.energy_elec)
++    assert abs(e[0] - e[1]) < 1e-9
 diff --git a/tests/test_qiskit_generalized_direct.py b/tests/test_qiskit_generalized_direct.py
 new file mode 100644
-index 0000000..1353b54
+index 0000000..7a4d096
 --- /dev/null
 +++ b/tests/test_qiskit_generalized_direct.py
-@@ -0,0 +1,114 @@
+@@ -0,0 +1,124 @@
 +import numpy as np
 +import pytest
 +from pyscf import gto, scf
@@ -3575,12 +4835,22 @@ index 0000000..1353b54
 +    ref.run_wf_optimization_direct(tol=1e-9)
 +    wf = GeneralizedWaveFunctionCircuitDirect(((2, 1), 6), ref.c_mo, mol, make_qi(), include_active_kappa=True, **extra)
 +    wf._optimize_thetas(1e-12, 3000)
-+    assert abs(wf.energy_elec - ref.energy_elec) < 1e-8
++    wf._optimize_thetas(1e-10, 100, "trust-exact")
++    assert abs(wf.energy_elec - ref.energy_elec) < 1e-10
 +    r0, r1 = LinearResponseDirect(ref, "SD"), LinearResponseCircuitDirect(wf, "SD")
 +    E0, _ = r0.explicit()
 +    E1, _ = r1.explicit()
 +    assert np.abs(E0 - E1).max() < 1e-4
 +    assert np.abs(r0.DB - r1.DB).max() < 1e-5
 +    w0, w1 = r0.calc_excitation_energies(4, tol=1e-8), r1.calc_excitation_energies(4, tol=1e-8)
-+    assert np.abs(w0 - w1).max() < 1e-5
++    assert np.abs(w0 - w1).max() < 1e-6
 +    assert np.abs(r0.get_polarizability(tol=1e-9) - r1.get_polarizability(tol=1e-9)).max() < 1e-4
++
++
++def test_adjoint_gradient_and_hessian_match_parameter_shift():
++    wf = random_wf(True)
++    p = np.array(wf.thetas)
++    g, H = wf.theta_gradient(p), wf.theta_hessian(p)
++    wf.parameter_shift = True
++    assert np.abs(g - wf.theta_gradient(p)).max() < 1e-12
++    assert np.abs(H[:4] - wf.theta_hessian(p)[:4]).max() < 1e-10

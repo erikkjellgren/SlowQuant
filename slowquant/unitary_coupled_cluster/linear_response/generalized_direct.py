@@ -9,6 +9,7 @@ from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import Gener
 from slowquant.unitary_coupled_cluster.linear_response.solvers import davidson_eig, davidson_solve
 from slowquant.unitary_coupled_cluster.operators import G1, G2, G3, G4, G5, G6
 from slowquant.unitary_coupled_cluster.util import iterate_t1, iterate_t2, iterate_t3, iterate_t4, iterate_t5, iterate_t6
+from slowquant.unitary_coupled_cluster.printing import key_value, value_table, roots_table, timing_line, HARTREE_EV
 
 
 def _dag(rho):
@@ -60,7 +61,7 @@ class LinearResponseDirect:
         ds = self.ds = wf.ds
         ds.set_rdms(wf.rdm1, wf.rdm2)
         ds.response_tensors()
-        print(f"Response integrals: {time.time() - t0:.1f} s")
+        timing_line("Response integrals", time.time() - t0)
         self.N = ds.C.shape[1]
         self.pos = -np.ones(self.N, dtype=int)
         self.pos[ds.occ] = np.arange(len(ds.occ))
@@ -73,7 +74,7 @@ class LinearResponseDirect:
         self.q_idx = self.q_idx[(np.abs(a_q) > screen) | (np.abs(s_q) > screen)]
         self.nq, self.nG = len(self.q_idx), len(G_ops)
         self.n = self.nq + self.nG
-        print(f"Operators: {self.nq} orbital, {self.nG} active-space")
+        print(key_value("LR operators", f"{self.nq} orbital, {self.nG} active-space"))
 
         ci = self.ci = ActiveCI(wf.ci_info)
         c0 = self.c0 = wf.ci_coeffs
@@ -92,7 +93,7 @@ class LinearResponseDirect:
         self.Gh = np.array([prop(G, h0) for G in G_ops]).reshape(-1, ndet)
         self.Gdh = np.array([prop(G.dagger, h0) for G in G_ops]).reshape(-1, ndet)
         self.DA, self.DB = self._cross_terms(G_ops) if symmetrize_qG else (np.zeros((self.nG, self.nq)),) * 2
-        print(f"Linear response setup: {time.time() - t0:.1f} s")
+        timing_line("Linear response setup", time.time() - t0)
 
     def _cross_terms(self, G_ops) -> tuple[np.ndarray, np.ndarray]:
         r"""Symmetrization corrections DA_Gq = 1/2<0|H[q, G^\dagger]|0>, DB_Gq = 1/2<0|H[q, G]|0>^* (zero for inactive-virtual q).
@@ -286,13 +287,16 @@ class LinearResponseDirect:
         """Full E2 and S by applying sigma to unit vectors (testing/small systems only)."""
         return self.sigma(np.eye(2 * self.n, dtype=complex))
 
-    def calc_excitation_energies(self, n_roots: int = 5, tol: float = 1e-6, max_iter: int = 100) -> np.ndarray:
-        """Lowest positive excitation energies via paired Davidson."""
+    def calc_excitation_energies(
+        self, n_roots: int = 5, tol: float = 1e-6, max_iter: int = 100, max_space: int = 400, n_extra: int = 4
+    ) -> np.ndarray:
+        """Lowest positive excitation energies via paired Davidson (n_extra unconverged buffer roots, subspace <= max_space)."""
+        t0 = time.time()
         self.excitation_energies, self.response_vectors = davidson_eig(
-            self.sigma, *self.diagonal(), n_roots, tol=tol, max_iter=max_iter
+            self.sigma, *self.diagonal(), n_roots, tol=tol, max_iter=max_iter, max_space=max_space, n_extra=n_extra
         )
-        with np.printoptions(precision=6, suppress=True):
-            print("Excitation energies:", self.excitation_energies)
+        roots_table("Excitation energies (linear response)", self.excitation_energies)
+        timing_line("Excitation energies", time.time() - t0)
         return self.excitation_energies
 
     def solve_response(self, V: np.ndarray, omega: float = 0.0, tol: float = 1e-6, max_iter: int = 100) -> np.ndarray:
@@ -355,14 +359,16 @@ class LinearResponseDirect:
 
     def get_oscillator_strength(self, dipole_integrals=None, x2c: bool = False) -> np.ndarray:
         r"""f_n = 2/3 omega_n |<0|mu|n>|^2."""
+        t0 = time.time()
         t = self.get_transition_dipole(dipole_integrals, x2c)
         self.oscillator_strengths = 2 / 3 * self.excitation_energies * np.sum(np.abs(t) ** 2, axis=1)
+        timing_line("Oscillator strengths", time.time() - t0)
         return self.oscillator_strengths
 
     def get_formatted_oscillator_strength(self) -> str:
-        output = "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n"
+        output = f" {'Root':>4}  {'omega [Eh]':>14}  {'omega [eV]':>12}  {'f':>12}\n"
         for i, (e, f) in enumerate(zip(self.excitation_energies, self.oscillator_strengths)):
-            output += f"{str(i + 1).center(12)} | {f'{e:2.6f}'.center(27)} | {f'{e * 27.2114079527:3.6f}'.center(22)} | {f'{f:1.6f}'.center(20)}\n"
+            output += f" {i + 1:>4d}  {e:>14.8f}  {e * HARTREE_EV:>12.6f}  {f:>12.6f}\n"
         return output
 
     def get_polarizability(self, omega: float = 0.0, dipole_integrals=None, tol: float = 1e-6, max_iter: int = 100) -> np.ndarray:
@@ -370,9 +376,17 @@ class LinearResponseDirect:
 
         Uses the error-cancelling expression V_a^H X_b + X_a^H V_b - X_a^H (E2 - omega S) X_b (error quadratic in the residual).
         """
+        t0 = time.time()
         if dipole_integrals is None:
             dipole_integrals = self.wf.int_gen.int_obj.intor("int1e_r", comp=3)
         V = self.property_gradient(dipole_integrals)
         X, EX = davidson_solve(self.sigma, *self.diagonal(), V, omega, tol=tol, max_iter=max_iter, return_ex=True)
         self.polarizability = (V.conj().T @ X + X.conj().T @ V - X.conj().T @ EX).real
+        value_table(
+            f"Polarizability tensor, omega = {omega} Eh [a.u.]",
+            [("", 3, ""), ("x", 14, ".6f"), ("y", 14, ".6f"), ("z", 14, ".6f")],
+            [(c, *r) for c, r in zip("xyz", self.polarizability)],
+            f"isotropic alpha = {np.trace(self.polarizability) / 3:.6f} a.u.",
+        )
+        timing_line("Polarizability", time.time() - t0)
         return self.polarizability

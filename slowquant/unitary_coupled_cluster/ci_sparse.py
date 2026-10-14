@@ -96,3 +96,122 @@ def ladder(src, dst, t: int, create: bool) -> sp.csr_matrix:
     rows = order[np.searchsorted(ddets[order], new)]
     vals = 1.0 - 2.0 * (np.bitwise_count(dets[ok] & below) % 2)
     return sp.csr_matrix((vals.astype(complex), (rows, cols)), shape=(len(ddets), len(dets)))
+
+
+def operator_matrix(ci_info, op) -> sp.csr_matrix:
+    """Sparse matrix of a number-conserving FermionicOperator with active-space (unfolded) spin-orbital indices."""
+    n = 2 * ci_info.num_active_orbs
+    dets = np.asarray(ci_info.idx2det, dtype=np.int64)
+    order = np.argsort(dets)
+    sdets = dets[order]
+    full = (1 << n) - 1
+    rows, cols, vals = [], [], []
+    for key, c in op.operators.items():
+        d = dets.copy()
+        ok = np.ones(len(d), dtype=bool)
+        sign = np.ones(len(d))
+        for orb, dag in reversed(key):
+            b = np.int64(1 << (n - 1 - orb))
+            occ = (d & b) != 0
+            ok &= ~occ if dag else occ
+            sign *= 1.0 - 2.0 * (np.bitwise_count(d & np.int64(full ^ ((1 << (n - orb)) - 1))) % 2)
+            d = d ^ b
+        j = np.nonzero(ok)[0]
+        pos = np.searchsorted(sdets, d[j])
+        keep = (pos < len(sdets)) & (sdets[np.minimum(pos, len(sdets) - 1)] == d[j])
+        rows.append(order[pos[keep]])
+        cols.append(j[keep])
+        vals.append(c * sign[j[keep]])
+    nd = len(dets)
+    if not rows:
+        return sp.csr_matrix((nd, nd), dtype=complex)
+    return sp.csr_matrix(
+        (np.concatenate(vals).astype(complex), (np.concatenate(rows), np.concatenate(cols))), shape=(nd, nd)
+    )
+
+
+class UPSEngine:
+    r"""Fast unitary product state: U_k = exp(theta_k T_k - theta_k^* T_k^\dagger) with sparse T_k.
+
+    U_k v = v + sin(r)/r A v + (1 - cos r)/r^2 A^2 v, r = |theta_k|, A^2 = -r^2 (T T^\dagger + T^\dagger T) (diagonal)
+    when T_k^2 = 0. Same conventions as generalized_construct_ups_state_test_erik / generalized_get_grad_action.
+    """
+
+    def __init__(self, ci_info, ups_struct, op_builder):
+        self.ci_info = ci_info
+        self.ups = ups_struct
+        self.build = op_builder
+        self.T, self.Td, self.P = [], [], []
+        self.update()
+
+    def update(self):
+        for k in range(len(self.T), len(self.ups.excitation_indices)):
+            T = operator_matrix(self.ci_info, self.build(self.ups.excitation_operator_type[k], self.ups.excitation_indices[k]))
+            Td = T.conj().T.tocsr()
+            P = None
+            if (T @ T).count_nonzero() == 0:
+                P = np.real((T @ Td + Td @ T).diagonal())
+            self.T.append(T)
+            self.Td.append(Td)
+            self.P.append(P)
+
+    def _A(self, k, theta, v):
+        return theta * (self.T[k] @ v) - np.conj(theta) * (self.Td[k] @ v)
+
+    def _A2(self, k, theta, v, Av=None):
+        if self.P[k] is not None:
+            return -abs(theta) ** 2 * (self.P[k][:, None] if v.ndim == 2 else self.P[k]) * v
+        return self._A(k, theta, self._A(k, theta, v) if Av is None else Av)
+
+    def apply(self, k, theta, v, dagger=False):
+        r = abs(theta)
+        if r < 1e-28:
+            return v.copy()
+        th = -theta if dagger else theta
+        Av = self._A(k, th, v)
+        return v + np.sin(r) / r * Av + (1 - np.cos(r)) / r**2 * self._A2(k, th, v, Av)
+
+    def state(self, v, thetas, dagger=False):
+        self.update()
+        out = np.array(v, dtype=complex)
+        ks = range(len(thetas))
+        for k in (reversed(ks) if dagger else ks):
+            out = self.apply(k, thetas[k], out, dagger)
+        return out
+
+    def grad_action(self, k, theta, v):
+        """(dU_k/dRe(theta) v, dU_k/dIm(theta) v)."""
+        VR, VI = self._V(k, True, v), self._V(k, False, v)
+        Av = theta.real * VR + theta.imag * VI
+        A2v = self._A2(k, theta, v, Av)
+        r = abs(theta)
+        if r < 1e-8:
+            f, g, c1, c2 = 1 - r**2 / 6, 0.5 - r**2 / 24, -1 / 3 + r**2 / 30, -1 / 12 + r**2 / 180
+        else:
+            f, g = np.sin(r) / r, (1 - np.cos(r)) / r**2
+            c1, c2 = (r * np.cos(r) - np.sin(r)) / r**3, (r * np.sin(r) - 2 + 2 * np.cos(r)) / r**4
+        out = []
+        for real, V, x in ((True, VR, theta.real), (False, VI, theta.imag)):
+            VAv = self._V(k, real, Av)
+            out.append(f * V + g * (VAv + self._A(k, theta, V)) + x * c1 * Av + x * c2 * A2v)
+        return out[0], out[1]
+
+    def _V(self, k, real, w):
+        Tw, Tdw = self.T[k] @ w, self.Td[k] @ w
+        return Tw - Tdw if real else 1j * (Tw + Tdw)
+
+
+def ups_theta_gradient(engine: UPSEngine, thetas: np.ndarray, ref: np.ndarray, hc: np.ndarray) -> np.ndarray:
+    """dE/d(Re theta, Im theta) for |0> = U(theta)|ref> from hc = H|0> (one unitary peeled off per parameter,
+    arXiv:2303.10825, Eq. 20)."""
+    nt = len(thetas)
+    g = np.zeros(2 * nt)
+    bra = engine.state(hc, thetas, dagger=True)
+    ket = np.array(ref, dtype=complex)
+    for i in range(nt):
+        bra = engine.apply(i, thetas[i], bra)
+        dR, dI = engine.grad_action(i, thetas[i], ket)
+        g[i] = 2 * np.vdot(bra, dR).real
+        g[i + nt] = 2 * np.vdot(bra, dI).real
+        ket = engine.apply(i, thetas[i], ket)
+    return g

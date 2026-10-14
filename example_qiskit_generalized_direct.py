@@ -35,7 +35,7 @@ n = len(WF.thetas) // 2
 WF.set_thetas_initial(rng.uniform(-0.05, 0.05, n), rng.uniform(-0.05, 0.05, n))
 
 t = time.time()
-WF.run_wf_optimization_2step_direct(tol=1e-6, theta_method="l-bfgs-b")
+WF.run_wf_optimization_2step_direct(tol=1e-6, theta_method="l-bfgs-b", e_scf=mf.e_tot)
 print(f"OO {time.time() - t:.1f} s  E_tot = {WF.energy_elec + mol.energy_nuc():.10f}  circuits: {WF.num_energy_evals}")
 
 t = time.time()

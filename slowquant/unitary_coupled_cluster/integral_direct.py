@@ -1,5 +1,6 @@
 import os
 import tempfile
+import time
 
 import h5py
 import numpy as np
@@ -18,7 +19,8 @@ class GHFDirect:
     (non-relativistic, X2C, ECP or finite field); default T + V.
     Conventions: (pq|rs) = sum C*_mp C_nq C*_ls C_sr (mn|ls), J[D]_pq = sum (pq|rs) D_sr, K[D]_pq = sum (ps|rq) D_sr.
     screen_tol: Schwarz/density screening threshold of the J/K builds (PySCF direct_scf_tol).
-    incore_memory: MO transformations use in-memory 8-fold AO integrals if they fit in this many MB (0: always out-of-core).
+    incore_memory: J/K and MO transformations use in-memory 8-fold AO integrals if they fit in this many MB
+    (0: always integral-direct J/K and out-of-core MO transformations).
     """
 
     def __init__(
@@ -38,14 +40,21 @@ class GHFDirect:
         self.h_ao = np.asarray(h_ao, dtype=complex)
         mf = scf.RHF(mol)
         mf.direct_scf_tol = screen_tol
+        self.screen_tol = screen_tol
         self.opt = mf.init_direct_scf(mol)
         self.max_memory = mol.max_memory if max_memory is None else max_memory
         self.incore_memory = incore_memory
         self._eri_ao = None
         self.tmpdir = lib.param.TMPDIR if tmpdir is None else tmpdir
 
+    def describe(self) -> str:
+        mode = "in-core AO integrals" if self._incore() else f"direct, screen_tol = {self.screen_tol:.0e}"
+        return f"GHFDirect (exact), {mode}"
+
     def _jk_exact(self, dms):
         def build(mol, dm, hermi, with_j, with_k, omega=None):
+            if self._incore():
+                return hf.dot_eri_dm(self._eri_ao, dm, hermi, with_j, with_k)
             return hf.get_jk(mol, dm, hermi, self.opt, with_j, with_k, omega)
 
         return ghf.get_jk(self.mol, dms, hermi=0, jkbuild=build)
@@ -119,7 +128,14 @@ class GHFCholesky(GHFDirect):
     def __init__(self, mol, tol: float = 1e-6, span: float = 1e-2, cd_jk: bool = True, **kwargs):
         super().__init__(mol, **kwargs)
         self.cd_jk = cd_jk
+        self.tol = tol
+        t0 = time.time()
         self.V = self._decompose(tol, span)
+        print(f"Cholesky decomposition: {len(self.V)} vectors (tol {tol:.0e}), {time.time() - t0:.1f} s")
+
+    def describe(self) -> str:
+        jk = "CD" if self.cd_jk else ("exact, in-core" if self._incore() else f"exact, screen_tol = {self.screen_tol:.0e}")
+        return f"GHFCholesky, tol = {self.tol:.0e}, {len(self.V)} vectors, J/K: {jk}"
 
     def _decompose(self, tol, span):
         mol, n = self.mol, self.nao
@@ -384,3 +400,9 @@ def orbital_gradient(F: np.ndarray, kappa_idx: list[tuple[int, int]]) -> np.ndar
     gr = 2 * (F[N, M] - F[M, N]).real
     gi = -2 * (F[N, M] + F[M, N]).imag
     return np.concatenate((gr, gi))
+
+
+def expm_antihermitian(K: np.ndarray) -> np.ndarray:
+    """exp(K) for anti-Hermitian K via eigh of the Hermitian iK (faster than scipy expm)."""
+    w, V = np.linalg.eigh(1j * K)
+    return (V * np.exp(-1j * w)) @ V.conj().T

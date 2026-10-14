@@ -17,8 +17,9 @@ from slowquant.molecularintegrals.integralfunctions import (
     generalized_1e_transform_spin_separated,
 )
 from slowquant.unitary_coupled_cluster.generalized_integral_manager import IntegralManager
-from slowquant.unitary_coupled_cluster.integral_direct import GHFDirect, DirectState, orbital_gradient
-from slowquant.unitary_coupled_cluster.ci_sparse import ActiveCI
+from slowquant.unitary_coupled_cluster.integral_direct import GHFDirect, DirectState, orbital_gradient, expm_antihermitian
+from slowquant.unitary_coupled_cluster.ci_sparse import ActiveCI, UPSEngine, ups_theta_gradient
+from slowquant.unitary_coupled_cluster.printing import IterationTable, key_value
 
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_generalized
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
@@ -45,7 +46,7 @@ from slowquant.unitary_coupled_cluster.generalized_operators import (
     a_op_spin,
     generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a
 )
-from slowquant.unitary_coupled_cluster.operators import G1, G2
+from slowquant.unitary_coupled_cluster.operators import G1, G1_generalized, G2, G2_generalized, G3, G4
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import (
     UpsStructure,
@@ -511,12 +512,7 @@ class GeneralizedWaveFunctionUPS:
         if isinstance(self._thetas_imag, np.ndarray):
             self._thetas_imag = self._thetas_imag.tolist()
 
-        self.ci_coeffs = generalized_construct_ups_state_test_erik(
-            self.csf_coeffs,
-            self.ci_info,
-            self.thetas,
-            self.ups_layout,
-        )
+        self.ci_coeffs = self.ups_engine.state(self.csf_coeffs, np.array(self.thetas))
 
     @property
     def c_mo(self) -> np.ndarray:
@@ -535,7 +531,7 @@ class GeneralizedWaveFunctionUPS:
         kappa_mat = np.zeros_like(self._c_mo)
         kappa_mat[P, Q] = d
         kappa_mat[Q, P] = -d.conj()
-        return self._c_mo @ scipy.linalg.expm(-kappa_mat)
+        return self._c_mo @ expm_antihermitian(-kappa_mat)
 
     def h_ao_spin(self) -> np.ndarray:
         """One-electron Hamiltonian in the 2nao spin-AO basis (alpha AOs, beta AOs): T + V (+ ECP), X2C or finite field."""
@@ -564,7 +560,8 @@ class GeneralizedWaveFunctionUPS:
 
     def _get_direct_state(self, C: np.ndarray) -> DirectState:
         if self._ds is None or not np.array_equal(self._ds.C, C):
-            self._ds = DirectState(self.direct, C, self.inactive_spin_idx, self.active_spin_idx, self.rdm1)
+            rdm1 = self.rdm1 if getattr(self, "_fixed_rdms", False) or len(self.thetas) == 0 else None
+            self._ds = DirectState(self.direct, C, self.inactive_spin_idx, self.active_spin_idx, rdm1)
         return self._ds
 
     @property
@@ -578,6 +575,17 @@ class GeneralizedWaveFunctionUPS:
         if self._ci_engine is None:
             self._ci_engine = ActiveCI(self.ci_info)
         return self._ci_engine
+
+    @property
+    def ups_engine(self) -> UPSEngine:
+        """Sparse-matrix UPS state and gradient engine (built once, extended when the ansatz grows)."""
+        if getattr(self, "_ups_engine", None) is None:
+            off = 2 * self.ci_info.space_extension_offset
+            ops = {"single": G1_generalized, "double": G2_generalized, "triple": G3, "quadruple": G4}
+            self._ups_engine = UPSEngine(
+                self.ci_info, self.ups_layout, lambda typ, idx: ops[typ](*[int(i) + off for i in idx])
+            )
+        return self._ups_engine
 
     def _make_rdms(self) -> None:
         c = self.ci_coeffs
@@ -894,16 +902,24 @@ class GeneralizedWaveFunctionUPS:
             e_old = e_new
         self._energy_elec = e_new
 
+    def _ups_theta_gradient(self, hc: np.ndarray) -> np.ndarray:
+        """dE/d(Re theta, Im theta) from hc = H|0>."""
+        return ups_theta_gradient(self.ups_engine, np.array(self.thetas), self.csf_coeffs, hc)
+
+    def _theta_energy_gradient(self, x: np.ndarray) -> tuple[float, np.ndarray]:
+        nt = len(x) // 2
+        self.set_thetas(x[:nt], x[nt:])
+        c = self.ci_coeffs
+        hc = self.ds.ci_hamiltonian(self.ci_engine) @ c
+        self.num_energy_evals += 1
+        return np.vdot(c, hc).real, self._ups_theta_gradient(hc)
+
     def _optimize_thetas(self, gtol: float, maxiter: int) -> float:
-        """Theta optimization at fixed orbitals (L-BFGS-B, converged on the gradient)."""
-        energy_theta = partial(self._calc_energy_optimization, theta_optimization=True, kappa_optimization=False)
-        gradient_theta = partial(self._calc_gradient_optimization, theta_optimization=True, kappa_optimization=False)
-        self._old_opt_parameters = np.zeros(2 * len(self.thetas), dtype=np.float64) + 10**20
-        self._E_opt_old = 0.0
+        """Theta optimization at fixed orbitals (L-BFGS-B on energy and gradient from one state build)."""
         res = scipy.optimize.minimize(
-            energy_theta,
+            self._theta_energy_gradient,
             np.array(self.thetas_real + self.thetas_imag),
-            jac=gradient_theta,
+            jac=True,
             method="L-BFGS-B",
             options={"maxiter": maxiter, "ftol": 1e-16, "gtol": gtol, "maxcor": 30},
         )
@@ -919,6 +935,84 @@ class GeneralizedWaveFunctionUPS:
         self._g_mo = None
         self._energy_elec = None
 
+    def print_info(self, e_scf: float | None = None) -> float:
+        """Print system, Hamiltonian, active space and integral backend, and check the initial orbitals.
+
+        The reference determinant energy with the current orbitals equals the SCF energy when the orbitals are
+        converged SCF orbitals of this Hamiltonian (e.g. PySCF GHF(mol).x2c() for do_x2c=True). Returns it.
+        """
+        t0 = time.time()
+        mol = self.int_gen.int_obj
+
+        def name(b):
+            if not isinstance(b, str):
+                return "custom"
+            if "\n" not in b:
+                return b
+            tag = [l.split(":", 1)[1].strip() for l in b.splitlines() if "Basis set:" in l]
+            return tag[0] if tag else "custom"
+
+        basis = name(mol.basis) if not isinstance(mol.basis, dict) else ", ".join(f"{k}: {name(v)}" for k, v in mol.basis.items())
+        if self.B is not None:
+            ham = f"non-relativistic + B = {np.round(self.B / 4.254e-6, 6)} T (gauge origin {self.orig})"
+        elif self.x2c:
+            ham = "X2C one-electron with spin-orbit (PySCF GHF(mol).x2c())"
+        else:
+            ham = "non-relativistic" + (" + scalar ECP" if self.ecp else "")
+        c = self.csf_coeffs
+        _, d1, d2 = self.ci_engine.transition_rdms(c[None], c)
+        ds = DirectState(self.direct, self.c_mo, self.inactive_spin_idx, self.active_spin_idx, d1[0])
+        ds.set_rdms(d1[0], d2[0])
+        e_nuc = mol.energy_nuc()
+        e_ref = ds.energy(d1[0], d2[0]) + e_nuc
+        g = orbital_gradient(ds.gen_fock(), [tuple(i) for i in self.kappa_spin_idx]) if len(self.kappa_spin_idx) else np.zeros(1)
+        W = 86
+        print("=" * W)
+        print(" System and wave function")
+        print("-" * W)
+        for k, v in (
+            ("Molecule", f"{mol.natm} atoms, {mol.nelectron} electrons, charge {mol.charge}, spin {mol.spin}"),
+            ("Basis set", basis),
+            ("Basis functions", f"{mol.nao} spatial AOs, {2 * mol.nao} spin AOs, {self.num_spin_orbs} spin MOs"),
+            ("Hamiltonian", ham),
+            ("Integral backend", self.direct.describe()),
+            ("Active space", f"({self.num_active_elec_alpha}, {self.num_active_elec_beta}) electrons in {self.num_active_spin_orbs} spin orbitals"),
+            ("Inactive / virtual", f"{self.num_inactive_spin_orbs} / {self.num_virtual_spin_orbs} spin orbitals"),
+            ("Determinants / thetas", f"{self.num_det} / {len(self.thetas)}"),
+            ("Orbital rotations", f"{len(self.kappa_spin_idx)} (complex)"),
+        ):
+            print(key_value(k, v))
+        print("-" * W)
+        print(key_value("Nuclear repulsion [Eh]", f"{e_nuc:20.10f}"))
+        if e_scf is not None:
+            print(key_value("PySCF SCF energy [Eh]", f"{e_scf:20.10f}"))
+        print(key_value("Reference determinant [Eh]", f"{e_ref:20.10f}"))
+        print(key_value("max|g_orb| of reference", f"{np.abs(g).max():20.3e}"))
+        print(key_value("Setup time [s]", f"{time.time() - t0:20.1f}"))
+        if e_scf is not None and abs(e_ref - e_scf) > 1e-6:
+            print(f" WARNING: reference energy differs from the PySCF energy by {e_ref - e_scf:.3e} Eh.")
+        if np.abs(g).max() > 1e-3:
+            print(
+                " WARNING: the initial orbitals are not SCF orbitals of this Hamiltonian. Check that the PySCF calculation\n"
+                "          matches do_x2c/ecp/B (do_x2c=True <-> scf.GHF(mol).x2c(); not sfx2c1e, RHF.x2c or scf.X2C),\n"
+                "          and that it converged."
+            )
+        if not self.ecp and self.B is None and not self.x2c and mol.has_ecp():
+            print(" WARNING: the molecule has an ECP but ecp=False; the ECP is not in the Hamiltonian.")
+        print("=" * W, flush=True)
+        return e_ref
+
+    def _oo_summary(self, t_start, e, e_ref, e_scf, timing):
+        e_nuc = self.int_gen.int_obj.energy_nuc()
+        out = [("Total time [s]", f"{time.time() - t_start:20.1f}")]
+        out += [(f"  {k} [s]", f"{v:20.1f}") for k, v in timing.items()]
+        out += [("Electronic energy [Eh]", f"{e:20.10f}"), ("Total energy [Eh]", f"{e + e_nuc:20.10f}")]
+        if e_ref is not None:
+            out.append(("E(OO) - E(reference) [Eh]", f"{e + e_nuc - e_ref:20.10f}"))
+        if e_scf is not None:
+            out.append(("E(OO) - E(PySCF) [Eh]", f"{e + e_nuc - e_scf:20.10f}"))
+        return out
+
     def run_wf_optimization_direct(
         self,
         tol: float = 1e-5,
@@ -928,29 +1022,33 @@ class GeneralizedWaveFunctionUPS:
         max_step: float = 1.0,
         h_min: float = 1e-3,
         memory: int = 10,
-    ) -> None:
+        e_scf: float | None = None,
+        verbose: bool = True,
+        print_iterations: bool = True,
+    ) -> int:
         r"""Integral-direct two-step orbital-optimization.
 
         Each macro iteration: full theta optimization at fixed orbitals (sparse CI Hamiltonian), then one
         orbital step C -> C exp(-K): L-BFGS direction with the diagonal Hessian
         h = 2(D_M F_NN + D_N F_MM - F^gen_MM - F^gen_NN) as initial inverse Hessian and Armijo backtracking.
-        One J/K pass (2 densities) and one (N a|a a) transformation per orbital point.
-        Converged when max |orbital gradient| < tol.
+        Converged when max |orbital gradient| < tol. e_scf: PySCF energy, printed and compared with the reference.
+        Returns the number of iterations.
         """
+        t_start = time.time()
+        e_ref = self.print_info(e_scf) if verbose else None
         idx = [tuple(i) for i in self.kappa_spin_idx]
         nk = len(idx)
-        print(f"### Integral-direct OO: {nk} orbital rotations (complex), {len(self.thetas)} thetas")
+        timing = {"theta optimization": 0.0, "Fock/integrals": 0.0}
         if nk == 0:
             if len(self.thetas) != 0:
                 self._optimize_thetas(theta_gtol, theta_maxiter)
-            print(f"No non-redundant orbital rotations. E_elec = {self.energy_elec:.12f}")
-            return
+            print(f" No non-redundant orbital rotations. E_elec = {self.energy_elec:.12f} Eh")
+            return 0
         M, N_ = np.array(idx, dtype=int).T
         space = np.empty(self._c_mo.shape[1], dtype="<U1")
         space[self.inactive_spin_idx] = "i"
         space[self.active_spin_idx] = "a"
         space[self.virtual_spin_idx] = "v"
-        print("Iteration | Time [s] | Electronic energy [Hartree] | max |orbital grad| (type) | step scale")
 
         def kappa(x):
             K = np.zeros_like(self._c_mo)
@@ -959,11 +1057,15 @@ class GeneralizedWaveFunctionUPS:
             return K
 
         def relax_thetas():
+            t = time.time()
             if len(self.thetas) != 0:
                 self._optimize_thetas(theta_gtol, theta_maxiter)
-            return self.energy_elec
+            e = self.energy_elec
+            timing["theta optimization"] += time.time() - t
+            return e
 
         def point():
+            t = time.time()
             ds = self.ds
             ds.set_rdms(self.rdm1, self.rdm2)
             F = ds.gen_fock()
@@ -973,17 +1075,27 @@ class GeneralizedWaveFunctionUPS:
             Fd = (ds.FI + ds.FA).diagonal().real
             Fg = F.diagonal().real
             h = np.tile(2 * (D[M] * Fd[N_] + D[N_] * Fd[M] - Fg[M] - Fg[N_]), 2)
+            timing["Fock/integrals"] += time.time() - t
             return orbital_gradient(F, idx), np.maximum(h, h_min)
 
+        def gtype(g):
+            j = np.argmax(np.abs(g)) % nk
+            return space[M[j]] + space[N_[j]]
+
+        tab = IterationTable(
+            "Two-step orbital optimization (integral-direct)",
+            [("Iter", 4, "d"), ("Time [s]", 9, ".2f"), ("E_elec [Eh]", 20, ".12f"), ("dE [Eh]", 10, ".2e"),
+             ("max|g_orb|", 10, ".2e"), ("Type", 4, ""), ("Step", 6, ".3f")],
+            [("Orbital rotations (complex)", nk), ("Thetas", len(self.thetas)), ("Convergence", f"max|g_orb| < {tol:.1e}")],
+            show=print_iterations,
+        )
         e = relax_thetas()
         g, h = point()
+        tab.row(0, tab.lap(), e, None, np.abs(g).max(), gtype(g), None)
         S, Y = [], []
-        for it in range(maxiter):
-            t0 = time.time()
-            gmax = np.abs(g).max()
-            if gmax < tol:
-                print(f"{it + 1:^9} | {time.time() - t0:^8.2f} | {e:^27.12f} | {gmax:^18.3e}      | converged")
-                break
+        n_iter = 0
+        while np.abs(g).max() >= tol and n_iter < maxiter:
+            n_iter += 1
             q = g.copy()
             al = []
             for s_, y_ in zip(S[::-1], Y[::-1]):
@@ -1004,7 +1116,7 @@ class GeneralizedWaveFunctionUPS:
             C, thetas = self._c_mo.copy(), (self.thetas_real, self.thetas_imag)
             a = 1.0
             for _ in range(15):
-                self._set_orbitals(C @ scipy.linalg.expm(-kappa(a * step)))
+                self._set_orbitals(C @ expm_antihermitian(-kappa(a * step)))
                 e_new = relax_thetas()
                 if e_new - e <= 1e-4 * a * slope + 1e-10:
                     break
@@ -1018,11 +1130,150 @@ class GeneralizedWaveFunctionUPS:
                 if len(S) > memory:
                     S.pop(0)
                     Y.pop(0)
-            j = np.argmax(np.abs(g)) % nk
-            print(f"{it + 1:^9} | {time.time() - t0:^8.2f} | {e_new:^27.12f} | {gmax:^11.3e} ({space[M[j]]}{space[N_[j]]}) | {a:.3f}")
+            tab.row(n_iter, tab.lap(), e_new, e_new - e, np.abs(g_new).max(), gtype(g_new), a)
             e, g = e_new, g_new
-        else:
-            print("WARNING: integral-direct OO did not converge")
+        conv = np.abs(g).max() < tol
+        status = f"Converged in {n_iter} iterations" if conv else f"WARNING: not converged in {maxiter} iterations"
+        tab.close(status, self._oo_summary(t_start, e, e_ref, e_scf, timing) if verbose else ())
+        if not conv and not print_iterations:
+            print(f" WARNING: orbital optimization not converged in {maxiter} iterations (max|g_orb| = {np.abs(g).max():.2e})")
+        return n_iter
+
+    def _theta_diag_hessian(self, c: np.ndarray, Hc_mat, e: float) -> np.ndarray:
+        eng = self.ups_engine
+        W = np.empty((len(c), 2 * len(eng.T)), dtype=complex)
+        for k in range(len(eng.T)):
+            Tc, Tdc = eng.T[k] @ c, eng.Td[k] @ c
+            W[:, k] = Tc - Tdc
+            W[:, k + len(eng.T)] = 1j * (Tc + Tdc)
+        return 2 * (np.sum(W.conj() * (Hc_mat @ W), axis=0) - e * np.sum(np.abs(W) ** 2, axis=0)).real
+
+    def run_wf_optimization_onestep_direct(
+        self,
+        tol: float = 1e-5,
+        maxiter: int = 200,
+        theta_gtol: float = 1e-9,
+        theta_maxiter: int = 1000,
+        max_step: float = 0.5,
+        h_min: float = 1e-3,
+        h_theta_min: float = 0.05,
+        memory: int = 20,
+        e_scf: float | None = None,
+        verbose: bool = True,
+    ) -> int:
+        r"""Integral-direct one-step OO: joint L-BFGS on (kappa, theta).
+
+        Each point costs one J/K pass with 2 densities (inactive + active) and one (N a|a a) transformation;
+        energy, orbital and theta gradients follow from it. Initial inverse Hessian: diagonal orbital Hessian
+        (as in run_wf_optimization_direct) and h_k = 2(<V_k 0|H|V_k 0> - E <V_k 0|V_k 0>) for the thetas.
+        Thetas are first optimized at the initial orbitals (no extra J/K). Converged when max |gradient| < tol.
+        Returns the number of iterations.
+        """
+        t_start = time.time()
+        e_ref = self.print_info(e_scf) if verbose else None
+        idx = [tuple(i) for i in self.kappa_spin_idx]
+        nk, nt = len(idx), len(self.thetas)
+        if nk == 0 or nt == 0:
+            return self.run_wf_optimization_direct(tol, maxiter, theta_gtol, theta_maxiter, 1.0, h_min, memory, e_scf, False)
+        M, N_ = np.array(idx, dtype=int).T
+        timing = {"initial thetas": 0.0, "J/K + integrals": 0.0, "CI + gradients": 0.0}
+        n_points = 0
+
+        def evaluate(C, th):
+            nonlocal n_points
+            t = time.time()
+            self._set_orbitals(C)
+            self.set_thetas(th[:nt], th[nt:])
+            rdm1 = self.rdm1
+            timing["CI + gradients"] += time.time() - t
+            t = time.time()
+            self._ds = DirectState(self.direct, C, self.inactive_spin_idx, self.active_spin_idx, rdm1)
+            timing["J/K + integrals"] += time.time() - t
+            n_points += 1
+            t = time.time()
+            Hm = self._ds.ci_hamiltonian(self.ci_engine)
+            hc = Hm @ self.ci_coeffs
+            self._energy_elec = np.vdot(self.ci_coeffs, hc).real
+            timing["CI + gradients"] += time.time() - t
+            return self._energy_elec, Hm, hc
+
+        def gradient(Hm, hc, e):
+            t = time.time()
+            ds = self._ds
+            ds.set_rdms(self.rdm1, self.rdm2)
+            F = ds.gen_fock()
+            D = np.zeros(F.shape[0])
+            D[ds.I] = 1.0
+            D[ds.A] = self.rdm1.diagonal().real
+            Fd = (ds.FI + ds.FA).diagonal().real
+            Fg = F.diagonal().real
+            hk = np.maximum(np.tile(2 * (D[M] * Fd[N_] + D[N_] * Fd[M] - Fg[M] - Fg[N_]), 2), h_min)
+            ht = np.maximum(self._theta_diag_hessian(self.ci_coeffs, Hm, e), h_theta_min)
+            g = np.concatenate((orbital_gradient(F, idx), self._ups_theta_gradient(hc)))
+            timing["CI + gradients"] += time.time() - t
+            return g, np.concatenate((hk, ht))
+
+        tab = IterationTable(
+            "One-step orbital optimization (integral-direct)",
+            [("Iter", 4, "d"), ("Time [s]", 9, ".2f"), ("E_elec [Eh]", 20, ".12f"), ("dE [Eh]", 10, ".2e"),
+             ("max|g_orb|", 10, ".2e"), ("max|g_theta|", 12, ".2e"), ("Step", 6, ".3f"), ("J/K", 4, "d")],
+            [("Orbital rotations (complex)", nk), ("Thetas", nt), ("Convergence", f"max|g| < {tol:.1e}")],
+        )
+        t = time.time()
+        self._optimize_thetas(theta_gtol, theta_maxiter)
+        timing["initial thetas"] = time.time() - t
+        th = np.array(self.thetas_real + self.thetas_imag)
+        e, Hm, hc = evaluate(self._c_mo, th)
+        g, h = gradient(Hm, hc, e)
+        gmax = lambda g: (np.abs(g[: 2 * nk]).max(), np.abs(g[2 * nk :]).max())
+        tab.row(0, tab.lap(), e, None, *gmax(g), None, n_points)
+        S, Y = [], []
+        n_iter = 0
+        while max(gmax(g)) >= tol and n_iter < maxiter:
+            n_iter += 1
+            q = g.copy()
+            al = []
+            for s_, y_ in zip(S[::-1], Y[::-1]):
+                a_ = (s_ @ q) / (y_ @ s_)
+                al.append(a_)
+                q = q - a_ * y_
+            r = q / h
+            for (s_, y_), a_ in zip(zip(S, Y), al[::-1]):
+                r = r + s_ * (a_ - (y_ @ r) / (y_ @ s_))
+            step = -r
+            if np.abs(step).max() > max_step:
+                step *= max_step / np.abs(step).max()
+            slope = g @ step
+            if slope >= 0:
+                S, Y = [], []
+                step = -g / h
+                slope = g @ step
+            C = self._c_mo.copy()
+            a = 1.0
+            for _ in range(20):
+                s_ = a * step
+                K = np.zeros_like(C)
+                K[M, N_] = s_[:nk] + 1j * s_[nk : 2 * nk]
+                K[N_, M] = -(s_[:nk] - 1j * s_[nk : 2 * nk])
+                e_new, Hm, hc = evaluate(C @ expm_antihermitian(-K), th + s_[2 * nk :])
+                if e_new - e <= 1e-4 * a * slope + 1e-11:
+                    break
+                a *= 0.5
+            th = th + s_[2 * nk :]
+            g_new, h = gradient(Hm, hc, e_new)
+            y_ = g_new - g
+            if s_ @ y_ > 1e-12 * np.linalg.norm(s_) * np.linalg.norm(y_):
+                S.append(s_)
+                Y.append(y_)
+                if len(S) > memory:
+                    S.pop(0)
+                    Y.pop(0)
+            tab.row(n_iter, tab.lap(), e_new, e_new - e, *gmax(g_new), a, n_points)
+            e, g = e_new, g_new
+        conv = max(gmax(g)) < tol
+        status = f"Converged in {n_iter} iterations ({n_points} J/K evaluations)" if conv else f"WARNING: not converged in {maxiter} iterations"
+        tab.close(status, self._oo_summary(t_start, e, e_ref, e_scf, timing) if verbose else ())
+        return n_iter
 
     def run_wf_optimization_1step(
         self,
@@ -1310,51 +1561,7 @@ class GeneralizedWaveFunctionUPS:
             ds.set_rdms(self.rdm1, self.rdm2)
             gradient[:num_kappa] = orbital_gradient(ds.gen_fock(), self.kappa_spin_idx)
         if theta_optimization:
-            # Reference bra state (no differentiations)
-            bra_vec = self.ds.ci_hamiltonian(self.ci_engine) @ self.ci_coeffs
-            # Reference ket state (no differentiations)
-            bra_vec = generalized_construct_ups_state_test_erik(
-                bra_vec,
-                self.ci_info,
-                self.thetas,
-                self.ups_layout,
-                dagger=True,
-            )
-            # CSF reference state on ket
-            ket_vec = np.copy(self.csf_coeffs)
-            # Calculate analytical derivative w.r.t. each theta using gradient_action function
-            for i in range(len(self.thetas)):
-                # Remove the i-th U^dagger from bra_vec.
-                # The effect of this unitary will be included from the derivative added to ket_vec.
-                bra_vec = generalized_propagate_unitary_test_anna(
-                    bra_vec,
-                    i,
-                    self.ci_info,
-                    self.thetas,
-                    self.ups_layout,
-                )
-                # Derivative action w.r.t. i-th theta on CSF ket
-                ket_vec_tmp_R, ket_vec_tmp_I = generalized_get_grad_action(
-                    ket_vec,
-                    i,
-                    self.ci_info,
-                    self.thetas,
-                    self.ups_layout,
-                )
-                gradient[i + num_kappa] += 2 * np.matmul(bra_vec.conj(), ket_vec_tmp_R).real
-                gradient[i + num_kappa + len(self.thetas)] += (
-                    2 * np.matmul(bra_vec.conj(), ket_vec_tmp_I).real
-                )
-
-                # Product rule implications on reference bra and CSF ket
-                # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
-                ket_vec = generalized_propagate_unitary_test_anna(
-                    ket_vec,
-                    i,
-                    self.ci_info,
-                    self.thetas,
-                    self.ups_layout,
-                )
+            gradient[num_kappa:] += self._ups_theta_gradient(self.ds.ci_hamiltonian(self.ci_engine) @ self.ci_coeffs)
             self.num_energy_evals += 2 * np.sum(
                 list(self.ups_layout.grad_param_R.values())
             )  # Count energy measurements for all gradients

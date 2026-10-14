@@ -6,6 +6,7 @@ import scipy
 from slowquant.qiskit_interface.fast_pauli import FermionPauliMap, PauliEstimator
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.integral_direct import orbital_gradient
+from slowquant.unitary_coupled_cluster.printing import IterationTable
 
 
 def shift_rule(R: int, order: int) -> tuple[np.ndarray, np.ndarray]:
@@ -75,6 +76,7 @@ class GeneralizedWaveFunctionCircuitDirect(GeneralizedWaveFunctionUPS):
         self._hk = None
         self._fixed_rdms = False
         self.num_energy_evals = 0
+        self.parameter_shift = False
 
     @property
     def thetas(self) -> list[float]:
@@ -129,8 +131,14 @@ class GeneralizedWaveFunctionCircuitDirect(GeneralizedWaveFunctionUPS):
         return self.estimator.expectation_multi(keys, c, points).real
 
     def theta_gradient(self, p=None) -> np.ndarray:
-        """Parameter-shift gradient (all shifted circuits in one batch)."""
+        """Parameter-shift gradient (all shifted circuits in one batch). On the exact (statevector) path the same
+        gradient is obtained by adjoint differentiation (two sweeps) unless self.parameter_shift is True."""
         p = np.array(self.thetas if p is None else p, dtype=float)
+        if self.estimator.exact and not self.parameter_shift:
+            res = self.estimator.energy_gradient(*self._hamiltonian_paulis(), p)
+            if res is not None:
+                self.num_energy_evals += 2
+                return res[1]
         pts, w, idx = [], [], []
         for i, R in enumerate(self.R):
             for x, wt in zip(*shift_rule(R, 1)):
@@ -144,9 +152,18 @@ class GeneralizedWaveFunctionCircuitDirect(GeneralizedWaveFunctionUPS):
         return g
 
     def theta_hessian(self, p=None) -> np.ndarray:
-        """Parameter-shift Hessian: second-derivative rule on the diagonal, product of first-derivative rules off it."""
+        """Parameter-shift Hessian: second-derivative rule on the diagonal, product of first-derivative rules off it.
+        Exact path (unless self.parameter_shift): first-derivative shift rule applied to adjoint gradients (exact)."""
         p = np.array(self.thetas if p is None else p, dtype=float)
         n = len(p)
+        if self.estimator.exact and not self.parameter_shift and self.estimator._simulator() is not None:
+            H = np.zeros((n, n))
+            for i in range(n):
+                for x, wt in zip(*shift_rule(self.R[i], 1)):
+                    q = p.copy()
+                    q[i] += x
+                    H[i] += wt * self.theta_gradient(q)
+            return 0.5 * (H + H.T)
         pts, w, ij = [], [], []
         for i in range(n):
             for x, wt in zip(*shift_rule(self.R[i], 2)):
@@ -218,36 +235,48 @@ class GeneralizedWaveFunctionCircuitDirect(GeneralizedWaveFunctionUPS):
         theta_gtol: float = 1e-8,
         theta_maxiter: int = 500,
         orbital_maxiter: int = 50,
+        e_scf: float | None = None,
         **orbital_options,
     ) -> None:
         """Hardware-friendly two-step OO: theta optimization (quantum) then orbital optimization at fixed measured
         RDMs (classical, integral-direct L-BFGS, see run_wf_optimization_direct).
-        Quantum cost per macro iteration: theta optimization + one RDM measurement."""
-        print(
-            f"### Circuit OO: {len(self.kappa_spin_idx)} orbital rotations, {len(self.thetas)} circuit parameters"
+        Quantum cost per macro iteration: theta optimization + one RDM measurement. e_scf: PySCF energy (printed)."""
+        t_start = time.time()
+        e_ref = self.print_info(e_scf)
+        timing = {"theta optimization + RDMs": 0.0, "orbital optimization": 0.0}
+        evals0 = self.num_energy_evals
+        tab = IterationTable(
+            "Circuit two-step orbital optimization (theta on device, orbitals classical)",
+            [("Macro", 5, "d"), ("Time [s]", 9, ".2f"), ("E after theta [Eh]", 20, ".12f"), ("max|g_orb|", 10, ".2e"),
+             ("E after orbitals [Eh]", 21, ".12f"), ("Orb.it", 6, "d"), ("Circuits", 9, "d")],
+            [("Orbital rotations (complex)", len(self.kappa_spin_idx)), ("Circuit parameters", len(self.thetas)),
+             ("Theta optimizer", theta_method), ("Convergence", f"max|g_orb| < {tol:.1e}")],
         )
-        print(
-            "Macro | Time [s] | E after theta opt. [Hartree] | max |orbital grad| | E after orbital opt. | energy evals"
-        )
+        conv = False
         for it in range(maxiter):
             t0 = time.time()
             e_theta = self._optimize_thetas(theta_gtol, theta_maxiter, theta_method)
             gmax = self.orbital_gradient_max()
+            timing["theta optimization + RDMs"] += time.time() - t0
             if gmax < tol:
-                print(
-                    f"{it + 1:^5} | {time.time() - t0:^8.2f} | {e_theta:^29.12f} | {gmax:^18.3e} | converged"
-                )
+                tab.row(it + 1, tab.lap(), e_theta, gmax, None, None, self.num_energy_evals - evals0)
+                conv = True
                 break
+            t1 = time.time()
             self._fixed_rdms = True
             try:
-                self.run_wf_optimization_direct(tol=tol, maxiter=orbital_maxiter, **orbital_options)
+                n_orb = self.run_wf_optimization_direct(
+                    tol=tol, maxiter=orbital_maxiter, verbose=False, print_iterations=False, **orbital_options
+                )
             finally:
                 self._fixed_rdms = False
+            timing["orbital optimization"] += time.time() - t1
             self._energy_elec = None
             e_orb = self.ds.energy(self.rdm1, self.rdm2)
-            print(
-                f"{it + 1:^5} | {time.time() - t0:^8.2f} | {e_theta:^29.12f} | {gmax:^18.3e} | {e_orb:^20.12f} | {self.num_energy_evals}"
-            )
-        else:
-            print("WARNING: circuit OO did not converge")
+            tab.row(it + 1, tab.lap(), e_theta, gmax, e_orb, n_orb, self.num_energy_evals - evals0)
         self._energy_elec = None
+        e = self.energy_elec
+        status = f"Converged in {it + 1} macro iterations" if conv else f"WARNING: not converged in {maxiter} macro iterations"
+        info = self._oo_summary(t_start, e, e_ref, e_scf, timing)
+        info.insert(len(timing) + 1, ("Circuits evaluated", f"{self.num_energy_evals - evals0:20d}"))
+        tab.close(status, info)

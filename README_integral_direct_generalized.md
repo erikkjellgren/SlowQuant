@@ -109,3 +109,32 @@ The test systems are H3 doublet, H4, LiH and H2O.
 | `LinearResponseDirect` (symmetrized): E2/S, excitation energies, oscillator strengths, polarizability | `generalized_naive` | 1e-14 (38 s → 3.4 s) |
 | Circuit OO | classical OO | 1e-13 |
 | Circuit LR, E2 | classical direct LR | 1e-8, limited by θ convergence |
+
+## Speed update and run script
+
+- **Classical UPS** (`ci_sparse.UPSEngine`): closed-form UPS factors on sparse CI vectors and an adjoint θ gradient. L-BFGS-B uses `jac=True`, and F^A is built lazily.
+- **One-step OO** `run_wf_optimization_onestep_direct(tol, maxiter, ..., e_scf=None)`:
+  - Joint L-BFGS on (κ, θ). Each point costs one J/K with 2 densities plus one (N a|a a). The 2-step needs an extra J/K for F^A after each θ relaxation.
+  - Same energy as the 2-step (≤1.5e-9 at tol 1e-6). `run_generalized_calculation.py` uses it by default (`oo_method="1step"`).
+- **`GHFDirect` in-core**: in-core AO integrals are used when they need less than `incore_memory` MB.
+- **Exact circuit path**:
+  - `fast_pauli.FermionSimulator` gives the fUCC state and exact adjoint gradients, and is checked against qiskit.
+  - The Hessian is computed as shift rule ∘ gradient.
+  - `WF.parameter_shift = True` forces the hardware-style rules.
+- **Sampler**: counts are vectorized.
+- **Bug fix** in `operators_circuits._double_excitation_efficient_generalized`: creation and annihilation indices were swapped for `l<j` or `k<i`. These orderings now use exact Pauli rotations, validated to 1e-13. **Circuit results for these excitations change.**
+- **`print_info`**: prints a header (PySCF energy, basis, AOs, active space) and checks the reference-determinant energy. It warns if the orbitals do not match the Hamiltonian, e.g. non-X2C orbitals with `do_x2c=True`.
+- **`run_generalized_calculation.py`** runs the full workflow with all settings printed, timings, an npz with `c_mo` + θ, and a comparison of the first 10 excitation energies and oscillator strengths. The workflow is:
+  1. PySCF GHF(.x2c) and TDA/TDHF;
+  2. OO-UPS (classical or circuit);
+  3. LR.
+  - The PySCF oscillator strengths are computed in the script, because PySCF does not implement them for GHF.
+  - Use `pyscf_td="TDA"`. TDHF on GHF-X2C can fail to converge (near-zero roots).
+
+| Timing (2 cores) | before | now |
+|---|---|---|
+| HI x2c-SVPall OO-UPS | 37.5 s | 4.0 s (1-step, 48 J/K) |
+| H2O 6-31G ((2,2),8) OO-UPS, 2-step → 1-step | 22.2 s, 178 J/K | 3.4 s, 102 J/K |
+| Exact θ gradient, 10 qubits, 168 parameters | 29 s | 0.013 s |
+
+**Output format.** All iterative steps print aligned, fixed-width tables with a title, the settings, columns with units, and a summary. This covers the OO drivers (1-step, 2-step, circuit), the Davidson and response solvers, excitation energies, the polarizability and the run-script comparisons and timings. The formatting lives in `slowquant/unitary_coupled_cluster/printing.py`. `run_wf_optimization_direct` now returns the number of iterations; `print_iterations=False` silences its table (used inside the circuit 2-step).

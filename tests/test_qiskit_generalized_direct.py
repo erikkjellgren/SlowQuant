@@ -103,12 +103,22 @@ def test_circuit_oo_and_linear_response_match_classical(extra):
     ref.run_wf_optimization_direct(tol=1e-9)
     wf = GeneralizedWaveFunctionCircuitDirect(((2, 1), 6), ref.c_mo, mol, make_qi(), include_active_kappa=True, **extra)
     wf._optimize_thetas(1e-12, 3000)
-    assert abs(wf.energy_elec - ref.energy_elec) < 1e-8
+    wf._optimize_thetas(1e-10, 100, "trust-exact")
+    assert abs(wf.energy_elec - ref.energy_elec) < 1e-10
     r0, r1 = LinearResponseDirect(ref, "SD"), LinearResponseCircuitDirect(wf, "SD")
     E0, _ = r0.explicit()
     E1, _ = r1.explicit()
     assert np.abs(E0 - E1).max() < 1e-4
     assert np.abs(r0.DB - r1.DB).max() < 1e-5
     w0, w1 = r0.calc_excitation_energies(4, tol=1e-8), r1.calc_excitation_energies(4, tol=1e-8)
-    assert np.abs(w0 - w1).max() < 1e-5
+    assert np.abs(w0 - w1).max() < 1e-6
     assert np.abs(r0.get_polarizability(tol=1e-9) - r1.get_polarizability(tol=1e-9)).max() < 1e-4
+
+
+def test_adjoint_gradient_and_hessian_match_parameter_shift():
+    wf = random_wf(True)
+    p = np.array(wf.thetas)
+    g, H = wf.theta_gradient(p), wf.theta_hessian(p)
+    wf.parameter_shift = True
+    assert np.abs(g - wf.theta_gradient(p)).max() < 1e-12
+    assert np.abs(H[:4] - wf.theta_hessian(p)[:4]).max() < 1e-10

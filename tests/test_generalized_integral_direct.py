@@ -100,3 +100,39 @@ def test_lr_vs_naive():
     assert np.abs(lr.get_polarizability(tol=1e-10) - a0).max() < 1e-6
     lr_plain = LinearResponseDirect(wf, "SD", symmetrize_qG=False)
     assert np.abs(lr_plain.DA).max() == 0.0
+
+
+def test_ups_engine_matches_reference_algebra():
+    from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import (
+        generalized_construct_ups_state_test_erik,
+        generalized_get_grad_action,
+    )
+
+    mol, C = h3()
+    for ans in ("fUCCSD", "fUCCSDT", "gtups"):
+        wf = GeneralizedWaveFunctionUPS(((2, 1), 6), C, mol, ans, ansatz_options={"n_layers": 1, "is_spin_conserving": False}, include_active_kappa=True)
+        rng = np.random.default_rng(1)
+        n = len(wf.thetas)
+        th = rng.uniform(-0.5, 0.5, n) + 1j * rng.uniform(-0.5, 0.5, n)
+        s0 = generalized_construct_ups_state_test_erik(wf.csf_coeffs, wf.ci_info, list(th), wf.ups_layout)
+        assert np.abs(wf.ups_engine.state(wf.csf_coeffs, th) - s0).max() < 1e-12
+        for k in (0, n // 2, n - 1):
+            a = generalized_get_grad_action(s0, k, wf.ci_info, list(th), wf.ups_layout)
+            b = wf.ups_engine.grad_action(k, th[k], s0)
+            assert max(np.abs(a[0] - b[0]).max(), np.abs(a[1] - b[1]).max()) < 1e-12
+
+
+def test_onestep_oo_matches_twostep():
+    mol = gto.M(atom="H 0 0 0; H 0 0 1.5; H 0 0 3.0; H 0 0 4.5", basis="6-31g", verbose=0)
+    mf = scf.GHF(mol)
+    mf.conv_tol = 1e-11
+    mf.kernel()
+    e = []
+    for name in ("run_wf_optimization_direct", "run_wf_optimization_onestep_direct"):
+        wf = GeneralizedWaveFunctionUPS(
+            ((2, 2), 8), np.array(mf.mo_coeff, dtype=complex), mol, "fUCCSD", ansatz_options=dict(OPTS),
+            include_active_kappa=True,
+        )
+        getattr(wf, name)(tol=1e-7, verbose=False)
+        e.append(wf.energy_elec)
+    assert abs(e[0] - e[1]) < 1e-9

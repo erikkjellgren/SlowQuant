@@ -11,8 +11,15 @@ import scipy.sparse as sp
 from qiskit.quantum_info import PauliList, SparsePauliOp, Statevector
 from qiskit_nature.second_q.mappers import JordanWignerMapper
 
+from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_generalized
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
-from slowquant.unitary_coupled_cluster.operators import a_op_spin
+from slowquant.unitary_coupled_cluster.operators import G1_generalized, G2_generalized, a_op_spin
+from slowquant.unitary_coupled_cluster.util import iterate_t1, iterate_t2
+
+try:
+    from slowquant.unitary_coupled_cluster.ci_sparse import UPSEngine, ups_theta_gradient
+except ImportError:
+    from slowquant.unitary_coupled_cluster.ci_sparse_DHF import UPSEngine, ups_theta_gradient
 
 
 def _popcount_parity(a):
@@ -196,6 +203,113 @@ class FermionPauliMap:
         return c
 
 
+class _Layout:
+    def __init__(self):
+        self.excitation_indices = []
+        self.excitation_operator_type = []
+
+
+class FermionSimulator:
+    """Exact simulation of fUCC circuits (QI ansatz fUCCSD / fUCCD, JW) in the N-electron determinant space.
+
+    Each circuit block (norm r_k, phase phi_k) is exp(theta_k T_k - theta_k^* T_k^dagger), theta_k = r_k e^{i phi_k};
+    states and gradients come from the sparse UPS engine (cost ~ n_params x n_det instead of n_gates x 2^n_qubits).
+    The equivalence with the circuit is checked against qiskit at construction (ValueError if it does not hold).
+    """
+
+    def __init__(self, QI):
+        if type(QI.mapper) is not JordanWignerMapper or QI.ansatz not in ("fUCCSD", "fUCCD"):
+            raise ValueError("FermionSimulator: only fUCCSD / fUCCD with JW")
+        n, el = QI.num_spin_orbs, QI.num_elec
+        self.n = n
+        opt = QI.ansatz_options
+        isc = opt.get("is_spin_conserving", True)
+        lay = _Layout()
+        for _ in range(opt.get("n_layers", 1)):
+            if opt.get("S", False):
+                for a, i in iterate_t1(QI.occ_spin_idx, QI.unocc_spin_idx, is_spin_conserving=isc):
+                    lay.excitation_indices.append((i, a))
+                    lay.excitation_operator_type.append("single")
+            if opt.get("D", False):
+                for a, i, b, j in iterate_t2(QI.occ_spin_idx, QI.unocc_spin_idx, is_spin_conserving=isc):
+                    lay.excitation_indices.append((i, j, a, b))
+                    lay.excitation_operator_type.append("double")
+        nk = len(lay.excitation_indices)
+        names = [str(p) for p in QI.circuit.parameters]
+        if len(names) != 2 * nk:
+            raise ValueError("FermionSimulator: parameter count mismatch")
+        self.ir = np.array([names.index(f"norm{k:09d}") for k in range(nk)])
+        self.ip = np.array([names.index(f"phi{k:09d}") for k in range(nk)])
+        ci = get_indexing_generalized(0, n, 0, el[0], el[1])
+        dets = np.asarray(ci.idx2det, dtype=np.int64)
+        occ = np.array([[t for t in range(n) if (d >> (n - 1 - t)) & 1] for d in dets], dtype=np.int64)
+        num_orbs = n // 2
+        q = occ // 2 + (occ % 2) * num_orbs
+        self.mask = np.sum(np.left_shift(np.int64(1), q), axis=1)
+        x, _, c = _jw_ladder_product(occ, (True,) * occ.shape[1], num_orbs)
+        self.sign = np.sum(np.where(x == self.mask[:, None], c, 0.0), axis=1)
+        ops = {"single": G1_generalized, "double": G2_generalized}
+        self.engine = UPSEngine(ci, lay, lambda t, idx: ops[t](*[int(v) for v in idx]))
+        self.index = -np.ones(1 << n, dtype=np.int64)
+        self.index[self.mask] = np.arange(len(dets))
+        sv0 = Statevector(QI.circuit.assign_parameters(np.zeros(len(names)))).data
+        self.ref = sv0[self.mask] / self.sign
+        if abs(np.linalg.norm(self.ref) - 1) > 1e-10:
+            raise ValueError("FermionSimulator: reference state outside the N-electron space")
+        self._hcache = None
+        rng = np.random.default_rng(11)
+        for _ in range(2):
+            p = rng.uniform(-0.8, 0.8, len(names))
+            a = Statevector(QI.circuit.assign_parameters(p)).data
+            b = self.qubit(self.state(p))
+            ov = np.vdot(b, a)
+            if abs(abs(ov) - 1) > 1e-10 or np.abs(b * ov / abs(ov) - a).max() > 1e-10:
+                raise ValueError("FermionSimulator: circuit is not the fermionic fUCC product")
+
+    def thetas(self, p):
+        p = np.asarray(p, dtype=float)
+        return p[self.ir] * np.exp(1j * p[self.ip])
+
+    def state(self, p):
+        return self.engine.state(self.ref, self.thetas(p))
+
+    def qubit(self, c):
+        out = np.zeros(1 << self.n, complex)
+        out[self.mask] = self.sign * c
+        return out
+
+    def hamiltonian(self, keys, coeffs, xs, W):
+        """Sparse N-electron matrix of sum_k coeffs_k X^x Z^z (cached for the last keys/coeffs)."""
+        h = self._hcache
+        if h is not None and np.array_equal(h[0], keys) and np.array_equal(h[1], coeffs):
+            return h[2]
+        rows, cols, vals = [], [], []
+        for x, w in zip(xs, W):
+            t = self.index[self.mask ^ x]
+            ok = t >= 0
+            rows.append(t[ok])
+            cols.append(np.nonzero(ok)[0])
+            vals.append(self.sign[t[ok]] * self.sign[ok] * w[self.mask[ok]])
+        nd = len(self.mask)
+        H = sp.csr_matrix((np.concatenate(vals), (np.concatenate(rows), np.concatenate(cols))), shape=(nd, nd))
+        self._hcache = (keys.copy(), np.array(coeffs).copy(), H)
+        return H
+
+    def energy_gradient(self, H, p):
+        p = np.asarray(p, dtype=float)
+        th = self.thetas(p)
+        c = self.engine.state(self.ref, th)
+        hc = H @ c
+        g = ups_theta_gradient(self.engine, th, self.ref, hc)
+        nk = len(th)
+        gR, gI = g[:nk], g[nk:]
+        grad = np.zeros(len(p))
+        ph = p[self.ip]
+        grad[self.ir] = gR * np.cos(ph) + gI * np.sin(ph)
+        grad[self.ip] = -gR * th.imag + gI * th.real
+        return np.vdot(c, hc).real, grad
+
+
 class PauliEstimator:
     """Expectation values <X^x Z^z> of the QI circuit.
 
@@ -214,6 +328,8 @@ class PauliEstimator:
         self._psi = None
         self._sim = None
         self._sim_circuit = None
+        self._fsim = None
+        self._fsim_circuit = None
         self._wcache = None
 
     def _reset(self, params):
@@ -237,6 +353,11 @@ class PauliEstimator:
         """sum_k coeffs_k <P_k> for each parameter set (independent of the cache); sampler: batched device calls."""
         keys = np.asarray(keys, dtype=np.int64)
         if self.exact:
+            fs = self._fermion()
+            if fs is not None:
+                H = fs.hamiltonian(keys, coeffs, *self._weights(keys, coeffs))
+                cs = [fs.state(p) for p in params_list]
+                return np.array([np.vdot(c, H @ c) for c in cs])
             xs, W = self._weights(keys, coeffs)
             b = np.arange(1 << self.n, dtype=np.int64)
             out = np.empty(len(params_list), complex)
@@ -302,13 +423,49 @@ class PauliEstimator:
                 self._sim = None
         return self._sim
 
+    def _fermion(self):
+        qc = self.QI.circuit
+        if self._fsim_circuit is not qc:
+            self._fsim_circuit = qc
+            try:
+                self._fsim = FermionSimulator(self.QI)
+            except (ValueError, AttributeError, KeyError):
+                self._fsim = None
+        return self._fsim
+
+    def energy_gradient(self, keys, coeffs, params):
+        """Exact (E, dE/dparams) of sum_k coeffs_k X^x Z^z (exact path only): fermionic fUCC simulation if
+        possible, else adjoint differentiation of the gate-level circuit. None if neither applies."""
+        fs = self._fermion()
+        if fs is not None:
+            return fs.energy_gradient(fs.hamiltonian(keys, coeffs, *self._weights(keys, coeffs)), params)
+        sim = self._simulator()
+        if sim is None:
+            return None
+        xs, W = self._weights(keys, coeffs)
+        b = np.arange(1 << self.n, dtype=np.int64)
+
+        def apply_h(psi):
+            out = np.zeros_like(psi)
+            for x, w in zip(xs, W):
+                out += (w * psi)[b ^ x]
+            return out
+
+        return sim.energy_gradient(params, apply_h)
+
     def _svs(self, params_list):
+        fs = self._fermion()
+        if fs is not None:
+            return np.array([fs.qubit(fs.state(p)) for p in params_list])
         sim = self._simulator()
         if sim is None:
             return np.array([self._sv(p) for p in params_list])
         return sim.statevectors(params_list)
 
     def _sv(self, params):
+        fs = self._fermion()
+        if fs is not None:
+            return fs.qubit(fs.state(params))
         sim = self._simulator()
         if sim is not None:
             return sim.statevectors(params)[0]
@@ -383,23 +540,34 @@ class PauliEstimator:
 class CircuitSimulator:
     """Batched statevector simulation of a parameterized circuit (many parameter sets per numpy pass).
 
-    Gate list compiled once; consecutive one-qubit gates are fused per qubit. Supports one- and two-qubit gates
-    with angles linear in one parameter. Raises ValueError for anything else (caller falls back to qiskit).
+    Gate list compiled once; consecutive one-qubit gates are fused per qubit (constant parts pre-multiplied).
+    Supports one- and two-qubit gates with angles linear in one parameter. Raises ValueError for anything else
+    (caller falls back to qiskit). energy_gradient: exact gradient by adjoint differentiation (two sweeps).
     """
 
     _fixed2 = {"cx", "cz"}
 
     def __init__(self, qc):
-        self.n = n = qc.num_qubits
+        self.n = qc.num_qubits
         self.params = list(qc.parameters)
         pidx = {p: i for i, p in enumerate(self.params)}
         self.gphase = self._lin(qc.global_phase, pidx)
         self.ops = []
+        self.gates = []
         pend = {}
 
         def flush(q):
-            if pend.get(q):
-                self.ops.append(("1q", q, pend.pop(q)))
+            items = pend.pop(q, [])
+            merged = []
+            for it in items:
+                if it[0] == "m" and merged and merged[-1][0] == "m":
+                    merged[-1] = ("m", it[1] @ merged[-1][1])
+                else:
+                    merged.append(it)
+            if len(merged) == 1 and merged[0][0] == "m":
+                self.ops.append(("1c", q, merged[0][1]))
+            elif merged:
+                self.ops.append(("1q", q, merged))
 
         for ins in qc.data:
             op, qs = ins.operation, [qc.find_bit(q).index for q in ins.qubits]
@@ -408,18 +576,22 @@ class CircuitSimulator:
                 continue
             if len(qs) == 1:
                 if op.params and name in ("rx", "ry", "rz", "p", "u1"):
-                    pend.setdefault(qs[0], []).append((name, self._lin(op.params[0], pidx)))
+                    item = ("p" if name == "u1" else name, self._lin(op.params[0], pidx))
                 elif not any(hasattr(x, "parameters") for x in op.params):
-                    pend.setdefault(qs[0], []).append(("m", np.asarray(op.to_matrix(), dtype=complex)))
+                    item = ("m", np.asarray(op.to_matrix(), dtype=complex))
                 else:
                     raise ValueError(f"unsupported parameterized gate {name}")
+                pend.setdefault(qs[0], []).append(item)
+                self.gates.append(("1", qs[0], item))
             elif len(qs) == 2 and not any(hasattr(x, "parameters") for x in op.params):
                 flush(qs[0])
                 flush(qs[1])
                 if name in self._fixed2:
-                    self.ops.append((name, qs[0], qs[1]))
+                    g = (name, qs[0], qs[1])
                 else:
-                    self.ops.append(("2q", qs, np.asarray(op.to_matrix(), dtype=complex).reshape(2, 2, 2, 2)))
+                    g = ("2q", qs, np.asarray(op.to_matrix(), dtype=complex).reshape(2, 2, 2, 2))
+                self.ops.append(g)
+                self.gates.append(g)
             else:
                 raise ValueError(f"unsupported gate {name}")
         for q in list(pend):
@@ -443,28 +615,69 @@ class CircuitSimulator:
         i, a, b = lin
         return np.full(len(P), b) if i < 0 else a * P[:, i] + b
 
+    @staticmethod
+    def _rot(kind, t):
+        """Rotation matrices (m, 2, 2) and their angle derivatives."""
+        m = len(t)
+        G = np.zeros((m, 2, 2), complex)
+        D = np.zeros((m, 2, 2), complex)
+        c, s = np.cos(t / 2), np.sin(t / 2)
+        if kind == "rx":
+            G[:, 0, 0] = G[:, 1, 1] = c
+            G[:, 0, 1] = G[:, 1, 0] = -1j * s
+            D[:, 0, 0] = D[:, 1, 1] = -0.5 * s
+            D[:, 0, 1] = D[:, 1, 0] = -0.5j * c
+        elif kind == "ry":
+            G[:, 0, 0] = G[:, 1, 1] = c
+            G[:, 0, 1], G[:, 1, 0] = -s, s
+            D[:, 0, 0] = D[:, 1, 1] = -0.5 * s
+            D[:, 0, 1], D[:, 1, 0] = -0.5 * c, 0.5 * c
+        elif kind == "rz":
+            G[:, 0, 0], G[:, 1, 1] = np.exp(-0.5j * t), np.exp(0.5j * t)
+            D[:, 0, 0], D[:, 1, 1] = -0.5j * np.exp(-0.5j * t), 0.5j * np.exp(0.5j * t)
+        else:
+            G[:, 0, 0], G[:, 1, 1] = 1.0, np.exp(1j * t)
+            D[:, 1, 1] = 1j * np.exp(1j * t)
+        return G, D
+
     def _mat(self, items, P):
-        m = len(P)
-        M = np.broadcast_to(np.eye(2, dtype=complex), (m, 2, 2)).copy()
+        M = None
         for kind, val in items:
-            if kind == "m":
-                M = val @ M
-                continue
-            t = self._angle(val, P)
-            G = np.zeros((m, 2, 2), complex)
-            c, s = np.cos(t / 2), np.sin(t / 2)
-            if kind == "rx":
-                G[:, 0, 0] = G[:, 1, 1] = c
-                G[:, 0, 1] = G[:, 1, 0] = -1j * s
-            elif kind == "ry":
-                G[:, 0, 0] = G[:, 1, 1] = c
-                G[:, 0, 1], G[:, 1, 0] = -s, s
-            elif kind == "rz":
-                G[:, 0, 0], G[:, 1, 1] = np.exp(-0.5j * t), np.exp(0.5j * t)
+            G = val if kind == "m" else self._rot(kind, self._angle(val, P))[0]
+            M = G if M is None else G @ M
+        return np.broadcast_to(M, (len(P), 2, 2)) if M.ndim == 2 else M
+
+    def _apply1(self, psi, q, M):
+        m = psi.shape[0]
+        v = psi.reshape(m, -1, 2, 1 << q)
+        a0, a1 = v[:, :, 0], v[:, :, 1]
+        if M.ndim == 2:
+            return np.stack((M[0, 0] * a0 + M[0, 1] * a1, M[1, 0] * a0 + M[1, 1] * a1), axis=2).reshape(m, -1)
+        M = M[:, :, :, None, None]
+        return np.stack((M[:, 0, 0] * a0 + M[:, 0, 1] * a1, M[:, 1, 0] * a0 + M[:, 1, 1] * a1), axis=2).reshape(m, -1)
+
+    def _apply2(self, psi, g, adjoint=False):
+        m, n = psi.shape[0], self.n
+        if g[0] in ("cx", "cz"):
+            c, t = g[1], g[2]
+            hi, lo = max(c, t), min(c, t)
+            v = psi.reshape(m, 1 << (n - 1 - hi), 2, 1 << (hi - lo - 1), 2, 1 << lo)
+            if g[0] == "cz":
+                v[:, :, 1, :, 1] *= -1
+            elif c == hi:
+                x = v[:, :, 1]
+                x[...] = x[:, :, :, ::-1].copy()
             else:
-                G[:, 0, 0], G[:, 1, 1] = 1.0, np.exp(1j * t)
-            M = G @ M
-        return M
+                x = v[:, :, :, :, 1]
+                x[...] = x[:, :, ::-1].copy()
+            return psi
+        (q0, q1), U = g[1], g[2]
+        if adjoint:
+            U = U.reshape(4, 4).conj().T.reshape(2, 2, 2, 2)
+        x = np.moveaxis(psi.reshape((m,) + (2,) * n), (n - q1, n - q0), (-2, -1))
+        return np.ascontiguousarray(
+            np.moveaxis(np.einsum("p...cd,abcd->p...ab", x, U), (-2, -1), (n - q1, n - q0))
+        ).reshape(m, -1)
 
     def statevectors(self, params) -> np.ndarray:
         P = np.atleast_2d(np.asarray(params, dtype=float))
@@ -472,31 +685,40 @@ class CircuitSimulator:
         psi = np.zeros((m, 1 << n), complex)
         psi[:, 0] = 1.0
         for op in self.ops:
-            if op[0] == "1q":
-                q = op[1]
-                M = self._mat(op[2], P)
-                v = psi.reshape(m, -1, 2, 1 << q)
-                a0, a1 = v[:, :, 0], v[:, :, 1]
-                M = M[:, :, :, None, None]
-                psi = np.stack((M[:, 0, 0] * a0 + M[:, 0, 1] * a1, M[:, 1, 0] * a0 + M[:, 1, 1] * a1), axis=2).reshape(m, -1)
-            elif op[0] in ("cx", "cz"):
-                c, t = op[1], op[2]
-                hi, lo = max(c, t), min(c, t)
-                v = psi.reshape(m, 1 << (n - 1 - hi), 2, 1 << (hi - lo - 1), 2, 1 << lo)
-                if op[0] == "cz":
-                    v[:, :, 1, :, 1] *= -1
-                elif c == hi:
-                    x = v[:, :, 1]
-                    x[...] = x[:, :, :, ::-1].copy()
-                else:
-                    x = v[:, :, :, :, 1]
-                    x[...] = x[:, :, ::-1].copy()
+            if op[0] == "1c":
+                psi = self._apply1(psi, op[1], op[2])
+            elif op[0] == "1q":
+                psi = self._apply1(psi, op[1], self._mat(op[2], P))
             else:
-                (q0, q1), U = op[1], op[2]
-                x = psi.reshape((m,) + (2,) * n)
-                x = np.moveaxis(x, (n - q1, n - q0), (-2, -1))
-                psi = np.ascontiguousarray(np.moveaxis(np.einsum("p...cd,abcd->p...ab", x, U), (-2, -1), (n - q1, n - q0))).reshape(m, -1)
+                psi = self._apply2(psi, op)
         return psi * np.exp(1j * self._angle(self.gphase, P))[:, None]
+
+    def energy_gradient(self, params, apply_h):
+        """E = <psi|H|psi> and dE/dparams by adjoint differentiation; apply_h(psi) returns H psi (1-D)."""
+        p = np.asarray(params, dtype=float)
+        P = p[None]
+        psi = self.statevectors(P)
+        lam = apply_h(psi[0])[None]
+        e = np.vdot(psi[0], lam[0]).real
+        grad = np.zeros(len(p))
+        for g in reversed(self.gates):
+            if g[0] != "1":
+                psi = self._apply2(psi, g, adjoint=True)
+                lam = self._apply2(lam, g, adjoint=True)
+                continue
+            q, (kind, val) = g[1], g[2]
+            if kind == "m":
+                Md = val.conj().T
+                psi = self._apply1(psi, q, Md)
+                lam = self._apply1(lam, q, Md)
+                continue
+            G, D = self._rot(kind, self._angle(val, P))
+            Gd = G[0].conj().T
+            psi = self._apply1(psi, q, Gd)
+            if val[0] >= 0:
+                grad[val[0]] += 2 * val[1] * np.vdot(lam[0], self._apply1(psi, q, D[0])[0]).real
+            lam = self._apply1(lam, q, Gd)
+        return e, grad
 
 def pauli_product(k1, k2, nq):
     """Keys and signs of X^x1 Z^z1 X^x2 Z^z2 = sign X^(x1^x2) Z^(z1^z2) (broadcasting)."""
