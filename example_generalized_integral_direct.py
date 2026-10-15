@@ -17,7 +17,7 @@ WF = GeneralizedWaveFunctionUPS(
     np.array(mf.mo_coeff, dtype=complex),
     mol,
     "fUCCSD",
-    do_x2c=False,
+    do_x2c=True,
     ansatz_options={"n_layers": 1, "is_spin_conserving": False},
     include_active_kappa=True,
 )
