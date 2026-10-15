@@ -13,7 +13,7 @@ from slowquant.SlowQuant import SlowQuant
 from slowquant.unitary_coupled_cluster.DHF_integral_manager import IntegralManager
 from slowquant.unitary_coupled_cluster.DHF_integral_direct import DHFDirect, DirectState, orbital_gradient, expm_antihermitian
 from slowquant.unitary_coupled_cluster.ci_sparse_DHF import ActiveCI, UPSEngine, ups_theta_gradient
-from slowquant.unitary_coupled_cluster.printing import IterationTable
+from slowquant.unitary_coupled_cluster.printing import IterationTable, key_value
 
 from slowquant.molecularintegrals.integralfunctions import (
     generalized_one_electron_transform,
@@ -1434,11 +1434,80 @@ class GeneralizedWaveFunctionUPS:
         self._g_mo = None
         self._energy_elec = None
 
-    def _oo_summary(self, t_start, e, timing):
+    def print_info(self, e_scf: float | None = None) -> float:
+        """Print system, Hamiltonian, active space and integral backend, and check the initial orbitals.
+
+        The reference determinant energy with the current orbitals equals the DHF energy when the orbitals are
+        converged PySCF scf.dhf.DHF orbitals of the same molecule (nucmod, basis). Returns it.
+        """
+        t0 = time.time()
+        mol = self.int_gen.int_obj
+
+        def name(b):
+            if not isinstance(b, str):
+                return "custom"
+            if "\n" not in b:
+                return b
+            tag = [l.split(":", 1)[1].strip() for l in b.splitlines() if "Basis set:" in l]
+            return tag[0] if tag else "custom"
+
+        basis = name(mol.basis) if not isinstance(mol.basis, dict) else ", ".join(f"{k}: {name(v)}" for k, v in mol.basis.items())
+        nucmod = mol.nucmod if mol.nucmod else "point"
+        c = self.csf_coeffs
+        _, d1, d2 = self.ci_engine.transition_rdms(c[None], c)
+        ds = DirectState(self._direct, self.c_mo, self.inactive_spin_idx, self.active_spin_idx, d1[0])
+        ds.set_rdms(d1[0], d2[0])
+        e_nuc = mol.energy_nuc()
+        e_ref = ds.energy(d1[0], d2[0]) + e_nuc
+        idx = [tuple(i) for i in self.kappa_spin_idx] + [tuple(i) for i in self.kappa_spin_idx_ep]
+        g = orbital_gradient(ds.gen_fock(), idx) if idx else np.zeros(2)
+        nee = len(self.kappa_spin_idx)
+        gee = np.abs(np.concatenate((g[:nee], g[len(idx) : len(idx) + nee]))).max() if nee else 0.0
+        gep = np.abs(np.concatenate((g[nee : len(idx)], g[len(idx) + nee :]))).max() if len(idx) > nee else 0.0
+        W = 86
+        print()
+        print("=" * W)
+        print(" System and wave function")
+        print("-" * W)
+        for k, v in (
+            ("Molecule", f"{mol.natm} atoms, {mol.nelectron} electrons, charge {mol.charge}, spin {mol.spin}"),
+            ("Basis set", basis),
+            ("Basis functions", f"{mol.nao} spherical AOs, {mol.nao_2c()} large-component spinors, {2 * mol.nao_2c()} 4c functions"),
+            ("Hamiltonian", f"Dirac-Coulomb (4c), nuclear model: {nucmod}"),
+            ("Integral backend", self._direct.describe()),
+            ("Active space", f"({self.num_active_elec_alpha}, {self.num_active_elec_beta}) electrons in {self.num_active_spin_orbs} spin orbitals"),
+            ("Inactive / virtual / positronic", f"{self.num_inactive_spin_orbs} / {self.num_virtual_spin_orbs} / {self.num_spin_orbs_NES} spin orbitals"),
+            ("Determinants / thetas", f"{self.num_det} / {len(self.thetas)}"),
+            ("Orbital rotations e-e / e-p", f"{nee} / {len(self.kappa_spin_idx_ep)} (complex)"),
+        ):
+            print(key_value(k, v))
+        print("-" * W)
+        print(key_value("Nuclear repulsion [Eh]", f"{e_nuc:20.10f}"))
+        if e_scf is not None:
+            print(key_value("PySCF DHF energy [Eh]", f"{e_scf:20.10f}"))
+        print(key_value("Reference determinant [Eh]", f"{e_ref:20.10f}"))
+        print(key_value("max|g_orb| e-e of reference", f"{gee:20.3e}"))
+        print(key_value("max|g_orb| e-p of reference", f"{gep:20.3e}"))
+        print(key_value("Setup time [s]", f"{time.time() - t0:20.1f}"))
+        if e_scf is not None and abs(e_ref - e_scf) > 1e-6:
+            print(f" WARNING: reference energy differs from the PySCF DHF energy by {e_ref - e_scf:.3e} Eh.")
+        if max(gee, gep) > 1e-3:
+            print(
+                " WARNING: the initial orbitals are not converged DHF orbitals of this Hamiltonian. Check that PySCF\n"
+                "          scf.dhf.DHF converged and used the same molecule (basis, nucmod), and the ssss setting."
+            )
+        print("=" * W, flush=True)
+        return e_ref
+
+    def _oo_summary(self, t_start, e, timing, e_ref=None, e_scf=None):
         e_nuc = self.int_gen.int_obj.energy_nuc()
         out = [("Total time [s]", f"{time.time() - t_start:20.1f}")]
         out += [(f"  {k} [s]", f"{v:20.1f}") for k, v in timing.items()]
         out += [("Electronic energy [Eh]", f"{e:20.10f}"), ("Total energy [Eh]", f"{e + e_nuc:20.10f}")]
+        if e_ref is not None:
+            out.append(("E(OO) - E(reference) [Eh]", f"{e + e_nuc - e_ref:20.10f}"))
+        if e_scf is not None:
+            out.append(("E(OO) - E(PySCF) [Eh]", f"{e + e_nuc - e_scf:20.10f}"))
         return out
 
     def _orbital_types(self, M, N_):
@@ -1460,6 +1529,8 @@ class GeneralizedWaveFunctionUPS:
         h_min: float = 1e-3,
         memory: int = 10,
         print_iterations: bool = True,
+        e_scf: float | None = None,
+        verbose: bool = True,
     ) -> int:
         r"""Integral-direct two-step OO optimization (e-e rotations minimized, e-p rotations maximized).
 
@@ -1467,9 +1538,10 @@ class GeneralizedWaveFunctionUPS:
         orbital step C -> C exp(-K). e-p rotations: diagonal Newton step -g/h (h exact to high accuracy).
         e-e rotations: L-BFGS direction with the diagonal Hessian h = 2(D_M F_NN + D_N F_MM - F^gen_MM - F^gen_NN)
         as initial inverse Hessian, Armijo backtracking. Converged when max |orbital gradient| < tol.
-        Returns the number of iterations.
+        e_scf: PySCF DHF energy, printed and compared with the reference. Returns the number of iterations.
         """
         t_start = time.time()
+        e_ref = self.print_info(e_scf) if verbose else None
         idx = [tuple(i) for i in self.kappa_spin_idx] + [tuple(i) for i in self.kappa_spin_idx_ep]
         M, N_ = np.array(idx, dtype=int).reshape(-1, 2).T
         nk = len(idx)
@@ -1517,6 +1589,7 @@ class GeneralizedWaveFunctionUPS:
         )
         e = relax_thetas()
         g, h = point()
+        hsec = np.zeros_like(h)
         gm = lambda g: np.abs(g).max() if nk else 0.0
         tab.row(0, tab.lap(), e, None, gm(g), gtype(g), None)
         S, Y = [], []
@@ -1551,6 +1624,8 @@ class GeneralizedWaveFunctionUPS:
                 a *= 0.5
                 self.set_thetas(*thetas)
             g_new, h = point()
+            hsec = self._ep_secant(hsec, ep, a * step, g_new - g)
+            h = np.where(ep, np.minimum(h, hsec), h)
             s_, y_ = np.where(ee, a * step, 0.0), np.where(ee, g_new - g, 0.0)
             if s_ @ y_ > 1e-12 * np.linalg.norm(s_) * np.linalg.norm(y_):
                 S.append(s_)
@@ -1563,11 +1638,23 @@ class GeneralizedWaveFunctionUPS:
         conv = gm(g) < tol
         tab.close(
             f"Converged in {n_iter} iterations" if conv else f"WARNING: not converged in {maxiter} iterations",
-            self._oo_summary(t_start, e, timing),
+            self._oo_summary(t_start, e, timing, e_ref, e_scf),
         )
         if not conv and not print_iterations:
             print(f" WARNING: orbital optimization not converged in {maxiter} iterations (max|g_orb| = {gm(g):.2e})")
         return n_iter
+
+    @staticmethod
+    def _ep_secant(hsec, ep, s_, dg):
+        """Per-coordinate secant curvature dg_i/s_i of the e-p rotations (kept where negative and the step is
+        significant). Captures the true (theta-relaxed) curvature; the diagonal estimate alone can be too small
+        in magnitude for weakly occupied active orbitals, making the Newton maximization overshoot and diverge."""
+        if not ep.any():
+            return hsec
+        smax = np.abs(s_[ep]).max()
+        big = ep & (np.abs(s_) > 1e-3 * smax) & (smax > 0)
+        sec = np.where(big, dg / np.where(big, s_, 1.0), 0.0)
+        return np.where(big & (sec < 0), sec, hsec)
 
     def _theta_diag_hessian(self, c: np.ndarray, Hc_mat, e: float) -> np.ndarray:
         eng = self.ups_engine
@@ -1588,6 +1675,8 @@ class GeneralizedWaveFunctionUPS:
         h_min: float = 1e-3,
         h_theta_min: float = 0.05,
         memory: int = 20,
+        e_scf: float | None = None,
+        verbose: bool = True,
     ) -> int:
         r"""Integral-direct one-step OO: joint L-BFGS on (e-e kappa, theta), diagonal Newton on e-p kappa (maximized).
 
@@ -1595,13 +1684,16 @@ class GeneralizedWaveFunctionUPS:
         energy, orbital and theta gradients follow from it. Initial inverse Hessian: diagonal orbital Hessian
         (as in run_wf_optimization_direct_DHF) and h_k = 2(<V_k 0|H|V_k 0> - E <V_k 0|V_k 0>) for the thetas.
         Thetas are first optimized at the initial orbitals (no extra J/K). Converged when max |gradient| < tol.
-        Returns the number of iterations.
+        e_scf: PySCF DHF energy, printed and compared with the reference. Returns the number of iterations.
         """
         t_start = time.time()
         idx = [tuple(i) for i in self.kappa_spin_idx] + [tuple(i) for i in self.kappa_spin_idx_ep]
         nk, nt = len(idx), len(self.thetas)
         if nk == 0 or nt == 0:
-            return self.run_wf_optimization_direct_DHF(tol, maxiter, theta_gtol, theta_maxiter, 1.0, h_min, memory)
+            return self.run_wf_optimization_direct_DHF(
+                tol, maxiter, theta_gtol, theta_maxiter, 1.0, h_min, memory, e_scf=e_scf, verbose=verbose
+            )
+        e_ref = self.print_info(e_scf) if verbose else None
         M, N_ = np.array(idx, dtype=int).reshape(-1, 2).T
         ep_set = set(tuple(i) for i in self.kappa_spin_idx_ep)
         ep = np.concatenate((np.tile(np.array([i in ep_set for i in idx], dtype=bool), 2), np.zeros(2 * nt, dtype=bool)))
@@ -1658,6 +1750,7 @@ class GeneralizedWaveFunctionUPS:
         th = np.array(self.thetas_real + self.thetas_imag)
         e, Hm, hc = evaluate(self._c_mo, th)
         g, h = gradient(Hm, hc, e)
+        hsec = np.zeros_like(h)
         gmax = lambda g: (np.abs(g[: 2 * nk]).max(), np.abs(g[2 * nk :]).max())
         tab.row(0, tab.lap(), e, None, *gmax(g), None, n_points)
         S, Y = [], []
@@ -1695,6 +1788,8 @@ class GeneralizedWaveFunctionUPS:
                 a *= 0.5
             th = th + s_[2 * nk :]
             g_new, h = gradient(Hm, hc, e_new)
+            hsec = self._ep_secant(hsec, ep, s_, g_new - g)
+            h = np.where(ep, np.minimum(h, hsec), h)
             s_, y_ = np.where(ee, s_, 0.0), np.where(ee, g_new - g, 0.0)
             if s_ @ y_ > 1e-12 * np.linalg.norm(s_) * np.linalg.norm(y_):
                 S.append(s_)
@@ -1707,7 +1802,7 @@ class GeneralizedWaveFunctionUPS:
         conv = max(gmax(g)) < tol
         tab.close(
             f"Converged in {n_iter} iterations ({n_points} J/K evaluations)" if conv else f"WARNING: not converged in {maxiter} iterations",
-            self._oo_summary(t_start, e, timing),
+            self._oo_summary(t_start, e, timing, e_ref, e_scf),
         )
         return n_iter
 

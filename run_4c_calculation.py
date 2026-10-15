@@ -185,16 +185,6 @@ with timed("wave function setup"):
         elif s["initial_theta_amplitude"] > 0:
             a = s["initial_theta_amplitude"]
             WF.set_thetas(list(rng.uniform(-a, a, n)), list(rng.uniform(-a, a, n)))
-info_block(
-    "Wave function",
-    [
-        ("Mode / ansatz", f"{s['mode']} / {s['ansatz']}"),
-        ("Active space (electrons, spinors)", str(s["cas"])),
-        ("Inactive / virtual / positronic", f"{WF.num_inactive_spin_orbs} / {WF.num_virtual_spin_orbs} / {WF.num_spin_orbs_NES}"),
-        ("Thetas", len(WF.thetas)),
-        ("Orbital rotations e-e / e-p", f"{len(WF.kappa_spin_idx)} / {len(WF.kappa_spin_idx_ep)}"),
-    ],
-)
 
 with timed("wave function optimization"):
     if s["mode"] == "circuit":
@@ -205,10 +195,11 @@ with timed("wave function optimization"):
             theta_gtol=s["theta_gtol"],
             theta_maxiter=s["theta_maxiter"],
             orbital_maxiter=s["circuit_orbital_maxiter"],
+            e_scf=mf.e_tot,
         )
     else:
         oo = WF.run_wf_optimization_onestep_direct_DHF if s["oo_method"] == "1step" else WF.run_wf_optimization_direct_DHF
-        oo(tol=s["oo_tol"], maxiter=s["oo_maxiter"], theta_gtol=s["theta_gtol"], theta_maxiter=s["theta_maxiter"])
+        oo(tol=s["oo_tol"], maxiter=s["oo_maxiter"], theta_gtol=s["theta_gtol"], theta_maxiter=s["theta_maxiter"], e_scf=mf.e_tot)
 e_tot = WF.energy_elec + mol.energy_nuc()
 print(key_value("E(WF) [Eh]", f"{e_tot:20.10f}"))
 print(key_value("E(WF) - E(DHF) [Eh]", f"{e_tot - mf.e_tot:20.10f}"))

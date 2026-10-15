@@ -111,3 +111,9 @@ The GG block scales as 256 n_G^2 n_Pauli(H) classical work and needs 4-body Paul
 | Exact θ gradient, 10 qubits, 168 parameters | 29 s | 0.013 s |
 
 **Output format (v6).** All iterative steps print aligned, fixed-width tables with a title, the settings, columns with units, and a summary. This covers the OO drivers (1-step, 2-step, circuit), the Davidson and response solvers, excitation energies, shieldings, SSCC and the run-script comparisons and timings. The formatting lives in `slowquant/unitary_coupled_cluster/printing.py` (`IterationTable`, `value_table`, `roots_table`, `info_block`).
+
+**Fix: variational collapse in the 4c OO (e-p rotations).**
+- e-p rotations are maximized with a diagonal Newton step −g/h. The diagonal estimate h ignores the coupling to θ: with θ relaxed, the true curvature is H_κκ − H_κθ H_θθ⁻¹ H_θκ, which is more negative than h.
+- For weakly occupied active orbitals (active–positronic "ap" rotations) |h| can be more than 2× too small. Each step then overshoots the maximum, the gradient grows geometrically, E drops (overshooting a maximum lowers E, so the line search accepts it), and the run ends in collapse.
+- Both 4c drivers now use h_i = min(h_diag, Δg_i/Δκ_i) per e-p rotation, the measured secant curvature (`_ep_secant`).
+- Verified on HF (F dyall-cv3z, H aug-cc-pVTZ uncontracted, CAS((2,2),8), random θ ±0.05): the old 2-step diverged from iteration 119; the fixed 2-step and 1-step stay stable.

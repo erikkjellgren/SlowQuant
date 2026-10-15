@@ -81,6 +81,9 @@ class DHFDirect:
         self.ssss = ssss
         self.ssss_ground, self.ssss_resp, self.ssss_eri, self.ssss_giao_jk, self.ssss_giao_g = _SSSS_MODES[ssss]
 
+    def describe(self) -> str:
+        return f"DHFDirect (exact), screen_tol = {self.mf.direct_scf_tol:.0e}, SSSS: {self.ssss}"
+
     def _jk_exact(self, dms, ssss, hermi=0):
         opt_ssll = self.opt[1] if len(dms) == 1 else None
         return scf.dhf.get_jk_coulomb(self.mol, dms, hermi, "SSSS" if ssss else "SSLL", self.opt[0], opt_ssll, self.opt[2])
@@ -153,8 +156,13 @@ class DHFCholesky(DHFDirect):
             assert self.ssss == "full"
         self.blocks = blocks
         self.cd_jk = cd_jk
+        self.tol = tol
         self.V = self._decompose(tol, span, blocks)
         self.V_eri = None if eri_tol is None else self._decompose(eri_tol, span, "LS")
+
+    def describe(self) -> str:
+        jk = "CD" if self.cd_jk else f"exact, screen_tol = {self.mf.direct_scf_tol:.0e}"
+        return f"DHFCholesky, tol = {self.tol:.0e}, {len(self.V)} vectors ({self.blocks}), J/K: {jk}, SSSS: {self.ssss}"
 
     def _decompose(self, tol, span, blocks):
         mol, n, c2 = self.mol, self.n2c, self.c2

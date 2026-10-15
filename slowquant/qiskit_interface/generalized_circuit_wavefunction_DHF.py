@@ -236,12 +236,14 @@ class GeneralizedWaveFunctionCircuitDHF(GeneralizedWaveFunctionUPS):
         theta_gtol: float = 1e-8,
         theta_maxiter: int = 500,
         orbital_maxiter: int = 50,
+        e_scf: float | None = None,
         **orbital_options,
     ) -> None:
         """Hardware-friendly two-step OO: theta optimization (quantum) then orbital optimization at fixed measured
         RDMs (classical, integral-direct; L-BFGS e-e minimized, diagonal Newton e-p maximized).
-        Quantum cost per macro iteration: theta optimization + one RDM measurement."""
+        Quantum cost per macro iteration: theta optimization + one RDM measurement. e_scf: PySCF DHF energy (printed)."""
         t_start = time.time()
+        e_ref = self.print_info(e_scf)
         timing = {"theta optimization + RDMs": 0.0, "orbital optimization": 0.0}
         evals0 = self.num_energy_evals
         tab = IterationTable(
@@ -265,7 +267,7 @@ class GeneralizedWaveFunctionCircuitDHF(GeneralizedWaveFunctionUPS):
             self._fixed_rdms = True
             try:
                 n_orb = self.run_wf_optimization_direct_DHF(
-                    tol=tol, maxiter=orbital_maxiter, print_iterations=False, **orbital_options
+                    tol=tol, maxiter=orbital_maxiter, print_iterations=False, verbose=False, **orbital_options
                 )
             finally:
                 self._fixed_rdms = False
@@ -274,7 +276,7 @@ class GeneralizedWaveFunctionCircuitDHF(GeneralizedWaveFunctionUPS):
             e_orb = self.ds.energy(self.rdm1, self.rdm2)
             tab.row(it + 1, tab.lap(), e_theta, gmax, e_orb, n_orb, self.num_energy_evals - evals0)
         self._energy_elec = None
-        info = self._oo_summary(t_start, self.energy_elec, timing)
+        info = self._oo_summary(t_start, self.energy_elec, timing, e_ref, e_scf)
         info.insert(len(timing) + 1, ("Circuits evaluated", f"{self.num_energy_evals - evals0:20d}"))
         tab.close(
             f"Converged in {it + 1} macro iterations" if conv else f"WARNING: not converged in {maxiter} macro iterations", info
