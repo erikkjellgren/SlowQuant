@@ -1529,6 +1529,7 @@ class GeneralizedWaveFunctionUPS:
         h_min: float = 1e-3,
         memory: int = 10,
         print_iterations: bool = True,
+        adaptive_theta_gtol: bool = True,
         e_scf: float | None = None,
         verbose: bool = True,
     ) -> int:
@@ -1557,10 +1558,13 @@ class GeneralizedWaveFunctionUPS:
             K[N_, M] = -(x[:nk] - 1j * x[nk:])
             return K
 
+        gnow = [1.0]
+
         def relax_thetas():
             t = time.time()
             if len(self.thetas) != 0:
-                self._optimize_thetas(theta_gtol, theta_maxiter)
+                gt = max(theta_gtol, min(1e-5, 1e-2 * gnow[0])) if adaptive_theta_gtol else theta_gtol
+                self._optimize_thetas(gt, theta_maxiter)
             e = self.energy_elec
             timing["theta optimization"] += time.time() - t
             return e
@@ -1589,6 +1593,7 @@ class GeneralizedWaveFunctionUPS:
         )
         e = relax_thetas()
         g, h = point()
+        gnow[0] = np.abs(g).max() if len(g) else 0.0
         hsec = np.zeros_like(h)
         gm = lambda g: np.abs(g).max() if nk else 0.0
         tab.row(0, tab.lap(), e, None, gm(g), gtype(g), None)
@@ -1624,6 +1629,7 @@ class GeneralizedWaveFunctionUPS:
                 a *= 0.5
                 self.set_thetas(*thetas)
             g_new, h = point()
+            gnow[0] = np.abs(g_new).max() if len(g_new) else 0.0
             hsec = self._ep_secant(hsec, ep, a * step, g_new - g)
             h = np.where(ep, np.minimum(h, hsec), h)
             s_, y_ = np.where(ee, a * step, 0.0), np.where(ee, g_new - g, 0.0)
