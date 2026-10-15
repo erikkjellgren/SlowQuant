@@ -1025,6 +1025,7 @@ class GeneralizedWaveFunctionUPS:
         e_scf: float | None = None,
         verbose: bool = True,
         print_iterations: bool = True,
+        adaptive_theta_gtol: bool = True,
     ) -> int:
         r"""Integral-direct two-step orbital-optimization.
 
@@ -1056,10 +1057,13 @@ class GeneralizedWaveFunctionUPS:
             K[N_, M] = -(x[:nk] - 1j * x[nk:])
             return K
 
+        gnow = [1.0]
+
         def relax_thetas():
             t = time.time()
             if len(self.thetas) != 0:
-                self._optimize_thetas(theta_gtol, theta_maxiter)
+                gt = max(theta_gtol, min(1e-5, 1e-2 * gnow[0])) if adaptive_theta_gtol else theta_gtol
+                self._optimize_thetas(gt, theta_maxiter)
             e = self.energy_elec
             timing["theta optimization"] += time.time() - t
             return e
@@ -1091,6 +1095,7 @@ class GeneralizedWaveFunctionUPS:
         )
         e = relax_thetas()
         g, h = point()
+        gnow[0] = np.abs(g).max() if len(g) else 0.0
         tab.row(0, tab.lap(), e, None, np.abs(g).max(), gtype(g), None)
         S, Y = [], []
         n_iter = 0
@@ -1123,6 +1128,7 @@ class GeneralizedWaveFunctionUPS:
                 a *= 0.5
                 self.set_thetas(*thetas)
             g_new, h = point()
+            gnow[0] = np.abs(g_new).max() if len(g_new) else 0.0
             s_, y_ = a * step, g_new - g
             if s_ @ y_ > 1e-12 * np.linalg.norm(s_) * np.linalg.norm(y_):
                 S.append(s_)
