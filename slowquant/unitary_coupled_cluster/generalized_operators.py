@@ -192,10 +192,6 @@ def generalized_hamiltonian_2i_2a(
     virtual_start = num_inactive_spin_orbs + num_active_spin_orbs
     for P in range(num_spin_orbs):
         for Q in range(num_spin_orbs):
-            if P >= virtual_start and Q >= virtual_start:
-                continue
-            if P < num_inactive_spin_orbs and Q < num_inactive_spin_orbs and P != Q:
-                continue
             if abs(h_mo[P, Q]) > 10**-14:
                 hamiltonian_operator += h_mo[P, Q] * a_op_spin(P,dagger=True)*a_op_spin(Q,dagger=False)
     for P in range(num_spin_orbs):

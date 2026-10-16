@@ -22,15 +22,15 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     """.........."""
     print("active space:", {active_space})
     # PySCF
-    # mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin, nucmod=1)
-    mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
+    mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin, nucmod=1)
+    # mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
 
     mol.build()
 
     # mf = scf.GHF(mol).sfx2c1e() #spinfree
     # mf = scf.GHF(mol).x2c1e()
-    # mf = scf.GHF(mol).x2c()
-    mf = scf.GHF(mol)
+    mf = scf.GHF(mol).x2c()
+    # mf = scf.GHF(mol)
 
 
     mf.conv_tol = 1e-10 #energy tolerance from PYSCF
@@ -56,8 +56,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         coeff,
         mol,
         "fuccsd",
-        False, #Do x2c
-        False, #Do ecp
+        True, #Do x2c
+        # False, #Do ecp
         {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
@@ -153,12 +153,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     charges = mol.atom_charges()
 
     for A in range(mol.natm):
-        int_pc = build_x2c_pc_operator_efg(mf, mol, A, c, x2c=False, picture_change=False, spin_free=False)  # (3, 3, 2*nao_c, 2*nao_c)
+        int_pc = build_x2c_pc_operator_efg(mf, mol, A, c, x2c=True, picture_change=True, spin_free=False)  # (3, 3, 2*nao_c, 2*nao_c)
 
         efg_elec = np.zeros((3, 3)) #create the EFG matrix
         for alpha in range(3):
             for beta in range(3):
-                mo = generalized_one_electron_transform(WF.c_mo, int_pc[alpha, beta], x2c=False) #must be false for sf...
+                mo = generalized_one_electron_transform(WF.c_mo, int_pc[alpha, beta], x2c=True) #must be false for sf...
                 op = generalized_one_elec_op_0i_0a(mo, WF.num_inactive_spin_orbs, WF.num_active_spin_orbs)
                 efg_elec[alpha, beta] = generalized_expectation_value(
                     WF.ci_coeffs, [op], WF.ci_coeffs, WF.ci_info)
@@ -468,15 +468,17 @@ def HCl():
 def HF():
     geometry = """F  0.0   0.0  0.0;
         H  0.0  0.0  0.91680 """
-    basis = {'H': gto.uncontract(load('x2c-SVPall.nw', 'H')),
-                'F': gto.uncontract(load('x2c-SVPall.nw', 'F'))}
+    basis = {'H': gto.uncontract(load('x2c-SV(P)all.nw', 'H')),
+                'F': gto.uncontract(load('x2c-SV(P)all.nw', 'F'))}
     # basis = "x2c-SVPall.nw"
-    active_space = ((3,3), 8) #spin orbitaler or spinor basis
+    active_space = ((4,4), 18) #spin orbitaler or spinor basis
     charge = 0
     spin = 0
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
+
+HF()
 
 
 def h2():
@@ -494,13 +496,12 @@ def h2():
 
 # h2()
 # HCl()
-HF()
 
 def HBr():
     geometry = """H  0.0   0.0  1.41443;
         Br  0.0  0.0  0.0 """
-    basis = {'H': gto.uncontract(load('x2c-SVPall.nw', 'H')),
-                'Br': gto.uncontract(load('x2c-SVPall.nw', 'Br'))}
+    basis = {'H': gto.uncontract(load('x2c-QZVPPall.nw', 'H')),
+                'Br': gto.uncontract(load('x2c-QZVPPall.nw', 'Br'))}
     active_space = ((3,3), 8) #spin orbitaler or spinor basis
     charge = 0
     spin = 0

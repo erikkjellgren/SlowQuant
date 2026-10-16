@@ -819,11 +819,13 @@ def generalized_propagate_unitary_test_anna(
         elif exc_type == "triple":
             (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
             T = G3(i, j, k, a, b, c, False)
-            T_dag = G3(i, j, k, a, b, c, True)
+            T_dag = T.dagger
+            # T_dag = G3(i, j, k, a, b, c, True)
         elif exc_type == "quadruple": #AE
             (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
             T = G4(i, j, k, l, a, b, c, d, False)
-            T_dag = G4(i, j, k, l, a, b, c, d, True)
+            T_dag = T.dagger
+            # T_dag = G4(i, j, k, l, a, b, c, d, True)
 
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
