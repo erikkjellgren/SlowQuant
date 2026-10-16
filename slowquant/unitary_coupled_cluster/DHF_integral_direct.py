@@ -163,7 +163,12 @@ class DHFCholesky(DHFDirect):
 
     def describe(self) -> str:
         jk = "CD" if self.cd_jk else f"exact, screen_tol = {self.mf.direct_scf_tol:.0e}"
-        return f"DHFCholesky, tol = {self.tol:.0e}, {len(self.V)} vectors ({self.blocks}), J/K: {jk}, SSSS: {self.ssss}"
+        nv = "released" if self.V is None else f"{len(self.V)} vectors"
+        return f"DHFCholesky, tol = {self.tol:.0e}, {nv} ({self.blocks}), J/K: {jk}, SSSS: {self.ssss}"
+
+    def release(self) -> None:
+        """Free the Cholesky vectors (e.g. after the LR setup). Later MO integrals and J/K use the exact path."""
+        self.V = self.V_eri = None
 
     def _decompose(self, tol, span, blocks):
         mol, n, c2 = self.mol, self.n2c, self.c2
@@ -264,7 +269,7 @@ class DHFCholesky(DHFDirect):
 
     def jk(self, dms: np.ndarray, response: bool = False, hermi: int = 0) -> tuple[np.ndarray, np.ndarray]:
         dms = np.asarray(dms)
-        if not self.cd_jk:
+        if not self.cd_jk or self.V is None:
             return super().jk(dms, response, hermi)
         if self.blocks == "LS":
             return self._jk_cd(dms)
@@ -293,6 +298,8 @@ class DHFCholesky(DHFDirect):
         return out.reshape(shape)
 
     def eri(self, c1, c2, c3, c4) -> np.ndarray:
+        if self.V is None:
+            return self._eri_exact(c1, c2, c3, c4, self.ssss_eri)
         if self.V_eri is not None:
             return self._eri_cd(c1, c2, c3, c4, self.V_eri, "LS")
         if self.blocks == "LS":
@@ -372,8 +379,8 @@ def giao_integrals(direct, C: np.ndarray, CA: np.ndarray, dms: np.ndarray, max_m
     g = np.zeros((3, N, na, na, na), dtype=complex)
     gc = np.zeros((3, N, na, na, na), dtype=complex)
     nworkers = max(1, lib.num_threads())
-    window = 2 * nworkers
-    max_elem /= window + 1
+    budget = 2 * max_elem
+    max_elem = budget / (nworkers + 1)
     keep_s = direct.ssss_giao_jk or direct.ssss_giao_g
     all_terms = [t for t in _GIAO_TERMS if t[1] != "SSSS" or keep_s]
     jobs = [
@@ -386,13 +393,21 @@ def giao_integrals(direct, C: np.ndarray, CA: np.ndarray, dms: np.ndarray, max_m
         intor, (i0, i1, j0, j1) = job
         return mol.intor(intor, comp=3, shls_slice=(i0, i1, j0, j1, 0, nb, 0, nb)).ravel(order="K")
 
+    sizes = [3 * n2c * n2c * (loc[i1] - loc[i0]) * (loc[j1] - loc[j0]) for _, (i0, i1, j0, j1) in jobs]
     pool = ThreadPoolExecutor(max_workers=nworkers)
-    futures = [pool.submit(compute, job) for job in jobs[:window]]
+    futures, state = {}, {"next": 0, "inflight": 0}
+
+    def fill():
+        while state["next"] < len(jobs) and len(futures) < nworkers + 1 and (
+            not futures or state["inflight"] + sizes[state["next"]] <= budget
+        ):
+            futures[state["next"]] = pool.submit(compute, jobs[state["next"]])
+            state["inflight"] += sizes[state["next"]]
+            state["next"] += 1
+
+    fill()
     for n_job, (intor, (i0, i1, j0, j1)) in enumerate(jobs):
-        raw = futures[n_job].result()
-        futures[n_job] = None
-        if n_job + window < len(jobs):
-            futures.append(pool.submit(compute, jobs[n_job + window]))
+        raw = futures.pop(n_job).result()
         terms = [(blk, p, form) for name, blk, p, form in all_terms if name == intor]
         a0, a1, b0, b1 = loc[i0], loc[i1], loc[j0], loc[j1]
         ni, nj = a1 - a0, b1 - b0
@@ -446,6 +461,9 @@ def giao_integrals(direct, C: np.ndarray, CA: np.ndarray, dms: np.ndarray, max_m
                 Jc[:, :, sl[B1], o4 + a0 : o4 + a1] -= fj * R.transpose(3, 0, 1, 2)
                 T = _half(W, Ab[B2].conj(), Cb[B1])
                 gc += fg * _ij(T, Ab[B4][ri].conj(), Ab[B3][rj])
+        del raw, W, Wm, Wt
+        state["inflight"] -= sizes[n_job]
+        fill()
     pool.shutdown()
     return J + Jc.conj(), g + gc.conj()
 
