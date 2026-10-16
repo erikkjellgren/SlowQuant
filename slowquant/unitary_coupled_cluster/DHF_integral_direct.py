@@ -1,5 +1,6 @@
 import os
 import tempfile
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 import h5py
@@ -177,42 +178,54 @@ class DHFCholesky(DHFDirect):
                     v = _intor4(mol, intor, (j, j + 1, i, i + 1, i, i + 1, j, j + 1))
                     d[x, loc[i] : loc[i + 1], loc[j] : loc[j + 1]] = c2**p * np.einsum("baab->ab", v).real
         d = d.ravel()
-        npair, cs = nx * n * n, 256
+        floor = np.maximum(tol, 128 * np.finfo(float).eps * d)
+        npair, cs, rows, max_cols = nx * n * n, 256, 65536, 64
         L = []
         k = 0
+        t0 = tlast = time.time()
         while True:
-            p = int(np.argmax(d))
+            p = int(np.argmax(np.where(d >= floor, d, 0.0)))
             dmax = d[p]
-            if dmax < tol:
+            if dmax < floor[p]:
                 break
             y, a, b = np.unravel_index(p, (nx, n, n))
             ci, cj = shell[a], shell[b]
             ra, rb = np.arange(loc[ci], loc[ci + 1]), np.arange(loc[cj], loc[cj + 1])
             cols = (y * n * n + ra[:, None] * n + rb[None, :]).ravel()
-            G = np.empty((nx, n, n, len(ra), len(rb)), dtype=complex)
+            keep = np.flatnonzero(d[cols] >= np.maximum(floor[cols], span * dmax))
+            keep = keep[np.argsort(-d[cols[keep]])[:max_cols]]
+            cols = cols[keep]
+            G = np.empty((npair, len(cols)), dtype=complex)
             for x, X in enumerate(blocks):
                 intor, pw = _CD_INTOR[X, blocks[y]]
-                G[x] = c2**pw * _intor4(mol, intor, (0, nb, 0, nb, ci, ci + 1, cj, cj + 1)).transpose(1, 0, 2, 3)
-            keep = d[cols] >= max(tol, span * dmax)
-            cols = cols[keep]
-            G = G.reshape(-1, len(keep))[:, keep]
+                raw = _intor4(mol, intor, (0, nb, 0, nb, ci, ci + 1, cj, cj + 1))
+                G[x * n * n : (x + 1) * n * n] = c2**pw * raw.transpose(1, 0, 2, 3).reshape(n * n, -1)[:, keep]
+                del raw
             for i, Lc in enumerate(L):
                 m = min(cs, k - i * cs)
-                G -= Lc[:m].T @ Lc[:m, cols].conj()
+                B = Lc[:m, cols].conj()
+                for r0 in range(0, npair, rows):
+                    G[r0 : r0 + rows] -= Lc[:m, r0 : r0 + rows].T @ B
             while True:
                 dc = G[cols, np.arange(len(cols))].real
+                dc = np.where(dc >= np.maximum(floor[cols], span * dmax), dc, 0.0)
                 j = int(np.argmax(dc))
-                if dc[j] < max(tol, span * dmax):
+                if dc[j] == 0.0:
                     break
-                v = G[:, j] / np.sqrt(dc[j])
                 if k % cs == 0:
                     L.append(np.empty((cs, npair), dtype=complex))
+                v = G[:, j] / np.sqrt(dc[j])
                 L[-1][k % cs] = v
                 k += 1
-                G -= np.outer(v, v[cols].conj())
+                b = v[cols].conj()
+                for r0 in range(0, npair, rows):
+                    G[r0 : r0 + rows] -= np.outer(v[r0 : r0 + rows], b)
                 d -= np.abs(v) ** 2
-                d[cols[j]] = 0.0
                 np.maximum(d, 0.0, out=d)
+            d[cols] = np.maximum(G[cols, np.arange(len(cols))].real, 0.0)
+            if time.time() - tlast > 60:
+                tlast = time.time()
+                print(f"Cholesky: {k} vectors ({k * npair * 16 / 1e9:.1f} GB), max residual {dmax:.1e}, {tlast - t0:.0f} s", flush=True)
         V = np.empty((k, npair), dtype=complex)
         for i in range(len(L)):
             m = min(cs, k - i * cs)
