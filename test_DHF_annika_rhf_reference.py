@@ -63,10 +63,28 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin, cart = False)
 
     mf = scf.RHF(mol)
-    mf.conv_tol = 1e-10
-    mf.conv_tol_grad = 1e-8
+    mf.conv_tol = 1e-9
+    #mf.conv_tol_grad = 1e-8
     mf.max_cycle = 500
     mf.kernel()
+
+
+        # WF object:
+    WF = GeneralizedWaveFunctionUPS(
+        active_space,
+        np.array(mf.mo_coeff,dtype=complex),
+        mol, 
+        [(1,2)],
+        False,
+        "fUCCSD",
+        {"n_layers": 1, "is_spin_conserving" : False},
+        include_active_kappa=True,
+    )
+
+    print("\nNr. of spin orbitals:", WF.num_spin_orbs)
+    print("Nr. of inactive spin orbitals:", WF.num_inactive_spin_orbs)
+    print("Nr. of active spin orbitals:", WF.num_active_spin_orbs)
+    print("Nr. of virtual spin orbitals:", WF.num_virtual_spin_orbs)
 
     nmr = nmr_rhf.NMR(mf)
     nmr.cphf = True
@@ -216,16 +234,17 @@ def HF():
     dyall_v2z = bse.get_basis('dyall-v2z', elements=['H', 'F'], fmt='nwchem')
     J_631g = bse.get_basis('6-31g-J', elements=['H'], fmt='nwchem')
     sap = bse.get_basis('sapporo-DZP', elements=['F'], fmt='nwchem')
+    H_basis = gto.uncontract(gto.basis.parse(bse.get_basis("aug-cc-pvtz", elements=["H"], fmt="nwchem")))
     basis={
-        'H': '6-31g**',
-        'F': '6-31g**',
+        'H': H_basis,
+        'F': "dyall-cv3z",
     }
     #basis = "sto-3g"
-    basis = dyall_v2z
+    #basis = dyall_v2z
     #basis= J_631g
     #basis = "aug-cc-pvtz-J"
-    #active_space = ((2, 2), 6)
-    active_space = ((5, 5), 10)
+    active_space = ((2, 2), 6)
+    #active_space = ((5, 5), 10)
     #active_space = ((1,1), 4)
     #active_space = ((5,5), 12)
     charge = 0
@@ -262,11 +281,16 @@ def HI():
     #basis = "sto-3g"
     J_631g = bse.get_basis('6-31g-J', elements=['H'], fmt='nwchem')
     sap = bse.get_basis('sapporo-DZP', elements=['I'], fmt='nwchem')
+    H_basis = gto.uncontract(gto.basis.parse(bse.get_basis("aug-cc-pvtz", elements=["H"], fmt="nwchem")))
+    basis={
+        'H': H_basis,
+        'I': "dyall-cv3z",
+    }
     # basis={
     #     'H': '6-31g**',
     #     'I': sap,
     # }
-    active_space = ((27,27), 54)
+    active_space = ((2,2), 6)
     charge = 0
     spin = 0
     NR(
@@ -280,11 +304,16 @@ def HBr():
     #basis = "sto-3g"
     J_631g = bse.get_basis('6-31g-J', elements=['H'], fmt='nwchem')
     sap = bse.get_basis('6-31g**', elements=['Br'], fmt='nwchem')
+    # basis={
+    #     'H': '6-31g**',
+    #     'Br': sap,
+    # }
+    H_basis = gto.uncontract(gto.basis.parse(bse.get_basis("aug-cc-pvtz", elements=["H"], fmt="nwchem")))
     basis={
-        'H': '6-31g**',
-        'Br': sap,
+        'H': H_basis,
+        'Br': "dyall-cv3z",
     }
-    active_space = ((18,18), 36)
+    active_space = ((2,2), 6)
     charge = 0
     spin = 0
     NR(
@@ -293,23 +322,44 @@ def HBr():
 
 def HCl():
     geometry = """H  0.0   0.0  0.0;
-                  Cl  0.0  0.0  1.41443 """  # 1.41443
+                  Cl  0.0  0.0  1.275 """  # 1.41443
     basis = "6-31g**"
     #basis = "sto-3g"
     J_631g = bse.get_basis('6-31g-J', elements=['H'], fmt='nwchem')
     sap = bse.get_basis('sapporo-DZP', elements=['Cl'], fmt='nwchem')
+    H_basis = gto.uncontract(gto.basis.parse(bse.get_basis("aug-cc-pvtz", elements=["H"], fmt="nwchem")))
+    basis={
+        'H': H_basis,
+        'Cl': "dyall-cv3z",
+    }
     #basis={
     #    'H': '6-31g**',
     #    'Cl': sap,
     #}
-    #active_space = ((2,2), 6)
-    active_space = ((9,9), 18)
+    active_space = ((2,2), 6)
+    #active_space = ((9,9), 18)
     #active_space = ((),)
     charge = 0
     spin = 0
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
+
+def HAt():
+    geometry = """H  0.0   0.0  0.0;
+                  At  0.0  0.0  1.718 """  # 1.41443
+    H_basis = gto.uncontract(gto.basis.parse(bse.get_basis("aug-cc-pvtz", elements=["H"], fmt="nwchem")))
+    basis={
+        'H': H_basis,
+        'At': "dyall-cv3z",
+    }
+    active_space = ((2,2), 6)
+    charge = 0
+    spin = 0
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+    
     
 def CuH():
     geometry = """Cu  0.000000   0.000000   0.000000
@@ -351,4 +401,4 @@ def N3():
 
 
 ###RUN SCRIPT###
-HBr()
+HAt()

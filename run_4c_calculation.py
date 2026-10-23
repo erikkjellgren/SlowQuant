@@ -219,8 +219,11 @@ if s["shieldings"] or s["sscc"] or s["lr_n_roots"] > 0:
         else:
             LR = LinearResponseDirect(WF, s["lr_excitations"], symmetrize_qG=s["lr_symmetrize_qG"])
     if isinstance(direct, DHFCholesky):
-        direct.release()
-        print(key_value("Cholesky vectors", "released (only needed for the OO and the LR setup)"))
+        if s["shieldings"] and not direct.cd_jk:
+            print(key_value("Cholesky vectors", "kept for the CD-GIAO step (overwritten and released there)"))
+        else:
+            direct.release()
+            print(key_value("Cholesky vectors", "released (only needed for the OO and the LR setup)"))
     if s["lr_n_roots"] > 0:
         with timed("excitation energies"):
             w = LR.calc_excitation_energies(s["lr_n_roots"], tol=s["lr_tol"], max_iter=s["lr_max_iter"])

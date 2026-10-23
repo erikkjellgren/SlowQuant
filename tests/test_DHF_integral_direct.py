@@ -4,7 +4,7 @@ import pytest
 from pyscf import scf
 
 from slowquant.unitary_coupled_cluster.ci_sparse_DHF import ActiveCI
-from slowquant.unitary_coupled_cluster.DHF_integral_direct import DHFCholesky, DHFDirect, giao_integrals
+from slowquant.unitary_coupled_cluster.DHF_integral_direct import DHFCholesky, DHFDirect, giao_integrals, giao_integrals_cd
 from slowquant.unitary_coupled_cluster.generalized_density_matrix_DHF import (
     RDM1,
     RDM2,
@@ -104,6 +104,23 @@ def test_giao_integrals_match_g_B():
     g_ref = np.einsum("xmnls,mN,nu,lv,sw->xNuvw", G, C.conj(), CA, CA.conj(), CA, optimize=True)
     assert np.abs(W - W_ref).max() < 1e-12
     assert np.abs(g - g_ref).max() < 1e-12
+
+
+def test_giao_integrals_cd_match_exact():
+    """CD-GIAO = derivative of the RI-equivalent CD; accurate for realistic bases (not for minimal ones)."""
+    mol = pyscf.M(atom="H 0 0 0; F 0.1 0.2 0.9", basis="6-31g", verbose=0)
+    n = 2 * mol.nao_2c()
+    rng = np.random.default_rng(2)
+    C = np.linalg.qr(rng.normal(size=(n, n)) + 1j * rng.normal(size=(n, n)))[0]
+    CA = C[:, 3:9]
+    X = rng.normal(size=(n, 3)) + 1j * rng.normal(size=(n, 3))
+    D = np.array([C[:, :5] @ C[:, :5].conj().T, X @ X.conj().T])
+    d = DHFCholesky(mol, tol=1e-9, cd_jk=False)
+    W0, g0 = giao_integrals(d, C, CA, D)
+    W1, g1 = giao_integrals_cd(d, C, CA, D, consume=True)
+    assert d.V is None
+    assert np.abs(W1 - W0).max() < 1e-6 * np.abs(W0).max()
+    assert np.abs(g1 - g0).max() < 1e-6 * np.abs(g0).max()
 
 
 def test_hessian_is_energy_second_derivative():

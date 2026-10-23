@@ -5,7 +5,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 import h5py
 import numpy as np
+import scipy.linalg
 from pyscf import lib, scf
+from pyscf.gto import moleintor
 from pyscf.ao2mo import r_outcore
 
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
@@ -158,8 +160,8 @@ class DHFCholesky(DHFDirect):
         self.blocks = blocks
         self.cd_jk = cd_jk
         self.tol = tol
-        self.V = self._decompose(tol, span, blocks)
-        self.V_eri = None if eri_tol is None else self._decompose(eri_tol, span, "LS")
+        self.V, self.piv = self._decompose(tol, span, blocks)
+        self.V_eri = None if eri_tol is None else self._decompose(eri_tol, span, "LS")[0]
 
     def describe(self) -> str:
         jk = "CD" if self.cd_jk else f"exact, screen_tol = {self.mf.direct_scf_tol:.0e}"
@@ -186,6 +188,7 @@ class DHFCholesky(DHFDirect):
         floor = np.maximum(tol, 128 * np.finfo(float).eps * d)
         npair, cs, rows, max_cols = nx * n * n, 256, 65536, 64
         L = []
+        piv = []
         k = 0
         t0 = tlast = time.time()
         while True:
@@ -206,28 +209,40 @@ class DHFCholesky(DHFDirect):
                 raw = _intor4(mol, intor, (0, nb, 0, nb, ci, ci + 1, cj, cj + 1))
                 G[x * n * n : (x + 1) * n * n] = c2**pw * raw.transpose(1, 0, 2, 3).reshape(n * n, -1)[:, keep]
                 del raw
+            S = G[cols].copy()
             for i, Lc in enumerate(L):
                 m = min(cs, k - i * cs)
-                B = Lc[:m, cols].conj()
-                for r0 in range(0, npair, rows):
-                    G[r0 : r0 + rows] -= Lc[:m, r0 : r0 + rows].T @ B
+                S -= Lc[:m, cols].T @ Lc[:m, cols].conj()
+            lim = np.maximum(floor[cols], span * dmax)
+            q, Lq = [], []
             while True:
-                dc = G[cols, np.arange(len(cols))].real
-                dc = np.where(dc >= np.maximum(floor[cols], span * dmax), dc, 0.0)
+                dc = S.diagonal().real
+                dc = np.where(dc >= lim, dc, 0.0)
                 j = int(np.argmax(dc))
                 if dc[j] == 0.0:
                     break
-                if k % cs == 0:
-                    L.append(np.empty((cs, npair), dtype=complex))
-                v = G[:, j] / np.sqrt(dc[j])
-                L[-1][k % cs] = v
-                k += 1
-                b = v[cols].conj()
-                for r0 in range(0, npair, rows):
-                    G[r0 : r0 + rows] -= np.outer(v[r0 : r0 + rows], b)
-                d -= np.abs(v) ** 2
+                l = S[:, j] / np.sqrt(dc[j])
+                S -= np.outer(l, l.conj())
+                q.append(j)
+                Lq.append(l)
+            if q:
+                Gq = G[:, q]
+                for i, Lc in enumerate(L):
+                    m = min(cs, k - i * cs)
+                    B = Lc[:m, cols[q]].conj()
+                    for r0 in range(0, npair, rows):
+                        Gq[r0 : r0 + rows] -= Lc[:m, r0 : r0 + rows].T @ B
+                Lqq = np.array(Lq)[:, q].T
+                Vn = scipy.linalg.solve_triangular(Lqq.conj(), Gq.T, lower=True)
+                for v, j in zip(Vn, q):
+                    if k % cs == 0:
+                        L.append(np.empty((cs, npair), dtype=complex))
+                    L[-1][k % cs] = v
+                    piv.append(int(cols[j]))
+                    k += 1
+                d -= (np.abs(Vn) ** 2).sum(axis=0)
                 np.maximum(d, 0.0, out=d)
-            d[cols] = np.maximum(G[cols, np.arange(len(cols))].real, 0.0)
+            d[cols] = np.maximum(S.diagonal().real, 0.0)
             if time.time() - tlast > 60:
                 tlast = time.time()
                 print(f"Cholesky: {k} vectors ({k * npair * 16 / 1e9:.1f} GB), max residual {dmax:.1e}, {tlast - t0:.0f} s", flush=True)
@@ -236,7 +251,7 @@ class DHFCholesky(DHFDirect):
             m = min(cs, k - i * cs)
             V[i * cs : i * cs + m] = L[i][:m]
             L[i] = None
-        return V.reshape(k, nx, n, n)
+        return V.reshape(k, nx, n, n), np.array(piv, dtype=np.int64)
 
     def _sub(self, dms, x, y):
         n = self.n2c
@@ -313,8 +328,8 @@ class DHFCholesky(DHFDirect):
 _GIAO_SAME_CENTRE_ZERO = {"int2e_g1_spinor", "int2e_spgsp1_spinor", "int2e_g1spsp2_spinor", "int2e_spgsp1spsp2_spinor"}
 
 
-def _giao_batches(mol, skip_same_atom: bool, max_elem: float):
-    """Shell batches (i0, i1, j0, j1) over the first pair; same-atom pairs skipped if requested."""
+def _giao_batches(mol, skip_same_atom: bool, max_elem: float, lower: bool = False):
+    """Shell batches (i0, i1, j0, j1) over the first pair; same-atom pairs skipped if requested, j < i if lower."""
     atom = mol._bas[:, 0]
     loc = mol.ao_loc_2c()
     n2c = loc[-1]
@@ -322,17 +337,30 @@ def _giao_batches(mol, skip_same_atom: bool, max_elem: float):
     for i in range(nb):
         ni = loc[i + 1] - loc[i]
         cap = max(1, int(max_elem / (3 * ni * n2c * n2c)))
+        jend = i if lower else nb
         j = 0
-        while j < nb:
+        while j < jend:
             if skip_same_atom and atom[j] == atom[i]:
                 j += 1
                 continue
             j1 = j
-            while j1 < nb and loc[j1 + 1] - loc[j] <= cap and not (skip_same_atom and atom[j1] == atom[i]):
+            while j1 < jend and loc[j1 + 1] - loc[j] <= cap and not (skip_same_atom and atom[j1] == atom[i]):
                 j1 += 1
             j1 = max(j1, j + 1)
             yield i, i + 1, j, j1
             j = j1
+
+
+def _shell_blocks(loc, nblk: int) -> list[int]:
+    """Shell boundaries splitting the spinor functions into about nblk blocks."""
+    nb = len(loc) - 1
+    target = loc[-1] / nblk
+    out = [0]
+    for s in range(1, nb):
+        if loc[s] - loc[out[-1]] >= target:
+            out.append(s)
+    out.append(nb)
+    return out
 
 
 def _half(W, P, Q):
@@ -362,12 +390,13 @@ def giao_integrals(direct, C: np.ndarray, CA: np.ndarray, dms: np.ndarray, max_m
     Returns W (n_dm, 3, n4c, n4c) = J^B - K^B of the AO densities dms (general, no symmetry assumed)
     and g (3, N, na, na, na) = (N u|v w)^B. First-pair same-centre shell pairs are skipped where the
     GIAO integrals vanish exactly (g1, spgsp1, g1spsp2, spgsp1spsp2).
+    Time-reversal symmetry: all classes obey (ij|kl) = s_k s_l (ij|p(l) p(k)) (only k-block >= l-block is
+    computed), the four derivative classes also (ij|kl) = -s_i s_j (p(j) p(i)|kl) (only j < i is computed).
     """
     mol = direct.mol
     n2c = direct.n2c
     n4c = 2 * n2c
     loc = mol.ao_loc_2c()
-    nb = mol.nbas
     nd, N, na = len(dms), C.shape[1], CA.shape[1]
     max_elem = (direct.max_memory if max_memory is None else max_memory) * 1e6 / 16 / 4
     sl = {"L": slice(0, n2c), "S": slice(n2c, n4c)}
@@ -378,6 +407,10 @@ def giao_integrals(direct, C: np.ndarray, CA: np.ndarray, dms: np.ndarray, max_m
     Jc = np.zeros((nd, 3, n4c, n4c), dtype=complex)
     g = np.zeros((3, N, na, na, na), dtype=complex)
     gc = np.zeros((3, N, na, na, na), dtype=complex)
+    tr = mol.time_reversal_map()
+    perm, sgn = np.abs(tr) - 1, np.sign(tr).astype(float)
+    blk = _shell_blocks(loc, max(1, min(8, mol.nbas)))
+    nblk = len(blk) - 1
     nworkers = max(1, lib.num_threads())
     budget = 2 * max_elem
     max_elem = budget / (nworkers + 1)
@@ -386,12 +419,82 @@ def giao_integrals(direct, C: np.ndarray, CA: np.ndarray, dms: np.ndarray, max_m
     jobs = [
         (intor, b)
         for intor in dict.fromkeys(t[0] for t in all_terms)
-        for b in _giao_batches(mol, intor in _GIAO_SAME_CENTRE_ZERO, max_elem)
+        for b in _giao_batches(mol, intor in _GIAO_SAME_CENTRE_ZERO, max_elem, intor in _GIAO_SAME_CENTRE_ZERO)
     ]
 
     def compute(job):
         intor, (i0, i1, j0, j1) = job
-        return mol.intor(intor, comp=3, shls_slice=(i0, i1, j0, j1, 0, nb, 0, nb)).ravel(order="K")
+        ni, nj = loc[i1] - loc[i0], loc[j1] - loc[j0]
+        W = np.empty((3, n2c, n2c, nj, ni), dtype=complex)
+        for kb in range(nblk):
+            k0, k1 = blk[kb], blk[kb + 1]
+            for lb in range(kb + 1):
+                l0, l1 = blk[lb], blk[lb + 1]
+                x = mol.intor(intor, comp=3, shls_slice=(i0, i1, j0, j1, k0, k1, l0, l1))
+                W[:, loc[l0] : loc[l1], loc[k0] : loc[k1]] = x.ravel(order="K").reshape(3, loc[l1] - loc[l0], loc[k1] - loc[k0], nj, ni)
+        for kb in range(nblk):
+            K = slice(loc[blk[kb]], loc[blk[kb + 1]])
+            for lb in range(kb + 1, nblk):
+                L = slice(loc[blk[lb]], loc[blk[lb + 1]])
+                src = W[:, perm[K][:, None], perm[L][None, :]].transpose(0, 2, 1, 3, 4)
+                W[:, L, K] = src * (sgn[L][:, None] * sgn[K][None, :])[None, :, :, None, None]
+        return W
+
+    def contract(W, terms, a0, a1, b0, b1):
+        ni, nj = a1 - a0, b1 - b0
+        ri, rj = slice(a0, a1), slice(b0, b1)
+        Wm = W.reshape(3, n2c * n2c, nj * ni)
+        Wk = W.reshape(3, n2c, n2c * nj, ni)
+        jl, jr, k1, k2, gq = [], [], [], [], []
+        for blk_, p, form in terms:
+            fac = direct.c2**p
+            fj = fac if blk_ != "SSSS" or direct.ssss_giao_jk else 0.0
+            fg = fac if blk_ != "SSSS" or direct.ssss_giao_g else 0.0
+            B1, B2, B3, B4 = blk_
+            o1, o2, o4 = sl[B1].start, sl[B2].start, sl[B4].start
+            if form == "id":
+                jl.append((fj, Db[B4, B3].reshape(nd, -1), J, (o1 + a0, o1 + a1), (o2 + b0, o2 + b1), (1, 0, 3, 2)))
+                k1.append((fj, Db[B2, B3][:, rj].transpose(0, 2, 1).reshape(nd, -1), J, (o1 + a0, o1 + a1), sl[B4], (3, 0, 2, 1)))
+                gq.append((fg, Ab[B4], Ab[B3].conj(), Cb[B1][ri].conj(), Ab[B2][rj], (0, 4, 3, 2, 1), g))
+            elif form == "cdab":
+                jr.append((fj, Db[B4, B3][:, rj, ri].reshape(nd, -1), J, sl[B1], sl[B2], (3, 0, 2, 1)))
+                k2.append((fj, Db[B2, B3][:, :, ri], J, sl[B1], (o4 + b0, o4 + b1), (3, 0, 1, 2)))
+                gq.append((fg, Ab[B2], Cb[B1].conj(), Ab[B3][ri].conj(), Ab[B4][rj], (0, 2, 1, 4, 3), g))
+            elif form == "badc":
+                jl.append((fj, Db[B4, B3].conj().transpose(0, 2, 1).reshape(nd, -1), Jc, (o1 + b0, o1 + b1), (o2 + a0, o2 + a1), (1, 0, 2, 3)))
+                k2.append((fj, Db[B2, B3][:, ri].conj().transpose(0, 2, 1), Jc, (o1 + b0, o1 + b1), sl[B4], (3, 0, 2, 1)))
+                gq.append((fg, Ab[B3], Ab[B4].conj(), Ab[B2][ri].conj(), Cb[B1][rj], (0, 3, 4, 1, 2), gc))
+            else:
+                jr.append((fj, Db[B4, B3][:, ri, rj].conj().transpose(0, 2, 1).reshape(nd, -1), Jc, sl[B1], sl[B2], (3, 0, 1, 2)))
+                k1.append((fj, Db[B2, B3][:, :, rj].conj().reshape(nd, -1), Jc, sl[B1], (o4 + a0, o4 + a1), (3, 0, 1, 2)))
+                T = _half(W, Ab[B2].conj(), Cb[B1])
+                gc[...] += fg * _ij(T, Ab[B4][ri].conj(), Ab[B3][rj])
+
+        def put(out, r0, r1, R):
+            out[:, :, slice(*r0) if isinstance(r0, tuple) else r0, slice(*r1) if isinstance(r1, tuple) else r1] += R
+
+        if jl:
+            R = np.matmul(np.concatenate([e for _, e, *_ in jl]), Wm).reshape(3, len(jl), nd, nj, ni)
+            for n, (f, _, out, r0, r1, tp) in enumerate(jl):
+                put(out, r0, r1, f * (R[:, n].transpose(1, 0, 3, 2) if tp == (1, 0, 3, 2) else R[:, n].transpose(1, 0, 2, 3)))
+        if jr:
+            R = np.matmul(Wm, np.concatenate([e for _, e, *_ in jr]).T).reshape(3, n2c, n2c, len(jr), nd)
+            for n, (f, _, out, r0, r1, tp) in enumerate(jr):
+                put(out, r0, r1, f * R[:, :, :, n].transpose(*tp))
+        if k1:
+            R = np.matmul(Wk.transpose(0, 1, 3, 2), np.concatenate([e for _, e, *_ in k1]).T).reshape(3, n2c, ni, len(k1), nd)
+            for n, (f, _, out, r0, r1, tp) in enumerate(k1):
+                put(out, r0, r1, -f * R[:, :, :, n].transpose(*tp))
+        if k2:
+            E = np.concatenate([e for _, e, *_ in k2]).transpose(1, 2, 0)
+            R = np.matmul(Wk, E).sum(axis=1).reshape(3, n2c, nj, len(k2), nd)
+            for n, (f, _, out, r0, r1, tp) in enumerate(k2):
+                put(out, r0, r1, -f * R[:, :, :, n].transpose(*tp))
+        if gq:
+            A = np.matmul(np.concatenate([q for _, q, *_ in gq], axis=1).T, W.reshape(3, n2c, -1)).reshape(3, len(gq), na, n2c, nj * ni)
+            for n, (f, _, P, R1, R2, tp, out) in enumerate(gq):
+                T = np.matmul(P.T, A[:, n]).reshape(3, na, P.shape[1], nj, ni)
+                out[...] += f * _ij(T, R1, R2).transpose(*tp)
 
     sizes = [3 * n2c * n2c * (loc[i1] - loc[i0]) * (loc[j1] - loc[j0]) for _, (i0, i1, j0, j1) in jobs]
     pool = ThreadPoolExecutor(max_workers=nworkers)
@@ -407,65 +510,213 @@ def giao_integrals(direct, C: np.ndarray, CA: np.ndarray, dms: np.ndarray, max_m
 
     fill()
     for n_job, (intor, (i0, i1, j0, j1)) in enumerate(jobs):
-        raw = futures.pop(n_job).result()
-        terms = [(blk, p, form) for name, blk, p, form in all_terms if name == intor]
-        a0, a1, b0, b1 = loc[i0], loc[i1], loc[j0], loc[j1]
-        ni, nj = a1 - a0, b1 - b0
-        W = raw.reshape(3, n2c, n2c, nj, ni)
-        Wm = W.reshape(3, n2c * n2c, nj * ni)
-        Wt = None
-        ri, rj = slice(a0, a1), slice(b0, b1)
-        for blk, p, form in terms:
-            fac = direct.c2**p
-            fj = fac if blk != "SSSS" or direct.ssss_giao_jk else 0.0
-            fg = fac if blk != "SSSS" or direct.ssss_giao_g else 0.0
-            B1, B2, B3, B4 = blk
-            o1, o2, o4 = sl[B1].start, sl[B2].start, sl[B4].start
-            if form == "id":
-                E = Db[B4, B3].reshape(nd, -1)
-                R = np.matmul(E, Wm).reshape(3, nd, nj, ni).transpose(1, 0, 3, 2)
-                J[:, :, o1 + a0 : o1 + a1, o2 + b0 : o2 + b1] += fj * R
-                E = Db[B2, B3][:, rj].transpose(0, 2, 1).reshape(nd, -1)
-                R = np.matmul(W.reshape(3, n2c, n2c * nj, ni).transpose(0, 1, 3, 2), E.T)
-                J[:, :, o1 + a0 : o1 + a1, sl[B4]] -= fj * R.transpose(3, 0, 2, 1)
-                T = _half(W, Ab[B3].conj(), Ab[B4])
-                g += fg * _ij(T, Cb[B1][ri].conj(), Ab[B2][rj]).transpose(0, 4, 3, 2, 1)
-            elif form == "cdab":
-                E = Db[B4, B3][:, rj, ri].reshape(nd, -1)
-                R = np.matmul(Wm, E.T).reshape(3, n2c, n2c, nd).transpose(3, 0, 2, 1)
-                J[:, :, sl[B1], sl[B2]] += fj * R
-                E = Db[B2, B3][:, :, ri].reshape(nd, -1)
-                if Wt is None:
-                    Wt = W.reshape(3, n2c, n2c * nj, ni).transpose(0, 2, 1, 3).reshape(3, n2c * nj, n2c * ni)
-                R = np.matmul(Wt, E.T).reshape(3, n2c, nj, nd).transpose(3, 0, 1, 2)
-                J[:, :, sl[B1], o4 + b0 : o4 + b1] -= fj * R
-                T = _half(W, Cb[B1].conj(), Ab[B2])
-                g += fg * _ij(T, Ab[B3][ri].conj(), Ab[B4][rj]).transpose(0, 2, 1, 4, 3)
-            elif form == "badc":
-                E = Db[B4, B3].conj().transpose(0, 2, 1).reshape(nd, -1)
-                R = np.matmul(E, Wm).reshape(3, nd, nj, ni).transpose(1, 0, 2, 3)
-                Jc[:, :, o1 + b0 : o1 + b1, o2 + a0 : o2 + a1] += fj * R
-                E = Db[B2, B3][:, ri].conj().transpose(0, 2, 1).reshape(nd, -1)
-                if Wt is None:
-                    Wt = W.reshape(3, n2c, n2c * nj, ni).transpose(0, 2, 1, 3).reshape(3, n2c * nj, n2c * ni)
-                R = np.matmul(Wt, E.T).reshape(3, n2c, nj, nd).transpose(3, 0, 2, 1)
-                Jc[:, :, o1 + b0 : o1 + b1, sl[B4]] -= fj * R
-                T = _half(W, Ab[B4].conj(), Ab[B3])
-                gc += fg * _ij(T, Ab[B2][ri].conj(), Cb[B1][rj]).transpose(0, 3, 4, 1, 2)
-            else:
-                E = Db[B4, B3][:, ri, rj].conj().transpose(0, 2, 1).reshape(nd, -1)
-                R = np.matmul(Wm, E.T).reshape(3, n2c, n2c, nd).transpose(3, 0, 1, 2)
-                Jc[:, :, sl[B1], sl[B2]] += fj * R
-                E = Db[B2, B3][:, :, rj].conj().reshape(nd, -1)
-                R = np.matmul(W.reshape(3, n2c, n2c * nj, ni).transpose(0, 1, 3, 2), E.T)
-                Jc[:, :, sl[B1], o4 + a0 : o4 + a1] -= fj * R.transpose(3, 0, 1, 2)
-                T = _half(W, Ab[B2].conj(), Cb[B1])
-                gc += fg * _ij(T, Ab[B4][ri].conj(), Ab[B3][rj])
-        del raw, W, Wm, Wt
+        W = futures.pop(n_job).result()
+        terms = [(blk_, p, form) for name, blk_, p, form in all_terms if name == intor]
+        a0, a1 = loc[i0], loc[i1]
+        contract(W, terms, a0, a1, loc[j0], loc[j1])
+        if intor in _GIAO_SAME_CENTRE_ZERO:
+            b0, b1 = loc[j0], loc[j1]
+            pI, pJ = perm[a0:a1] - a0, perm[b0:b1] - b0
+            Wp = np.empty((3, n2c, n2c, a1 - a0, b1 - b0), dtype=complex)
+            Wp[...] = W[:, :, :, pJ[None, :], pI[:, None]]
+            Wp *= -(sgn[a0:a1][:, None] * sgn[b0:b1][None, :])
+            del W
+            contract(Wp, terms, b0, b1, a0, a1)
+            del Wp
+        W = None
         state["inflight"] -= sizes[n_job]
         fill()
     pool.shutdown()
     return J + Jc.conj(), g + gc.conj()
+
+
+def _ints3(mol, intor, shls, opt):
+    """GIAO derivative integrals of a shell slice as (3, ni, nj, nk, nl); opt: libcint optimizer for intor."""
+    loc = mol.ao_loc_2c()
+    d = [loc[shls[2 * i + 1]] - loc[shls[2 * i]] for i in range(4)]
+    raw = moleintor.getints(intor, mol._atm, mol._bas, mol._env, shls, 3, 0, "s1", loc, opt)
+    return raw.ravel(order="K").reshape(3, d[3], d[2], d[1], d[0]).transpose(0, 4, 3, 2, 1)
+
+
+def giao_integrals_cd(
+    direct, C: np.ndarray, CA: np.ndarray, dms: np.ndarray, max_memory: float | None = None, consume: bool = False
+):
+    r"""giao_integrals from the derivative of the RI-equivalent pivoted Cholesky decomposition (Nottoli et al. 2022).
+
+    Pair metric G_{(ab),(cd)} = (ba|cd) over LL and SS pairs, G ~ M M^+, M = V^T, L = M[P, :] (pivots P).
+    G^B ~ A W + W^+ A^+ - W^+ A_PP W with A = G^B[:, P] (derivative integrals at the pivot columns only)
+    and W = G_PP^-1 G[P, :] = L^-+ V^*. Same output as giao_integrals: W_out = J^B - K^B of the Hermitian
+    densities dms (low-rank factorized for K) and g = (N u|v w)^B.
+    consume=True: W overwrites the Cholesky vectors in place (no extra memory); the vectors are released afterwards.
+    """
+    mol, n, c2 = direct.mol, direct.n2c, direct.c2
+    loc = mol.ao_loc_2c()
+    nb = mol.nbas
+    shell = np.repeat(np.arange(nb), np.diff(loc))
+    piv = direct.piv
+    k = len(piv)
+    npair = 2 * n * n
+    nd, N, na = len(dms), C.shape[1], CA.shape[1]
+    budget = (direct.max_memory if max_memory is None else max_memory) * 1e6 / 16 / 4
+    Vf = direct.V.reshape(k, npair)
+    L = np.ascontiguousarray(Vf[:, piv].T)
+    W = Vf if consume else np.empty((k, npair), dtype=complex)
+    step = max(1, int(budget / max(k, 1)))
+    for c0 in range(0, npair, step):
+        W[:, c0 : c0 + step] = scipy.linalg.solve_triangular(L.conj().T, Vf[:, c0 : c0 + step].conj(), lower=False)
+    if consume:
+        direct.V = None
+    Wb = W.reshape(k, 2, n, n)
+    sl = [slice(0, n), slice(n, 2 * n)]
+    Cx, Ax = [C[:n], C[n:]], [CA[:n], CA[n:]]
+    terms = [t for t in _GIAO_TERMS if t[1] != "SSSS" or direct.ssss_giao_jk]
+    opts = {t[0]: moleintor.make_cintopt(mol._atm, mol._bas, mol._env, t[0]) for t in terms}
+    dvec = np.stack([dms[:, s, s].transpose(0, 2, 1) for s in sl], 1).reshape(nd, -1)
+    wd = dvec @ W.T
+    fac_d = []
+    for d in dms:
+        e, U = np.linalg.eigh(d)
+        m = np.abs(e) > 1e-12 * max(1.0, np.abs(e).max())
+        X = U[:, m]
+        Uk = [np.ascontiguousarray((Wb[:, x].transpose(0, 2, 1) @ X[sl[x]].conj()).conj()) for x in range(2)]
+        fac_d.append((e[m], X, Uk))
+    wP = sum(np.einsum("lv,pls,sw->pvw", Ax[x].conj(), Wb[:, x], Ax[x], optimize=True) for x in range(2))
+    omP = sum(np.einsum("mN,pnm,nu->pNu", Cx[x].conj(), Wb[:, x].conj(), Ax[x], optimize=True) for x in range(2))
+    t1 = np.zeros((nd, 3, npair), dtype=complex)
+    u = np.zeros((nd, 3, k), dtype=complex)
+    App = np.zeros((3, k, k), dtype=complex)
+    Kout = np.zeros((nd, 3, 2 * n, 2 * n), dtype=complex)
+    g = np.zeros((3, N, na, na, na), dtype=complex)
+    y_, a_, b_ = np.unravel_index(piv, (2, n, n))
+    tr = mol.time_reversal_map()
+    perm, sgn = np.abs(tr) - 1, np.sign(tr).astype(float)
+    blks = _shell_blocks(loc, max(1, min(8, nb)))
+    nblk = len(blks) - 1
+    groups = {}
+    for K_, key in enumerate(zip(y_, shell[a_], shell[b_])):
+        groups.setdefault(key, []).append(K_)
+    g1set = _GIAO_SAME_CENTRE_ZERO
+    pin = [np.flatnonzero(piv // (n * n) == x) for x in range(2)]
+    pin_loc = [piv[pin[x]] - x * n * n for x in range(2)]
+
+    def place(Ag, x, v, Ra, Rb, sym, fac):
+        Ag[:, x, Ra, Rb] += fac * v
+        if sym and Ra != Rb:
+            ia, ib = perm[Ra] - Ra.start, perm[Rb] - Rb.start
+            w = v[:, ia][:, :, ib].transpose(0, 2, 1, 3)
+            Ag[:, x, Rb, Ra] += (sym * fac) * (sgn[perm[Rb]][:, None] * sgn[perm[Ra]][None, :])[None, :, :, None] * w
+
+    done = set()
+    for key in groups:
+        if key in done:
+            continue
+        y, cs, ds = key
+        keys = [key] + ([(y, ds, cs)] if cs != ds and (y, ds, cs) in groups else [])
+        done.update(keys)
+        info = []
+        for y_g, c_s, d_s in keys:
+            Ks = np.array(groups[(y_g, c_s, d_s)])
+            info.append((Ks, a_[Ks], b_[Ks]))
+        (K1, c1, d1) = info[0]
+        cl1, dl1 = c1 - loc[cs], d1 - loc[ds]
+        pc1, pd1 = perm[c1] - loc[cs], perm[d1] - loc[ds]
+        s1 = sgn[c1] * sgn[d1]
+        if len(info) > 1:
+            (K2, c2_, d2_) = info[1]
+            cl2, dl2 = c2_ - loc[ds], d2_ - loc[cs]
+            pc2, pd2 = perm[c2_] - loc[ds], perm[d2_] - loc[cs]
+            s2 = sgn[c2_] * sgn[d2_]
+        for xs in range(2):
+            As = [np.zeros((3, 1, n, n, len(Ks)), dtype=complex) for Ks, _, _ in info]
+            A1 = As[0]
+            A2 = As[1] if len(As) > 1 else None
+            for intor in dict.fromkeys(t[0] for t in terms):
+                tl = [(blk, p, form) for name, blk, p, form in terms if name == intor and blk[2] == "LS"[y] and blk[0] == "LS"[xs]]
+                idt = [t for t in tl if t[2] in ("id", "badc")]
+                brt = [t for t in tl if t[2] in ("cdab", "dcba")]
+                g1c = intor in g1set
+                if idt:
+                    rs = -1.0 if g1c else 0.0
+                    for i1 in range(nblk):
+                        for i2 in range(nblk):
+                            if rs and i2 > i1:
+                                continue
+                            S1, S2 = (blks[i1], blks[i1 + 1]), (blks[i2], blks[i2 + 1])
+                            R1, R2 = slice(loc[S1[0]], loc[S1[1]]), slice(loc[S2[0]], loc[S2[1]])
+                            Y = _ints3(mol, intor, (*S1, *S2, cs, cs + 1, ds, ds + 1), opts[intor])
+                            for blk, p, form in idt:
+                                x, fac = "LS".index(blk[0]), c2**p
+                                if x != xs:
+                                    continue
+                                if form == "id":
+                                    place(A1, 0, Y[:, :, :, cl1, dl1].transpose(0, 2, 1, 3), R2, R1, rs, fac)
+                                    if len(info) > 1:
+                                        place(A2, 0, (s2 * Y[:, :, :, pd2, pc2]).transpose(0, 2, 1, 3), R2, R1, rs, fac)
+                                else:
+                                    place(A1, 0, (s1 * Y[:, :, :, pc1, pd1]).conj(), R1, R2, 0.0, fac)
+                                    if len(info) > 1:
+                                        place(A2, 0, Y[:, :, :, dl2, cl2].conj(), R1, R2, 0.0, fac)
+                if brt:
+                    need2 = (not g1c) and (len(info) > 1 or any(t[2] == "dcba" for t in brt))
+                    for i1 in range(nblk):
+                        for i2 in range(i1 + 1):
+                            S1, S2 = (blks[i1], blks[i1 + 1]), (blks[i2], blks[i2 + 1])
+                            R1, R2 = slice(loc[S1[0]], loc[S1[1]]), slice(loc[S2[0]], loc[S2[1]])
+                            Yb1 = _ints3(mol, intor, (cs, cs + 1, ds, ds + 1, *S1, *S2), opts[intor])
+                            Yb2 = _ints3(mol, intor, (ds, ds + 1, cs, cs + 1, *S1, *S2), opts[intor]) if need2 else None
+                            for blk, p, form in brt:
+                                x, fac = "LS".index(blk[0]), c2**p
+                                if x != xs:
+                                    continue
+                                if form == "cdab":
+                                    place(A1, 0, Yb1[:, cl1, dl1].transpose(0, 3, 2, 1), R2, R1, 1.0, fac)
+                                    if len(info) > 1:
+                                        v = -s2[:, None, None] * Yb1[:, pd2, pc2] if g1c else Yb2[:, cl2, dl2]
+                                        place(A2, 0, v.transpose(0, 3, 2, 1), R2, R1, 1.0, fac)
+                                else:
+                                    place(A1, 0, Yb2[:, dl1, cl1].transpose(0, 2, 3, 1).conj(), R1, R2, 1.0, fac)
+                                    if len(info) > 1:
+                                        place(A2, 0, Yb1[:, dl2, cl2].transpose(0, 2, 3, 1).conj(), R1, R2, 1.0, fac)
+            for (Ks, _, _), A in zip(info, As):
+                kb = len(Ks)
+                Af = A[:, 0].reshape(3, n * n, kb)
+                rx = slice(xs * n * n, (xs + 1) * n * n)
+                t1[:, :, rx] += (Af @ wd[:, Ks].T).transpose(2, 0, 1)
+                u[:, :, Ks] += (dvec[:, rx].conj() @ Af).conj().transpose(1, 0, 2)
+                App[:, pin[xs], Ks[:, None]] = Af[:, pin_loc[xs], :].transpose(0, 2, 1)
+                AT = A[:, 0].reshape(3, n, n * kb).transpose(0, 2, 1)
+                for i, (lam, X, Uk) in enumerate(fac_d):
+                    r = len(lam)
+                    Pm = (AT @ X[sl[xs]]).reshape(3, n, kb * r)
+                    for yy in range(2):
+                        F = Pm @ (Uk[yy][Ks].conj().transpose(0, 2, 1) * lam[:, None]).reshape(kb * r, n)
+                        Kout[i, :, sl[xs], sl[yy]] += F
+                        Kout[i, :, sl[yy], sl[xs]] += F.conj().transpose(0, 2, 1)
+                Ta = (AT @ Ax[xs]).reshape(3, n, kb * na)
+                a = (Cx[xs].conj().T @ Ta).reshape(3, N, kb, na).transpose(0, 1, 3, 2).reshape(3 * N * na, kb)
+                g += (a @ wP[Ks].reshape(kb, na * na)).reshape(3, N, na, na, na)
+                al = (Ta.transpose(0, 2, 1) @ Ax[xs].conj()).conj().reshape(3, kb, na * na)
+                g += (omP[Ks].reshape(kb, N * na).T @ al).reshape(3, N, na, na, na)
+    s = np.einsum("xpq,dq->dxp", App, wd, optimize=True)
+    J = t1 + np.einsum("kp,dxk->dxp", W.conj(), u - s, optimize=True)
+    qb = max(1, int(budget / max(1, 3 * n * max(len(f[0]) for f in fac_d))))
+    for i, (lam, X, Uk) in enumerate(fac_d):
+        for q0 in range(0, k, qb):
+            Q = slice(q0, q0 + qb)
+            r = len(lam)
+            AQ = App[:, :, Q].transpose(0, 2, 1)
+            q = AQ.shape[1]
+            Ut = [(AQ @ Uk[x].reshape(k, n * r)).reshape(3, q, n, r).transpose(0, 2, 1, 3).reshape(3, n, q * r) for x in range(2)]
+            for yy in range(2):
+                B = (Uk[yy][Q].conj().transpose(0, 2, 1) * lam[:, None]).reshape(q * r, n)
+                for x in range(2):
+                    Kout[i, :, sl[x], sl[yy]] -= Ut[x] @ B
+    g -= np.einsum("pNu,xpq,qvw->xNuvw", omP, App, wP, optimize=True)
+    out = -Kout
+    Jb = J.reshape(nd, 3, 2, n, n)
+    for x in range(2):
+        out[:, :, sl[x], sl[x]] += Jb[:, :, x].transpose(0, 1, 3, 2)
+    return out, g
 
 
 class DirectState:
@@ -578,17 +829,17 @@ class DirectState:
         if vIA is not None:
             FIt[:, :nI] += Cd @ vIA @ C[:, I]
         Q = A @ self.Q
-        Q += T0.reshape(N, -1) @ np.einsum("xu,tuvw->xvwt", BA, G2).reshape(-1, na)
-        Q += T1.reshape(N, -1) @ np.einsum("vx,tuvw->uxwt", AA, G2).reshape(-1, na)
-        Q += T2.reshape(N, -1) @ np.einsum("xw,tuvw->uvxt", BA, G2).reshape(-1, na)
+        Q += T0.reshape(N, -1) @ np.einsum("xu,tuvw->xvwt", BA, G2, optimize=True).reshape(-1, na)
+        Q += T1.reshape(N, -1) @ np.einsum("vx,tuvw->uxwt", AA, G2, optimize=True).reshape(-1, na)
+        Q += T2.reshape(N, -1) @ np.einsum("xw,tuvw->uvxt", BA, G2, optimize=True).reshape(-1, na)
         F = np.empty((N, nI + na), dtype=complex)
         F[:, :nI] = FIt[:, :nI]
         F[:, nI:] = FIt[:, nI:] @ r1t + Q
         gt = (
-            np.einsum("tx,xuvw->tuvw", AA, T0[:, Ai])
-            + np.einsum("txvw,xu->tuvw", T0[Ai], BA)
-            + np.einsum("vx,tuxw->tuvw", AA, T1[Ai])
-            + np.einsum("tuvx,xw->tuvw", T2[Ai], BA)
+            np.einsum("tx,xuvw->tuvw", AA, T0[:, Ai], optimize=True)
+            + np.einsum("txvw,xu->tuvw", T0[Ai], BA, optimize=True)
+            + np.einsum("vx,tuxw->tuvw", AA, T1[Ai], optimize=True)
+            + np.einsum("tuvx,xw->tuvw", T2[Ai], BA, optimize=True)
         )
         return F, FIt[Ai, nI:], gt
 
@@ -603,7 +854,7 @@ class DirectState:
         F[:, : len(I)] = s * self.FI[:, I]
         if v is not None:
             F[:, : len(I)] += C.conj().T @ v @ C[:, I]
-        F[:, len(I) :] = self.FI[:, A] @ d.T + np.einsum("nuvw,tuvw->nt", self.g_paaa, G)
+        F[:, len(I) :] = self.FI[:, A] @ d.T + np.einsum("nuvw,tuvw->nt", self.g_paaa, G, optimize=True)
         return F
 
     def transition_density(self, d: np.ndarray) -> np.ndarray:

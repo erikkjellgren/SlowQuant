@@ -13,6 +13,10 @@ from slowquant.SlowQuant import SlowQuant
 from slowquant.unitary_coupled_cluster.DHF_integral_manager import IntegralManager
 from slowquant.unitary_coupled_cluster.DHF_integral_direct import DHFDirect, DirectState, orbital_gradient, expm_antihermitian
 from slowquant.unitary_coupled_cluster.ci_sparse_DHF import ActiveCI, UPSEngine, ups_theta_gradient
+try:
+    from slowquant.unitary_coupled_cluster.ci_sparse_DHF import quad_forms
+except ImportError:
+    quad_forms = None
 from slowquant.unitary_coupled_cluster.printing import IterationTable, key_value
 
 from slowquant.molecularintegrals.integralfunctions import (
@@ -1663,13 +1667,71 @@ class GeneralizedWaveFunctionUPS:
         return np.where(big & (sec < 0), sec, hsec)
 
     def _theta_diag_hessian(self, c: np.ndarray, Hc_mat, e: float) -> np.ndarray:
+        """h_k = 2(<V_k|H|V_k> - E <V_k|V_k>), V_k = dU/dtheta_k |0> at theta_k = 0 (Re and Im parts).
+
+        self.theta_hessian: "exact", "diag" (<V|H|V> from diag(H) only; same convergence in tests, O(n_param n_pair))
+        or "auto" (default: diag when nnz(H) * n_param > 1e9 with numba, 2e8 without)."""
         eng = self.ups_engine
-        W = np.empty((len(c), 2 * len(eng.T)), dtype=complex)
-        for k in range(len(eng.T)):
-            Tc, Tdc = eng.T[k] @ c, eng.Td[k] @ c
-            W[:, k] = Tc - Tdc
-            W[:, k + len(eng.T)] = 1j * (Tc + Tdc)
-        return 2 * (np.sum(W.conj() * (Hc_mat @ W), axis=0) - e * np.sum(np.abs(W) ** 2, axis=0)).real
+        nt = len(eng.T)
+        H = Hc_mat.tocsr()
+        out = np.empty(2 * nt)
+        pk = eng.packed()
+        mode = getattr(self, "theta_hessian", "auto")
+        if mode == "auto":
+            mode = "diag" if H.nnz * nt > (1e9 if quad_forms is not None else 2e8) else "exact"
+        if pk is not None and quad_forms is not None and mode == "exact":
+            R, Cc, sg, off = pk
+            lens = np.diff(off)
+            seg = np.repeat(np.arange(nt), lens)
+            pr = 2 * off[seg] + np.arange(len(R)) - off[seg]
+            pc = pr + lens[seg]
+            u1, u2 = sg * c[Cc], np.conj(sg) * c[R]
+            S = np.empty(2 * len(R), dtype=np.int64)
+            S[pr], S[pc] = R, Cc
+            Vx, Vy = np.empty(2 * len(R), dtype=complex), np.empty(2 * len(R), dtype=complex)
+            Vx[pr], Vx[pc] = u1, -u2
+            Vy[pr], Vy[pc] = 1j * u1, 1j * u2
+            n2 = np.bincount(seg, weights=np.abs(u1) ** 2 + np.abs(u2) ** 2, minlength=nt)
+            args = (H.indptr.astype(np.int64), H.indices.astype(np.int64), H.data, S)
+            qx = quad_forms(*args, Vx, 2 * off, len(c)).real
+            qy = quad_forms(*args, Vy, 2 * off, len(c)).real
+            return np.concatenate((2 * (qx - e * n2), 2 * (qy - e * n2)))
+        if mode == "diag" and pk is not None:
+            R, Cc, sg, off = pk
+            hd = H.diagonal().real - e
+            seg = np.repeat(np.arange(nt), np.diff(off))
+            h = 2 * np.bincount(seg, weights=np.abs(c[Cc]) ** 2 * hd[R] + np.abs(c[R]) ** 2 * hd[Cc], minlength=nt)
+            return np.concatenate((h, h))
+        if mode == "diag" and all(p is not None for p in eng.pairs):
+            hd = H.diagonal().real - e
+            for k in range(nt):
+                R, Cc, sg = eng.pairs[k]
+                out[k] = out[k + nt] = 2 * (np.abs(c[Cc]) ** 2 @ hd[R] + np.abs(c[R]) ** 2 @ hd[Cc])
+            return out
+        v = np.zeros(len(c), dtype=complex)
+        for k in range(nt):
+            if eng.pairs[k] is None:
+                T, Td = eng._mat(k)
+                Tc, Tdc = T @ c, Td @ c
+                for col, W in ((k, Tc - Tdc), (k + nt, 1j * (Tc + Tdc))):
+                    out[col] = 2 * (np.vdot(W, H @ W) - e * np.vdot(W, W)).real
+                continue
+            R, Cc, sg = eng.pairs[k]
+            u1, u2 = sg * c[Cc], np.conj(sg) * c[R]
+            S = np.concatenate((R, Cc))
+            p = len(R)
+            HS = H[S]
+            v[R] = u1
+            w1 = HS @ v
+            v[R] = 0
+            v[Cc] = u2
+            w2 = HS @ v
+            v[Cc] = 0
+            a, b, x = np.vdot(u1, w1[:p]), np.vdot(u2, w2[p:]), np.vdot(u1, w2[:p])
+            n2 = np.vdot(u1, u1).real + np.vdot(u2, u2).real
+            out[k] = 2 * ((a + b).real - 2 * x.real - e * n2)
+            out[k + nt] = 2 * ((a + b).real + 2 * x.real - e * n2)
+        return out
 
     def run_wf_optimization_onestep_direct_DHF(
         self,

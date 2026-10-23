@@ -3,9 +3,14 @@ import time
 import numpy as np
 from pyscf.data import nist
 
-from slowquant.unitary_coupled_cluster.ci_sparse_DHF import ActiveCI, ladder
+from slowquant.unitary_coupled_cluster.ci_sparse_DHF import ActiveCI, ladder, operator_matrix
+try:
+    from slowquant.unitary_coupled_cluster.ci_sparse_DHF import quad_forms
+except ImportError:
+    quad_forms = None
+from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_DHF
-from slowquant.unitary_coupled_cluster.DHF_integral_direct import giao_integrals
+from slowquant.unitary_coupled_cluster.DHF_integral_direct import giao_integrals, giao_integrals_cd
 from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import generalized_propagate_state
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction_DHF import GeneralizedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.linear_response.solvers_DHF import davidson_eig, davidson_solve
@@ -87,12 +92,17 @@ class LinearResponseDirect:
             return generalized_propagate_state([op], v, wf.ci_info)
 
         h0 = H @ c0
-        self.gk = np.array([prop(G, c0) for G in G_ops]).reshape(-1, ndet)
-        self.gdk = np.array([prop(G.dagger, c0) for G in G_ops]).reshape(-1, ndet)
-        self.Hg = (H @ self.gk.T).T
-        self.Hgd = (H @ self.gdk.T).T
-        self.Gh = np.array([prop(G, h0) for G in G_ops]).reshape(-1, ndet)
-        self.Gdh = np.array([prop(G.dagger, h0) for G in G_ops]).reshape(-1, ndet)
+        self.H = H
+        shift = wf.active_spin_idx[0]
+        Gm = [
+            operator_matrix(wf.ci_info, FermionicOperator({tuple((o - shift, d) for o, d in k): v for k, v in G.operators.items()}))
+            for G in G_ops
+        ]
+        self.gk = np.array([M @ c0 for M in Gm]).reshape(-1, ndet)
+        self.gdk = np.array([M.conj().T @ c0 for M in Gm]).reshape(-1, ndet)
+        self.Gh = np.array([M @ h0 for M in Gm]).reshape(-1, ndet)
+        self.Gdh = np.array([M.conj().T @ h0 for M in Gm]).reshape(-1, ndet)
+        self.gkc, self.Ghc = self.gk.conj(), self.Gh.conj()
         self.DA, self.DB = self._cross_terms(G_ops) if symmetrize_qG else (np.zeros((self.nG, self.nq)),) * 2
         timing_line("Linear response setup", time.time() - t0)
 
@@ -170,17 +180,19 @@ class LinearResponseDirect:
         return np.where(p >= 0, F[rows, np.maximum(p, 0)], 0.0)
 
     def _gg(self, x, y):
-        gk, gdk, Hg, Hgd, Gh, Gdh = self.gk, self.gdk, self.Hg, self.Hgd, self.Gh, self.Gdh
+        gk, gdk, Gh, Gdh, gkc, Ghc, H = self.gk, self.gdk, self.Gh, self.Gdh, self.gkc, self.Ghc, self.H
         xc, yc = x.conj(), y.conj()
-        Xc, Xdc, HXc, HXdc, Xh, Xdh = gk.T @ x, gdk.T @ xc, Hg.T @ x, Hgd.T @ xc, Gh.T @ x, Gdh.T @ xc
-        s = gk.conj() @ HXc + gdk @ HXdc.conj()
-        s -= 0.5 * (gk.conj() @ Xh + gdk @ Xdh.conj() + Gdh @ Xdc.conj() + Gh.conj() @ Xc)
-        HYc, Yh, Ydh, HYdc = Hgd.T @ y, Gdh.T @ y, Gh.T @ yc, Hg.T @ yc
-        s += gk.conj() @ (HYc - Yh) + gdk @ (HYdc - Ydh).conj()
+        Xc, Xdc, Xh, Xdh = gk.T @ x, gdk.T @ xc, Gh.T @ x, Gdh.T @ xc
+        HXc, HXdc = H @ Xc, H @ Xdc
+        s = gkc @ HXc + gdk @ HXdc.conj()
+        s -= 0.5 * (gkc @ Xh + gdk @ Xdh.conj() + Gdh @ Xdc.conj() + Ghc @ Xc)
+        Yc, Ydc = gdk.T @ y, gk.T @ yc
+        HYc, Yh, Ydh, HYdc = H @ Yc, Gdh.T @ y, Gh.T @ yc, H @ Ydc
+        s += gkc @ (HYc - Yh) + gdk @ (HYdc - Ydh).conj()
         return s
 
     def _sgg(self, x):
-        return self.gk.conj() @ (self.gk.T @ x) - self.gdk @ (self.gdk.T @ x.conj()).conj()
+        return self.gkc @ (self.gk.T @ x) - self.gdk @ (self.gdk.T @ x.conj()).conj()
 
     def _metric_q(self, X):
         occ = self.ds.occ
@@ -275,12 +287,25 @@ class LinearResponseDirect:
     def diagonal(self) -> tuple[np.ndarray, np.ndarray]:
         """Approximate diagonal of A (orbital part from Fock energies) and diagonal of Sigma."""
         a_q, s_q = self._diag_q()
-        gk, gdk, Hg, Hgd, Gh, Gdh = self.gk, self.gdk, self.Hg, self.Hgd, self.Gh, self.Gdh
+        gk, gdk, Gh, Gdh, H = self.gk, self.gdk, self.Gh, self.Gdh, self.H
 
         def dot(u, v):
             return np.einsum("md,md->m", u.conj(), v)
 
-        a_G = dot(gk, Hg) + dot(Hgd, gdk) - 0.5 * (dot(gk, Gh) + dot(Gdh, gdk) + dot(gdk, Gdh) + dot(Gh, gk))
+        def quad(V):
+            if quad_forms is not None:
+                r, cl = np.nonzero(V)
+                off = np.zeros(len(V) + 1, dtype=np.int64)
+                np.cumsum(np.bincount(r, minlength=len(V)), out=off[1:])
+                Hc = H.tocsr()
+                return quad_forms(Hc.indptr.astype(np.int64), Hc.indices.astype(np.int64), Hc.data, cl.astype(np.int64), V[r, cl], off, V.shape[1])
+            out = np.empty(len(V), dtype=complex)
+            for k, v in enumerate(V):
+                S = np.flatnonzero(v)
+                out[k] = np.vdot(v[S], H[S][:, S] @ v[S])
+            return out
+
+        a_G = quad(gk) + quad(gdk).conj() - 0.5 * (dot(gk, Gh) + dot(Gdh, gdk) + dot(gdk, Gdh) + dot(Gh, gk))
         s_G = dot(gk, gk) - dot(gdk, gdk)
         return np.concatenate((a_q, a_G.real)), np.concatenate((s_q, s_G.real))
 
@@ -288,17 +313,24 @@ class LinearResponseDirect:
         """Full E2 and S by applying sigma to unit vectors (testing/small systems only)."""
         return self.sigma(np.eye(2 * self.n, dtype=complex))
 
+    def max_batch(self) -> int:
+        """Trial vectors per sigma call (one J/K integral pass each), from mol.max_memory; 16..128."""
+        mol = self.wf.int_gen.int_obj
+        nA = len(self.ds.occ) - len(self.ds.I)
+        per = 16 * (6 * (2 * mol.nao_2c()) ** 2 + 3 * self.N**2 + 3 * nA**4)
+        return int(np.clip(0.3 * mol.max_memory * 1e6 / per, 16, 128))
+
     def calc_excitation_energies(self, n_roots: int = 5, tol: float = 1e-6, max_iter: int = 100) -> np.ndarray:
         """Lowest positive excitation energies via paired Davidson."""
         self.excitation_energies, self.response_vectors = davidson_eig(
-            self.sigma, *self.diagonal(), n_roots, tol=tol, max_iter=max_iter
+            self.sigma, *self.diagonal(), n_roots, tol=tol, max_iter=max_iter, max_batch=self.max_batch()
         )
         roots_table("Excitation energies (linear response)", self.excitation_energies)
         return self.excitation_energies
 
     def solve_response(self, V: np.ndarray, omega: float = 0.0, tol: float = 1e-6, max_iter: int = 100) -> np.ndarray:
         """Solve (E2 - omega S) X = V for all columns of V (one shared subspace)."""
-        return davidson_solve(self.sigma, *self.diagonal(), V, omega, tol=tol, max_iter=max_iter)
+        return davidson_solve(self.sigma, *self.diagonal(), V, omega, tol=tol, max_iter=max_iter, max_batch=self.max_batch())
 
     def operator_gradient(self, ops) -> np.ndarray:
         """Property gradients of Hermitian 1+2-electron operators given as (F[:, occ], F^I[A, A], g[A, A, A, A])."""
@@ -344,8 +376,18 @@ class LinearResponseDirect:
         Cd, CA, CI = C.conj().T, C[:, A], C[:, I]
         nI, N = len(I), self.N
         dA = CA @ wf.rdm1.T @ CA.conj().T
-        W, gB = giao_integrals(direct, C, CA, np.array([ds.dI, dA]))
-        timing_line("GIAO two-electron integrals", time.time() - t0)
+        use_cd = (
+            getattr(direct, "V", None) is not None
+            and getattr(direct, "piv", None) is not None
+            and getattr(direct, "blocks", "") == "LS"
+            and direct.ssss_giao_jk == direct.ssss_giao_g
+            and getattr(direct, "cd_giao", True)
+        )
+        if use_cd:
+            W, gB = giao_integrals_cd(direct, C, CA, np.array([ds.dI, dA]), consume=not direct.cd_jk)
+        else:
+            W, gB = giao_integrals(direct, C, CA, np.array([ds.dI, dA]))
+        timing_line("GIAO two-electron integrals (CD)" if use_cd else "GIAO two-electron integrals", time.time() - t0)
         ts, dms = [], []
         for x in range(3):
             t = -0.5 * Cd @ ig.S_B[x] @ C
@@ -383,7 +425,7 @@ class LinearResponseDirect:
         return out
 
     def get_properties(
-        self, shieldings: bool = True, sscc: bool = True, tol: float = 1e-5, max_iter: int = 100, nuclei=None
+        self, shieldings: bool = True, sscc: bool = True, tol: float = 1e-5, max_iter: int = 100, nuclei=None, b_only=None
     ):
         """RMB-GIAO isotropic shieldings (ppm) and/or RKB isotropic reduced spin-spin couplings (Hz).
 
@@ -391,7 +433,15 @@ class LinearResponseDirect:
         Where both response vectors exist the second-order (error-cancelling) expression
         <<A;B>> = -(V_A^H X_B + X_A^H V_B - X_A^H E2 X_B) is used (error quadratic in the residuals), otherwise
         the linear one -V_A^H X_B. Shieldings of all nuclei need only X_B; a coupling K-L needs K or L in `nuclei`.
+        Cost is set by the number of sigma calls (one J/K integral pass for up to max_batch() vectors).
+        b_only: solve only the 3 B right-hand sides with tol/100 and use the linear expression (more iterations,
+        but one pass per iteration). Default: used for shieldings only when 3 + 3 natm > max_batch().
         """
+        mb = self.max_batch()
+        if b_only is None:
+            b_only = shieldings and not sscc and nuclei is None and 3 + 3 * self.wf.int_gen.h_m.shape[0] > mb
+        if b_only:
+            nuclei, tol = [], tol * 1e-2
         h_m = self.wf.int_gen.h_m
         natm = h_m.shape[0]
         nuc = list(range(natm)) if nuclei is None else sorted(nuclei)
@@ -401,7 +451,7 @@ class LinearResponseDirect:
         if shieldings:
             VB = self.operator_gradient(self.giao_operators())
             V = np.hstack((VB, V))
-        X, EX = davidson_solve(self.sigma, *self.diagonal(), V, tol=tol, max_iter=max_iter, return_ex=True)
+        X, EX = davidson_solve(self.sigma, *self.diagonal(), V, tol=tol, max_iter=max_iter, max_batch=mb, return_ex=True)
         Xm, EXm = X[:, V.shape[1] - len(sel) :], EX[:, V.shape[1] - len(sel) :]
         res = {}
         if shieldings:

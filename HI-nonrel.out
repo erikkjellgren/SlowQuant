@@ -1,0 +1,40 @@
+active space: {((2, 2), 6)}
+SCF not converged.
+SCF energy = -6918.57413992713
+WARNING: Operators are not spin conserving.
+
+Nr. of spin orbitals: 228
+Nr. of inactive spin orbitals: 50
+Nr. of active spin orbitals: 6
+Nr. of virtual spin orbitals: 58
+
+WARN: Ground state SCF is not converged
+
+
+total shielding of atom 0 H
+B_x [ 2.07821961e+01 -7.57294251e-09  2.55370565e-10]
+B_y [8.34147976e-09 2.07821961e+01 1.15935904e-10]
+B_z [-1.62146373e-11 -3.81357295e-10  5.20223342e+01]
+dia-magnetic contribution
+B_x [ 2.03986046e+01 -2.22634651e-09 -4.89934879e-09]
+B_y [ 3.07528853e-09  2.03986046e+01 -2.36609794e-09]
+B_z [ 4.75494574e-11 -1.61626798e-10  5.20223342e+01]
+para-magnetic contribution
+B_x [ 3.83591447e-01 -5.34659600e-09  5.15471936e-09]
+B_y [5.26619123e-09 3.83591450e-01 2.48203384e-09]
+B_z [-6.37640947e-11 -2.19730496e-10  8.76665632e-15]
+
+total shielding of atom 1 I
+B_x [4.05635902e+03 1.82477158e-06 1.85088359e-08]
+B_y [-1.85525018e-06  4.05635902e+03  4.52320153e-07]
+B_z [2.92908770e-08 5.48111283e-08 5.50542156e+03]
+dia-magnetic contribution
+B_x [ 5.49968224e+03  1.02165177e-09 -1.76113415e-09]
+B_y [-2.63674212e-09  5.49968224e+03 -3.80236904e-09]
+B_z [-4.51779093e-11 -7.80385884e-11  5.50542156e+03]
+para-magnetic contribution
+B_x [-1.44332322e+03  1.82374993e-06  2.02699700e-08]
+B_y [-1.85261344e-06 -1.44332323e+03  4.56122522e-07]
+B_z [ 2.93360549e-08  5.48891668e-08 -1.76631423e-12]
+shieldings
+[  31.19557545 4539.37986442]
