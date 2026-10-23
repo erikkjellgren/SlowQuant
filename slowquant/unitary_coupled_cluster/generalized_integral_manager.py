@@ -133,6 +133,9 @@ class IntegralManager:
         if isinstance(self.int_obj, SlowQuant):
             h_core = self.nuclear_electron_attraction + self.kinetic_energy
         elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
+            if self.x2c == "sf":
+                mf = pyscf.scf.GHF(self.int_obj).sfx2c1e()
+                h_core = mf.get_hcore()
             if self.x2c:
                 mf = pyscf.scf.GHF(self.int_obj).x2c()
                 h_core = mf.get_hcore()

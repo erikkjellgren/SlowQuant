@@ -521,6 +521,9 @@ class GeneralizedWaveFunctionUPS:
         """
         # Construct anti-hermitian kappa matrix
         kappa_mat = np.zeros_like(self._c_mo)
+        # nmo = self._c_mo.shape[1] #AE
+        # kappa_mat = np.zeros((nmo, nmo), dtype=np.complex128)
+
         if len(self.kappa_real) != 0:
             # The MO transformation is calculated as a difference between current kappa and kappa old.
             # This is to make the moving of the expansion point to work with SciPy optimization algorithms.
