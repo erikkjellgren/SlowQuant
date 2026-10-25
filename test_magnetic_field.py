@@ -44,7 +44,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # Modyfing the Hcore
     # B in T
-    B = np.array([.2, .5, .3]) ; B = (B * (2.3505 * 1e5) / np.linalg.norm(B).tolist()).tolist() ; orig = (0, 0, 0)
+    B = np.array([.2, .5, .3]) ; B = (B * 0.07 * (2.3505 * 1e5) / np.linalg.norm(B).tolist()).tolist() ; orig = (0, 0, 0)
+
+    #[.2, .5, .3]
 
     hcore = mf.get_hcore().astype(complex)
     hcoreB_corr = get_HcoreB(mf, mol, B = B, orig = orig)
@@ -109,6 +111,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     orb_opt = True
     tolerance = 1e-10
     maxiter = 10000
+    act_k = True
 
     GHF.run_wf_optimization_1step(optimizer, orbital_optimization=orb_opt, tol=tolerance, maxiter = maxiter)
 
@@ -120,7 +123,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         mol,
         "fuccsd",
         ansatz_options = {"n_layers": 1, "is_spin_conserving" : False},
-        include_active_kappa=True,
+        include_active_kappa=act_k,
         B = B,
         orig = orig,
     )
@@ -135,8 +138,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Nr. of virtual spin orbitals:", WF.num_virtual_spin_orbs)
 
     bounds = [-0.05,0.05]
-    rd_seed = 70
-    rd_seed2 = 50
+    rd_seed = 60
+    rd_seed2 = 70
     np.random.seed(rd_seed)
     new_thetas_real = np.random.uniform(bounds[0], bounds[1], len(WF.thetas_real)).tolist()
     np.random.seed(rd_seed2)
@@ -159,6 +162,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Maxiter UCCSD:", maxiter)
     print("Magnetic field in T:", B)
     print("Origin of the magnetic field,", orig)
+    print("Include active kappa: ", act_k)
 
     WF.run_wf_optimization_1step(optimizer, orbital_optimization=orb_opt, tol=tolerance, maxiter = maxiter)
 
@@ -169,7 +173,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # Saving the data:
     directory = os.getcwd()
-    name = "data_mfield_H3_def2svp_2_1_6_imag"
+    name = "data_mf_H3_def2svp_216_y"
     j,k = 0,0
     while j < 100:
         if j < 10:

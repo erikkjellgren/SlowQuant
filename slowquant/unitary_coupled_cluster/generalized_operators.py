@@ -1,4 +1,7 @@
 import numpy as np
+from scipy import constants
+g_factor = constants.physical_constants['electron g factor'][0]
+T_to_au = 1/constants.value('atomic unit of mag. flux density')
 
 from slowquant.unitary_coupled_cluster.fermionic_operator import (
     FermionicOperator, 
@@ -258,7 +261,7 @@ def get_HcoreB(mf, mol, B, orig = None):
     if orig == None:
         orig = (0, 0, 0)
 
-    B = np.array(B) * 4.254e-6
+    B = np.array(B) * T_to_au    #4.254e-6
 
     mol.set_common_origin(orig)
 
@@ -285,16 +288,15 @@ def get_HcoreB(mf, mol, B, orig = None):
     sigmaSB[:nao, nao:] =  ovlp * B[0] - 1j * ovlp * B[1]
     sigmaSB[nao:, :nao] =  ovlp * B[0] + 1j * ovlp * B[1]
 
-    g_e = 2.00231930436256            # Electronic g-factor
 
     hcoreB = - 0.5 * 1j * np.einsum('k,kij->ij', B, L_spinor)   # Correct
     hcoreB += H_dia                                             # Correct 
-    hcoreB += 0.5 * g_e/2 * sigmaSB                                     # Correct
+    hcoreB += 0.5 * g_factor/2 * sigmaSB                                     # Correct
 
     return hcoreB
 
 
-def get_HcoreB_z(mf, mol, Bz, orig = None):
+def get_HcoreB_z(mf, mol, Bz, orig = None): # Not corrected!
         # Building the magnetic field Hamiltonian: 
         nao = mol.nao
 
@@ -322,7 +324,6 @@ def get_HcoreB_z(mf, mol, Bz, orig = None):
         sigmaS[:nao, :nao] =  mol.intor("int1e_ovlp")
         sigmaS[nao:, nao:] = -mol.intor("int1e_ovlp")
 
-        # g_e = 2.00231930436256            # Electronic g-factor, Do I need this?
 
         hcoreB = -0.5 * Bz * 1j * Lz_spinor       # Correct for field in the z direction
         hcoreB += H_dia                           # Correct for field in the z direction

@@ -7,7 +7,9 @@ import pyscf
 
 import numpy as np
 import scipy
+from scipy import constants
 from scipy.optimize import root_scalar
+T_to_au = 1/constants.value('atomic unit of mag. flux density')
 
 from slowquant.SlowQuant import SlowQuant
 from slowquant.molecularintegrals.integralfunctions import (
@@ -105,7 +107,7 @@ class GeneralizedWaveFunctionUPS:
         self.ecp = ecp
         # Magnetic field Hamiltonian:
         if B is not None:
-            B = np.array(B) * 4.254e-6
+            B = np.array(B) * T_to_au
         self.B = B
         self.orig = orig
         self.int_gen: IntegralManager = IntegralManager(integral_generator, x2c=self.x2c, ecp = self.ecp, B = self.B, orig = self.orig)
