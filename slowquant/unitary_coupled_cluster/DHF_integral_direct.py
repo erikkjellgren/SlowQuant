@@ -303,7 +303,7 @@ class DHFCholesky(DHFDirect):
         for x, X in enumerate(bl):
             self._sub(vj, X, X)[:] = (c.T @ V[:, x].reshape(nK, -1)).reshape(nd, n, n).transpose(0, 2, 1)
         if chunk is None:
-            chunk = max(1, int(self.max_memory * 1e6 / 16 / (2 * n * n)))
+            chunk = max(1, int(self.max_memory * 1e6 / 8 / 16 / (2 * n * n)))
         for k0 in range(0, nK, chunk):
             Vc = V[k0 : k0 + chunk]
             m = len(Vc)

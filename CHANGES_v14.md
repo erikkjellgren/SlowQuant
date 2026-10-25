@@ -23,3 +23,5 @@ Measured (HBr dyall-v2z, (2,2) in 6 spin orbitals, one-step OO tol 1e-7, LR tol 
 
 5. (v14.1) DHFHybrid(jk_backend, eri_backend): J/K from one backend, MO integrals/GIAO from the other, e.g. DF (SS|SS) J/K
    + Cholesky-pivot MO integrals. run script: "jk_backend": "df_ssss". HCl 6-31G: identical to pivots-only (1e-10 Eh, 1e-5 ppm).
+
+6. (v14.2) Cholesky/DF J/K temporaries limited to max_memory/8 (were up to ~max_memory).
