@@ -1,6 +1,7 @@
 # type: ignore
 import numpy as np
 import pyscf
+from orbital_phases import canonicalize_mo_coeff
 from qiskit_aer.primitives import Sampler
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 
@@ -556,7 +557,9 @@ def test_pp_ups_to_circuit() -> None:
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
 
-    mo_coeff = SQobj.hartree_fock.mo_coeff
+    # The flat start below means a different state for every choice of orbital signs, which the
+    # eigensolver leaves open, so they are fixed first.
+    mo_coeff = canonicalize_mo_coeff(SQobj.hartree_fock.mo_coeff, SQobj.hartree_fock.fock_matrix)
     integral_generator = SQobj
 
     WF = WaveFunctionUPS(

@@ -1,6 +1,7 @@
 import numpy as np
 import pyscf
 from numpy.testing import assert_allclose
+from orbital_phases import canonicalize_mo_coeff
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel, depolarizing_error
 from qiskit_aer.noise.errors import (
@@ -711,6 +712,10 @@ def test_mitigation_nocm() -> None:
     SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
+    # The noisy references depend on the sign of each orbital, which the eigensolver leaves open.
+    SQobj.hartree_fock.mo_coeff = canonicalize_mo_coeff(
+        SQobj.hartree_fock.mo_coeff, SQobj.hartree_fock.fock_matrix
+    )
 
     # Conventional UPS wave function
     WF = WaveFunctionUPS(
@@ -778,6 +783,10 @@ def test_mitigation() -> None:
     SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
+    # The noisy references depend on the sign of each orbital, which the eigensolver leaves open.
+    SQobj.hartree_fock.mo_coeff = canonicalize_mo_coeff(
+        SQobj.hartree_fock.mo_coeff, SQobj.hartree_fock.fock_matrix
+    )
 
     # Conventional UPS wave function
     WF = WaveFunctionUPS(
@@ -1007,6 +1016,10 @@ def test_state_average_Mplus() -> None:
     SQobj.init_hartree_fock()
 
     SQobj.hartree_fock.run_restricted_hartree_fock()
+    # The noisy references depend on the sign of each orbital, which the eigensolver leaves open.
+    SQobj.hartree_fock.mo_coeff = canonicalize_mo_coeff(
+        SQobj.hartree_fock.mo_coeff, SQobj.hartree_fock.fock_matrix
+    )
 
     WF = WaveFunctionSAUPS(
         (2, 2),
@@ -1106,6 +1119,10 @@ def test_no_saving() -> None:
     SQobj.init_hartree_fock()
 
     SQobj.hartree_fock.run_restricted_hartree_fock()
+    # The noisy references depend on the sign of each orbital, which the eigensolver leaves open.
+    SQobj.hartree_fock.mo_coeff = canonicalize_mo_coeff(
+        SQobj.hartree_fock.mo_coeff, SQobj.hartree_fock.fock_matrix
+    )
 
     WF = WaveFunctionSAUPS(
         (2, 2),
@@ -1243,6 +1260,10 @@ def test_variance() -> None:
     SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
+    # The noisy references depend on the sign of each orbital, which the eigensolver leaves open.
+    SQobj.hartree_fock.mo_coeff = canonicalize_mo_coeff(
+        SQobj.hartree_fock.mo_coeff, SQobj.hartree_fock.fock_matrix
+    )
 
     # Conventional UPS wave function
     WF = WaveFunctionUPS(
