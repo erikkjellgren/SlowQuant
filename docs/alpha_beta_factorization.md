@@ -1,8 +1,16 @@
 # α/β factorization of the operator–state algebra
 
-Notes for a future performance project. Nothing here is implemented; this records the structure
-the spin-blocked ordering makes available, so the groundwork laid for it is not accidentally
-removed.
+**Status.** Opportunities 2 and 3 below are implemented in
+`slowquant/unitary_coupled_cluster/spin_factorized_algebra.py`, whose module docstring is now the
+reference for this structure, together with the per-spin rotations of the ansatz generators.
+Opportunity 1 is implemented for that path, which needs no determinant lookup at all since
+`I = I_alpha * N_beta + I_beta`. The general kernels in `operator_state_algebra.py` still probe
+`det2idx`, and run only when the CI space is not a spin product or a string of the operator is
+not Sz conserving. The rest of this file is the original plan, kept for its reasoning.
+
+Notes for a future performance project, written before any of it was implemented; this records the
+structure the spin-blocked ordering makes available, so the groundwork laid for it is not
+accidentally removed.
 
 ## What blocking bought
 

@@ -122,7 +122,20 @@ def iterate_t1(
     active_unocc_spin_idx: Sequence[int],
     num_orbs: int,
 ) -> Generator[tuple[int, int], None, None]:
-    """Iterate over T1 spin-conserving operators.
+    r"""Iterate over T1 spin-conserving operators.
+
+    Takes the creation index from active_unocc_spin_idx and the annihilation index from
+    active_occ_spin_idx, and keeps an excitation only when it moves as many alpha electrons in
+    as out,
+
+    .. math::
+        \#\left\{p \in \text{creation} : p < N\right\}
+            = \#\left\{p \in \text{annihilation} : p < N\right\}
+
+    since a blocked spin-orbital index below :math:`N`, num_orbs, is alpha. The beta count then
+    matches too. The order the excitations are yielded in, unoccupied indices outermost, is the
+    order of the factors of a factorized ansatz, so it is part of the ansatz rather than a detail.
+    It follows the spin-orbital ordering and changed with the move to the blocked one.
 
     Args:
         active_occ_spin_idx: Spin indices of strongly occupied orbitals.
@@ -183,7 +196,20 @@ def iterate_t2(
     active_unocc_spin_idx: Sequence[int],
     num_orbs: int,
 ) -> Generator[tuple[int, int, int, int], None, None]:
-    """Iterate over T2 spin-conserving operators.
+    r"""Iterate over T2 spin-conserving operators.
+
+    Takes 2 creation indices from active_unocc_spin_idx and 2 annihilation indices from
+    active_occ_spin_idx, each set in increasing list position, and keeps an excitation only
+    when it moves as many alpha electrons in as out,
+
+    .. math::
+        \#\left\{p \in \text{creation} : p < N\right\}
+            = \#\left\{p \in \text{annihilation} : p < N\right\}
+
+    since a blocked spin-orbital index below :math:`N`, num_orbs, is alpha. The beta count then
+    matches too. The order the excitations are yielded in, unoccupied indices outermost, is the
+    order of the factors of a factorized ansatz, so it is part of the ansatz rather than a detail.
+    It follows the spin-orbital ordering and changed with the move to the blocked one.
 
     Args:
         active_occ_spin_idx: Spin indices of strongly occupied orbitals.
@@ -264,7 +290,20 @@ def iterate_t3(
     active_unocc_spin_idx: Sequence[int],
     num_orbs: int,
 ) -> Generator[tuple[int, int, int, int, int, int], None, None]:
-    """Iterate over T3 spin-conserving operators.
+    r"""Iterate over T3 spin-conserving operators.
+
+    Takes 3 creation indices from active_unocc_spin_idx and 3 annihilation indices from
+    active_occ_spin_idx, each set in increasing list position, and keeps an excitation only
+    when it moves as many alpha electrons in as out,
+
+    .. math::
+        \#\left\{p \in \text{creation} : p < N\right\}
+            = \#\left\{p \in \text{annihilation} : p < N\right\}
+
+    since a blocked spin-orbital index below :math:`N`, num_orbs, is alpha. The beta count then
+    matches too. The order the excitations are yielded in, unoccupied indices outermost, is the
+    order of the factors of a factorized ansatz, so it is part of the ansatz rather than a detail.
+    It follows the spin-orbital ordering and changed with the move to the blocked one.
 
     Args:
         active_occ_spin_idx: Spin indices of strongly occupied orbitals.
@@ -316,7 +355,20 @@ def iterate_t4(
     active_unocc_spin_idx: Sequence[int],
     num_orbs: int,
 ) -> Generator[tuple[int, int, int, int, int, int, int, int], None, None]:
-    """Iterate over T4 spin-conserving operators.
+    r"""Iterate over T4 spin-conserving operators.
+
+    Takes 4 creation indices from active_unocc_spin_idx and 4 annihilation indices from
+    active_occ_spin_idx, each set in increasing list position, and keeps an excitation only
+    when it moves as many alpha electrons in as out,
+
+    .. math::
+        \#\left\{p \in \text{creation} : p < N\right\}
+            = \#\left\{p \in \text{annihilation} : p < N\right\}
+
+    since a blocked spin-orbital index below :math:`N`, num_orbs, is alpha. The beta count then
+    matches too. The order the excitations are yielded in, unoccupied indices outermost, is the
+    order of the factors of a factorized ansatz, so it is part of the ansatz rather than a detail.
+    It follows the spin-orbital ordering and changed with the move to the blocked one.
 
     Args:
         active_occ_spin_idx: Spin indices of strongly occupied orbitals.
@@ -378,7 +430,20 @@ def iterate_t5(
     active_unocc_spin_idx: Sequence[int],
     num_orbs: int,
 ) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int], None, None]:
-    """Iterate over T5 spin-conserving operators.
+    r"""Iterate over T5 spin-conserving operators.
+
+    Takes 5 creation indices from active_unocc_spin_idx and 5 annihilation indices from
+    active_occ_spin_idx, each set in increasing list position, and keeps an excitation only
+    when it moves as many alpha electrons in as out,
+
+    .. math::
+        \#\left\{p \in \text{creation} : p < N\right\}
+            = \#\left\{p \in \text{annihilation} : p < N\right\}
+
+    since a blocked spin-orbital index below :math:`N`, num_orbs, is alpha. The beta count then
+    matches too. The order the excitations are yielded in, unoccupied indices outermost, is the
+    order of the factors of a factorized ansatz, so it is part of the ansatz rather than a detail.
+    It follows the spin-orbital ordering and changed with the move to the blocked one.
 
     Args:
         active_occ_spin_idx: Spin indices of strongly occupied orbitals.
@@ -450,7 +515,20 @@ def iterate_t6(
     active_unocc_spin_idx: Sequence[int],
     num_orbs: int,
 ) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int, int, int], None, None]:
-    """Iterate over T6 spin-conserving operators.
+    r"""Iterate over T6 spin-conserving operators.
+
+    Takes 6 creation indices from active_unocc_spin_idx and 6 annihilation indices from
+    active_occ_spin_idx, each set in increasing list position, and keeps an excitation only
+    when it moves as many alpha electrons in as out,
+
+    .. math::
+        \#\left\{p \in \text{creation} : p < N\right\}
+            = \#\left\{p \in \text{annihilation} : p < N\right\}
+
+    since a blocked spin-orbital index below :math:`N`, num_orbs, is alpha. The beta count then
+    matches too. The order the excitations are yielded in, unoccupied indices outermost, is the
+    order of the factors of a factorized ansatz, so it is part of the ansatz rather than a detail.
+    It follows the spin-orbital ordering and changed with the move to the blocked one.
 
     Args:
         active_occ_spin_idx: Spin indices of strongly occupied orbitals.
@@ -537,6 +615,11 @@ def iterate_pair_t2(
     num_orbs: int,
 ) -> Generator[tuple[int, int, int, int], None, None]:
     """Iterate over pair T2 operators.
+
+    Each pair excitation moves both electrons of spatial orbital i into spatial orbital a, and is
+    yielded as the blocked spin-orbital indices (a_alpha, i_alpha, a_beta, i_beta), with the
+    occupied orbitals outermost. That order is the factor order of the ansatz, as for
+    iterate_t2.
 
     Args:
         active_occ_idx: Indices of strongly occupied orbitals.

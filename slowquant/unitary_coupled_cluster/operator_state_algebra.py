@@ -18,8 +18,14 @@ from slowquant.unitary_coupled_cluster.operators import (
     G2_sa,
 )
 from slowquant.unitary_coupled_cluster.spin_factorized_algebra import (
+    accumulate_string_pairing,
+    apply_spin_block_layout,
+    apply_string_rotation,
+    build_spin_block_layout,
+    build_string_rotation_layout,
     propagate_state_factorized,
     propagate_state_SA_factorized,
+    string_pairing_overlap,
 )
 from slowquant.unitary_coupled_cluster.spin_ordering import alpha_idx, beta_idx
 from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
@@ -454,7 +460,10 @@ def rotate_determinant_pairs(
                        \Gamma\sin\theta & \cos\theta\end{pmatrix}
         \begin{pmatrix}c_p\\c_q\end{pmatrix}
 
-    The pairs are disjoint, so this needs no output vector.
+    The determinant-space counterpart of
+    spin_factorized_algebra.rotate_alpha_string_pairs, used when the CI space is not a spin
+    product and the rotation cannot be held per spin string. The pairs are disjoint, so this
+    needs no output vector.
 
     Args:
         states: States as (number of states, number of determinants), updated in place.
@@ -475,12 +484,30 @@ def rotate_determinant_pairs(
             states[state_idx, q] = signed_sin * amplitude_p + cos_theta * amplitude_q
 
 
+# Largest group of determinants build_generator_blocks will diagonalize. The spin-adapted
+# doubles need at most 8, so this only refuses a generator that connects a large part of the
+# CI space at once, which then falls back to its closed form.
 MAX_EXPONENTIAL_BLOCK = 64
 
-# Frequencies and the weight of each power of the generator in the closed form of a
-# spin-adapted double, as the branches that used to carry a copy each spelled them. Odd
-# powers are weighted by sin(S*theta) and even ones by cos(S*theta)-1. Only reached when
-# the generator cannot be blocked, see build_generator_blocks.
+# Frequencies S and the weight k of each power of the generator in the closed form of a
+# spin-adapted double, as the branches that used to carry a copy each spelled them. Odd powers
+# are weighted by sin(S*theta) and even ones by cos(S*theta)-1, see spin_adapted_double_weight.
+#
+# The keys are the cases of operators.G2_sa, which map onto the five operators of
+# 10.48550/arXiv.2505.00883 as follows. sa_double_1 (i = j, a = b) is Eq. 14, which reduces to
+# a plain fermionic double and is a pairing, so it never reaches this table. sa_double_2
+# (i = j) is Eq. 16 and sa_double_3 (a = b) is Eq. 15; both have two frequencies and four
+# powers, from Eq. 45 and Table I, which the paper states holds for both. sa_double_4 is
+# Eq. 17, the singlet-coupled case with four distinct indices, four frequencies and eight
+# powers, from Eq. 47 and Table II. sa_double_5 is Eq. 18, the triplet-coupled case, five
+# frequencies and ten powers, from Eq. 49 and Table III.
+#
+# Only reached when the generator cannot be blocked, see build_generator_blocks and
+# spin_factorized_algebra.build_spin_block_layout, since a sweep over the blocks replaces the
+# up to ten applications of the generator this table would otherwise cost.
+#
+# . 10.48550/arXiv.2505.00883, Eq. 41-49, and Tables I, II and III
+# . 10.48550/arXiv.2505.02984, Eq. 35, D1, and, D2
 SPIN_ADAPTED_DOUBLE_SERIES: dict[str, tuple[tuple[float, ...], tuple[tuple[float, ...], ...]]] = {
     "sa_double_2": (
         (1, math.sqrt(2) / 2),
@@ -565,6 +592,11 @@ SPIN_ADAPTED_DOUBLE_SERIES: dict[str, tuple[tuple[float, ...], tuple[tuple[float
 def label_connected_determinants(src: np.ndarray, dst: np.ndarray, num_dets: int) -> np.ndarray:
     """Label each determinant with the connected group of the generator it belongs to.
 
+    Reads the generator's determinant map as the edges of a graph and returns its connected
+    components, by union-find. A determinant the generator annihilates is a component on its
+    own, and the generator cannot mix two components, which is what makes the exponential block
+    diagonal over them.
+
     Args:
         src: Determinant the generator acts on.
         dst: Determinant it is taken to.
@@ -604,9 +636,10 @@ def rotate_determinant_blocks(
     r"""Apply a small dense rotation to each group of determinants, in place.
 
     .. math::
-        c_{d_r} \leftarrow \sum_s R^{(b)}_{rs} c_{d_s}
+        c_{d_r} \leftarrow \sum_s \left[\exp\left(\theta T^{(b)}\right)\right]_{rs} c_{d_s}
 
-    The groups are disjoint, so this needs no output vector.
+    The groups are disjoint, so this needs no output vector. Determinants no group reaches are
+    left alone, which is what the identity part of the exponential does to them.
 
     Args:
         states: States as (number of states, number of determinants), updated in place.
@@ -646,10 +679,22 @@ def build_generator_blocks(op: FermionicOperator, ci_info: CI_Info) -> tuple[np.
     groups of up to eight, of which only a handful are distinct however large the active space
     is, because a group is fixed by the occupation of the few orbitals the generator touches.
 
+    The point of blocking a spin-adapted double is that its closed form is a sum over up to ten
+    powers of the generator, each of which costs one application, see
+    SPIN_ADAPTED_DOUBLE_SERIES. Diagonalizing the blocks once turns that into a single sweep at
+    every parameter value the optimizer visits.
+
     Each fermionic string of the generator is a signed map of determinants on its own, so
     applying it to :math:`v_k = k+1`, which is positive and all different, names the determinant
     each one came from and the sign it picked up. The groups and their matrices follow from
     those maps.
+
+    Over a spin product the same blocking is done per spin-string cell instead, which does not
+    grow with the CI space, see spin_factorized_algebra.build_spin_block_layout. This form is
+    what is left for a space that is not a spin product.
+
+    #. 10.48550/arXiv.2505.00883, Eq. 45, 47, and, 49 (SA doubles)
+    #. 10.48550/arXiv.2505.02984, Eq. 35, D1, and, D2 (SA doubles)
 
     Args:
         op: Excitation generator, already embedded in the CI space.
@@ -660,7 +705,7 @@ def build_generator_blocks(op: FermionicOperator, ci_info: CI_Info) -> tuple[np.
         those matrices. None if the generator leaves the CI space or connects too much of it to
         be worth blocking.
     """
-    num_dets = len(ci_info.idx2det)
+    num_dets = ci_info.num_dets
     ramp = np.arange(1.0, num_dets + 1.0)
     rows, cols, values = [], [], []
     try:
@@ -745,6 +790,8 @@ def diagonalize_generator_blocks(blocks: np.ndarray) -> tuple[np.ndarray, np.nda
         \exp\left(\theta T\right) = V e^{-i\theta\lambda}V^\dagger
 
     which is real and costs two small matrix products to assemble once the parameter is known.
+    The blocks depend only on the generator and the CI space, not on the parameter, so this is
+    paid once per generator and the optimizer only ever redoes the two products.
 
     Args:
         blocks: Generator blocks as (number of distinct groups, size, size).
@@ -760,6 +807,14 @@ def exponentiate_generator_blocks(
     eigenvectors: np.ndarray, eigenvalues: np.ndarray, theta: float
 ) -> np.ndarray:
     r"""Assemble :math:`\exp(\theta T^{(b)})` for every distinct block.
+
+    .. math::
+        \exp\left(\theta T^{(b)}\right) = V e^{-i\theta\lambda}V^\dagger
+
+    from the eigendecomposition of :math:`iT^{(b)}` built once by
+    diagonalize_generator_blocks. This is the only part of a blocked exponential that has to be
+    redone when the parameter changes, and it runs over the distinct block shapes rather than
+    over the groups, of which there are many more.
 
     Args:
         eigenvectors: Eigenvectors of each block.
@@ -778,18 +833,22 @@ def build_rotation_layout(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
     r"""Find the determinant pairs that the exponential of a generator rotates.
 
-    An excitation generator :math:`\hat{T} = \hat{T}_{\text{exc}} - \hat{T}_{\text{exc}}^\dagger`
-    squares to minus a projector,
+    An excitation generator :math:`\hat{T} = \hat{\tau} - \hat{\tau}^\dagger` squares to minus a
+    projector, because :math:`\hat{\tau}^2 = 0` and :math:`\hat{\tau}^\dagger\hat{\tau}`
+    projects onto the determinants the excitation does not annihilate,
 
     .. math::
-        \hat{T}^2 = -\left[\hat{n}_i\left(1-\hat{n}_a\right)
-                         + \hat{n}_a\left(1-\hat{n}_i\right)\right] \equiv -\hat{P}
+        \hat{T}^2 = -\left(\hat{\tau}^\dagger\hat{\tau} + \hat{\tau}\hat{\tau}^\dagger\right)
+                  \equiv -\hat{P},\qquad
+        \text{e.g. }\hat{P} = \hat{n}_i\left(1-\hat{n}_a\right)
+                            + \hat{n}_a\left(1-\hat{n}_i\right)
+        \text{ for }\hat{\tau} = \hat{a}^\dagger_a\hat{a}_i
 
     so that :math:`\hat{T}^3 = -\hat{T}` and the series for the exponential closes,
 
     .. math::
-        \exp\left(\theta\hat{T}\right) = 1 + \sin\theta\,\hat{T}
-                                       + \left(1-\cos\theta\right)\hat{T}^2
+        \exp\left(\theta\hat{T}\right) = \hat{I} + \hat{T}\sin\theta
+                                       + \hat{T}^2\left(1-\cos\theta\right)
 
     Because :math:`\hat{P}` is diagonal, the determinant basis splits into the determinants the
     generator annihilates, which the unitary leaves alone, and pairs
@@ -805,6 +864,13 @@ def build_rotation_layout(
     two are then checked against each other, so a generator that is not a signed pairing, such
     as a spin-adapted double, reports None and is left to the caller.
 
+    Over a spin product the same pairing is held per spin string instead, which does not grow
+    with the CI space, see spin_factorized_algebra.build_string_rotation_layout. This form is
+    what is left for a space that is not a spin product.
+
+    #. 10.48550/arXiv.2303.10825, Eq. 29-32 (v1)
+    #. 10.48550/arXiv.2505.00883, Eq. 6 and 7
+
     Args:
         op: Excitation generator, already embedded in the CI space.
         ci_info: Information about the CI space.
@@ -813,7 +879,7 @@ def build_rotation_layout(
         First and second determinant of each pair with its phase, or None if the generator does
         not act as a signed pairing of determinants.
     """
-    num_dets = len(ci_info.idx2det)
+    num_dets = ci_info.num_dets
     ramp = np.arange(1.0, num_dets + 1.0)
     try:
         phases = propagate_state([op], np.ones(num_dets), ci_info, do_folding=False)
@@ -850,7 +916,9 @@ def get_rotation_layout(
     """Get the rotation layout of a generator, building it the first time it is asked for.
 
     The layout depends only on the generator and the CI space, so it is reused across every
-    parameter value the optimizer visits.
+    parameter value the optimizer visits. It costs one entry per determinant the generator
+    reaches, so over a spin product get_string_rotation_layout is asked first and this is only
+    reached for a space that is not a product.
 
     Args:
         op: Excitation generator, already embedded in the CI space.
@@ -865,13 +933,72 @@ def get_rotation_layout(
     return ci_info.rotation_layouts[cache_key]
 
 
+def get_spin_block_layout(
+    op: FermionicOperator, ci_info: CI_Info, cache_key: tuple[str, tuple[int, ...]]
+) -> tuple | None:
+    """Get the per-spin blocked form of a generator, building it the first time it is asked for.
+
+    The layout depends only on the generator and the CI space, so it is reused across every
+    parameter value the optimizer visits. Only the exponential of the small blocks is rebuilt
+    when the parameter changes, see spin_factorized_algebra.apply_spin_block_layout.
+
+    Args:
+        op: Excitation generator, already embedded in the CI space.
+        ci_info: Information about the CI space.
+        cache_key: Excitation type and indices naming this generator.
+
+    Returns:
+        The cell pair layout, or None if the generator does not block this way.
+    """
+    if cache_key not in ci_info.spin_block_layouts:
+        ci_info.spin_block_layouts[cache_key] = build_spin_block_layout(op, ci_info)
+    return ci_info.spin_block_layouts[cache_key]
+
+
+def apply_spin_blocked_exponential(
+    states: np.ndarray,
+    op: FermionicOperator,
+    theta: float,
+    ci_info: CI_Info,
+    cache_key: tuple[str, tuple[int, ...]],
+    in_place: bool = False,
+) -> np.ndarray | None:
+    r"""Apply the exponential of a generator through its spin-string cell pairs, if it has them.
+
+    .. math::
+        \left|\tilde{\nu}\right> = \exp\left(\theta\hat{T}\right)\left|\nu\right>
+            = \bigoplus_{A,B}\bigoplus_g\exp\left(\theta T^{(A,B)}_g\right)\left|\nu\right>
+
+    The route a spin-adapted double takes over a spin product, see
+    spin_factorized_algebra.build_spin_block_layout.
+
+    Args:
+        states: States as (number of states, number of determinants).
+        op: Excitation generator, already embedded in the CI space.
+        theta: Ansatz parameter value.
+        ci_info: Information about the CI space.
+        cache_key: Excitation type and indices naming this generator.
+        in_place: Rotate the states handed in rather than a copy of them.
+
+    Returns:
+        New states, or None if the generator does not block over spin-string cells.
+    """
+    layout = get_spin_block_layout(op, ci_info, cache_key)
+    if layout is None:
+        return None
+    out = states if in_place else np.copy(states)
+    apply_spin_block_layout(out, layout, theta, ci_info)
+    return out
+
+
 def get_block_layout(
     op: FermionicOperator, ci_info: CI_Info, cache_key: tuple[str, tuple[int, ...]]
 ) -> tuple[np.ndarray, ...] | None:
     """Get the blocked form of a generator, building and diagonalizing it the first time.
 
     The blocks depend only on the generator and the CI space, so they are reused across every
-    parameter value the optimizer visits and only their exponential is rebuilt.
+    parameter value the optimizer visits and only their exponential is rebuilt, see
+    exponentiate_generator_blocks.
 
     Args:
         op: Excitation generator, already embedded in the CI space.
@@ -905,6 +1032,10 @@ def apply_blocked_exponential(
 
     .. math::
         \left|\tilde{\nu}\right> = \exp\left(\theta\hat{T}\right)\left|\nu\right>
+            = \bigoplus_b\exp\left(\theta T^{(b)}\right)\left|\nu\right>
+
+    The determinant-space counterpart of apply_spin_blocked_exponential, used when the CI space
+    is not a spin product.
 
     Args:
         states: States as (number of states, number of determinants).
@@ -932,9 +1063,24 @@ def spin_adapted_double_weight(
 ) -> float:
     r"""Weight of one power of the generator in the closed form of a spin-adapted double.
 
+    A spin-adapted double does not obey :math:`\hat{G}^3=-\hat{G}`. It obeys a higher-order
+    polynomial relation instead, so its exponential closes only after several powers and carries
+    several frequencies :math:`S_f`,
+
+    .. math::
+        \exp\left(\theta\,{}^\text{SA}\hat{G}\right)
+            = \hat{I} + \sum_m c_m\left(\theta\right)\,{}^\text{SA}\hat{G}^m
+
+    with the weight of each power given by
+
     .. math::
         c_m = \sum_f k^{(m)}_f \sin\left(S_f\theta\right) \quad m \text{ odd}, \qquad
         c_m = \sum_f k^{(m)}_f \left(\cos\left(S_f\theta\right)-1\right) \quad m \text{ even}
+
+    The frequencies and the coefficients :math:`k^{(m)}_f` are the tables of the reference and
+    are spelled out in SPIN_ADAPTED_DOUBLE_SERIES.
+
+    #. 10.48550/arXiv.2505.00883, Eq. 41-44, and Tables I, II and III
 
     Args:
         order: Power of the generator this weight belongs to, counted from one.
@@ -957,6 +1103,7 @@ def apply_spin_adapted_double(
     theta: float,
     ci_info: CI_Info,
     cache_key: tuple[str, tuple[int, ...]],
+    in_place: bool = False,
 ) -> np.ndarray:
     r"""Apply the exponential of a spin-adapted double excitation generator to a state.
 
@@ -964,10 +1111,24 @@ def apply_spin_adapted_double(
         \left|\tilde{0}\right> = \exp\left(\theta\hat{T}\right)\left|0\right>
 
     Unlike a plain excitation these generators carry several frequencies, so their exponential
-    is not a rotation of determinant pairs. It is still block diagonal, over groups of at most
-    eight determinants, and taking it that way costs one sweep instead of one application of the
-    generator per power. When the groups cannot be built the closed form is summed instead,
-    which is what the code did everywhere before.
+    is not a rotation of determinant pairs but the multi-term closed form
+
+    .. math::
+        \exp\left(\theta\,{}^\text{SA}\hat{G}\right)
+            = \hat{I} + \sum_m c_m\left(\theta\right)\,{}^\text{SA}\hat{G}^m
+
+    which costs one application of the generator per power: four for the two cases with a
+    repeated index, eight for the singlet-coupled case with four distinct indices and ten for
+    the triplet-coupled one, see SPIN_ADAPTED_DOUBLE_SERIES.
+
+    It is still block diagonal though, over groups of at most eight determinants, and taking it
+    that way costs one sweep instead. Over a spin product the groups are found per spin-string
+    cell so that the layout does not grow with the CI space; otherwise they are found per
+    determinant. When neither works the closed form above is summed, which is what the code did
+    everywhere before.
+
+    #. 10.48550/arXiv.2505.00883, Eq. 45, 47, and, 49 (SA doubles)
+    #. 10.48550/arXiv.2505.02984, Eq. 35, D1, and, D2 (SA doubles)
 
     Args:
         state: State.
@@ -976,16 +1137,25 @@ def apply_spin_adapted_double(
         theta: Ansatz parameter value.
         ci_info: Information about the CI space.
         cache_key: Excitation type and indices naming this generator.
+        in_place: Let the exponential overwrite the state handed in rather than a copy of it.
+                  Only for a caller that owns the array. The spin-blocked route and the closed
+                  form work in place, the determinant-blocked route returns a new array, so the
+                  result is always the return value.
 
     Returns:
         New state.
     """
+    spin_blocked = apply_spin_blocked_exponential(
+        state.reshape(1, -1), op, theta, ci_info, cache_key, in_place=in_place
+    )
+    if spin_blocked is not None:
+        return spin_blocked.reshape(state.shape)
     blocked = apply_blocked_exponential(state.reshape(1, -1), op, theta, ci_info, cache_key)
     if blocked is not None:
         return blocked.reshape(state.shape)
     frequencies, weights = SPIN_ADAPTED_DOUBLE_SERIES[exc_type]
-    out = np.copy(state)
-    power = state
+    out = state if in_place else np.copy(state)
+    power = np.copy(state) if in_place else state
     for order, weight in enumerate(weights, start=1):
         power = propagate_state([op], power, ci_info, do_folding=False)
         out += spin_adapted_double_weight(order, weight, frequencies, theta) * power
@@ -999,11 +1169,18 @@ def apply_spin_adapted_double_SA(
     theta: float,
     ci_info: CI_Info,
     cache_key: tuple[str, tuple[int, ...]],
+    in_place: bool = False,
 ) -> np.ndarray:
     r"""Apply the exponential of a spin-adapted double to every state of a state average.
 
     .. math::
         \left|\tilde{\nu}\right> = \exp\left(\theta\hat{T}\right)\left|\nu\right>
+
+    Same three routes as apply_spin_adapted_double, applied to every state at once so that the
+    blocks and their exponential are built once for the whole average.
+
+    #. 10.48550/arXiv.2505.00883, Eq. 45, 47, and, 49 (SA doubles)
+    #. 10.48550/arXiv.2505.02984, Eq. 35, D1, and, D2 (SA doubles)
 
     Args:
         states: States as (number of states, number of determinants).
@@ -1012,20 +1189,50 @@ def apply_spin_adapted_double_SA(
         theta: Ansatz parameter value.
         ci_info: Information about the CI space.
         cache_key: Excitation type and indices naming this generator.
+        in_place: Let the exponential overwrite the state handed in rather than a copy of it.
+                  Only for a caller that owns the array. The spin-blocked route and the closed
+                  form work in place, the determinant-blocked route returns a new array, so the
+                  result is always the return value.
 
     Returns:
         New states.
     """
+    spin_blocked = apply_spin_blocked_exponential(states, op, theta, ci_info, cache_key, in_place=in_place)
+    if spin_blocked is not None:
+        return spin_blocked
     blocked = apply_blocked_exponential(states, op, theta, ci_info, cache_key)
     if blocked is not None:
         return blocked
     frequencies, weights = SPIN_ADAPTED_DOUBLE_SERIES[exc_type]
-    out = np.copy(states)
-    power = states
+    out = states if in_place else np.copy(states)
+    power = np.copy(states) if in_place else states
     for order, weight in enumerate(weights, start=1):
         power = propagate_state_SA([op], power, ci_info, do_folding=False)
         out += spin_adapted_double_weight(order, weight, frequencies, theta) * power
     return out
+
+
+def get_string_rotation_layout(
+    op: FermionicOperator, ci_info: CI_Info, cache_key: tuple[str, tuple[int, ...]]
+) -> tuple[int, tuple[np.ndarray, ...], tuple[np.ndarray, ...]] | None:
+    """Get the string-space rotation of a generator, building it the first time it is asked for.
+
+    The layout depends only on the generator and the CI space, so it is reused across every
+    parameter value the optimizer visits. It costs one entry per spin string rather than one per
+    determinant, which is what keeps the memory of an ansatz independent of the size of the
+    active space, see spin_factorized_algebra.build_string_rotation_layout.
+
+    Args:
+        op: Excitation generator, already embedded in the CI space.
+        ci_info: Information about the CI space.
+        cache_key: Excitation type and indices naming this generator.
+
+    Returns:
+        String rotation layout, or None if the generator is not a pairing over a spin product.
+    """
+    if cache_key not in ci_info.string_rotation_layouts:
+        ci_info.string_rotation_layouts[cache_key] = build_string_rotation_layout(op, ci_info)
+    return ci_info.string_rotation_layouts[cache_key]
 
 
 def apply_generator_exponential(
@@ -1034,15 +1241,34 @@ def apply_generator_exponential(
     theta: float,
     ci_info: CI_Info,
     cache_key: tuple[str, tuple[int, ...]],
+    in_place: bool = False,
 ) -> np.ndarray:
     r"""Apply the exponential of an excitation generator to a state.
 
     .. math::
         \left|\tilde{0}\right> = \exp\left(\theta\hat{T}\right)\left|0\right>
 
-    A generator that pairs determinants is applied as a Givens rotation, see
-    build_rotation_layout. Anything else, a spin-adapted double in particular, falls back to
-    summing the three terms of the closed form.
+    A generator that is one excitation and its adjoint obeys :math:`\hat{T}^3=-\hat{T}`, so its
+    exponential closes after two terms,
+
+    .. math::
+        \exp\left(\theta\hat{T}\right) = \hat{I} + \hat{T}\sin\theta
+                                       + \hat{T}^2\left(1-\cos\theta\right)
+
+    and acts as a Givens rotation on pairs of basis states. The routes below are that rotation
+    held in progressively more general form, each falling back to the next:
+
+    * pairs of spin strings, which do not grow with the CI space, over a spin product,
+    * pairs of determinants, for a CI space that is not a spin product,
+    * blocks over spin-string cells, for a generator that is not a pairing at all,
+    * blocks over determinants, for the same generator over a space that is not a product,
+    * the closed form above, summed with two extra state vectors.
+
+    The last one is what the code did everywhere before, and is what a spin-adapted double falls
+    back to when it cannot be blocked, with more terms, see apply_spin_adapted_double.
+
+    #. 10.48550/arXiv.2303.10825, Eq. 29-32 (v1)
+    #. 10.48550/arXiv.2505.00883, Eq. 6 and 7
 
     Args:
         state: State.
@@ -1050,15 +1276,28 @@ def apply_generator_exponential(
         theta: Ansatz parameter value.
         ci_info: Information about the CI space.
         cache_key: Excitation type and indices naming this generator.
+        in_place: Let the rotation overwrite the state handed in rather than a copy of it. Only
+                  for a caller that owns the array, which the ansatz builders and
+                  propagate_unitary do. Only the string-rotation route works in place; the
+                  others return a new array, so the result is always the return value and the
+                  array handed in may or may not have been changed.
 
     Returns:
         New state.
     """
+    strings = get_string_rotation_layout(op, ci_info, cache_key)
+    if strings is not None:
+        out = state if in_place else np.copy(state)
+        apply_string_rotation(out.reshape(1, -1), strings, theta, ci_info)
+        return out
     layout = get_rotation_layout(op, ci_info, cache_key)
     if layout is not None:
         out = np.copy(state)
         rotate_determinant_pairs(out.reshape(1, -1), *layout, np.cos(theta), np.sin(theta))
         return out
+    spin_blocked = apply_spin_blocked_exponential(state.reshape(1, -1), op, theta, ci_info, cache_key)
+    if spin_blocked is not None:
+        return spin_blocked.reshape(state.shape)
     blocked = apply_blocked_exponential(state.reshape(1, -1), op, theta, ci_info, cache_key)
     if blocked is not None:
         return blocked.reshape(state.shape)
@@ -1075,11 +1314,18 @@ def apply_generator_exponential_SA(
     theta: float,
     ci_info: CI_Info,
     cache_key: tuple[str, tuple[int, ...]],
+    in_place: bool = False,
 ) -> np.ndarray:
     r"""Apply the exponential of an excitation generator to every state of a state average.
 
     .. math::
         \left|\tilde{\nu}\right> = \exp\left(\theta\hat{T}\right)\left|\nu\right>
+
+    Same routes as apply_generator_exponential, applied to every state at once so that the
+    layout is looked up once for the whole average.
+
+    #. 10.48550/arXiv.2303.10825, Eq. 29-32 (v1)
+    #. 10.48550/arXiv.2505.00883, Eq. 6 and 7
 
     Args:
         states: States as (number of states, number of determinants).
@@ -1087,15 +1333,28 @@ def apply_generator_exponential_SA(
         theta: Ansatz parameter value.
         ci_info: Information about the CI space.
         cache_key: Excitation type and indices naming this generator.
+        in_place: Let the rotation overwrite the state handed in rather than a copy of it. Only
+                  for a caller that owns the array, which the ansatz builders and
+                  propagate_unitary do. Only the string-rotation route works in place; the
+                  others return a new array, so the result is always the return value and the
+                  array handed in may or may not have been changed.
 
     Returns:
         New states.
     """
+    strings = get_string_rotation_layout(op, ci_info, cache_key)
+    if strings is not None:
+        out = states if in_place else np.copy(states)
+        apply_string_rotation(out, strings, theta, ci_info)
+        return out
     layout = get_rotation_layout(op, ci_info, cache_key)
     if layout is not None:
         out = np.copy(states)
         rotate_determinant_pairs(out, *layout, np.cos(theta), np.sin(theta))
         return out
+    spin_blocked = apply_spin_blocked_exponential(states, op, theta, ci_info, cache_key)
+    if spin_blocked is not None:
+        return spin_blocked
     blocked = apply_blocked_exponential(states, op, theta, ci_info, cache_key)
     if blocked is not None:
         return blocked
@@ -1107,7 +1366,15 @@ def apply_generator_exponential_SA(
 
 
 def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bool = False) -> np.ndarray:
-    """Build matrix representation of operator.
+    r"""Build matrix representation of operator.
+
+    .. math::
+        O_{IJ} = \left<I\left|\hat{O}\right|J\right>
+
+    over every pair of determinants of the CI space, so it costs :math:`N_\text{det}^2` and is
+    only for small spaces. It always goes through the determinant kernel and never through
+    spin_factorized_algebra, which is what makes it the independent reference the
+    spin-factorized tests compare against.
 
     Args:
         op: Fermionic number and spin conserving operator.
@@ -1170,6 +1437,16 @@ def propagate_state(
     .. math::
         \left|\tilde{0}\right> = \hat{O}\left|0\right>
 
+    There are two kernels behind this and they must agree to rounding, which
+    tests/test_spin_factorized_algebra.py holds them to at 1e-12; they sum in different orders,
+    so not bit for bit. When the CI space is a product of an alpha and a beta string space and
+    every string of the operator is :math:`S_z` conserving, the operator factorizes as
+    :math:`\hat{O} = \pm\hat{O}_\alpha\otimes\hat{O}_\beta` and is applied per spin, see
+    spin_factorized_algebra. That is the fast route and is tried first. A string that changes
+    the electron count of a spin, or a CI space that is not a spin product, such as the one
+    get_indexing_extended builds, falls back to the general kernel below, which walks the
+    determinants one operator string at a time.
+
     Args:
         operators: List of operators.
         state: State.
@@ -1186,8 +1463,6 @@ def propagate_state(
     """
     if len(operators) == 0:
         return np.copy(state)
-    idx2det = ci_info.idx2det
-    det2idx = ci_info.det2idx
     num_inactive_orbs = ci_info.num_inactive_orbs
     num_active_orbs = ci_info.num_active_orbs
     num_virtual_orbs = ci_info.num_virtual_orbs
@@ -1257,6 +1532,11 @@ def propagate_state(
                     tmp_state = np.zeros_like(state, dtype=float)
                     tmp_state_is_zero = True
                 continue
+            # Only the general kernels below index by determinant. Over a spin product these two
+            # maps are derived on demand and hold one entry per determinant each, so asking for
+            # them here rather than above keeps them unbuilt on the path that never needs them.
+            idx2det = ci_info.idx2det
+            det2idx = ci_info.det2idx
             # loop over all strings of annihilation operators in FermionicOperator sum
             if is_parallel:
                 for fermi_label in op_folded.operators.keys():
@@ -1329,7 +1609,12 @@ def propagate_state_SA(
     This would violate the "do not multiply folded operators" rule.
 
     .. math::
-        \left|\tilde{0}\right> = \hat{O}\left|0\right>
+        \left|\tilde{\nu}\right> = \hat{O}\left|\nu\right>
+
+    The same two kernels as propagate_state, with the operator applied to every state of the
+    average. The operator is the same for all of them, so the spin-factorized route builds its
+    one-spin matrices and its contraction layout once and reuses them across the states, see
+    spin_factorized_algebra.propagate_state_SA_factorized.
 
     Args:
         operators: List of operators.
@@ -1347,8 +1632,6 @@ def propagate_state_SA(
     """
     if len(operators) == 0:
         return np.copy(state)
-    idx2det = ci_info.idx2det
-    det2idx = ci_info.det2idx
     num_inactive_orbs = ci_info.num_inactive_orbs
     num_active_orbs = ci_info.num_active_orbs
     num_virtual_orbs = ci_info.num_virtual_orbs
@@ -1408,6 +1691,11 @@ def propagate_state_SA(
                     tmp_state = np.zeros_like(state, dtype=float)
                     tmp_state_is_zero = True
                 continue
+            # Only the general kernels below index by determinant. Over a spin product these two
+            # maps are derived on demand and hold one entry per determinant each, so asking for
+            # them here rather than above keeps them unbuilt on the path that never needs them.
+            idx2det = ci_info.idx2det
+            det2idx = ci_info.det2idx
             # loop over all strings of annihilation operators in FermionicOperator sum
             if is_parallel:
                 for fermi_label in op_folded.operators.keys():
@@ -1698,6 +1986,7 @@ def construct_ups_state(
                 A * theta,
                 ci_info,
                 ("sa_single_alpha", tuple(exc_indices)),
+                in_place=True,
             )
             out = apply_generator_exponential(
                 out,
@@ -1705,6 +1994,7 @@ def construct_ups_state(
                 A * theta,
                 ci_info,
                 ("sa_single_beta", tuple(exc_indices)),
+                in_place=True,
             )
         elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
             # Create T matrix
@@ -1738,7 +2028,9 @@ def construct_ups_state(
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
             # Analytical application on state vector
-            out = apply_generator_exponential(out, T, theta, ci_info, (exc_type, tuple(exc_indices)))
+            out = apply_generator_exponential(
+                out, T, theta, ci_info, (exc_type, tuple(exc_indices)), in_place=True
+            )
         elif exc_type in ("sa_double_2", "sa_double_3"):
             (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
             T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
@@ -1807,6 +2099,7 @@ def construct_ups_state_SA(
                 A * theta,
                 ci_info,
                 ("sa_single_alpha", tuple(exc_indices)),
+                in_place=True,
             )
             out = apply_generator_exponential_SA(
                 out,
@@ -1814,6 +2107,7 @@ def construct_ups_state_SA(
                 A * theta,
                 ci_info,
                 ("sa_single_beta", tuple(exc_indices)),
+                in_place=True,
             )
         elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
             # Create T matrix
@@ -1847,7 +2141,9 @@ def construct_ups_state_SA(
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
             # Analytical application on state vector
-            out = apply_generator_exponential_SA(out, T, theta, ci_info, (exc_type, tuple(exc_indices)))
+            out = apply_generator_exponential_SA(
+                out, T, theta, ci_info, (exc_type, tuple(exc_indices)), in_place=True
+            )
         elif exc_type in ("sa_double_2", "sa_double_3"):
             (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
             T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
@@ -1877,6 +2173,7 @@ def propagate_unitary(
     ci_info: CI_Info,
     thetas: Sequence[float],
     ups_struct: UpsStructure,
+    in_place: bool = False,
 ) -> np.ndarray:
     """Apply unitary from UPS operator number 'idx' to state.
 
@@ -1889,6 +2186,10 @@ def propagate_unitary(
         ci_info: Information about the CI space.
         thetas: Values for ansatz parameters.
         ups_struct: UPS structure object.
+        in_place: Let the unitary overwrite the state handed in rather than a copy of it. Only
+                  for a caller that owns the array, as the gradient's two propagated states are.
+                  Not every route works in place, see apply_generator_exponential, so the result
+                  is always the return value.
 
     Returns:
         State with unitary applied.
@@ -1898,7 +2199,7 @@ def propagate_unitary(
     exc_indices = ups_struct.excitation_indices[idx]
     theta = thetas[idx]
     if abs(theta) < 10**-28:
-        return np.copy(state)
+        return state if in_place else np.copy(state)
     if exc_type in ("sa_single",):
         A = 1  # 2**(-1/2)
         (i, a) = embed_spatial_indices(exc_indices, ci_info)
@@ -1912,8 +2213,11 @@ def propagate_unitary(
             A * theta,
             ci_info,
             ("sa_single_alpha", tuple(exc_indices)),
+            in_place=in_place,
         )
-        out = apply_generator_exponential(out, Tb, A * theta, ci_info, ("sa_single_beta", tuple(exc_indices)))
+        out = apply_generator_exponential(
+            out, Tb, A * theta, ci_info, ("sa_single_beta", tuple(exc_indices)), in_place=True
+        )
     elif exc_type in ("single", "double", "triple", "quadruple", "quintuple", "sextuple", "sa_double_1"):
         # Create T matrix
         if exc_type == "single":
@@ -1944,19 +2248,27 @@ def propagate_unitary(
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Analytical application on state vector
-        out = apply_generator_exponential(state, T, theta, ci_info, (exc_type, tuple(exc_indices)))
+        out = apply_generator_exponential(
+            state, T, theta, ci_info, (exc_type, tuple(exc_indices)), in_place=in_place
+        )
     elif exc_type in ("sa_double_2", "sa_double_3"):
         (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
         T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
-        out = apply_spin_adapted_double(state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)))
+        out = apply_spin_adapted_double(
+            state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)), in_place=in_place
+        )
     elif exc_type in ("sa_double_4",):
         (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
         T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
-        out = apply_spin_adapted_double(state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)))
+        out = apply_spin_adapted_double(
+            state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)), in_place=in_place
+        )
     elif exc_type in ("sa_double_5",):
         (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
         T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
-        out = apply_spin_adapted_double(state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)))
+        out = apply_spin_adapted_double(
+            state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)), in_place=in_place
+        )
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")
     return out
@@ -1968,6 +2280,7 @@ def propagate_unitary_SA(
     ci_info: CI_Info,
     thetas: Sequence[float],
     ups_struct: UpsStructure,
+    in_place: bool = False,
 ) -> np.ndarray:
     """Apply unitary from UPS operator number 'idx' to state.
 
@@ -1980,6 +2293,10 @@ def propagate_unitary_SA(
         ci_info: Information about the CI space.
         thetas: Values for ansatz parameters.
         ups_struct: UPS structure object.
+        in_place: Let the unitary overwrite the state handed in rather than a copy of it. Only
+                  for a caller that owns the array, as the gradient's two propagated states are.
+                  Not every route works in place, see apply_generator_exponential, so the result
+                  is always the return value.
 
     Returns:
         State with unitary applied.
@@ -1989,7 +2306,7 @@ def propagate_unitary_SA(
     exc_indices = ups_struct.excitation_indices[idx]
     theta = thetas[idx]
     if abs(theta) < 10**-28:
-        return np.copy(state)
+        return state if in_place else np.copy(state)
     if exc_type in ("sa_single",):
         A = 1  # 2**(-1/2)
         (i, a) = embed_spatial_indices(exc_indices, ci_info)
@@ -2003,6 +2320,7 @@ def propagate_unitary_SA(
             A * theta,
             ci_info,
             ("sa_single_alpha", tuple(exc_indices)),
+            in_place=in_place,
         )
         out = apply_generator_exponential_SA(
             out,
@@ -2041,58 +2359,151 @@ def propagate_unitary_SA(
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Analytical application on state vector
-        out = apply_generator_exponential_SA(state, T, theta, ci_info, (exc_type, tuple(exc_indices)))
+        out = apply_generator_exponential_SA(
+            state, T, theta, ci_info, (exc_type, tuple(exc_indices)), in_place=in_place
+        )
     elif exc_type in ("sa_double_2", "sa_double_3"):
         (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
         T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
-        out = apply_spin_adapted_double_SA(state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)))
+        out = apply_spin_adapted_double_SA(
+            state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)), in_place=in_place
+        )
     elif exc_type in ("sa_double_4",):
         (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
         T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
-        out = apply_spin_adapted_double_SA(state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)))
+        out = apply_spin_adapted_double_SA(
+            state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)), in_place=in_place
+        )
     elif exc_type in ("sa_double_5",):
         (i, j, a, b) = embed_spatial_indices(exc_indices, ci_info)
         T = G2_sa(i, j, a, b, int(exc_type[-1]), True, num_orbs=ci_info.num_active_orbs)
-        out = apply_spin_adapted_double_SA(state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)))
+        out = apply_spin_adapted_double_SA(
+            state, T, exc_type, theta, ci_info, (exc_type, tuple(exc_indices)), in_place=in_place
+        )
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")
     return out
 
 
-def get_grad_action(
+def apply_generator_once(
     state: np.ndarray,
-    idx: int,
+    operators: list[FermionicOperator],
     ci_info: CI_Info,
-    ups_struct: UpsStructure,
+    cache_keys: list[tuple[str, tuple[int, ...]]],
 ) -> np.ndarray:
-    r"""Get effect of differentiation with respect to "idx" operator in the UPS expansion.
+    r"""Apply a sum of excitation generators once.
 
     .. math::
-        \frac{\partial}{\partial \theta_i}\left(\left<\text{CSF}\right|\boldsymbol{U}(\theta_{i-1})\boldsymbol{U}(\theta_i)\right) =
-        \left<\text{CSF}\right|\boldsymbol{U}(\theta_{i-1})\frac{\partial \boldsymbol{U}(\theta_i)}{\partial \theta_i}
+        \left|\tilde{0}\right> = \sum_k \hat{T}_k\left|0\right>
 
-    With,
+    This is the factor the derivative of a unitary leaves behind,
 
     .. math::
-        \begin{align}
-        \frac{\partial \boldsymbol{U}(\theta_i)}{\partial \theta_i} &= \frac{\partial}{\partial \theta_i}\exp\left(\theta_i \hat{T}_i\right)\\
-                &= \exp\left(\theta_i \hat{T}_i\right)\hat{T}_i
-        \end{align}
+        \frac{\partial}{\partial\theta_i}\exp\left(\theta_i\hat{T}_i\right)
+            = \exp\left(\theta_i\hat{T}_i\right)\hat{T}_i
 
-    This function only applies the $\hat{T}_i$ part to the state.
+    and the sum is over the pieces one ansatz parameter drives, which for a spin-adapted single
+    is an alpha and a beta generator.
 
-    #. 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
+    When every generator pairs spin strings, each goes through that pairing, which is the same
+    map its unitary rotates over and is already cached for it. If any one of them does not, all
+    of them go through the general operator machinery instead.
+
+    #. 10.48550/arXiv.2303.10825, Eq. 36 (v1)
+    #. 10.48550/arXiv.2505.00883, Eq. 9 (spin-adapted single as an alpha and a beta generator)
 
     Args:
-        state: State vector.
+        state: State.
+        operators: Excitation generators, already embedded in the CI space.
+        ci_info: Information about the CI space.
+        cache_keys: Excitation type and indices naming each generator.
+
+    Returns:
+        New state.
+    """
+    layouts = [get_string_rotation_layout(op, ci_info, key) for op, key in zip(operators, cache_keys)]
+    if any(layout is None for layout in layouts):
+        total = propagate_state([operators[0]], state, ci_info, do_folding=False)
+        for op in operators[1:]:
+            total = total + propagate_state([op], state, ci_info, do_folding=False)
+        return total
+    resolved = [layout for layout in layouts if layout is not None]
+    out = np.zeros_like(state)
+    for layout in resolved:
+        accumulate_string_pairing(out.reshape(1, -1), state.reshape(1, -1), layout, ci_info)
+    return out
+
+
+def apply_generator_once_SA(
+    states: np.ndarray,
+    operators: list[FermionicOperator],
+    ci_info: CI_Info,
+    cache_keys: list[tuple[str, tuple[int, ...]]],
+) -> np.ndarray:
+    r"""Apply a sum of excitation generators once to every state of a state average.
+
+    .. math::
+        \left|\tilde{\nu}\right> = \sum_k \hat{T}_k\left|\nu\right>
+
+    #. 10.48550/arXiv.2303.10825, Eq. 36 (v1)
+
+    Args:
+        states: States as (number of states, number of determinants).
+        operators: Excitation generators, already embedded in the CI space.
+        ci_info: Information about the CI space.
+        cache_keys: Excitation type and indices naming each generator.
+
+    Returns:
+        New states.
+    """
+    layouts = [get_string_rotation_layout(op, ci_info, key) for op, key in zip(operators, cache_keys)]
+    if any(layout is None for layout in layouts):
+        total = propagate_state_SA([operators[0]], states, ci_info, do_folding=False)
+        for op in operators[1:]:
+            total = total + propagate_state_SA([op], states, ci_info, do_folding=False)
+        return total
+    resolved = [layout for layout in layouts if layout is not None]
+    out = np.zeros_like(states)
+    for layout in resolved:
+        accumulate_string_pairing(out, states, layout, ci_info)
+    return out
+
+
+def gradient_generators(
+    idx: int, ci_info: CI_Info, ups_struct: UpsStructure
+) -> tuple[list[FermionicOperator], list[tuple[str, tuple[int, ...]]], float]:
+    r"""The generators whose sum is the derivative factor of one unitary.
+
+    .. math::
+        \frac{\partial}{\partial\theta_i}\exp\left(\theta_i\hat{T}_i\right)
+            = \exp\left(\theta_i\hat{T}_i\right)\hat{T}_i
+
+    so the derivative needs the bare generator. A spin-adapted single is the sum of an alpha and
+    a beta generator, which commute, so its unitary factorizes into one exponential per spin,
+
+    .. math::
+        {}^\text{SA}\hat{G}_{ai} = \frac{1}{\sqrt{2}}
+            \left(\hat{G}_{a_\alpha i_\alpha} + \hat{G}_{a_\beta i_\beta}\right),\qquad
+        \exp\left(\theta\,{}^\text{SA}\hat{G}_{ai}\right)
+            = \exp\left(\frac{\theta}{\sqrt{2}}\hat{G}_{a_\alpha i_\alpha}\right)
+              \exp\left(\frac{\theta}{\sqrt{2}}\hat{G}_{a_\beta i_\beta}\right)
+
+    It is returned as two operators rather than one, because each of them pairs spin strings on
+    its own while their sum does not. The ansatz absorbs the :math:`1/\sqrt{2}` into the
+    parameter, so the factor returned here is one and not :math:`2^{-1/2}`, matching how
+    propagate_unitary applies the two exponentials.
+
+    #. 10.48550/arXiv.2303.10825, Eq. 36 (v1)
+    #. 10.48550/arXiv.2505.00883, Eq. 9 and 10
+
+    Args:
         idx: Index of operator in the ups_struct.
         ci_info: Information about the CI space.
         ups_struct: UPS structure object.
 
     Returns:
-        State with derivative of the idx'th unitary applied.
+        The generators, the cache key naming each, and an overall factor.
     """
-    # Select unitary operation based on idx
     exc_type = ups_struct.excitation_operator_type[idx]
     exc_indices = ups_struct.excitation_indices[idx]
     if exc_type in ("sa_single",):
@@ -2101,12 +2512,10 @@ def get_grad_action(
         (i, a) = embed_spatial_indices(exc_indices, ci_info)
         Ta = G1(alpha_idx(i, ci_info.num_active_orbs), alpha_idx(a, ci_info.num_active_orbs), True)
         Tb = G1(beta_idx(i, ci_info.num_active_orbs), beta_idx(a, ci_info.num_active_orbs), True)
-        # Apply missing T factor of derivative
-        tmp = propagate_state(
-            [A * (Ta + Tb)],
-            state,
-            ci_info,
-            do_folding=False,
+        return (
+            [Ta, Tb],
+            [("sa_single_alpha", tuple(exc_indices)), ("sa_single_beta", tuple(exc_indices))],
+            float(A),
         )
     elif exc_type in (
         "single",
@@ -2161,16 +2570,73 @@ def get_grad_action(
             T = G2_sa(i, j, a, b, 5, True, num_orbs=ci_info.num_active_orbs)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
-        # Apply missing T factor of derivative
-        tmp = propagate_state(
-            [T],
-            state,
-            ci_info,
-            do_folding=False,
-        )
-    else:
-        raise ValueError(f"Got unknown excitation type, {exc_type}")
-    return tmp
+        return [T], [(exc_type, tuple(exc_indices))], 1.0
+    raise ValueError(f"Got unknown excitation type, {exc_type}")
+
+
+def get_grad_action(state: np.ndarray, idx: int, ci_info: CI_Info, ups_struct: UpsStructure) -> np.ndarray:
+    r"""Get effect of differentiation with respect to "idx" operator in the UPS expansion.
+
+    .. math::
+        \frac{\partial \boldsymbol{U}(\theta_i)}{\partial \theta_i}
+            = \exp\left(\theta_i \hat{T}_i\right)\hat{T}_i
+
+    This function only applies the :math:`\hat{T}_i` part to the state.
+
+    #. 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
+
+    Args:
+        state: State vector.
+        idx: Index of operator in the ups_struct.
+        ci_info: Information about the CI space.
+        ups_struct: UPS structure object.
+
+    Returns:
+        State with derivative of the idx'th unitary applied.
+    """
+    operators, cache_keys, factor = gradient_generators(idx, ci_info, ups_struct)
+    return factor * apply_generator_once(state, operators, ci_info, cache_keys)
+
+
+def get_grad_overlap(
+    bra: np.ndarray, ket: np.ndarray, idx: int, ci_info: CI_Info, ups_struct: UpsStructure
+) -> np.ndarray:
+    r"""Overlap of a bra with the derivative factor of one unitary acting on a ket.
+
+    The energy gradient with respect to one ansatz parameter is
+
+    .. math::
+        \frac{\partial\left<E\right>}{\partial\theta_i}
+            = 2\left<\psi^\prime_{i+1}\right|\hat{T}_i\left|\psi_i\right>
+
+    so what the optimizer needs is a number, not the state
+    :math:`\hat{T}_i\left|\psi_i\right>`. Where the generator pairs spin strings the overlap is
+    summed over the pairs directly, so that state is never formed: forming it would cost a pass
+    to zero it, a pass to fill it and a pass to read it back. The factor of two and, for a state
+    average, the mean over the states are left to the caller.
+
+    #. 10.48550/arXiv.2303.10825, Eq. 36 and 37 (v1)
+
+    Args:
+        bra: Bra states as (number of states, number of determinants).
+        ket: Ket states, same shape.
+        idx: Index of operator in the ups_struct.
+        ci_info: Information about the CI space.
+        ups_struct: UPS structure object.
+
+    Returns:
+        One overlap per state.
+    """
+    operators, cache_keys, factor = gradient_generators(idx, ci_info, ups_struct)
+    layouts = [get_string_rotation_layout(op, ci_info, key) for op, key in zip(operators, cache_keys)]
+    if any(layout is None for layout in layouts):
+        acted = apply_generator_once_SA(ket, operators, ci_info, cache_keys)
+        return factor * np.einsum("ij,ij->i", bra, acted)
+    out = np.zeros(bra.shape[0])
+    for layout in layouts:
+        if layout is not None:
+            string_pairing_overlap(bra, ket, layout, ci_info, out)
+    return factor * out
 
 
 def get_grad_action_SA(
@@ -2216,11 +2682,11 @@ def get_grad_action_SA(
         Ta = G1(alpha_idx(i, ci_info.num_active_orbs), alpha_idx(a, ci_info.num_active_orbs), True)
         Tb = G1(beta_idx(i, ci_info.num_active_orbs), beta_idx(a, ci_info.num_active_orbs), True)
         # Apply missing T factor of derivative
-        tmp = propagate_state_SA(
-            [A * (Ta + Tb)],
+        tmp = A * apply_generator_once_SA(
             state,
+            [Ta, Tb],
             ci_info,
-            do_folding=False,
+            [("sa_single_alpha", tuple(exc_indices)), ("sa_single_beta", tuple(exc_indices))],
         )
     elif exc_type in (
         "single",
@@ -2276,12 +2742,7 @@ def get_grad_action_SA(
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Apply missing T factor of derivative
-        tmp = propagate_state_SA(
-            [T],
-            state,
-            ci_info,
-            do_folding=False,
-        )
+        tmp = apply_generator_once_SA(state, [T], ci_info, [(exc_type, tuple(exc_indices))])
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")
     return tmp

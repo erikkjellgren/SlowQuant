@@ -113,7 +113,10 @@ def is_alpha(i: int, num_orbs: int) -> bool:
 
 
 def interleaved_to_blocked(i: int, num_orbs: int) -> int:
-    """Convert an interleaved spin-orbital index to a blocked one.
+    r"""Convert an interleaved spin-orbital index to a blocked one.
+
+    .. math::
+        2p \rightarrow p,\qquad 2p + 1 \rightarrow p + N
 
     Args:
         i: Spin-orbital index in interleaved ordering.
@@ -130,7 +133,10 @@ def interleaved_to_blocked(i: int, num_orbs: int) -> int:
 
 
 def blocked_to_interleaved(i: int, num_orbs: int) -> int:
-    """Convert a blocked spin-orbital index to an interleaved one.
+    r"""Convert a blocked spin-orbital index to an interleaved one.
+
+    .. math::
+        p \rightarrow 2p,\qquad p + N \rightarrow 2p + 1
 
     Args:
         i: Spin-orbital index in blocked ordering.
@@ -186,7 +192,11 @@ def get_reordering_sign(det: str) -> int:
     :math:`\alpha` operators in front of all :math:`\beta` operators is a permutation
     whose sign is the parity of the number of occupied
     :math:`\left(\beta,\alpha\right)` inversions, i.e. the number of pairs where an
-    occupied :math:`\beta` spin orbital precedes an occupied :math:`\alpha` one.
+    occupied :math:`\beta` spin orbital precedes an occupied :math:`\alpha` one. In the
+    interleaved order :math:`p_\beta` precedes :math:`q_\alpha` exactly when :math:`p < q`, so
+
+    .. math::
+        \text{sign} = \left(-1\right)^{\sum_{p<q} n_{p\beta}\,n_{q\alpha}}
 
     Args:
         det: Determinant in interleaved ordering.

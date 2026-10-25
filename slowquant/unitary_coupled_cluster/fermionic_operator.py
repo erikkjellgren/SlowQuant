@@ -1,3 +1,32 @@
+r"""Fermionic operators as sums of normal-ordered strings.
+
+An operator is held as a dictionary of normal-ordered strings and their factors, see
+FermionicOperator. Products are taken by Wick's theorem, which is what keeps that form closed
+under multiplication, and the two places where the representation is subtle are:
+
+#. **Normal ordering and sorting.** Each half of a key is sorted descending and lists its
+   operators in written order, left to right, so the key ((5, 1), (4, 0)) is the string
+   :math:`\hat{a}^\dagger_5\hat{a}^\dagger_1\hat{a}_4\hat{a}_0`. Anything building a key by
+   hand has to sort it the same way, with the sign of the permutation, or the dictionary
+   silently gains terms.
+
+#. **Folding.** The inactive orbitals are doubly occupied and the virtual ones empty in both bra
+   and ket, so an expectation value only needs the active part of the operator,
+
+   .. math::
+       \left<0\left|\hat{O}\right|0\right>
+           = \left<I\left|\hat{O}_I\right|I\right>
+             \left<A\left|\hat{O}_A\right|A\right>
+             \left<V\left|\hat{O}_V\right|V\right>
+
+   up to the phase from moving the active operators past the occupied inactive ones. Folding
+   evaluates the inactive and virtual parts to that phase or to zero and remaps the active
+   indices to start at zero, so a folded operator is valid only as the last step: build the
+   product first, fold last. See fold_fermionic_string and FermionicOperator.get_folded_operator.
+
+Spin-orbital indices are in the alpha/beta-blocked ordering, see spin_ordering.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -403,6 +432,36 @@ def commutator_multiply(A: FermionicOperator, B: FermionicOperator) -> Fermionic
 
 
 class FermionicOperator:
+    r"""Fermionic operator as a sum of normal-ordered strings with a factor each.
+
+    .. math::
+        \hat{O} = \sum_t c_t\,\hat{a}^\dagger_{p_1}\cdots\hat{a}^\dagger_{p_m}
+                          \hat{a}_{q_1}\cdots\hat{a}_{q_n},\qquad
+        p_1 > \dots > p_m,\quad q_1 > \dots > q_n
+
+    Each string is a key of operators, the tuple
+    :math:`\left(\left(p_1,\dots,p_m\right),\left(q_1,\dots,q_n\right)\right)`, and its factor
+    is the value. The indices are spin-orbital indices in the alpha/beta-blocked ordering, see
+    spin_ordering.
+
+    Two invariants make the dictionary well defined, and breaking either of them adds terms
+    silently rather than raising:
+
+    #. Each half of a key is sorted **descending**, with the sign of the permutation taken into
+       the factor. Two spellings of the same string must produce the same key, or they stop
+       combining in the dictionary.
+    #. The tuple order is the written order, left to right. Acting on a ket the operators
+       apply right to left, which is how fold_fermionic_string walks them. The state-vector
+       kernels apply each block in stored order instead, which reverses both blocks and so
+       gives the same phase for any string with as many creation as annihilation operators,
+       see spin_factorized_algebra.build_spin_excitation_map.
+
+    Products are taken by Wick's theorem and the result is put back in this form, see
+    do_product_extended_normal_ordering, so the class is closed under multiplication. Folding
+    into the active space is not: a folded operator is only valid as the last step, see
+    get_folded_operator.
+    """
+
     __slots__ = ("_operator_sets", "operators")
 
     def __init__(

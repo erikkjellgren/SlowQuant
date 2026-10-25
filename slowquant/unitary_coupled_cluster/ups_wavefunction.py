@@ -25,7 +25,7 @@ from slowquant.unitary_coupled_cluster.integral_manager import IntegralManager
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     construct_ups_state,
     expectation_value,
-    get_grad_action,
+    get_grad_overlap,
     propagate_state,
     propagate_state_SA,
     propagate_unitary,
@@ -285,11 +285,11 @@ class WaveFunctionUPS:
             self.num_active_elec_alpha,
             self.num_active_elec_beta,
         )
-        self.num_det = len(self.ci_info.idx2det)
+        self.num_det = self.ci_info.num_dets
         self.ref_coeffs = np.zeros(self.num_det, dtype=float)
         print("Reference (active) determinant:", ref_det)
         # The reference determinant is given interleaved, the CI space is blocked.
-        self.ref_coeffs[self.ci_info.det2idx[int(det_interleaved_to_blocked(ref_det), 2)]] = 1
+        self.ref_coeffs[self.ci_info.index_of_determinant(int(det_interleaved_to_blocked(ref_det), 2))] = 1
         self._ci_coeffs = np.copy(self.ref_coeffs)
         # Construct UPS Structure
         self.ups_layout = UpsStructure()
@@ -1008,7 +1008,43 @@ class WaveFunctionUPS:
     def _calc_gradient_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
     ) -> np.ndarray:
-        """Calculate electronic gradient.
+        r"""Calculate electronic gradient.
+
+        The orbital part is taken from the density matrices. The ansatz part uses the
+        recurrence that walks the product of unitaries once rather than rebuilding it per
+        parameter. Writing the two partially propagated states as
+
+        .. math::
+            \left|\psi_j\right> = \prod_{k=j}^{1}\exp\left(\theta_k\hat{T}_k\right)
+                \left|\text{CSF}\right>,\qquad
+            \left<\psi^\prime_j\right| = \left<\psi\right|\hat{H}
+                \prod_{k=N}^{j}\exp\left(\theta_k\hat{T}_k\right)
+
+        the gradient with respect to one ansatz parameter is
+
+        .. math::
+            \frac{\partial\left<E\right>}{\partial\theta_j}
+                = 2\left<\psi^\prime_{j+1}\right|\hat{T}_j\left|\psi_j\right>
+                = 2\left<\psi^\prime_j\right|\hat{T}_j\left|\psi_{j-1}\right>
+
+        the two forms being equal because :math:`\hat{T}_j` commutes with its own exponential.
+        The reference walks this backwards from :math:`\left|\psi_N\right> = \left|\psi\right>`.
+        The loop here walks it forwards from the CSF instead, starting from
+        :math:`\left|\psi_0\right> = \left|\text{CSF}\right>` and
+        :math:`\left<\psi^\prime_1\right| = \left<\psi\right|\hat{H}\boldsymbol{U}`, which is
+        built once by applying the whole ansatz in reverse to :math:`\hat{H}\left|\psi\right>`,
+        and taking the second form of the gradient before each step
+
+        .. math::
+            \left|\psi_j\right> = \exp\left(\theta_j\hat{T}_j\right)\left|\psi_{j-1}\right>,\qquad
+            \left<\psi^\prime_{j+1}\right| = \left<\psi^\prime_j\right|
+                \exp\left(-\theta_j\hat{T}_j\right)
+
+        so every parameter costs two rotations and one overlap, and only two state vectors are
+        ever held. The overlap is taken without forming
+        :math:`\hat{T}_j\left|\psi_{j-1}\right>`, see get_grad_overlap.
+
+        #. 10.48550/arXiv.2303.10825, Eq. 36 and 37 (v1)
 
         Args:
             parameters: Ansatz and orbital rotation parameters.
@@ -1052,25 +1088,31 @@ class WaveFunctionUPS:
             )
             # CSF reference state on ket
             ket_vec = np.copy(self.ref_coeffs)
-            ket_vec_tmp = np.copy(self.ref_coeffs)
-            # Calculate analytical derivative w.r.t. each theta using gradient_action function
+            # Calculate analytical derivative w.r.t. each theta using get_grad_overlap
             for i in range(len(self.thetas)):
-                # Derivative action w.r.t. i-th theta on CSF ket
-                ket_vec_tmp = get_grad_action(
-                    ket_vec,
-                    i,
-                    self.ci_info,
-                    self.ups_layout,
+                # Derivative action w.r.t. i-th theta on CSF ket, contracted with the bra
+                # directly: the gradient needs the number, not the state.
+                gradient[i + num_kappa] += (
+                    2
+                    * get_grad_overlap(
+                        bra_vec.reshape(1, -1),
+                        ket_vec.reshape(1, -1),
+                        i,
+                        self.ci_info,
+                        self.ups_layout,
+                    )[0]
                 )
-                gradient[i + num_kappa] += 2 * np.matmul(bra_vec, ket_vec_tmp)
                 # Product rule implications on reference bra and CSF ket
                 # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
+                # Both of these are this function's own working vectors, so the unitary is
+                # applied to them rather than to a copy.
                 bra_vec = propagate_unitary(
                     bra_vec,
                     i,
                     self.ci_info,
                     self.thetas,
                     self.ups_layout,
+                    in_place=True,
                 )
                 ket_vec = propagate_unitary(
                     ket_vec,
@@ -1078,6 +1120,7 @@ class WaveFunctionUPS:
                     self.ci_info,
                     self.thetas,
                     self.ups_layout,
+                    in_place=True,
                 )
             self.num_energy_evals += 2 * np.sum(
                 list(self.ups_layout.grad_param_R.values())

@@ -27,21 +27,62 @@ def bitcount(x: int) -> int:
 
 
 class CI_Info:
+    r"""Determinant expansion of an active space, and the caches built over it.
+
+    The spin-orbital ordering is alpha/beta-blocked, so a determinant integer splits into an
+    alpha string in the high half and a beta string in the low half, see spin_ordering,
+
+    .. math::
+        \left|I\right> = \left|I_\alpha\right>\otimes\left|I_\beta\right>
+
+    For a complete active space the expansion is the full product of the two string spaces,
+
+    .. math::
+        \dim = \binom{N}{N_\alpha}\binom{N}{N_\beta},\qquad
+        I = I_\alpha N_\beta + I_\beta
+
+    with the alpha strings enumerated in the outer loop and the beta strings in the inner one,
+    see get_indexing. Only the two per-spin maps are stored; the maps over every determinant
+    follow from them and are built lazily, because they are the two largest structures in the
+    program, see idx2det and det2idx.
+
+    That product structure is what spin_factorized_algebra needs. For an expansion that is not a
+    spin product, which get_indexing_extended builds, the per-spin maps are empty,
+    num_alpha_strings and num_beta_strings are zero, and is_spin_product is False, which routes
+    the algebra back to the general determinant kernels.
+
+    Everything else held here is a cache, built on first use and never invalidated, so a
+    CI_Info must not be mutated after determinants have been acted on:
+
+    * spin_arena and spin_op_cache, the string excitation lists shared by every operator over
+      this space, see spin_factorized_algebra.get_spin_sub_string_slice.
+    * string_rotation_layouts and spin_block_layouts, the exponential of each ansatz generator
+      held per spin string, which does not grow with the number of determinants.
+    * rotation_layouts and block_layouts, the same two held per determinant, which is what is
+      left when the space is not a spin product.
+
+    #. 10.1016/0009-2614(80)85158-X (alpha and beta strings)
+    #. 10.1063/1.455063 (the CI vector indexed as C(I_alpha, I_beta))
+    #. C. D. Sherrill, An Introduction to Configuration Interaction Theory, Eq. 6.3,
+       https://vergil.chemistry.gatech.edu/static/content/ci.pdf
+    """
+
     __slots__ = (
+        "_det2idx",
+        "_idx2det",
         "alpha_str2idx",
         "alpha_str2idx_nb",
         "beta_str2idx",
         "beta_str2idx_nb",
         "block_layouts",
-        "det2idx",
         "idx2alpha_str",
         "idx2beta_str",
-        "idx2det",
         "num_active_elec_alpha",
         "num_active_elec_beta",
         "num_active_orbs",
         "num_alpha_strings",
         "num_beta_strings",
+        "num_dets",
         "num_inactive_orbs",
         "num_virtual_orbs",
         "rotation_layouts",
@@ -49,7 +90,9 @@ class CI_Info:
         "spin_arena",
         "spin_arena_length",
         "spin_arena_packed",
+        "spin_block_layouts",
         "spin_op_cache",
+        "string_rotation_layouts",
     )
 
     def __init__(
@@ -59,25 +102,12 @@ class CI_Info:
         num_virtual_orbs: int,
         num_active_elec_alpha: int,
         num_active_elec_beta: int,
-        idx2det: np.ndarray,
-        det2idx: dict[int, int],
+        idx2det: np.ndarray | None = None,
+        det2idx: dict[int, int] | None = None,
         alpha_str2idx: dict[int, int] | None = None,
         beta_str2idx: dict[int, int] | None = None,
     ) -> None:
-        r"""Initialize configuration expansion information object.
-
-        The spin-orbital ordering is alpha/beta-blocked, so a determinant integer splits into an
-        alpha string in the high half and a beta string in the low half, see spin_ordering.
-
-        When the expansion is a product of an alpha and a beta string space, which is the case for
-        get_indexing but not for get_indexing_extended, the per-spin index maps relate the two,
-
-        .. math::
-            I = I_\alpha N_\beta + I_\beta
-
-        The product structure is what spin_factorized_algebra is built on. For an expansion that
-        is not a spin product the maps are empty, num_alpha_strings and num_beta_strings are zero,
-        and is_spin_product is False, which routes the algebra back to the general kernels.
+        """Initialize configuration expansion information object.
 
         Args:
             num_inactive_orbs: Number of inactive spatial orbitals.
@@ -85,8 +115,8 @@ class CI_Info:
             num_virtual_orbs: Number of virtual orbitals.
             num_active_elec_alpha: Number of active alpha electrons.
             num_active_elec_beta: Number of active beta electrons.
-            idx2det: Index to determinant mapping.
-            det2idx: Determinant to index mapping.
+            idx2det: Index to determinant mapping, or None to derive it from the per-spin maps.
+            det2idx: Determinant to index mapping, or None to derive it from the per-spin maps.
             alpha_str2idx: Alpha string to alpha index mapping, if the space is a spin product.
             beta_str2idx: Beta string to beta index mapping, if the space is a spin product.
         """
@@ -95,17 +125,27 @@ class CI_Info:
         self.num_virtual_orbs = num_virtual_orbs
         self.num_active_elec_alpha = num_active_elec_alpha
         self.num_active_elec_beta = num_active_elec_beta
-        self.idx2det = idx2det
-        # Unfortunately, Numba needs a little bit of typing help.
-        nb_dict = nbt.Dict.empty(key_type=nb.int64, value_type=nb.int64)
-        for k, v in det2idx.items():
-            nb_dict[k] = v
-        self.det2idx = nb_dict
         self.space_extension_offset = 0
         self.alpha_str2idx = {} if alpha_str2idx is None else alpha_str2idx
         self.beta_str2idx = {} if beta_str2idx is None else beta_str2idx
         self.num_alpha_strings = len(self.alpha_str2idx)
         self.num_beta_strings = len(self.beta_str2idx)
+        # Over a spin product both determinant maps are implied by the per-spin ones, and they
+        # are the two largest structures in the program: one entry per determinant each, against
+        # one per spin string for the maps that replace them. So they are only materialized if
+        # something actually asks, which over a spin product nothing on the fast path does.
+        self._idx2det = idx2det
+        self._det2idx: dict[int, int] | None = None
+        if det2idx is not None:
+            # Unfortunately, Numba needs a little bit of typing help.
+            nb_dict = nbt.Dict.empty(key_type=nb.int64, value_type=nb.int64)
+            for k, v in det2idx.items():
+                nb_dict[k] = v
+            self._det2idx = nb_dict
+        if idx2det is not None:
+            self.num_dets = len(idx2det)
+        else:
+            self.num_dets = self.num_alpha_strings * self.num_beta_strings
         # Array form of the per-spin maps, which is what the Numba kernels of the
         # spin-factorized algebra can consume. Empty when the space is not a spin product.
         self.idx2alpha_str = np.zeros(self.num_alpha_strings, dtype=int)
@@ -147,6 +187,79 @@ class CI_Info:
         # The same for generators that connect more than two determinants at a time, see
         # operator_state_algebra.build_generator_blocks.
         self.block_layouts: dict[tuple[str, tuple[int, ...]], tuple[np.ndarray, ...] | None] = {}
+        # The same rotations again, but held as pairs of spin strings rather than pairs of
+        # determinants, which is what a spin product allows and what keeps the ansatz's memory
+        # independent of the size of the CI space. See
+        # spin_factorized_algebra.build_string_rotation_layout.
+        # Generators that are not pairings, the spin-adapted doubles above all, block over pairs
+        # of spin-string cells instead. See spin_factorized_algebra.build_spin_block_layout.
+        self.spin_block_layouts: dict[tuple[str, tuple[int, ...]], tuple | None] = {}
+        self.string_rotation_layouts: dict[
+            tuple[str, tuple[int, ...]], tuple[int, tuple[np.ndarray, ...], tuple[np.ndarray, ...]] | None
+        ] = {}
+
+    @property
+    def idx2det(self) -> np.ndarray:
+        r"""Determinant of every index, built on first use over a spin product.
+
+        .. math::
+            \text{det}\left(I_\alpha N_\beta + I_\beta\right)
+                = \left(\text{str}_\alpha \ll N\right) | \text{str}_\beta
+
+        Costs eight bytes per determinant, so over a spin product it is left unbuilt until
+        something asks for it, which only the general kernels do. At CAS(16,16) that is 1.3 GB
+        over 165.6 million determinants, against 206 kB for the two per-spin maps of 12,870
+        entries each that it is derived from.
+
+        Returns:
+            Index to determinant mapping.
+        """
+        if self._idx2det is None:
+            self._idx2det = (
+                (self.idx2alpha_str[:, np.newaxis] << self.num_active_orbs) | self.idx2beta_str[np.newaxis, :]
+            ).ravel()
+        return self._idx2det
+
+    @property
+    def det2idx(self) -> dict[int, int]:
+        """Index of every determinant, built on first use over a spin product.
+
+        This is the single largest structure in the program, tens of bytes per determinant in a
+        Numba typed dictionary, and over a spin product it is redundant with the two per-spin
+        maps. Use index_of_determinant for a single lookup rather than forcing it to be built.
+
+        Returns:
+            Determinant to index mapping.
+        """
+        if self._det2idx is None:
+            nb_dict = nbt.Dict.empty(key_type=nb.int64, value_type=nb.int64)
+            for idx, det in enumerate(self.idx2det):
+                nb_dict[int(det)] = idx
+            self._det2idx = nb_dict
+        return self._det2idx
+
+    def index_of_determinant(self, det: int) -> int:
+        r"""Look one determinant up without building the whole determinant map.
+
+        Over a spin product the index follows from the two per-spin maps,
+
+        .. math::
+            I = I_\alpha N_\beta + I_\beta
+
+        so a handful of lookups, as the wave function classes do to place their reference
+        determinant, need not pay for a map over every determinant in the space.
+
+        Args:
+            det: Determinant as an integer.
+
+        Returns:
+            Index of the determinant.
+        """
+        if self._det2idx is None and self.is_spin_product:
+            alpha_str = det >> self.num_active_orbs
+            beta_str = det & ((1 << self.num_active_orbs) - 1)
+            return self.alpha_str2idx[alpha_str] * self.num_beta_strings + self.beta_str2idx[beta_str]
+        return self.det2idx[det]
 
     @property
     def is_spin_product(self) -> bool:
@@ -230,7 +343,19 @@ def get_indexing(
     num_active_elec_alpha: int,
     num_active_elec_beta: int,
 ) -> CI_Info:
-    """Get relation between index and determinant.
+    r"""Get relation between index and determinant.
+
+    Enumerates the complete active space as the product of an alpha and a beta string space,
+
+    .. math::
+        \left|I\right> = \left|I_\alpha\right>\otimes\left|I_\beta\right>,\qquad
+        I = I_\alpha N_\beta + I_\beta
+
+    with the alpha strings in the outer loop and the beta strings in the inner one. That
+    ordering is load bearing for spin_factorized_algebra, which reads the CI vector as a matrix
+    :math:`C_{I_\alpha I_\beta}` without copying it, so the two loops must not be swapped.
+
+    #. 10.1063/1.455063 (alpha and beta strings as the two axes of the CI vector)
 
     Args:
         num_inactive_orbs: Number of inactive spatial orbitals.
@@ -242,35 +367,27 @@ def get_indexing(
     Returns:
         CI_Info object.
     """
-    idx = 0
-    idx2det = []
-    det2idx = {}
-    alpha_str2idx = {}
-    beta_str2idx = {}
-    # Loop over all possible particle and spin conserving determinant combinations.
-    # Alpha is the outer loop and beta the inner one, so the index of a determinant is
-    # idx_alpha*num_beta_strings + idx_beta. This product structure is relied upon, do not
-    # reorder the loops.
-    for idx_alpha, alpha_string in enumerate(generate_spin_strings(num_active_orbs, num_active_elec_alpha)):
-        alpha_str = spin_string_to_int(alpha_string)
-        alpha_str2idx[alpha_str] = idx_alpha
-        for idx_beta, beta_string in enumerate(generate_spin_strings(num_active_orbs, num_active_elec_beta)):
-            beta_str = spin_string_to_int(beta_string)
-            beta_str2idx[beta_str] = idx_beta
-            det = det_from_spin_strings(alpha_str, beta_str, num_active_orbs)
-            idx2det.append(det)  # relate index to determinant
-            det2idx[det] = idx  # relate determinant to index
-            idx += 1
+    # Only the per-spin maps are built. A determinant is an alpha string in the high half and a
+    # beta string in the low half, and the index of one is idx_alpha*num_beta_strings +
+    # idx_beta, so the maps over every determinant follow from these two and are left to
+    # CI_Info to derive if anything ever asks. Alpha is still the outer space and beta the
+    # inner one; that convention is what makes the index formula hold, so do not swap them.
+    alpha_str2idx = {
+        spin_string_to_int(occupation): idx_alpha
+        for idx_alpha, occupation in enumerate(generate_spin_strings(num_active_orbs, num_active_elec_alpha))
+    }
+    beta_str2idx = {
+        spin_string_to_int(occupation): idx_beta
+        for idx_beta, occupation in enumerate(generate_spin_strings(num_active_orbs, num_active_elec_beta))
+    }
     return CI_Info(
         num_inactive_orbs,
         num_active_orbs,
         num_virtual_orbs,
         num_active_elec_alpha,
         num_active_elec_beta,
-        np.array(idx2det, dtype=int),
-        det2idx,
-        alpha_str2idx,
-        beta_str2idx,
+        alpha_str2idx=alpha_str2idx,
+        beta_str2idx=beta_str2idx,
     )
 
 

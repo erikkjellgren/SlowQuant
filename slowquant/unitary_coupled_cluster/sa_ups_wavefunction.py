@@ -24,7 +24,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     construct_ups_state_SA,
     expectation_value,
     expectation_value_SA,
-    get_grad_action_SA,
+    get_grad_overlap,
     propagate_state_SA,
     propagate_unitary_SA,
 )
@@ -236,7 +236,7 @@ class WaveFunctionSAUPS:
             self.num_active_elec_alpha,
             self.num_active_elec_beta,
         )
-        self.num_det = len(self.ci_info.idx2det)
+        self.num_det = self.ci_info.num_dets
         # SA details
         self.num_states = len(states[0])
         self.ref_coeffs = np.zeros((self.num_states, self.num_det))  # state vector for each state in SA
@@ -256,7 +256,7 @@ class WaveFunctionSAUPS:
                 # one in the blocked ordering permutes its creation operators, which carries a
                 # sign. For a single determinant that is a global phase, but these states are
                 # superpositions, so the relative signs are physical.
-                idx = self.ci_info.det2idx[int(det_interleaved_to_blocked(on_vec), 2)]
+                idx = self.ci_info.index_of_determinant(int(det_interleaved_to_blocked(on_vec), 2))
                 self.ref_coeffs[i, idx] = coeff * get_reordering_sign(on_vec)
         self._ci_coeffs = np.copy(self.ref_coeffs)
         for i, coeff_i in enumerate(self.ci_coeffs):
@@ -889,9 +889,43 @@ class WaveFunctionSAUPS:
     ) -> np.ndarray:
         r"""Calculate electronic gradient.
 
-        For theta part,
+        The orbital part is taken from the state-averaged density matrices. The ansatz part uses
+        the recurrence that walks the product of unitaries once rather than rebuilding it per
+        parameter. Writing the two partially propagated states of one CSF as
+
+        .. math::
+            \left|\psi_j\right> = \prod_{k=j}^{1}\exp\left(\theta_k\hat{T}_k\right)
+                \left|\text{CSF}\right>,\qquad
+            \left<\psi^\prime_j\right| = \left<\psi\right|\hat{H}
+                \prod_{k=N}^{j}\exp\left(\theta_k\hat{T}_k\right)
+
+        the gradient with respect to one ansatz parameter is
+
+        .. math::
+            \frac{\partial\left<E\right>}{\partial\theta_j}
+                = 2\left<\psi^\prime_{j+1}\right|\hat{T}_j\left|\psi_j\right>
+                = 2\left<\psi^\prime_j\right|\hat{T}_j\left|\psi_{j-1}\right>
+
+        the two forms being equal because :math:`\hat{T}_j` commutes with its own exponential.
+        The reference walks this backwards from :math:`\left|\psi_N\right> = \left|\psi\right>`.
+        The loop here walks it forwards from the CSF instead, starting from
+        :math:`\left|\psi_0\right> = \left|\text{CSF}\right>` and
+        :math:`\left<\psi^\prime_1\right| = \left<\psi\right|\hat{H}\boldsymbol{U}`, which is
+        built once by applying the whole ansatz in reverse to :math:`\hat{H}\left|\psi\right>`,
+        and taking the second form of the gradient before each step
+
+        .. math::
+            \left|\psi_j\right> = \exp\left(\theta_j\hat{T}_j\right)\left|\psi_{j-1}\right>,\qquad
+            \left<\psi^\prime_{j+1}\right| = \left<\psi^\prime_j\right|
+                \exp\left(-\theta_j\hat{T}_j\right)
+
+        averaged over the CSFs with equal weight. Every CSF is carried through the recurrence at
+        once as a row of a matrix, so a parameter costs two rotations and one overlap per state
+        and only two sets of state vectors are ever held. The overlap is taken without forming
+        :math:`\hat{T}_j\left|\psi_{j-1}\right>`, see get_grad_overlap.
 
         #. 10.48550/arXiv.2303.10825, Eq. 17-21 (appendix - v1)
+        #. 10.48550/arXiv.2303.10825, Eq. 36 and 37 (v1)
 
         Args:
             parameters: Ansatz and orbital rotation parameters.
@@ -941,18 +975,15 @@ class WaveFunctionSAUPS:
             )
             # CSF reference state on ket
             ket_vec = np.copy(self.ref_coeffs)
-            ket_vec_tmp = np.copy(self.ref_coeffs)
-            # Calculate analytical derivative w.r.t. each theta using gradient_action function
+            # Calculate analytical derivative w.r.t. each theta using get_grad_overlap
             for i in range(len(self.thetas)):
-                # Loop over each state in SA
-                ket_vec_tmp = get_grad_action_SA(
-                    ket_vec,
-                    i,
-                    self.ci_info,
-                    self.ups_layout,
+                # One overlap per state in the average, contracted without forming the state
+                # the generator would produce.
+                gradient[i + num_kappa] += (
+                    2
+                    * float(np.sum(get_grad_overlap(bra_vec, ket_vec, i, self.ci_info, self.ups_layout)))
+                    / len(bra_vec)
                 )
-                for bra, ket in zip(bra_vec, ket_vec_tmp):
-                    gradient[i + num_kappa] += 2 * np.matmul(bra, ket) / len(bra_vec)
                 # Product rule implications on reference bra and CSF ket
                 # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
                 bra_vec = propagate_unitary_SA(
