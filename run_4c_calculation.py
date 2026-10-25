@@ -11,45 +11,49 @@ from pyscf.data import nist
 from pyscf.prop import nmr, ssc
 from pyscf.scf import hf
 
-from slowquant.unitary_coupled_cluster.DHF_integral_direct import DHFCholesky, DHFDirect
+from slowquant.unitary_coupled_cluster.DHF_integral_direct import DHFCholesky, DHFDensityFit, DHFDirect, DHFHybrid
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction_DHF import GeneralizedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.linear_response.generalized_direct_DHF import LinearResponseDirect
 from slowquant.unitary_coupled_cluster.printing import info_block, key_value, roots_table, value_table
 
 settings = {
-    #"atom": "H 1.0215 -0.0252 0.5645; H 1.1785 -0.5748 1.0355",
-    "atom": "H 0  0  0; F 0  0  0.9168",
+    "atom": "H 1.0215 -0.0252 0.5645; H 1.1785 -0.5748 1.0355",
     "unit": "angstrom",
-    "basis": "dyall-cv3z",
+    "basis": "dyall-v2z",
     "charge": 0,
     "spin": 0,
     "nucmod": "gaussian",
     "max_memory_MB": 4000,
-    "scf_conv_tol": 1e-9,
+    "scf_conv_tol": 1e-11,
     "scf_direct_scf_tol": 1e-10,
-    "scf_max_cycle": 1000,
+    "scf_max_cycle": 100,
     "pyscf_shieldings": True,
-    "pyscf_sscc": False,
+    "pyscf_sscc": True,
     "pyscf_td": "TDA",
-    "pyscf_td_max_cycle": 1000,
-    "lr_n_roots": 0,
+    "pyscf_td_max_cycle": 100,
+    "lr_n_roots": 10,
     "mode": "classical",
-    "cas": ((2, 2), 6),
+    "cas": ((1, 1), 4),
     "ansatz": "fUCCSD",
     "ansatz_options": {"n_layers": 1, "is_spin_conserving": False},
     "include_active_kappa": True,
     "restart_npz": None,
     "initial_theta_amplitude": 0.0,
     "seed": 42,
-    "backend": "cholesky",
+    "backend": "cholesky",  # "cholesky" (stored vectors), "cd_pivots" (pivots only), "df", "direct" (exact)
     "screen_tol": 1e-10,
     "cd_tol": 1e-8,
     "cd_span": 1e-2,
     "cd_jk": False,
+    "cd_blocks": "LS",  # "LS": all blocks decomposed/fitted, "S": only (SS|SS), rest exact
+    "df_auxbasis": None,  # PySCF basis spec; None: even-tempered aug_etb(df_beta)
+    "df_beta": 2.0,
+    "df_jk": False,
+    "jk_backend": "exact",  # "exact" or "df_ssss": J/K with density-fitted (SS|SS) (df_auxbasis/df_beta), MO integrals from "backend"
     "ssss": "full",
     "oo_method": "1step",
-    "oo_tol": 1e-5,
-    "oo_maxiter": 10000,
+    "oo_tol": 1e-6,
+    "oo_maxiter": 100,
     "theta_gtol": 1e-9,
     "theta_maxiter": 1000,
     "circuit_shots": None,
@@ -61,7 +65,7 @@ settings = {
     "lr_tol": 1e-5,
     "lr_max_iter": 100,
     "shieldings": True,
-    "sscc": False,
+    "sscc": True,
     "nuclei": None,
     "output_npz": "wf_4c.npz",
 }
@@ -142,13 +146,27 @@ if restart is not None:
     C = restart["c_mo"]
 
 with timed("integral backend"):
-    if s["backend"] == "cholesky":
+    if s["backend"] in ("cholesky", "cd_pivots"):
         direct = DHFCholesky(
-            mol, tol=s["cd_tol"], span=s["cd_span"], cd_jk=s["cd_jk"], screen_tol=s["screen_tol"], ssss=s["ssss"]
+            mol, tol=s["cd_tol"], span=s["cd_span"], cd_jk=s["cd_jk"], blocks=s["cd_blocks"], store=s["backend"] == "cholesky",
+            screen_tol=s["screen_tol"], ssss=s["ssss"],
         )
-        print(key_value("Cholesky vectors", f"{len(direct.V)} ({direct.V.nbytes / 1e9:.2f} GB)"))
+        if direct.V is not None:
+            print(key_value("Cholesky vectors", f"{len(direct.V)} ({direct.V.nbytes / 1e9:.2f} GB)"))
+        else:
+            print(key_value("Cholesky pivots", f"{len(direct.piv)} (vectors not stored)"))
+    elif s["backend"] == "df":
+        direct = DHFDensityFit(
+            mol, auxbasis=s["df_auxbasis"], beta=s["df_beta"], blocks=s["cd_blocks"], df_jk=s["df_jk"],
+            screen_tol=s["screen_tol"], ssss=s["ssss"],
+        )
+        print(key_value("Auxiliary functions", f"{direct.naux}" + (f" ({direct.V.nbytes / 1e9:.2f} GB stored)" if direct.V is not None else "")))
     else:
         direct = DHFDirect(mol, screen_tol=s["screen_tol"], ssss=s["ssss"])
+    if s["jk_backend"] == "df_ssss":
+        jk = DHFDensityFit(mol, auxbasis=s["df_auxbasis"], beta=s["df_beta"], blocks="S", df_jk=True, screen_tol=s["screen_tol"], ssss=s["ssss"])
+        direct = DHFHybrid(jk, direct)
+        print(key_value("J/K", f"(SS|SS) density-fitted, {jk.naux} aux functions ({jk.V.nbytes / 1e9:.2f} GB)"))
 
 rng = np.random.default_rng(s["seed"])
 with timed("wave function setup"):
@@ -219,7 +237,7 @@ if s["shieldings"] or s["sscc"] or s["lr_n_roots"] > 0:
             LR = LinearResponseCircuitDirect(WF, s["lr_excitations"], symmetrize_qG=s["lr_symmetrize_qG"])
         else:
             LR = LinearResponseDirect(WF, s["lr_excitations"], symmetrize_qG=s["lr_symmetrize_qG"])
-    if isinstance(direct, DHFCholesky):
+    if s["backend"] == "cholesky":
         if s["shieldings"] and not direct.cd_jk:
             print(key_value("Cholesky vectors", "kept for the CD-GIAO step (overwritten and released there)"))
         else:

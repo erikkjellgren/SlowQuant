@@ -4,7 +4,7 @@ import pytest
 from pyscf import scf
 
 from slowquant.unitary_coupled_cluster.ci_sparse_DHF import ActiveCI
-from slowquant.unitary_coupled_cluster.DHF_integral_direct import DHFCholesky, DHFDirect, giao_integrals, giao_integrals_cd
+from slowquant.unitary_coupled_cluster.DHF_integral_direct import DHFCholesky, DHFDensityFit, DHFDirect, DHFHybrid, giao_integrals, giao_integrals_cd
 from slowquant.unitary_coupled_cluster.generalized_density_matrix_DHF import (
     RDM1,
     RDM2,
@@ -165,6 +165,36 @@ def test_cholesky_and_ssss_options():
     g = DHFDirect(mol, ssss="ground")
     assert np.abs(g.veff(D) - v0).max() < 1e-14
     assert np.abs(g.veff(D, response=True) - (v0n[0] - v0n[1])).max() < 1e-14
+
+
+def test_cholesky_pivots_and_density_fitting():
+    mol = pyscf.M(atom="H 0 0 0; F 0 0 0.92", basis="6-31g", nucmod="gaussian", verbose=0)
+    ex = DHFDirect(mol)
+    n = 2 * mol.nao_2c()
+    rng = np.random.default_rng(0)
+    C = rng.normal(size=(n, 6)) + 1j * rng.normal(size=(n, 6))
+    e0 = ex.eri(C, C[:, :2], C, C[:, 1:3])
+    for blocks in ("LS", "S"):
+        cd = DHFCholesky(mol, tol=1e-12, blocks=blocks, cd_jk=False)
+        pv = DHFCholesky(mol, tol=1e-12, blocks=blocks, store=False)
+        assert pv.V is None and len(pv.piv) == len(cd.piv)
+        e1 = pv.eri(C, C[:, :2], C, C[:, 1:3])
+        assert np.abs(e1 - cd.eri(C, C[:, :2], C, C[:, 1:3])).max() < 1e-9
+        assert np.abs(e1 - e0).max() < 1e-7
+        pv.max_memory = 1e-4
+        assert np.abs(pv.eri(C, C[:, :2], C, C[:, 1:3]) - e1).max() < 1e-12
+    for blocks, tol in (("LS", 2e-3), ("S", 1e-6)):
+        d0 = DHFDensityFit(mol, beta=1.6, blocks=blocks)
+        d1 = DHFDensityFit(mol, beta=1.6, blocks=blocks, df_jk=True)
+        e1 = d0.eri(C, C[:, :2], C, C[:, 1:3])
+        assert np.abs(e1 - d1.eri(C, C[:, :2], C, C[:, 1:3])).max() < 1e-9
+        assert np.abs(e1 - e0).max() < tol * np.abs(e0).max()
+    D = rng.normal(size=(1, n, n)) + 1j * rng.normal(size=(1, n, n))
+    jk, pv = DHFDensityFit(mol, beta=1.6, blocks="S", df_jk=True), DHFCholesky(mol, tol=1e-12, store=False)
+    h = DHFHybrid(jk, pv)
+    assert np.abs(h.veff(D, response=True) - jk.veff(D, response=True)).max() < 1e-12
+    assert np.abs(h.eri(C, C[:, :2], C, C[:, 1:3]) - pv.eri(C, C[:, :2], C, C[:, 1:3])).max() < 1e-12
+    assert h.V is None and h.n2c == pv.n2c
 
 
 def test_subset_of_nuclei():
