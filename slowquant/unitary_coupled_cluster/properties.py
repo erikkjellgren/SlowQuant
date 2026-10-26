@@ -21,6 +21,7 @@ class Properties():
         wave_function: WaveFunctionUCC | WaveFunctionUPS | WaveFunctionCircuit,
         lr_formulation: str,
         response_options: dict[str, Any] = {},
+        verbose: bool = True
     ) -> None:
         """Initialize response property calculations.
 
@@ -28,9 +29,11 @@ class Properties():
             wave_function: Wave function object.
             lr_formulation: Name of linear response formulation
             response_options: Response options
+            verbose: print outputs
         """
         self.wf = wave_function
         self.lr_formulation = lr_formulation.lower()
+        self.verbose = verbose
         self.qLR = False
 
         # Do I need to change this for the lr formulations that use the index_info_extended?
@@ -55,7 +58,7 @@ class Properties():
         self._LR_singlet = None
         self._LR_triplet = None
 
-    def run_LR(self, triplet: bool):
+    def _run_LR(self, triplet: bool):
         """Create linear response object.
 
         Args:
@@ -135,7 +138,7 @@ class Properties():
             singlet spin-adapted linear response object
         """
         if self._LR_singlet is None:
-            self._LR_singlet = self.run_LR(triplet = False)
+            self._LR_singlet = self._run_LR(triplet = False)
         return self._LR_singlet
     
     @property
@@ -146,7 +149,7 @@ class Properties():
             triplet spin-adapted linear response object
         """
         if self._LR_triplet is None:
-            self._LR_triplet = self.run_LR(triplet = True)
+            self._LR_triplet = self._run_LR(triplet = True)
         return self._LR_triplet
 
     def get_excitation_energies(self, triplet: bool = False, osc_strs: bool = False) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
@@ -157,7 +160,7 @@ class Properties():
             osc_strs: calculate oscillator strenghts
 
         Returns:
-            excitation energies and if osc_strs is True osciallator strenghts)
+            excitation energies (and if osc_strs is True osciallator strenghts)
         """
         if not triplet:
             LR = self.LR_singlet
@@ -171,15 +174,16 @@ class Properties():
                 LR.get_excitation_energies()
 
         if not osc_strs:
-            output = (
-                "Excitation # | Excitation energy [Hartree] | Excitation energy [eV]\n"
-            )
+            if self.verbose:
+                output = (
+                    "Excitation # | Excitation energy [Hartree] | Excitation energy [eV]\n"
+                )
 
-            for i, exc_energy in enumerate(LR.excitation_energies):
-                exc_str = f"{exc_energy:2.6f}"
-                exc_str_ev = f"{exc_energy * 27.2114079527:3.6f}"
-                output += f"{str(i + 1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)}\n"
-            print(output)
+                for i, exc_energy in enumerate(LR.excitation_energies):
+                    exc_str = f"{exc_energy:2.6f}"
+                    exc_str_ev = f"{exc_energy * 27.2114079527:3.6f}"
+                    output += f"{str(i + 1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)}\n"
+                print(output)
 
             return LR.excitation_energies
 
@@ -188,18 +192,19 @@ class Properties():
                 LR.get_normed_excitation_vectors()
             LR.get_oscillator_strength()
 
-        output = (
-            "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n"
-        )
+        if self.verbose:
+            output = (
+                "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n"
+            )
 
-        for i, (exc_energy, osc_strength) in enumerate(
-            zip(LR.excitation_energies, LR.oscillator_strengths)
-        ):
-            exc_str = f"{exc_energy:2.6f}"
-            exc_str_ev = f"{exc_energy * 27.2114079527:3.6f}"
-            osc_str = f"{osc_strength:1.6f}"
-            output += f"{str(i + 1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
-        print(output)
+            for i, (exc_energy, osc_strength) in enumerate(
+                zip(LR.excitation_energies, LR.oscillator_strengths)
+            ):
+                exc_str = f"{exc_energy:2.6f}"
+                exc_str_ev = f"{exc_energy * 27.2114079527:3.6f}"
+                osc_str = f"{osc_strength:1.6f}"
+                output += f"{str(i + 1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
+            print(output)
 
         return LR.excitation_energies, LR.oscillator_strengths
 
@@ -227,7 +232,8 @@ class Properties():
         
         alpha = np.einsum('ix,iy->xy', prop_grad, response)
 
-        print(f'Polarisabilities:\n \t xx: {alpha[0,0]:.4f} \t yy: {alpha[1,1]:.4f} \t zz: {alpha[2,2]:.4f}')
+        if self.verbose:
+            print(f'Polarisabilities:\n \t xx: {alpha[0,0]:.4f} \t yy: {alpha[1,1]:.4f} \t zz: {alpha[2,2]:.4f}')
 
         return alpha
 
@@ -298,9 +304,10 @@ class Properties():
         dia_shield *= nist.ALPHA**2 * 1e6
         para_shield *= nist.ALPHA**2 * 1e6
 
-        print('Shielding (in ppm):')
-        for i in range(len(atoms)):
-            print(f'{i}: \tTotal={np.trace(dia_shield[i,:,:] + para_shield[i,:,:]) / 3:.4f} \tDia={np.trace(dia_shield[i,:,:]) / 3:.4f} \tPara={np.trace(para_shield[i,:,:]) / 3:.4f}')
+        if self.verbose:
+            print('Shielding (in ppm):')
+            for i in range(len(atoms)):
+                print(f'{i}: \tTotal={np.trace(dia_shield[i,:,:] + para_shield[i,:,:]) / 3:.4f} \tDia={np.trace(dia_shield[i,:,:]) / 3:.4f} \tPara={np.trace(para_shield[i,:,:]) / 3:.4f}')
 
         return dia_shield, para_shield
 
@@ -318,20 +325,40 @@ class Properties():
         dia_shield = np.zeros((len(atoms), 3, 3))
         para_shield = np.zeros((len(atoms), 3, 3))
 
+        # Angular momentum
+        # Unmodified MO integrals
+        S1_mo  = one_electron_integral_transform(self.wf.c_mo, self.wf.int_gen.overlap_giao)
+        h1mo = one_electron_integral_transform(self.wf.c_mo, self.wf.int_gen.angular_momentum_giao)
+        g1mo = two_electron_integral_transform(self.wf.c_mo, self.wf.int_gen.electron_electron_repulsion_giao)
+
+        # Orthonomalized MOs
+        h1mo -= 1/2 * np.einsum('vmo,on->vmn', S1_mo, self.wf.h_mo)
+        h1mo -= 1/2 * np.einsum('von,mo->vmn', S1_mo, self.wf.h_mo)
+        g1mo -= 1/2 * np.einsum('vmo,onpq->vmnpq', S1_mo, self.wf.g_mo)
+        g1mo -= 1/2 * np.einsum('von,mopq->vmnpq', S1_mo, self.wf.g_mo)
+        g1mo -= 1/2 * np.einsum('vpo,mnoq->vmnpq', S1_mo, self.wf.g_mo)
+        g1mo -= 1/2 * np.einsum('voq,mnpo->vmnpq', S1_mo, self.wf.g_mo)
+
+        property_gradient = self.LR_singlet.get_property_gradient(
+            int1e = h1mo,
+            int2e = g1mo,
+            spin = False,
+        )
+        response_vector = scipy.linalg.solve(self.LR_singlet.hessian, property_gradient)
+
         for i in range(len(atoms)):
             dia_i = []
             origin = atoms[i,:]
 
-            # Diamagnetic term
-            # Unmodified MOs
+            # More unmodified MO integrals
             dia_mo = one_electron_integral_transform(self.wf.c_mo, self.wf.int_gen.diamagnetic_shielding_giao(atom_coord=origin))
-            S1_mo  = one_electron_integral_transform(self.wf.c_mo, self.wf.int_gen.overlap_giao)
             pso_mo = one_electron_integral_transform(self.wf.c_mo, self.wf.int_gen.orbital_paramagnetic(origin))
 
             # Orthonomalized MOs
             dia_mo += 1/2 * np.einsum('vmo,won->vwmn', S1_mo, pso_mo).reshape(dia_mo.shape)
             dia_mo += 1/2 * np.einsum('von,wmo->vwmn', S1_mo, pso_mo).reshape(dia_mo.shape)
 
+            # Diamagnetic shiedling tensor
             for comp in dia_mo:
                 dia_op = one_elec_op_0i_0a(comp, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
                 if not self.qLR:
@@ -355,26 +382,7 @@ class Properties():
             
             # PSO
             property_gradient = self.LR_singlet.get_property_gradient(pso_mo, spin = False)
-            response_vector = scipy.linalg.solve(self.LR_singlet.hessian, property_gradient)
 
-            # Anguar Momentum
-            # Unmodified MOs
-            h1mo = one_electron_integral_transform(self.wf.c_mo, self.wf.int_gen.angular_momentum_giao)
-            g1mo = two_electron_integral_transform(self.wf.c_mo, self.wf.int_gen.electron_electron_repulsion_giao)
-
-            # Orthonomalized MOs
-            h1mo -= 1/2 * np.einsum('vmo,on->vmn', S1_mo, self.wf.h_mo)
-            h1mo -= 1/2 * np.einsum('von,mo->vmn', S1_mo, self.wf.h_mo)
-            g1mo -= 1/2 * np.einsum('vmo,onpq->vmnpq', S1_mo, self.wf.g_mo)
-            g1mo -= 1/2 * np.einsum('von,mopq->vmnpq', S1_mo, self.wf.g_mo)
-            g1mo -= 1/2 * np.einsum('vpo,mnoq->vmnpq', S1_mo, self.wf.g_mo)
-            g1mo -= 1/2 * np.einsum('voq,mnpo->vmnpq', S1_mo, self.wf.g_mo)
-
-            property_gradient = self.LR_singlet.get_property_gradient(
-                int1e = h1mo,
-                int2e = g1mo,
-                spin = False,
-            )
             # Paramagnetic shielding tensor
             para_shield[i,:,:] -= np.einsum('ix,iy->xy', response_vector, property_gradient)
 
@@ -382,9 +390,10 @@ class Properties():
         dia_shield *= nist.ALPHA**2 * 1e6
         para_shield *= nist.ALPHA**2 * 1e6
 
-        print('Shielding (in ppm):')
-        for i in range(len(atoms)):
-            print(f'{i}: \tTotal={np.trace(dia_shield[i,:,:] + para_shield[i,:,:]) / 3:.4f} \tDia={np.trace(dia_shield[i,:,:]) / 3:.4f} \tPara={np.trace(para_shield[i,:,:]) / 3:.4f}')
+        if self.verbose:
+            print('Shielding (in ppm):')
+            for i in range(len(atoms)):
+                print(f'{i}: \tTotal={np.trace(dia_shield[i,:,:] + para_shield[i,:,:]) / 3:.4f} \tDia={np.trace(dia_shield[i,:,:]) / 3:.4f} \tPara={np.trace(para_shield[i,:,:]) / 3:.4f}')
 
         return dia_shield, para_shield
     
@@ -539,8 +548,9 @@ class Properties():
         jtensor_sdfc = convert_unit(sdfc)
         jtensor_total = jtensor_dso + jtensor_pso + jtensor_sdfc
 
-        print('SSCC (in Hz):')
-        for k, (i,j) in enumerate(nuc_pair):
-            print(f'{i} {j}: \tDSO={np.trace(jtensor_dso[k,:,:])/3:.4f} \tPSO={np.trace(jtensor_pso[k,:,:])/3:.4f} \tSD={np.trace(jtensor_sdfc[k,:,:]-jtensor_fc[k,:,:])/3:.4f} \tFC={np.trace(jtensor_fc[k,:,:])/3:.4f} \tTotal={np.trace(jtensor_total[k,:,:])/3:.4f}')
+        if self.verbose:
+            print('SSCC (in Hz):')
+            for k, (i,j) in enumerate(nuc_pair):
+                print(f'{i} {j}: \tDSO={np.trace(jtensor_dso[k,:,:])/3:.4f} \tPSO={np.trace(jtensor_pso[k,:,:])/3:.4f} \tSD={np.trace(jtensor_sdfc[k,:,:]-jtensor_fc[k,:,:])/3:.4f} \tFC={np.trace(jtensor_fc[k,:,:])/3:.4f} \tTotal={np.trace(jtensor_total[k,:,:])/3:.4f}')
 
         return jtensor_dso, jtensor_pso, jtensor_fc, (jtensor_sdfc - jtensor_fc)
