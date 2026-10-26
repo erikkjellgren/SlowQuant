@@ -103,18 +103,20 @@ def davidson_eig(sigma, dA, dS, n_roots, tol=1e-6, max_iter=100, max_batch=16, m
     raise RuntimeError("Davidson (eigenvalues) did not converge")
 
 
-def davidson_solve(sigma, dA, dS, V, omega=0.0, tol=1e-6, max_iter=100, max_batch=16, return_ex=False):
+def davidson_solve(sigma, dA, dS, V, omega=0.0, tol=1e-6, max_iter=100, max_batch=16, return_ex=False, precond=None):
     """Solve (E2 - omega S) X = V (matrix-free subspace solver).
 
     The subspace solution minimizes the residual weighted with the inverse diagonal, so that the small-eigenvalue
     (electron-electron, CI) components are as well converged as the large electron-positron ones.
     Convergence: max_j ||W r_j|| / ||W v_j|| < tol with W = 1/|diag(E2 - omega S)|.
     return_ex: also return (E2 - omega S) X from the subspace.
+    precond(R, omega): optional preconditioner replacing the diagonal one.
     """
+    pre = _precondition if precond is None else (lambda R, a, b, w: precond(R, w))
     V = V.reshape(V.shape[0], -1)
     w = 1 / np.maximum(np.abs(np.concatenate((dA, dA)) - omega * np.concatenate((dS, -dS))), 1e-2)
     vnorm = np.maximum(np.linalg.norm(w[:, None] * V, axis=0), 1e-300)
-    R = _precondition(V, dA, dS, np.full(V.shape[1], omega))
+    R = pre(V, dA, dS, np.full(V.shape[1], omega))
     space = _Subspace(sigma, max_batch)
     tab = IterationTable(
         f"Linear response solver, omega = {omega:.6f} Eh",
@@ -132,6 +134,6 @@ def davidson_solve(sigma, dA, dS, V, omega=0.0, tol=1e-6, max_iter=100, max_batc
         if res.max() < tol:
             tab.close(f"Converged in {it + 1} iterations")
             return (X, space.EV @ u - omega * (space.SV @ u)) if return_ex else X
-        R = _precondition(Rfull[:, res >= tol], dA, dS, np.full(int((res >= tol).sum()), omega))
+        R = pre(Rfull[:, res >= tol], dA, dS, np.full(int((res >= tol).sum()), omega))
     tab.close(f"WARNING: not converged in {max_iter} iterations")
     raise RuntimeError("Davidson (linear response) did not converge")

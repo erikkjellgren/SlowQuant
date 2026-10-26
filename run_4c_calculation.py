@@ -66,7 +66,9 @@ settings = {
     "lr_max_iter": 100,
     "shieldings": True,
     "sscc": True,
-    "nuclei": None,
+    "nuclei": None,  # 0-based atom indices (or element symbols, e.g. ["O"]) given the second-order treatment
+    "lr_b_only": False,  # True: solve only the 3 B components (tol/100, linear expression)
+    "lr_two_level": 0,  # > 0: LR preconditioner with exact blocks for the active space and this many lowest-gap orbital rotations
     "output_npz": "wf_4c.npz",
 }
 
@@ -236,7 +238,7 @@ if s["shieldings"] or s["sscc"] or s["lr_n_roots"] > 0:
         if s["mode"] == "circuit":
             LR = LinearResponseCircuitDirect(WF, s["lr_excitations"], symmetrize_qG=s["lr_symmetrize_qG"])
         else:
-            LR = LinearResponseDirect(WF, s["lr_excitations"], symmetrize_qG=s["lr_symmetrize_qG"])
+            LR = LinearResponseDirect(WF, s["lr_excitations"], symmetrize_qG=s["lr_symmetrize_qG"], two_level=s["lr_two_level"])
     if s["backend"] == "cholesky":
         if s["shieldings"] and not direct.cd_jk:
             print(key_value("Cholesky vectors", "kept for the CD-GIAO step (overwritten and released there)"))
@@ -246,10 +248,11 @@ if s["shieldings"] or s["sscc"] or s["lr_n_roots"] > 0:
     if s["lr_n_roots"] > 0:
         with timed("excitation energies"):
             w = LR.calc_excitation_energies(s["lr_n_roots"], tol=s["lr_tol"], max_iter=s["lr_max_iter"])
+    nuclei = None if s["nuclei"] is None else sorted({i for x in s["nuclei"] for i in range(mol.natm) if x == i or x == mol.atom_symbol(i)})
     if s["shieldings"] or s["sscc"]:
         with timed("properties"):
             res = LR.get_properties(
-                shieldings=s["shieldings"], sscc=s["sscc"], tol=s["lr_tol"], max_iter=s["lr_max_iter"], nuclei=s["nuclei"]
+                shieldings=s["shieldings"], sscc=s["sscc"], tol=s["lr_tol"], max_iter=s["lr_max_iter"], nuclei=nuclei, b_only=s["lr_b_only"]
             )
 
 if s["lr_n_roots"] > 0:

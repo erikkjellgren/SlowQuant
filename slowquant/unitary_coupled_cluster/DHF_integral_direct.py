@@ -55,6 +55,36 @@ _SSSS_MODES = {
 }
 
 
+def _jk_gemm(direct, dms, ssss):
+    """Exact J/K for many densities: integral blocks (ij|all kl) contracted with all densities by GEMM.
+    (LL|SS) taken from (SS|LL) by bra-ket symmetry."""
+    mol, n = direct.mol, direct.n2c
+    loc, nb, nd = mol.ao_loc_2c(), mol.nbas, len(dms)
+    o = {"L": slice(0, n), "S": slice(n, 2 * n)}
+    vj = np.zeros(dms.shape, dtype=complex)
+    vk = np.zeros(dms.shape, dtype=complex)
+    max_elem = direct.max_memory * 1e6 / 16 / 6
+    for intor, blk, p in _DC_TERMS:
+        if blk == "LLSS" or (blk == "SSSS" and not ssss):
+            continue
+        X, Y, fac = blk[0], blk[2], direct.c2**p
+        DY = dms[:, o[Y], o[Y]].reshape(nd, -1)
+        DXY, DYX, DXX = dms[:, o[X], o[Y]], dms[:, o[Y], o[X]], dms[:, o[X], o[X]]
+        for i0, i1, j0, j1 in _giao_batches(mol, False, 3 * max_elem):
+            ri, rj = slice(loc[i0], loc[i1]), slice(loc[j0], loc[j1])
+            ni, nj = ri.stop - ri.start, rj.stop - rj.start
+            W = mol.intor(intor, shls_slice=(i0, i1, j0, j1, 0, nb, 0, nb)).ravel(order="K").reshape(n, n, nj, ni)
+            Wm = W.reshape(n * n, nj * ni)
+            vj[:, o[X], o[X]][:, ri, rj] += fac * (DY @ Wm).reshape(nd, nj, ni).transpose(0, 2, 1)
+            Dk = DXY[:, rj, :].transpose(0, 2, 1).reshape(nd, n * nj)
+            vk[:, o[X], o[Y]][:, ri, :] += fac * np.matmul(Dk, W.reshape(n, n * nj, ni)).transpose(1, 2, 0)
+            if X != Y:
+                Dji = DXX[:, rj, ri].reshape(nd, nj * ni)
+                vj[:, o[Y], o[Y]] += fac * (Wm @ Dji.T).T.reshape(nd, n, n).transpose(0, 2, 1)
+                vk[:, o[Y], o[X]][:, :, rj] += fac * np.tensordot(DYX[:, :, ri], W, axes=([1, 2], [0, 3]))
+    return vj, vk
+
+
 class DHFDirect:
     """Integral-direct 4c Dirac-Coulomb building blocks (PySCF backend).
 
@@ -87,7 +117,11 @@ class DHFDirect:
     def describe(self) -> str:
         return f"DHFDirect (exact), screen_tol = {self.mf.direct_scf_tol:.0e}, SSSS: {self.ssss}"
 
+    jk_gemm_min = 10**9
+
     def _jk_exact(self, dms, ssss, hermi=0):
+        if len(dms) >= self.jk_gemm_min:
+            return _jk_gemm(self, np.asarray(dms), ssss)
         opt_ssll = self.opt[1] if len(dms) == 1 else None
         return scf.dhf.get_jk_coulomb(self.mol, dms, hermi, "SSSS" if ssss else "SSLL", self.opt[0], opt_ssll, self.opt[2])
 
@@ -727,6 +761,32 @@ def _ints3(mol, intor, shls, opt):
     return raw.ravel(order="K").reshape(3, d[3], d[2], d[1], d[0]).transpose(0, 4, 3, 2, 1)
 
 
+def _pivot_w_terms(direct, dms, Xs, C, CA):
+    """Contractions of W = S^-1 G[P, :] used by CD-GIAO, from one pass over the pivot columns (no stored vectors)."""
+    n, k, nd, N, na = direct.n2c, len(direct.piv), len(dms), C.shape[1], CA.shape[1]
+    sl = (slice(0, n), slice(n, 2 * n))
+    h = np.zeros((k, nd), dtype=complex)
+    H = [[np.zeros((k, n, X.shape[1]), dtype=complex) for _ in range(2)] for X in Xs]
+    Y = np.zeros((k, na, na), dtype=complex)
+    Z = np.zeros((k, N, na), dtype=complex)
+    for Ks, raws in direct._ri_columns("LS"):
+        m = len(Ks)
+        for x, (_, r) in enumerate(raws):
+            o = sl[x]
+            h[Ks] += r.reshape(n * n, m).conj().T @ dms[:, o, o].reshape(nd, n * n).T
+            rt = r.transpose(2, 0, 1)
+            for i, X in enumerate(Xs):
+                H[i][x][Ks] = rt @ X[o]
+            Y[Ks] += (CA[o].conj().T @ rt @ CA[o]).conj().transpose(0, 2, 1)
+            Z[Ks] += C[o].conj().T @ rt @ CA[o]
+    solve = direct._ri_solve
+    wd = solve(h).T
+    wP = solve(Y.reshape(k, -1)).reshape(Y.shape)
+    omP = solve(Z.reshape(k, -1).conj()).conj().reshape(Z.shape)
+    Uks = [[solve(Hx.reshape(k, -1).conj()).conj().reshape(Hx.shape) for Hx in Hi] for Hi in H]
+    return wd, wP, omP, Uks
+
+
 def giao_integrals_cd(
     direct, C: np.ndarray, CA: np.ndarray, dms: np.ndarray, max_memory: float | None = None, consume: bool = False
 ):
@@ -747,30 +807,35 @@ def giao_integrals_cd(
     npair = 2 * n * n
     nd, N, na = len(dms), C.shape[1], CA.shape[1]
     budget = (direct.max_memory if max_memory is None else max_memory) * 1e6 / 16 / 4
-    Vf = direct.V.reshape(k, npair)
-    L = np.ascontiguousarray(Vf[:, piv].T)
-    W = Vf if consume else np.empty((k, npair), dtype=complex)
-    step = max(1, int(budget / max(k, 1)))
-    for c0 in range(0, npair, step):
-        W[:, c0 : c0 + step] = scipy.linalg.solve_triangular(L.conj().T, Vf[:, c0 : c0 + step].conj(), lower=False)
-    if consume:
-        direct.V = None
-    Wb = W.reshape(k, 2, n, n)
+    pivots = direct.V is None
+    if not pivots:
+        Vf = direct.V.reshape(k, npair)
+        L = np.ascontiguousarray(Vf[:, piv].T)
+        W = Vf if consume else np.empty((k, npair), dtype=complex)
+        step = max(1, int(budget / max(k, 1)))
+        for c0 in range(0, npair, step):
+            W[:, c0 : c0 + step] = scipy.linalg.solve_triangular(L.conj().T, Vf[:, c0 : c0 + step].conj(), lower=False)
+        if consume:
+            direct.V = None
+        Wb = W.reshape(k, 2, n, n)
     sl = [slice(0, n), slice(n, 2 * n)]
     Cx, Ax = [C[:n], C[n:]], [CA[:n], CA[n:]]
     terms = [t for t in _GIAO_TERMS if t[1] != "SSSS" or direct.ssss_giao_jk]
     opts = {t[0]: moleintor.make_cintopt(mol._atm, mol._bas, mol._env, t[0]) for t in terms}
     dvec = np.stack([dms[:, s, s].transpose(0, 2, 1) for s in sl], 1).reshape(nd, -1)
-    wd = dvec @ W.T
     fac_d = []
     for d in dms:
         e, U = np.linalg.eigh(d)
         m = np.abs(e) > 1e-12 * max(1.0, np.abs(e).max())
-        X = U[:, m]
-        Uk = [np.ascontiguousarray((Wb[:, x].transpose(0, 2, 1) @ X[sl[x]].conj()).conj()) for x in range(2)]
-        fac_d.append((e[m], X, Uk))
-    wP = sum(np.einsum("lv,pls,sw->pvw", Ax[x].conj(), Wb[:, x], Ax[x], optimize=True) for x in range(2))
-    omP = sum(np.einsum("mN,pnm,nu->pNu", Cx[x].conj(), Wb[:, x].conj(), Ax[x], optimize=True) for x in range(2))
+        fac_d.append((e[m], U[:, m]))
+    if pivots:
+        wd, wP, omP, Uks = _pivot_w_terms(direct, dms, [X for _, X in fac_d], C, CA)
+        fac_d = [(e, X, Uk) for (e, X), Uk in zip(fac_d, Uks)]
+    else:
+        wd = dvec @ W.T
+        fac_d = [(e, X, [np.ascontiguousarray((Wb[:, x].transpose(0, 2, 1) @ X[sl[x]].conj()).conj()) for x in range(2)]) for e, X in fac_d]
+        wP = sum(np.einsum("lv,pls,sw->pvw", Ax[x].conj(), Wb[:, x], Ax[x], optimize=True) for x in range(2))
+        omP = sum(np.einsum("mN,pnm,nu->pNu", Cx[x].conj(), Wb[:, x].conj(), Ax[x], optimize=True) for x in range(2))
     t1 = np.zeros((nd, 3, npair), dtype=complex)
     u = np.zeros((nd, 3, k), dtype=complex)
     App = np.zeros((3, k, k), dtype=complex)
@@ -887,7 +952,15 @@ def giao_integrals_cd(
                 al = (Ta.transpose(0, 2, 1) @ Ax[xs].conj()).conj().reshape(3, kb, na * na)
                 g += (omP[Ks].reshape(kb, N * na).T @ al).reshape(3, N, na, na, na)
     s = np.einsum("xpq,dq->dxp", App, wd, optimize=True)
-    J = t1 + np.einsum("kp,dxk->dxp", W.conj(), u - s, optimize=True)
+    if pivots:
+        z = direct._ri_solve((u - s).reshape(-1, k).T).T.reshape(nd * 3, k)
+        J = t1.reshape(nd * 3, 2, n, n)
+        for Ks, raws in direct._ri_columns("LS"):
+            for x, (_, r) in enumerate(raws):
+                J[:, x] += (r.reshape(n * n, -1) @ z[:, Ks].T).T.reshape(-1, n, n).transpose(0, 2, 1)
+        J = J.reshape(nd, 3, npair)
+    else:
+        J = t1 + np.einsum("kp,dxk->dxp", W.conj(), u - s, optimize=True)
     qb = max(1, int(budget / max(1, 3 * n * max(len(f[0]) for f in fac_d))))
     for i, (lam, X, Uk) in enumerate(fac_d):
         for q0 in range(0, k, qb):

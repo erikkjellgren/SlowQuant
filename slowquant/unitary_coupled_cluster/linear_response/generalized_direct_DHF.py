@@ -1,6 +1,7 @@
 import time
 
 import numpy as np
+import scipy.linalg
 from pyscf.data import nist
 
 from slowquant.unitary_coupled_cluster.ci_sparse_DHF import ActiveCI, ladder, operator_matrix
@@ -13,7 +14,7 @@ from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_DHF
 from slowquant.unitary_coupled_cluster.DHF_integral_direct import giao_integrals, giao_integrals_cd
 from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import generalized_propagate_state
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction_DHF import GeneralizedWaveFunctionUPS
-from slowquant.unitary_coupled_cluster.linear_response.solvers_DHF import davidson_eig, davidson_solve
+from slowquant.unitary_coupled_cluster.linear_response.solvers_DHF import _precondition, davidson_eig, davidson_solve
 from slowquant.unitary_coupled_cluster.operators import G1, G2, G3, G4, G5, G6
 from slowquant.unitary_coupled_cluster.util import iterate_t1, iterate_t2, iterate_t3, iterate_t4, iterate_t5, iterate_t6
 from slowquant.unitary_coupled_cluster.printing import key_value, value_table, roots_table, timing_line
@@ -42,8 +43,10 @@ class LinearResponseDirect:
         excitations: str = "SD",
         screen: float = 1e-8,
         symmetrize_qG: bool = False,
+        two_level: int = 0,
     ) -> None:
         t0 = time.time()
+        self.two_level = 200 if two_level is True else int(two_level)
         wf = self.wf = wave_function
         excitations = excitations.lower()
         occ, unocc = wf.active_occ_spin_idx, wf.active_unocc_spin_idx
@@ -313,6 +316,75 @@ class LinearResponseDirect:
         """Full E2 and S by applying sigma to unit vectors (testing/small systems only)."""
         return self.sigma(np.eye(2 * self.n, dtype=complex))
 
+    def _projected_block(self, idx):
+        """E2 and S restricted to the parameters idx (orbital rotations), from sigma with J/K projected onto the
+        orbitals O they involve (+ active): v = S C_O [(OO|OO) contraction] C_O^+ S, exact on the O block."""
+        ds = self.ds
+        P, Q = self.q_idx[idx].T
+        O = np.unique(np.concatenate((P, Q, ds.A)))
+        CO = ds.C[:, O]
+        g = ds.direct.eri(CO, CO, CO, CO)
+        SC = ds.direct.mf.get_ovlp() @ CO
+
+        class Projected:
+            def __init__(self, direct):
+                self.direct = direct
+
+            def __getattr__(self, name):
+                return getattr(self.direct, name)
+
+            def veff(self, dms, response=False, hermi=0):
+                X = np.einsum("mp,dmn,nq->dpq", SC.conj(), dms, SC, optimize=True)
+                V = np.einsum("pqrs,dsr->dpq", g, X, optimize=True) - np.einsum("psrq,dsr->dpq", g, X, optimize=True)
+                return np.einsum("mp,dpq,nq->dmn", SC, V, SC.conj(), optimize=True)
+
+        n = self.n
+        cols = np.concatenate((idx, n + idx))
+        I = np.zeros((2 * n, len(cols)), dtype=complex)
+        I[cols, np.arange(len(cols))] = 1.0
+        direct, ds.direct = ds.direct, Projected(ds.direct)
+        try:
+            E, Sm = [], []
+            for c0 in range(0, len(cols), 64):
+                e, sm = self.sigma(I[:, c0 : c0 + 64])
+                E.append(e[cols])
+                Sm.append(sm[cols])
+        finally:
+            ds.direct = direct
+        return cols, np.hstack(E), np.hstack(Sm)
+
+    def preconditioner(self, n_orb: int = 200):
+        """Two-level preconditioner: exact blocks for the active-space parameters (CI part only) and for the n_orb
+        orbital rotations with the smallest diagonal (J/K projected onto their orbitals, no J/K pass); diagonal elsewhere."""
+        nq, n, nG = self.nq, self.n, self.nG
+        if getattr(self, "_blocks", None) is None:
+            t0 = time.time()
+            self._blocks = []
+            dA, _ = self.diagonal()
+            if nq and n_orb:
+                idx = np.argsort(np.abs(dA[:nq]))[: min(n_orb, nq)]
+                self._blocks.append(self._projected_block(idx))
+            if nG:
+                I, Z = np.eye(nG, dtype=complex), np.zeros((nG, nG), dtype=complex)
+                A, B = self._gg(I, Z), self._gg(Z, I)
+                Sx = self._sgg(I)
+                self._blocks.append((np.r_[nq:n, n + nq : 2 * n], np.block([[A, B], [B.conj(), A.conj()]]), np.block([[Sx, Z], [Z, -Sx.conj()]])))
+            self._lu = {}
+            timing_line("LR preconditioner blocks", time.time() - t0)
+        dA, dS = self.diagonal()
+
+        def apply(R, omega):
+            out = _precondition(R, dA, dS, omega)
+            for b, (cols, E, Sm) in enumerate(self._blocks):
+                for w in np.unique(omega):
+                    if (b, w) not in self._lu:
+                        self._lu[b, w] = scipy.linalg.lu_factor(E - w * Sm)
+                    c = np.flatnonzero(omega == w)
+                    out[np.ix_(cols, c)] = scipy.linalg.lu_solve(self._lu[b, w], R[np.ix_(cols, c)])
+            return out
+
+        return apply
+
     def max_batch(self) -> int:
         """Trial vectors per sigma call (one J/K integral pass each), from mol.max_memory; 16..128."""
         mol = self.wf.int_gen.int_obj
@@ -330,7 +402,7 @@ class LinearResponseDirect:
 
     def solve_response(self, V: np.ndarray, omega: float = 0.0, tol: float = 1e-6, max_iter: int = 100) -> np.ndarray:
         """Solve (E2 - omega S) X = V for all columns of V (one shared subspace)."""
-        return davidson_solve(self.sigma, *self.diagonal(), V, omega, tol=tol, max_iter=max_iter, max_batch=self.max_batch())
+        return davidson_solve(self.sigma, *self.diagonal(), V, omega, tol=tol, max_iter=max_iter, max_batch=self.max_batch(), precond=self.preconditioner(self.two_level) if getattr(self, "two_level", 0) else None)
 
     def operator_gradient(self, ops) -> np.ndarray:
         """Property gradients of Hermitian 1+2-electron operators given as (F[:, occ], F^I[A, A], g[A, A, A, A])."""
@@ -377,7 +449,7 @@ class LinearResponseDirect:
         nI, N = len(I), self.N
         dA = CA @ wf.rdm1.T @ CA.conj().T
         use_cd = (
-            getattr(direct, "V", None) is not None
+            (getattr(direct, "V", None) is not None or getattr(direct, "_ri_L", None) is not None)
             and getattr(direct, "piv", None) is not None
             and getattr(direct, "blocks", "") == "LS"
             and direct.ssss_giao_jk == direct.ssss_giao_g
@@ -425,7 +497,7 @@ class LinearResponseDirect:
         return out
 
     def get_properties(
-        self, shieldings: bool = True, sscc: bool = True, tol: float = 1e-5, max_iter: int = 100, nuclei=None, b_only=None
+        self, shieldings: bool = True, sscc: bool = True, tol: float = 1e-5, max_iter: int = 100, nuclei=None, b_only=False
     ):
         """RMB-GIAO isotropic shieldings (ppm) and/or RKB isotropic reduced spin-spin couplings (Hz).
 
@@ -433,13 +505,11 @@ class LinearResponseDirect:
         Where both response vectors exist the second-order (error-cancelling) expression
         <<A;B>> = -(V_A^H X_B + X_A^H V_B - X_A^H E2 X_B) is used (error quadratic in the residuals), otherwise
         the linear one -V_A^H X_B. Shieldings of all nuclei need only X_B; a coupling K-L needs K or L in `nuclei`.
-        Cost is set by the number of sigma calls (one J/K integral pass for up to max_batch() vectors).
+        Cost grows with the number of trial vectors (J/K contraction per density and CI part per vector).
         b_only: solve only the 3 B right-hand sides with tol/100 and use the linear expression (more iterations,
-        but one pass per iteration). Default: used for shieldings only when 3 + 3 natm > max_batch().
+        far fewer trial vectors; cheaper for molecules with several nuclei, but needs the tight tolerance).
         """
         mb = self.max_batch()
-        if b_only is None:
-            b_only = shieldings and not sscc and nuclei is None and 3 + 3 * self.wf.int_gen.h_m.shape[0] > mb
         if b_only:
             nuclei, tol = [], tol * 1e-2
         h_m = self.wf.int_gen.h_m
@@ -451,7 +521,7 @@ class LinearResponseDirect:
         if shieldings:
             VB = self.operator_gradient(self.giao_operators())
             V = np.hstack((VB, V))
-        X, EX = davidson_solve(self.sigma, *self.diagonal(), V, tol=tol, max_iter=max_iter, max_batch=mb, return_ex=True)
+        X, EX = davidson_solve(self.sigma, *self.diagonal(), V, tol=tol, max_iter=max_iter, max_batch=mb, return_ex=True, precond=self.preconditioner(self.two_level) if getattr(self, "two_level", 0) else None)
         Xm, EXm = X[:, V.shape[1] - len(sel) :], EX[:, V.shape[1] - len(sel) :]
         res = {}
         if shieldings:

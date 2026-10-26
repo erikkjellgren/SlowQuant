@@ -25,3 +25,7 @@ Measured (HBr dyall-v2z, (2,2) in 6 spin orbitals, one-step OO tol 1e-7, LR tol 
    + Cholesky-pivot MO integrals. run script: "jk_backend": "df_ssss". HCl 6-31G: identical to pivots-only (1e-10 Eh, 1e-5 ppm).
 
 6. (v14.2) Cholesky/DF J/K temporaries limited to max_memory/8 (were up to ~max_memory).
+
+7. (v14.3) LR: b_only (3 B right-hand sides, tol/100, linear expression) is now the default for shieldings-only runs
+   with 3 or more atoms. CH4 cc-pVDZ ((2,2),6), lr_tol 1e-4: sigma time 69 s -> 42 s, shieldings change <= 2e-4 ppm.
+   Cost of the LR solve grows with the number of trial vectors (J/K per density), not only with the number of passes.

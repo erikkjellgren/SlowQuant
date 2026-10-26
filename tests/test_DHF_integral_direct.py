@@ -117,10 +117,15 @@ def test_giao_integrals_cd_match_exact():
     D = np.array([C[:, :5] @ C[:, :5].conj().T, X @ X.conj().T])
     d = DHFCholesky(mol, tol=1e-9, cd_jk=False)
     W0, g0 = giao_integrals(d, C, CA, D)
-    W1, g1 = giao_integrals_cd(d, C, CA, D, consume=True)
-    assert d.V is None
+    W1, g1 = giao_integrals_cd(d, C, CA, D)
     assert np.abs(W1 - W0).max() < 1e-6 * np.abs(W0).max()
     assert np.abs(g1 - g0).max() < 1e-6 * np.abs(g0).max()
+    p = DHFCholesky(mol, tol=1e-9, store=False)
+    W2, g2 = giao_integrals_cd(p, C, CA, D)
+    assert np.abs(W2 - W1).max() < 1e-9 * np.abs(W0).max()
+    assert np.abs(g2 - g1).max() < 1e-9 * np.abs(g0).max()
+    W3, g3 = giao_integrals_cd(d, C, CA, D, consume=True)
+    assert d.V is None and np.abs(W3 - W1).max() < 1e-12 * np.abs(W0).max()
 
 
 def test_hessian_is_energy_second_derivative():
@@ -195,6 +200,22 @@ def test_cholesky_pivots_and_density_fitting():
     assert np.abs(h.veff(D, response=True) - jk.veff(D, response=True)).max() < 1e-12
     assert np.abs(h.eri(C, C[:, :2], C, C[:, 1:3]) - pv.eri(C, C[:, :2], C, C[:, 1:3])).max() < 1e-12
     assert h.V is None and h.n2c == pv.n2c
+
+
+def test_two_level_preconditioner():
+    _, wf = make_wf(((2, 2), 4), scale=0.0)
+    wf.run_wf_optimization_onestep_direct_DHF(tol=1e-8)
+    lr = LinearResponseDirect(wf, "SD")
+    dA, _ = lr.diagonal()
+    idx = np.argsort(np.abs(dA[: lr.nq]))[:10]
+    cols, E, S = lr._projected_block(idx)
+    I = np.zeros((2 * lr.n, len(cols)), dtype=complex)
+    I[cols, np.arange(len(cols))] = 1.0
+    E0, S0 = lr.sigma(I)
+    assert np.abs(E - E0[cols]).max() < 1e-8 and np.abs(S - S0[cols]).max() < 1e-12
+    r0 = lr.get_properties(tol=1e-8, sscc=False)
+    r1 = LinearResponseDirect(wf, "SD", two_level=20).get_properties(tol=1e-8, sscc=False)
+    assert np.abs(r1["shieldings"] - r0["shieldings"]).max() < 1e-6
 
 
 def test_subset_of_nuclei():
