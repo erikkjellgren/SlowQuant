@@ -323,93 +323,107 @@ def two_electron_integral_transform(C: np.ndarray, int2e: np.ndarray) -> np.ndar
     )
 
 
+# def generalized_two_electron_transform(C: np.ndarray, int_2e_inp: np.ndarray) -> np.ndarray:
+#     # int(C.shape[0]/2) is number of occupied orbitals to assure that we get the correct alpha and beta terms from the coefficient matrix
+#     # alpha alpha alpha alpha
+#     cont1 = np.einsum(
+#         "aP,bQ,cR,dS,abcd->PQRS",
+#         C[: int(C.shape[0] / 2)].conj(),
+#         C[: int(C.shape[0] / 2)],
+#         C[: int(C.shape[0] / 2)].conj(),
+#         C[: int(C.shape[0] / 2)],
+#         int_2e_inp,
+#         optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
+#     )
+#     # beta beta beta beta
+#     cont2 = np.einsum(
+#         "aP,bQ,cR,dS,abcd->PQRS",
+#         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
+#         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
+#         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
+#         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
+#         int_2e_inp,
+#         optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
+#     )
+#     # alpha alpha, beta beta
+#     cont3 = np.einsum(
+#         "aP,bQ,cR,dS,abcd->PQRS",
+#         C[: int(C.shape[0] / 2)].conj(),
+#         C[: int(C.shape[0] / 2)],
+#         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
+#         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
+#         int_2e_inp,
+#         optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
+#     )
+#     # beta beta alpha alpha
+#     cont4 = np.einsum(
+#         "aP,bQ,cR,dS,abcd->PQRS",
+#         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
+#         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
+#         C[: int(C.shape[0] / 2)].conj(),
+#         C[: int(C.shape[0] / 2)],
+#         int_2e_inp,
+#         optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
+#     )
+#     return cont1 + cont2 + cont3 + cont4
+
+# def DHF_two_electron_transform(C: np.ndarray, int_2e_inp: np.array) -> np.ndarray:
+#     # LLLL
+#     cont1 = np.einsum(
+#         "aP,bQ,cR,dS,abcd->PQRS",
+#         C[: int(C.shape[0] / 2)].conj(),
+#         C[: int(C.shape[0] / 2)],
+#         C[: int(C.shape[0] / 2)].conj(),
+#         C[: int(C.shape[0] / 2)],
+#         int_2e_inp[0],
+#         optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
+#     )
+#     # SSSS
+#     cont2 = np.einsum(
+#         "aP,bQ,cR,dS,abcd->PQRS",
+#         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
+#         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
+#         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
+#         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
+#         int_2e_inp[1],
+#         optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
+#     )
+#     # LLSS
+#     cont3 = np.einsum(
+#         "aP,bQ,cR,dS,abcd->PQRS",
+#         C[: int(C.shape[0] / 2)].conj(),
+#         C[: int(C.shape[0] / 2)],
+#         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
+#         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
+#         int_2e_inp[2],
+#         optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
+#     )
+#     # SSLL
+#     cont4 = np.einsum(
+#         "aP,bQ,cR,dS,abcd->PQRS",
+#         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
+#         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
+#         C[: int(C.shape[0] / 2)].conj(),
+#         C[: int(C.shape[0] / 2)],
+#         int_2e_inp[3],
+#         optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
+#     )
+#     return cont1 + cont2 + cont3 + cont4
+
 def generalized_two_electron_transform(C: np.ndarray, int_2e_inp: np.ndarray) -> np.ndarray:
-    # int(C.shape[0]/2) is number of occupied orbitals to assure that we get the correct alpha and beta terms from the coefficient matrix
-    # alpha alpha alpha alpha
-    cont1 = np.einsum(
-        "aP,bQ,cR,dS,abcd->PQRS",
-        C[: int(C.shape[0] / 2)].conj(),
-        C[: int(C.shape[0] / 2)],
-        C[: int(C.shape[0] / 2)].conj(),
-        C[: int(C.shape[0] / 2)],
-        int_2e_inp,
-        optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
-    )
-    # beta beta beta beta
-    cont2 = np.einsum(
-        "aP,bQ,cR,dS,abcd->PQRS",
-        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
-        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
-        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
-        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
-        int_2e_inp,
-        optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
-    )
-    # alpha alpha, beta beta
-    cont3 = np.einsum(
-        "aP,bQ,cR,dS,abcd->PQRS",
-        C[: int(C.shape[0] / 2)].conj(),
-        C[: int(C.shape[0] / 2)],
-        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
-        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
-        int_2e_inp,
-        optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
-    )
-    # beta beta alpha alpha
-    cont4 = np.einsum(
-        "aP,bQ,cR,dS,abcd->PQRS",
-        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
-        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
-        C[: int(C.shape[0] / 2)].conj(),
-        C[: int(C.shape[0] / 2)],
-        int_2e_inp,
-        optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
-    )
-    return cont1 + cont2 + cont3 + cont4
+    """g_PQRS = sum_abcd T[ab,PQ] (ab|cd) T[cd,RS],  T[ab,PQ] = Ca*[a,P] Ca[b,Q] + Cb*[a,P] Cb[b,Q].
 
-def DHF_two_electron_transform(C: np.ndarray, int_2e_inp: np.array) -> np.ndarray:
-    # LLLL
-    cont1 = np.einsum(
-        "aP,bQ,cR,dS,abcd->PQRS",
-        C[: int(C.shape[0] / 2)].conj(),
-        C[: int(C.shape[0] / 2)],
-        C[: int(C.shape[0] / 2)].conj(),
-        C[: int(C.shape[0] / 2)],
-        int_2e_inp[0],
-        optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
-    )
-    # SSSS
-    cont2 = np.einsum(
-        "aP,bQ,cR,dS,abcd->PQRS",
-        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
-        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
-        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
-        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
-        int_2e_inp[1],
-        optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
-    )
-    # LLSS
-    cont3 = np.einsum(
-        "aP,bQ,cR,dS,abcd->PQRS",
-        C[: int(C.shape[0] / 2)].conj(),
-        C[: int(C.shape[0] / 2)],
-        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
-        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
-        int_2e_inp[2],
-        optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
-    )
-    # SSLL
-    cont4 = np.einsum(
-        "aP,bQ,cR,dS,abcd->PQRS",
-        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
-        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
-        C[: int(C.shape[0] / 2)].conj(),
-        C[: int(C.shape[0] / 2)],
-        int_2e_inp[3],
-        optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
-    )
-    return cont1 + cont2 + cont3 + cont4
-
+    Same result as the four spin-block einsums, but one spin-summed transformation:
+    two large matrix multiplications (BLAS) and only one nmo^4 array in memory.
+    """
+    n = C.shape[0] // 2
+    nmo = C.shape[1]
+    T = np.einsum("aP,bQ->abPQ", C[:n].conj(), C[:n]).reshape(n * n, nmo * nmo)
+    T += np.einsum("aP,bQ->abPQ", C[n:].conj(), C[n:]).reshape(n * n, nmo * nmo)
+    half = np.asarray(int_2e_inp).reshape(n * n, n * n) @ T
+    g = T.T @ half
+    del T, half
+    return g.reshape(nmo, nmo, nmo, nmo)
 
 # def generalized_two_electron_transform(C: np.ndarray, int_2e_inp_spinor: np.ndarray) -> np.ndarray: #change name AE
 #     # C: (nao2c, nmo), eri_ao: (nao2c,nao2c,nao2c,nao2c)

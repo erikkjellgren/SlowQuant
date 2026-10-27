@@ -99,9 +99,9 @@ class LinearResponseBaseClass:
             ):
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
 
-        # for p, q in self.wf.kappa_no_activeactive_spin_idx:
-            # self.q_ops.append(G1(p, q)) #AE from G1 skal det være generalized??
-            # self.operator_labels_q.append(('q',p,q))
+        for p, q in self.wf.kappa_no_activeactive_spin_idx:
+            self.q_ops.append(G1(p, q)) #AE from G1 skal det være generalized??
+            self.operator_labels_q.append(('q',p,q))
             # print('qs:',p,q)
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex

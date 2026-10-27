@@ -55,19 +55,19 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         active_space,
         coeff,
         mol,
-        "fuccsd",
+        "gtups",
         True, #Do x2c
         # False, #Do ecp
-        {"n_layers": 1, "is_spin_conserving" : False},
+        {"n_layers": 3, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
-    # ny_theta_real = np.random.uniform(-0.05, 0.05, len(WF.thetas))
-    # ny_theta_imag = [0.0] * len(WF.thetas)
+    ny_theta_real = np.random.uniform(-0.05, 0.05, len(WF.thetas))
+    ny_theta_imag = [0.0] * len(WF.thetas)
 
-    # WF.set_thetas(ny_theta_real, ny_theta_imag)
+    WF.set_thetas(ny_theta_real, ny_theta_imag)
 
-    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=False, tol=1e-10, maxiter = 2000)
+    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=False, tol=1e-16,  maxiter = 20000)
 
     # #Saving the data:
     # directory = os.getcwd()
@@ -471,7 +471,7 @@ def HF():
     basis = {'H': gto.uncontract(load('x2c-SV(P)all.nw', 'H')),
                 'F': gto.uncontract(load('x2c-SV(P)all.nw', 'F'))}
     # basis = "x2c-SVPall.nw"
-    active_space = ((4,4), 18) #spin orbitaler or spinor basis
+    active_space = ((4,4), 10) #spin orbitaler or spinor basis
     charge = 0
     spin = 0
     NR(

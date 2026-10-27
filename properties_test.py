@@ -14,10 +14,6 @@ from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import Gener
 # from slowquant.unitary_coupled_cluster.generalized_ucc_wavefunction import GeneralizedWaveFunctionUCC
 from slowquant.unitary_coupled_cluster.generalized_properties import GeneralizedProperties
 
-
-
-
-
 def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     """.........."""
     print("active space:", {active_space})
@@ -27,9 +23,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     mol.build()
 
-    mf = scf.GHF(mol).sfx2c1e() #spinfree
+    # mf = scf.GHF(mol).sfx2c1e() #spinfree
     # mf = scf.GHF(mol).x2c1e()
-    # mf = scf.GHF(mol).x2c()
+    mf = scf.GHF(mol).x2c()
     # mf = scf.GHF(mol)
 
 
@@ -56,36 +52,38 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         active_space,
         coeff,
         mol,
-        "gtups",
-        "sf", #Do x2c
+        "fuccsd",
+        True, #Do x2c "sf" for spinfree
         {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=False,
     )
 
     ny_theta_real = np.random.uniform(-0.05, 0.05, len(WF.thetas))
-    ny_theta_imag = np.random.uniform(-0.05, 0.05, len(WF.thetas))
+    # ny_theta_imag = np.random.uniform(-0.05, 0.05, len(WF.thetas))
 
     ny_theta_imag = [0.0] * len(WF.thetas)
 
-    # WF.set_thetas(ny_theta_real, ny_theta_imag)
+    WF.set_thetas(ny_theta_real, ny_theta_imag)
 
-    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=False, tol=1e-10, maxiter = 2000)
+    WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=False, tol=1e-16, maxiter = 20000)
     
     print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
 
-    props = GeneralizedProperties(WF, mol, mf, x2c=True, picture_change=True, spin_free=True, c=c)
+    props = GeneralizedProperties(WF, mol, mf, x2c=True, picture_change=True, spin_free=False, c=c)
 
     "Electric field gradients"
-    # efg = props.electric_field_gradient()
-    exi=props.excitation_energies()
-    os=props.oscillator_strengths()
+    efg = props.electric_field_gradient()
+    # exi=props.excitation_energies()
+    # os=props.oscillator_strengths()
     # dip_mol=props.dipole_moment()
-    print(exi)
-    print(os)
 
+    print(efg)
 
 from pyscf.gto.basis import load
 import pyscf.gto as gto
+
+#MOLEKYLE
+
 def HF():
     geometry = """F  0.0   0.0  0.0;
         H  0.0  0.0  0.91680 """
@@ -140,4 +138,19 @@ def HRb():
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
-HRb()
+# HRb()
+
+def HCl():
+    geometry = """H  0.0   0.0  1.27455;
+        Cl  0.0  0.0  0.0 """
+    basis='dyallv2z'
+    # basis = {'H':'sto-3g','Cl': 'x2c-SVPall.nw'}
+    # basis = {'H': gto.uncontract(load('x2c-SVPall_2c.nw', 'H')),
+    #             'Cl': gto.uncontract(load('x2c-SVPall_2c.nw', 'Cl'))}
+    active_space = ((3,3), 8) #spin orbitaler or spinor basis
+    charge = 0
+    spin = 0
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+HCl()
