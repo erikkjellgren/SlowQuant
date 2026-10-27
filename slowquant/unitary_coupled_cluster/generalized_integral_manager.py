@@ -2,6 +2,8 @@ import copy
 
 import numpy as np
 import pyscf
+from scipy import constants
+g_factor = constants.physical_constants['electron g factor'][0]
 
 from slowquant.SlowQuant import SlowQuant
 
@@ -198,17 +200,15 @@ class IntegralManager:
         mf = pyscf.scf.GHF(self.int_obj)
         hcoreB = mf.get_hcore().astype(complex)
 
-        g_e = 2.00231930436256            # Electronic g-factor
-
         hcoreB -= 0.5 * 1j * np.einsum('k,kij->ij', self.B, L_spinor)   # Correct
         hcoreB += H_dia                                                 # Correct 
-        hcoreB += 0.5 * g_e/2 * sigmaSB                                         # Correct
+        hcoreB += 0.5 * g_factor/2 * sigmaSB                                         # Correct
     
         return hcoreB
 
 
     @property
-    def magnetic_field_H_z(self) -> np.ndarray:
+    def magnetic_field_H_z(self) -> np.ndarray: # Not corrected!
         # Building the magnetic field Hamiltonian: 
         nao = self.int_obj.nao
 
@@ -234,13 +234,11 @@ class IntegralManager:
         sigmaS[:nao, :nao] =  self.int_obj.intor("int1e_ovlp")
         sigmaS[nao:, nao:] = -self.int_obj.intor("int1e_ovlp")
 
-        g_e = 2.00231930436256            # Electronic g-factor
-
         mf = pyscf.scf.GHF(self.int_obj)
         hcoreB = mf.get_hcore().astype(complex)
 
         hcoreB -= 0.5 * self.B[2] * 1j * Lz_spinor       # Correct for field in the z direction
         hcoreB += H_dia                     # Correct for field in the z direction
-        hcoreB += 0.5 * g_e/2 * self.B[2] * sigmaS         # Correct for field in the z direction? Should there be a spin exchange contribution for cGHF?
+        hcoreB += 0.5 * g_factor/2 * self.B[2] * sigmaS         # Correct for field in the z direction? Should there be a spin exchange contribution for cGHF?
 
         return hcoreB
