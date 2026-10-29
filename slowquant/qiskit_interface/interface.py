@@ -1074,12 +1074,13 @@ class QuantumInterface:
                         ]
                     else:
                         self._apply_M_mitigation(distr_raw, run_circuit, circuit_M)
+                        # save mitigated results
+                        self.saver[det_int].update_distr(head_mit, distr_raw, M_only_flags)
 
                 if self.mitigation_flags.do_postselection:  # apply post-selection if requested
                     self._apply_postselection(distr_raw, head_mit)
-
-                # save mitigated results
-                self.saver[det_int].update_distr(head_mit, distr_raw, self.mitigation_flags)
+                    # save mitigated results
+                    self.saver[det_int].update_distr(head_mit, distr_raw, self.mitigation_flags)
 
         # Loop over all Pauli strings in observable and build final result with coefficients
         for pauli, coeff in zip(paulis_str, observables.coeffs):
