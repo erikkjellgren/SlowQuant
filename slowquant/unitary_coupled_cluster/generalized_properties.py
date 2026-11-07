@@ -288,6 +288,14 @@ class GeneralizedProperties:
         return self.linear_response().get_oscillator_strength(
             dip_ao, x2c=self._is_spinor(dip_ao)
         )
+    
+    def get_states(self, f_min: float = 0.01, n_top: int = 3, w_min: float = 0.02, omega_max_eV=30) -> None:
+        """Print dominerende operatorer for tilstande med f >= f_min."""
+        lr = self.linear_response()
+        if not hasattr(lr, "oscillator_strengths"):
+            self.oscillator_strengths()      
+        lr.print_bright_states(f_min=f_min, n_top=n_top, w_min=w_min, omega_max_eV=omega_max_eV)
+
 
     def polarizability(self, omega: float = 0.0) -> np.ndarray:
         """Fuld 3x3 polarisabilitetstensor. omega != 0 kræver LR.metric."""

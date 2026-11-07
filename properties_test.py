@@ -58,12 +58,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         include_active_kappa=False,
     )
 
-    ny_theta_real = np.random.uniform(-0.05, 0.05, len(WF.thetas))
-    # ny_theta_imag = np.random.uniform(-0.05, 0.05, len(WF.thetas))
+    # ny_theta_real = np.random.uniform(-0.05, 0.05, len(WF.thetas))
+    # # ny_theta_imag = np.random.uniform(-0.05, 0.05, len(WF.thetas))
 
-    ny_theta_imag = [0.0] * len(WF.thetas)
+    # ny_theta_imag = [0.0] * len(WF.thetas)
 
-    WF.set_thetas(ny_theta_real, ny_theta_imag)
+    # WF.set_thetas(ny_theta_real, ny_theta_imag)
 
     WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=False, tol=1e-16, maxiter = 20000)
     
@@ -72,12 +72,14 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     props = GeneralizedProperties(WF, mol, mf, x2c=True, picture_change=True, spin_free=False, c=c)
 
     "Electric field gradients"
-    efg = props.electric_field_gradient()
-    # exi=props.excitation_energies()
-    # os=props.oscillator_strengths()
+    # efg = props.electric_field_gradient()
+    exi=props.excitation_energies()
+    os=props.oscillator_strengths()
     # dip_mol=props.dipole_moment()
-
-    print(efg)
+    props.get_states(f_min=0.1, n_top=3, w_min=0.02, omega_max_eV=30)
+    print(exi)
+    print(os)
+    # print(states)
 
 from pyscf.gto.basis import load
 import pyscf.gto as gto
@@ -153,4 +155,20 @@ def HCl():
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
-HCl()
+# HCl()
+def h3():
+    geometry = """H  0.000000   0.000000       0.000000;
+                  H  1.000000   0.000000       0.000000;
+                  H  0.500000   0.8660254038   0.000000"""
+    # basis = "def2SVP"
+    basis = "sto-"
+    #active_space = ((2, 1), 6)
+    active_space = ((2,1), 6)
+    #active_space = (2, 4)
+    charge = 0
+    spin = 1
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+
+h3()

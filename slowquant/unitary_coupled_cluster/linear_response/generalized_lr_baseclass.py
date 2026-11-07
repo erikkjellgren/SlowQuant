@@ -76,10 +76,12 @@ class LinearResponseBaseClass:
             for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx, is_spin_conserving=False): ## -diagonal jf HJ. Cross?, # is_spin_conserving  AWE
                 self.G_ops.append(G1(i, a)) #AE from G1
                 self.operator_labels_G.append(('G1',i,a))
+                # print('G1',i,a)
         if "d" in excitations:
             for a, i, b, j in iterate_t2(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx, is_spin_conserving=False): 
                 self.G_ops.append(G2(i, j, a, b)) #AE from G2
                 self.operator_labels_G.append(('G2',i,j,a,b))
+                # print('G2',i,j,a,b)
         if "t" in excitations:
             for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
                 self.G_ops.append(G3(i, j, k, a, b, c))
@@ -169,15 +171,15 @@ class LinearResponseBaseClass:
         # print('Hessian før', hessian_for)
         # metric_for = self.metric
         # print('Metric før', metric_for)
-        # self.metric = 1/2*(self.metric+self.metric.conj().T) 
-        # self.hessian = 1/2*(self.hessian+self.hessian.conj().T)
+        self.metric = 1/2*(self.metric+self.metric.conj().T) 
+        self.hessian = 1/2*(self.hessian+self.hessian.conj().T)
 
         # hessian_efter = self.hessian
         # print('Hessian efter', hessian_efter)
         # metric_efter = self.metric
         # print('Metric efter', metric_efter)
 
-        print("Metric is real?", np.allclose(self.metric.imag, 0))
+        # print("Metric is real?", np.allclose(self.metric.imag, 0))
 
         print(f"Hermiticity check of the Hessian: max|E2 - E2†| = "
         f"{np.max(np.abs(self.hessian - self.hessian.conj().T)):.2e}")  
@@ -197,49 +199,13 @@ class LinearResponseBaseClass:
         eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)     
      
             
-        #     # num=(eigvec.conj().T@(self.hessian)@eigvec)
-        #     # den=(eigvec.conj().T@(self.metric)@eigvec)
-        #     # print('eigenvalues on the diagonal?',num/den)
-            
-        #     # for j in range(len(vec)):
-        #     #     print(vec[j], self.operator_labels[j])
-        
-
-        #AE
-        operator_labels = np.array(
-            self.operator_labels_q +
-            self.operator_labels_G +
-            self.operator_labels_q +
-            self.operator_labels_G,
-            dtype=object)
-        for i in range(len(eigval)):
-            vec=eigvec[:,i]
-            absvec = np.abs(vec)
-        
-            # print('Eigenvalue', eigval[i],'Max value eigvec', np.max(abs(vec)), 'Max value eigvec index', np.argmax(abs(vec)))
-            # # k = np.argmax(np.abs(vec))
-            # # print("dominant operator:", operator_labels[k])
-
-            # # top 3 contributors
-            # top3 = np.argsort(absvec)[-3:][::-1]
-            # # print(len(top3))
-            # for j in top3:
-            #     print(
-            #     "  operator:", operator_labels[j],
-            #     " weight:", absvec[j])
-
-
-        #     # print(self.operator_labels[k])
-
-            
    
         sorting = np.argsort(np.real(eigval.real)) #AE added np.real
         self.excitation_energies = np.real(eigval[sorting][size:]) 
         self.response_vectors = (eigvec[:, sorting][:, size:]) #Removed np.real
         self.normed_response_vectors = np.zeros_like(self.response_vectors, dtype=complex) #AE
         self.num_q = len(self.q_ops)
-        
-        
+
         #PERNILLES
         self.num_q = self.q_ops_finite
         self.num_qG = size
@@ -394,8 +360,39 @@ class LinearResponseBaseClass:
         return output
     
     
+    # def print_bright_states(
+    #     self, f_min: float = 0.01, n_top: int = 3, w_min: float = 0.02, omega_max_eV: float | None = None
+    # ) -> None:
+    #     """Print dominerende operatorer (metrik-vægte) for tilstande med f >= f_min og ω <= omega_max_eV."""
+    #     HARTREE_TO_EV = 27.211386245988
+    #     if not hasattr(self, "oscillator_strengths"):
+    #         raise ValueError("Kald get_oscillator_strength først.")
+    #     S = self.metric[: self.num_qG, : self.num_qG]
+    #     labels = self.operator_labels_q + self.operator_labels_G
+    #     if len(labels) != self.num_qG:
+    #         print("WARNING: labels passer ikke med antal operatorer (screening?)")
+    #         return
+    #     for k, (w_k, f_k) in enumerate(zip(self.excitation_energies, self.oscillator_strengths)):
+    #         if f_k < f_min:
+    #             continue
+    #         if omega_max_eV is not None and w_k * HARTREE_TO_EV > omega_max_eV:
+    #             continue
+    #         Z = self.Z_qG_normed[:, k]
+    #         Yc = self.Y_qG_normed[:, k]  # = Y*
+    #         wZ = np.real(Z.conj() * (S @ Z))
+    #         wY = np.real(Yc * (S @ Yc.conj()))
+    #         print(
+    #             f"State {k}: ω = {w_k:.6f} Eh = {w_k * HARTREE_TO_EV:.3f} eV  f = {f_k:.4f}"
+    #             f"   (ΣwZ - ΣwY = {wZ.sum() - wY.sum():.3f})"
+    #         )
+    #         entries = [(wZ[m], labels[m]) for m in range(len(labels))] + \
+    #                   [(-wY[m], labels[m] + ("†",)) for m in range(len(labels))]
+    #         entries.sort(key=lambda x: -abs(x[0]))
+    #         for w, lab in entries[:n_top]:
+    #             if abs(w) < w_min:
+    #                 break
+    #             print(f"    {lab}   w = {w:+.3f}")
     
-   
    
 import scipy.linalg as la
 def solve_lr_drop_sigma_null(H, sigma, cut=1e-10):
@@ -415,4 +412,5 @@ def solve_lr_drop_sigma_null(H, sigma, cut=1e-10):
     # 5) backtransform eigenvectors
     v = Uk @ y
     return w, v, s, keep
- 
+
+

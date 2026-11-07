@@ -23,8 +23,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     """.........."""
     print("active space:", {active_space})
     # PySCF
-    mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin, nucmod=1)
-    # mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
+    # mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin, nucmod=1)
+    mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
     mol.build()
 
     # mf = scf.GHF(mol).sfx2c1e() #spinfree
@@ -61,6 +61,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # print(c_u)
     # # Slowquant
+    data = np.load("data_H3_UCCSD_03.npz")
+    c_mo, thetas_real, thetas_imag = data["c_mo"], data["thetas_real"], data["thetas_imag"]
+    coeff=np.array(c_mo, dtype=complex)
+
     
     WF =GeneralizedWaveFunctionUPS(
         # mol.nelectron,
@@ -73,21 +77,40 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         include_active_kappa=True,
     )
 
-    ny_theta_real = np.random.uniform(-0.05, 0.05, len(WF.thetas))
-    ny_theta_imag = [0.0] * len(WF.thetas)
+    # ny_theta_real = np.random.uniform(-0.05, 0.05, len(WF.thetas))
+    # ny_theta_imag = [0.0] * len(WF.thetas)
 
-    WF.set_thetas(ny_theta_real, ny_theta_imag)
+    # ingen spin-flip i optimeringen 
+    keep = [p % 2 == q % 2 for (p, q) in WF.kappa_spin_idx]       # kun spin-bevarende rotationer
+    sel = lambda lst: [x for x, k in zip(lst, keep) if k]
+    WF.kappa_spin_idx  = sel(WF.kappa_spin_idx)
+    WF._kappa_real     = sel(WF._kappa_real)
+    WF._kappa_imag     = sel(WF._kappa_imag)
+    WF._kappa_real_old = sel(WF._kappa_real_old)
+    WF._kappa_imag_old = sel(WF._kappa_imag_old)
+    print("kappaer i optimering:", len(WF.kappa_spin_idx),
+    "  q'er i LR:", len(WF.kappa_no_activeactive_spin_idx))   # LR-listen er uændret
+
+
+    # WF.set_thetas(thetas_real, thetas_imag)
 
     # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
 
     # print("c_mo is real?", np.allclose(WF.c_mo.imag, 0))
 
     # print(WF.c_mo)
-
+    print(WF.kappa_spin_idx)
     WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
+    print(WF.kappa_spin_idx)
+    np.savez(
+        "H3_no_spinflip_optimization.npz",
+        c_mo=WF.c_mo,
+        thetas_real=WF.thetas_real,
+        thetas_imag=WF.thetas_imag
+        )
 
     # print("E_opt:", WF._energy_elec)
-    print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
+    # print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
     
     # print(WF.ci_coeffs)
 
@@ -95,6 +118,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     
     # dip_ao = build_x2c_pc_operator(mf, mol, "int1e_r", 'int1e_sprsp', c, x2c=False, picture_change=True)
 
+    #Ingen spin-flip i LR-delen husk også at ændre i baseclass
+    # keep = [p % 2 == q % 2 for (p, q) in WF.kappa_no_activeactive_spin_idx]
+    # WF.kappa_no_activeactive_spin_idx = [pq for pq, k in zip(WF.kappa_no_activeactive_spin_idx, keep) if k]
+    # WF.kappa_no_activeactive_spin_idx_dagger = [pq for pq, k in zip(WF.kappa_no_activeactive_spin_idx_dagger, keep) if k]
+    # print("q'er tilbage:", len(WF.kappa_no_activeactive_spin_idx))
 
     "Calculate Excitation energies"
     LR = generalized_naive.LinearResponse(WF, excitations="sd")
@@ -442,8 +470,8 @@ def h3():
     geometry = """H  0.000000   0.000000       0.000000;
                   H  1.000000   0.000000       0.000000;
                   H  0.500000   0.8660254038   0.000000"""
-    # basis = "def2SVP"
-    basis = "sto-3g"
+    basis = "def2SVP"
+    # basis = "sto-3g"
     #active_space = ((2, 1), 6)
     active_space = ((2,1), 6)
     #active_space = (2, 4)

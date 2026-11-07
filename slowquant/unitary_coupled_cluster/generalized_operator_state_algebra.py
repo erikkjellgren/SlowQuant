@@ -1241,56 +1241,56 @@ def generalized_add_operator_matrix(
         op_mat[det2idx[det], i] += factor * (-1) ** phase_changes
     return op_mat
 
-def generalized_build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bool = False) -> np.ndarray:
-    """Build matrix representation of operator.
+# def generalized_build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bool = False) -> np.ndarray:
+#     """Build matrix representation of operator.
 
-    Args:
-        op: Fermionic number and spin conserving operator.
-        ci_info: Information about the CI space.
-        do_unsafe: Ignore elements that are outside the space defined in ci_info. (default: False)
-                If not ignored, getting elements outside the space will stop the calculation.
+#     Args:
+#         op: Fermionic number and spin conserving operator.
+#         ci_info: Information about the CI space.
+#         do_unsafe: Ignore elements that are outside the space defined in ci_info. (default: False)
+#                 If not ignored, getting elements outside the space will stop the calculation.
 
-    Returns:
-        Matrix representation of operator.
-    """
-    idx2det = ci_info.idx2det
-    det2idx = ci_info.det2idx
-    num_active_orbs = ci_info.num_active_orbs
-    num_dets = len(idx2det)  # number of spin and particle conserving determinants
-    op_mat = np.zeros((num_dets, num_dets))  # basis
-    # Create bitstrings for parity check. Contains occupied determinant up to orbital index.
-    parity_check = np.zeros(2 * num_active_orbs + 1, dtype=int)
-    num = 0
-    for i in range(2 * num_active_orbs - 1, -1, -1):
-        num += 2**i
-        parity_check[2 * num_active_orbs - i] = num
-    # loop over all strings of annihilation operators in FermionicOperator sum
-    for fermi_label in op.operators.keys():
-        factor = op.operators[fermi_label]
-        if not isinstance(factor, (float,complex)):
-            raise ValueError(f"Got factor, {factor}, of type {type(factor)}, expected type float.")
-        # Separate each annihilation operator string in creation and annihilation indices
-        anni_idx = []
-        create_idx = []
-        for fermi_op in fermi_label:
-            if fermi_op[1]:
-                create_idx.append(fermi_op[0])
-            else:
-                anni_idx.append(fermi_op[0])
-        anni_idx = np.array(anni_idx, dtype=np.int64)
-        create_idx = np.array(create_idx, dtype=np.int64)
-        op_mat = generalized_add_operator_matrix(
-            op_mat,
-            anni_idx,
-            create_idx,
-            num_active_orbs,
-            parity_check,
-            idx2det,
-            det2idx,
-            do_unsafe,
-            factor,
-        )
-    return op_mat
+#     Returns:
+#         Matrix representation of operator.
+#     """
+#     idx2det = ci_info.idx2det
+#     det2idx = ci_info.det2idx
+#     num_active_orbs = ci_info.num_active_orbs
+#     num_dets = len(idx2det)  # number of spin and particle conserving determinants
+#     op_mat = np.zeros((num_dets, num_dets))  # basis
+#     # Create bitstrings for parity check. Contains occupied determinant up to orbital index.
+#     parity_check = np.zeros(2 * num_active_orbs + 1, dtype=int)
+#     num = 0
+#     for i in range(2 * num_active_orbs - 1, -1, -1):
+#         num += 2**i
+#         parity_check[2 * num_active_orbs - i] = num
+#     # loop over all strings of annihilation operators in FermionicOperator sum
+#     for fermi_label in op.operators.keys():
+#         factor = op.operators[fermi_label]
+#         if not isinstance(factor, (float,complex)):
+#             raise ValueError(f"Got factor, {factor}, of type {type(factor)}, expected type float.")
+#         # Separate each annihilation operator string in creation and annihilation indices
+#         anni_idx = []
+#         create_idx = []
+#         for fermi_op in fermi_label:
+#             if fermi_op[1]:
+#                 create_idx.append(fermi_op[0])
+#             else:
+#                 anni_idx.append(fermi_op[0])
+#         anni_idx = np.array(anni_idx, dtype=np.int64)
+#         create_idx = np.array(create_idx, dtype=np.int64)
+#         op_mat = generalized_add_operator_matrix(
+#             op_mat,
+#             anni_idx,
+#             create_idx,
+#             num_active_orbs,
+#             parity_check,
+#             idx2det,
+#             det2idx,
+#             do_unsafe,
+#             factor,
+#         )
+#     return op_mat
 
 
 def generalized_construct_ucc_state(
