@@ -80,10 +80,13 @@ PYTHONPATH=/home/kjellgren/gitreps/SlowQuant_claude python script.py
   non-commuting generators, so the order the excitations are generated in is part of the ansatz,
   not a detail. Energies from a factorized ansatz are therefore *not* invariant under a change to
   the iteration order, unlike everything else. A single `expm(T)`, as in `WaveFunctionUCC`, is.
-- **`_double_excitation_efficient` only supports some index topologies.** Writing the sorted
-  creation/annihilation indices as `c`/`a`, it is correct for `aacc`, `acac` and `ccaa`, and
-  wrong for `acca`, `caac` and `caca`. It raises on the unsupported ones; do not loosen that
-  check without re-running `tests/test_excitation_circuits.py`.
+- **The JW excitation circuits take any distinct indices, and each piece is load bearing.**
+  `_single_excitation_efficient`/`_double_excitation_efficient` are a qubit excitation (2 CNOT;
+  the 12-CNOT gate of arXiv:2608.11733 for doubles) on the excitation qubits, the fermionic sign
+  from `_jordan_wigner_sign`, and a CNOT ladder + CZ per Jordan-Wigner string
+  (`_jordan_wigner_string`), which flips the rotation angle when the string's parity is odd.
+  Drop the sign or put the CZ on a qubit the excitation does not flip and only some orderings go
+  wrong; `tests/test_excitation_circuits.py` checks every ordering against the exact exponential.
 - Numba is set to **1 thread at import** (`operator_state_algebra._init`). `propagate_state`
   picks its serial/threaded kernel from `nb.get_num_threads()`.
 - `do_unsafe=True` tolerates determinants falling outside the CI space; leaving it `False`

@@ -1,10 +1,10 @@
 """Test the hand-written excitation circuits against exact matrix exponentials.
 
-The efficient single and double excitation circuits are hand-derived, and they depend on how the
-spin-orbital indices are laid out: the Jordan-Wigner strings run between the indices in sorted
-order. Under interleaved ordering a spin-conserving double always came out with both creation
-indices above both annihilation indices, but under alpha/beta-blocked ordering the two pairs
-interleave instead, so the circuits are exercised on index topologies they were not before.
+The efficient single and double excitation circuits are a qubit excitation, a fermionic sign
+worked out from the indices, and a parity ladder for each Jordan-Wigner string. The strings run
+between the indices in sorted order, so every ordering of the indices, every way the creation
+and annihilation indices interleave, and every spin combination is a separate case, and all of
+them are checked.
 
 These tests compare the circuit unitary with the exponential of the Jordan-Wigner mapped
 generator, built with Qiskit's own mapper, so they check the circuits rather than restate them.
@@ -24,7 +24,9 @@ from qiskit_nature.second_q.operators import FermionicOp
 from slowquant.qiskit_interface.operators_circuits import (
     _double_excitation_efficient,
     _single_excitation_efficient,
+    upslayout2circuit,
 )
+from slowquant.unitary_coupled_cluster.spin_ordering import alpha_idx, beta_idx
 from slowquant.unitary_coupled_cluster.util import UpsStructure
 
 THETA = 0.37
@@ -114,27 +116,7 @@ def circuit_unitary(builder, indices: tuple[int, ...], num_orbs: int, theta: flo
     return Operator(qc.assign_parameters({parameter: theta})).data
 
 
-@pytest.mark.parametrize("num_orbs", [2, 3])
-def test_single_excitation_circuit(num_orbs: int) -> None:
-    """Test the single excitation circuit for every spin-conserving pair.
-
-    Args:
-        num_orbs: Number of spatial orbitals.
-    """
-    checked = 0
-    for i, k in itertools.permutations(range(2 * num_orbs), 2):
-        if (i < num_orbs) != (k < num_orbs):  # spin conserving only
-            continue
-        if k <= i:  # the circuit requires the excitation to go upwards
-            continue
-        computed = circuit_unitary(_single_excitation_efficient, (k, i), num_orbs, THETA)
-        reference = exact_excitation(f"+_{k} -_{i}", num_orbs, THETA)
-        assert np.allclose(computed, reference, atol=1e-10), f"k={k} i={i}"
-        checked += 1
-    assert checked > 0
-
-
-SUPPORTED_TOPOLOGIES = ("aacc", "acac", "ccaa")
+ALL_TOPOLOGIES = {"aacc", "acac", "acca", "caac", "caca", "ccaa"}
 
 
 def sorted_topology(k: int, l: int, i: int, j: int) -> str:
@@ -152,64 +134,140 @@ def sorted_topology(k: int, l: int, i: int, j: int) -> str:
     return "".join(kind for _, kind in sorted(((k, "c"), (l, "c"), (i, "a"), (j, "a"))))
 
 
-@pytest.mark.parametrize("num_orbs", [2, 3])
-def test_double_excitation_circuit(num_orbs: int) -> None:
-    """Test the double excitation circuit for every supported spin-conserving quadruple.
+def two_qubit_gate_count(qc: QuantumCircuit) -> int:
+    """Count the two-qubit gates in a circuit.
+
+    Args:
+        qc: Quantum circuit.
+
+    Returns:
+        Number of two-qubit gates.
+    """
+    return sum(1 for instruction in qc.data if instruction.operation.num_qubits == 2)
+
+
+@pytest.mark.parametrize("num_orbs", [2, 3, 4])
+def test_single_excitation_circuit(num_orbs: int) -> None:
+    """Test the single excitation circuit for every ordered pair of spin orbitals.
+
+    Both orders of the two indices are included, and so are the pairs that change the spin, as
+    the circuit does not restrict either.
 
     Args:
         num_orbs: Number of spatial orbitals.
     """
+    for k, i in itertools.permutations(range(2 * num_orbs), 2):
+        computed = circuit_unitary(_single_excitation_efficient, (k, i), num_orbs, THETA)
+        reference = exact_excitation(f"+_{k} -_{i}", num_orbs, THETA)
+        assert np.allclose(computed, reference, atol=1e-10), f"k={k} i={i}"
+
+
+@pytest.mark.parametrize(("num_orbs", "both_pair_orders"), [(2, True), (3, True), (4, False)])
+def test_double_excitation_circuit(num_orbs: int, both_pair_orders: bool) -> None:
+    """Test the double excitation circuit for every ordered quadruple of spin orbitals.
+
+    Every order of the four indices is included, which covers every way the creation and
+    annihilation indices interleave and both orders within each pair, so the sign the circuit
+    works out from the indices is checked, and so are the doubles that change the spin. Four
+    spatial orbitals are the first size with three qubits inside a Jordan-Wigner string, and to
+    keep the test fast only one order within each pair is taken there.
+
+    Args:
+        num_orbs: Number of spatial orbitals.
+        both_pair_orders: Include both orders of the indices within each pair.
+    """
     seen = set()
     for k, l, i, j in itertools.permutations(range(2 * num_orbs), 4):
-        if k >= l or i >= j:  # each pair is unordered, take one representative
-            continue
-        if sum(1 for p in (k, l, i, j) if p < num_orbs) % 2 != 0:
-            continue
-        topology = sorted_topology(k, l, i, j)
-        if topology not in SUPPORTED_TOPOLOGIES:
+        if not both_pair_orders and (k > l or i > j):
             continue
         computed = circuit_unitary(_double_excitation_efficient, (k, l, i, j), num_orbs, THETA)
         reference = exact_excitation(f"+_{k} +_{l} -_{j} -_{i}", num_orbs, THETA)
         assert np.allclose(computed, reference, atol=1e-10), f"k={k} l={l} i={i} j={j}"
-        seen.add(topology)
-    # "aacc" is what interleaved ordering produced, "acac" is what blocked ordering produces for
-    # a double sharing spatial orbitals between the spins. Both must be covered.
-    assert {"aacc", "acac"} <= seen, seen
+        seen.add(sorted_topology(k, l, i, j))
+    assert seen == ALL_TOPOLOGIES, seen
 
 
-@pytest.mark.parametrize("num_orbs", [3])
-def test_double_excitation_circuit_rejects_unsupported(num_orbs: int) -> None:
-    """Test that an unsupported index ordering raises rather than building a wrong circuit.
+def test_excitation_circuit_gate_count() -> None:
+    """Test the two-qubit gate count of the excitation circuits.
 
-    Args:
-        num_orbs: Number of spatial orbitals.
+    A single costs 2 and a double 12 for the qubit excitation, plus 2 for each qubit inside a
+    Jordan-Wigner string.
     """
-    rejected = set()
+    num_orbs = 4
+    parameter = Parameter("t")
+    for k, i in itertools.permutations(range(2 * num_orbs), 2):
+        qc = _single_excitation_efficient(k, i, num_orbs, QuantumCircuit(2 * num_orbs), parameter)
+        num_string = abs(k - i) - 1
+        assert two_qubit_gate_count(qc) == 2 + 2 * num_string, f"k={k} i={i}"
     for k, l, i, j in itertools.permutations(range(2 * num_orbs), 4):
-        if k >= l or i >= j:
-            continue
-        if sum(1 for p in (k, l, i, j) if p < num_orbs) % 2 != 0:
-            continue
-        topology = sorted_topology(k, l, i, j)
-        if topology in SUPPORTED_TOPOLOGIES:
-            continue
-        with pytest.raises(ValueError, match="ordering of creation and annihilation"):
-            circuit_unitary(_double_excitation_efficient, (k, l, i, j), num_orbs, THETA)
-        rejected.add(topology)
-    assert rejected == {"acca", "caac", "caca"}, rejected
+        qc = _double_excitation_efficient(k, l, i, j, num_orbs, QuantumCircuit(2 * num_orbs), parameter)
+        p0, p1, p2, p3 = sorted((k, l, i, j))
+        num_string = (p1 - p0 - 1) + (p3 - p2 - 1)
+        assert two_qubit_gate_count(qc) == 12 + 2 * num_string, f"k={k} l={l} i={i} j={j}"
 
 
-@pytest.mark.parametrize("name", sorted(UPS_ANSATZE))
-def test_ansatz_doubles_are_supported_topologies(name: str) -> None:
-    """Test that no ansatz builder emits a double the circuit cannot represent.
+def test_excitation_circuits_reject_repeated_indices() -> None:
+    """Test that an excitation with a repeated spin orbital raises.
+
+    Such an operator is not an excitation, it is zero or a number operator times an excitation
+    of lower rank.
+    """
+    parameter = Parameter("t")
+    with pytest.raises(ValueError, match="distinct"):
+        _single_excitation_efficient(1, 1, 2, QuantumCircuit(4), parameter)
+    with pytest.raises(ValueError, match="distinct"):
+        _double_excitation_efficient(0, 1, 1, 2, 2, QuantumCircuit(4), parameter)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        pytest.param(
+            name,
+            marks=pytest.mark.xfail(
+                raises=ValueError,
+                strict=True,
+                reason="iterate_t2_generalized yields doubles with i == j or a == b, which are zero",
+            ),
+        )
+        if name == "fUCC_GS_GD"
+        else name
+        for name in sorted(UPS_ANSATZE)
+    ],
+)
+def test_ansatz_circuit(name: str) -> None:
+    """Test that an ansatz circuit is the ordered product of its exact excitation unitaries.
+
+    This also checks that upslayout2circuit hands the indices of each excitation to the
+    circuits in the right roles.
 
     Args:
         name: Key of the ansatz in UPS_ANSATZE.
     """
     layout = UpsStructure()
     UPS_ANSATZE[name](layout)
-    for exc_type, exc_indices in zip(layout.excitation_operator_type, layout.excitation_indices):
-        if exc_type != "double":
-            continue
-        i, j, a, b = exc_indices
-        assert sorted_topology(a, b, i, j) in SUPPORTED_TOPOLOGIES, f"{name} {exc_indices}"
+    qc, _ = upslayout2circuit(layout, NUM_ACTIVE_ORBS, JordanWignerMapper())
+    # Parameters are named p000000000, p000000001, ..., so their sorted order is the layout order.
+    thetas = np.random.default_rng(1234).uniform(-np.pi, np.pi, qc.num_parameters)
+    computed = Operator(qc.assign_parameters(dict(zip(qc.parameters, thetas)))).data
+    reference = np.eye(2 ** (2 * NUM_ACTIVE_ORBS), dtype=complex)
+    for theta, exc_type, exc_indices in zip(
+        thetas, layout.excitation_operator_type, layout.excitation_indices
+    ):
+        if exc_type == "single":
+            i, a = exc_indices
+            keys = [f"+_{a} -_{i}"]
+        elif exc_type == "double":
+            i, j, a, b = exc_indices
+            keys = [f"+_{a} +_{b} -_{j} -_{i}"]
+        elif exc_type == "sa_single":
+            i, a = exc_indices
+            keys = [
+                f"+_{alpha_idx(a, NUM_ACTIVE_ORBS)} -_{alpha_idx(i, NUM_ACTIVE_ORBS)}",
+                f"+_{beta_idx(a, NUM_ACTIVE_ORBS)} -_{beta_idx(i, NUM_ACTIVE_ORBS)}",
+            ]
+        else:
+            raise ValueError(f"Unexpected excitation type {exc_type}")
+        for key in keys:
+            reference = exact_excitation(key, NUM_ACTIVE_ORBS, theta) @ reference
+    assert np.allclose(computed, reference, atol=1e-10), name

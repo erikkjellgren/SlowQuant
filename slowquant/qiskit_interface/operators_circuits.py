@@ -100,6 +100,172 @@ def sa_single_excitation(
     return qc
 
 
+def _jordan_wigner_sign(operators: list[tuple[int, bool]]) -> int:
+    r"""Get the sign of an excitation operator written as a qubit excitation.
+
+    Under the Jordan-Wigner mapping an excitation operator with distinct spin orbital indices
+    becomes a qubit excitation times a Pauli-Z string and a sign,
+
+    .. math::
+       \hat{a}^\dagger_{k}\hat{a}^\dagger_{l}\hat{a}_{j}\hat{a}_{i}
+       = s\hat{Z}_\text{string}\left|1_k1_l0_i0_j\right>\left<0_k0_l1_i1_j\right|
+
+    The Pauli-Z string is one on the state where only the annihilated spin orbitals are
+    occupied, so :math:`s` is the sign the operator picks up on that state. Each operator is
+    applied right to left and contributes a minus sign per occupied spin orbital below it.
+
+    Args:
+        operators: (spin orbital index, is creation operator) in the written order.
+
+    Returns:
+        Sign of the excitation operator.
+    """
+    occupied = {idx for idx, dagger in operators if not dagger}
+    sign = 1
+    for idx, dagger in reversed(operators):
+        if sum(1 for p in occupied if p < idx) % 2 == 1:
+            sign *= -1
+        if dagger:
+            occupied.add(idx)
+        else:
+            occupied.remove(idx)
+    return sign
+
+
+def _jordan_wigner_string(low: int, high: int, qc: QuantumCircuit, uncompute: bool) -> QuantumCircuit:
+    r"""Get the circuit applying a Jordan-Wigner string as a conditional Pauli-Z.
+
+    The qubits strictly between low and high carry a Pauli-Z string. The parity of those qubits
+    is collected on qubit high-1 with a nearest-neighbour CNOT ladder and then applied to qubit
+    high with a CZ. When placed on both sides of a qubit excitation that flips qubit high, the
+    Pauli-Z on qubit high anticommutes with the generator, so the rotation angle changes sign
+    exactly when the parity is odd,
+
+    .. math::
+       \exp\left(\theta\hat{Z}_\text{string}\hat{G}\right)
+       = \text{CZ}_\text{string}\exp\left(\theta\hat{G}\right)\text{CZ}_\text{string}
+
+    #. 10.1103/PhysRevA.102.062612, Fig. 8 and Fig. 9
+
+    Args:
+        low: Lowest spin orbital index of the string.
+        high: Highest spin orbital index of the string, must be flipped by the excitation.
+        qc: Quantum circuit.
+        uncompute: Add the second half, i.e. the CZ followed by the reversed ladder.
+
+    Returns:
+        Jordan-Wigner string circuit.
+    """
+    if high - low < 2:
+        # No qubits between, no string.
+        return qc
+    if not uncompute:
+        for t in range(low + 1, high - 1):
+            qc.cx(t, t + 1)
+        qc.cz(high - 1, high)
+    else:
+        qc.cz(high - 1, high)
+        for t in range(high - 2, low, -1):
+            qc.cx(t, t + 1)
+    return qc
+
+
+def _single_qubit_excitation(
+    k: int, i: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression
+) -> QuantumCircuit:
+    r"""Get the single qubit excitation circuit.
+
+    Rotation between the two states where exactly one of the qubits is set,
+
+    .. math::
+       \boldsymbol{U}\left|1_i0_k\right> = \cos\left(\theta\right)\left|1_i0_k\right>
+       + \sin\left(\theta\right)\left|0_i1_k\right>
+
+    and the other two basis states are unchanged.
+
+    #. 10.1103/PhysRevA.102.062612, Fig. 3
+
+    Args:
+        k: Qubit that is set after the excitation.
+        i: Qubit that is set before the excitation.
+        qc: Quantum circuit.
+        theta: Circuit parameter.
+
+    Returns:
+        Single qubit excitation circuit.
+    """
+    qc.rz(np.pi / 2, i)
+    qc.rx(np.pi / 2, i)
+    qc.rx(np.pi / 2, k)
+    qc.cx(i, k)
+    qc.rx(theta, i)
+    qc.rz(theta, k)
+    qc.cx(i, k)
+    qc.rx(-np.pi / 2, k)
+    qc.rx(-np.pi / 2, i)
+    qc.rz(-np.pi / 2, i)
+    return qc
+
+
+def _double_qubit_excitation(
+    k: int, l: int, i: int, j: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression
+) -> QuantumCircuit:
+    r"""Get the 12-CNOT double qubit excitation circuit.
+
+    Rotation between the state where qubits i and j are set and the one where k and l are,
+
+    .. math::
+       \boldsymbol{U}\left|1_i1_j0_k0_l\right> = \cos\left(\theta\right)\left|1_i1_j0_k0_l\right>
+       + \sin\left(\theta\right)\left|0_i0_j1_k1_l\right>
+
+    and the other fourteen basis states are unchanged.
+
+    #. 10.48550/arXiv.2608.11733, Eq. 2 and Fig. 5
+
+    Args:
+        k: Qubit that is set after the excitation.
+        l: Qubit that is set after the excitation.
+        i: Qubit that is set before the excitation.
+        j: Qubit that is set before the excitation.
+        qc: Quantum circuit.
+        theta: Circuit parameter.
+
+    Returns:
+        Double qubit excitation circuit.
+    """
+    # Fig. 5 names its qubits (q_i, q_j, q_k, q_l) and rotates |0011> into |1100>,
+    # so its first two qubits are the ones set after the excitation, here (k, l, i, j).
+    qc.cx(k, i)
+    qc.cx(l, j)
+    qc.h(k)
+    qc.sdg(i)
+    qc.cx(k, l)
+    qc.sxdg(k)
+    qc.sxdg(l)
+    qc.rz(theta / 4, k)
+    qc.rz(-theta / 4, l)
+    qc.cx(j, l)
+    qc.rz(theta / 4, l)
+    qc.cx(j, k)
+    qc.cx(i, l)
+    qc.rz(-theta / 4, k)
+    qc.rz(-theta / 4, l)
+    qc.cx(i, k)
+    qc.cx(j, l)
+    qc.rz(theta / 4, k)
+    qc.cx(j, k)
+    qc.rz(-np.pi / 2 - theta / 4, k)
+    qc.rz(theta / 4, l)
+    qc.h(k)
+    qc.cx(k, l)
+    qc.sx(k)
+    qc.sx(l)
+    qc.cx(k, i)
+    qc.cx(l, j)
+    qc.rz(np.pi / 2, i)
+    return qc
+
+
 def _single_excitation_efficient(
     k: int, i: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression
 ) -> QuantumCircuit:
@@ -108,14 +274,19 @@ def _single_excitation_efficient(
     Implementation of the following operator,
 
     .. math::
-       \boldsymbol{U} = \exp\left(\theta\hat{a}^\dagger_k\hat{a}_i\right)
+       \boldsymbol{U} = \exp\left(\theta\left(\hat{a}^\dagger_k\hat{a}_i - \hat{a}^\dagger_i\hat{a}_k\right)\right)
+
+    for any two distinct spin orbitals, in either order and of either spin. Under the
+    Jordan-Wigner mapping the operator is a single qubit excitation on qubits i and k times the
+    Pauli-Z string between them, with a plus sign for either order. The cost is
+    :math:`2+2m` two-qubit gates for :math:`m` qubits between i and k.
 
     #. 10.1103/PhysRevA.102.062612, Fig. 3 and Fig. 8
     #. 10.1038/s42005-021-00730-0, Fig. 1
 
     Args:
-        k: Weakly occupied spin orbital index.
-        i: Strongly occupied spin orbital index.
+        k: Spin orbital index of the creation operator.
+        i: Spin orbital index of the annihilation operator.
         num_orbs: Number of spatial orbitals.
         qc: Quantum circuit.
         theta: Circuit parameter.
@@ -123,32 +294,12 @@ def _single_excitation_efficient(
     Returns:
         Single excitation circuit.
     """
-    if k <= i:
-        raise ValueError(f"k={k}, must be larger than i={i}")
-    if k - 1 == i:
-        qc.rz(np.pi / 2, i)
-        qc.rx(np.pi / 2, i)
-        qc.rx(np.pi / 2, k)
-        qc.cx(i, k)
-        qc.rx(theta, i)
-        qc.rz(theta, k)
-        qc.cx(i, k)
-        qc.rx(-np.pi / 2, k)
-        qc.rx(-np.pi / 2, i)
-        qc.rz(-np.pi / 2, i)
-    else:
-        qc.cx(k, i)
-        for t in range(k - 2, i, -1):
-            qc.cx(t + 1, t)
-        qc.cz(i + 1, k)
-        qc.ry(theta, k)
-        qc.cx(i, k)
-        qc.ry(-theta, k)
-        qc.cx(i, k)
-        qc.cz(i + 1, k)
-        for t in range(i + 1, k - 1):
-            qc.cx(t + 1, t)
-        qc.cx(k, i)
+    if k == i:
+        raise ValueError(f"Single excitation needs two distinct spin orbitals, got k={k}, i={i}")
+    low, high = sorted((k, i))
+    qc = _jordan_wigner_string(low, high, qc, uncompute=False)
+    qc = _single_qubit_excitation(k, i, qc, theta)
+    qc = _jordan_wigner_string(low, high, qc, uncompute=True)
     return qc
 
 
@@ -160,16 +311,23 @@ def _double_excitation_efficient(
     Implementation of the following operator,
 
     .. math::
-       \boldsymbol{U} = \exp\left(\theta\hat{a}^\dagger_k\hat{a}^\dagger_l\hat{a}_j\hat{a}_i\right)
+       \boldsymbol{U} = \exp\left(\theta\left(\hat{a}^\dagger_k\hat{a}^\dagger_l\hat{a}_j\hat{a}_i
+       - \hat{a}^\dagger_i\hat{a}^\dagger_j\hat{a}_l\hat{a}_k\right)\right)
 
-    #. 10.1103/PhysRevA.102.062612, Fig. 6, Fig. 7, and, Fig. 9
-    #. 10.1038/s42005-021-00730-0, Fig. 2
+    for any four distinct spin orbitals, in any order and of any spin. Under the Jordan-Wigner
+    mapping the operator is a double qubit excitation times a sign and a Pauli-Z string. Writing
+    the sorted indices as :math:`p_0<p_1<p_2<p_3`, the string covers the qubits strictly between
+    :math:`p_0` and :math:`p_1` and strictly between :math:`p_2` and :math:`p_3`. The cost is
+    :math:`12+2m` two-qubit gates for :math:`m` qubits in the string.
+
+    #. 10.48550/arXiv.2608.11733, Fig. 5 (12-CNOT double qubit excitation)
+    #. 10.1103/PhysRevA.102.062612, Fig. 9 (Jordan-Wigner string)
 
     Args:
-        k: Weakly occupied spin orbital index.
-        l: Weakly occupied spin orbital index.
-        i: Strongly occupied spin orbital index.
-        j: Strongly occupied spin orbital index.
+        k: Spin orbital index of a creation operator.
+        l: Spin orbital index of a creation operator.
+        i: Spin orbital index of an annihilation operator.
+        j: Spin orbital index of an annihilation operator.
         num_orbs: Number of spatial orbitals.
         qc: Quantum circuit.
         theta: Circuit parameter.
@@ -178,119 +336,16 @@ def _double_excitation_efficient(
         Double excitation circuit.
     """
     if len({k, l, i, j}) != 4:
-        raise ValueError(f"Operator needs four distinct spin orbitals, got k={k}, l={l}, i={i}, j={j}")
-    # The circuit is only valid for certain interleavings of the creation and annihilation
-    # indices, because the Jordan-Wigner strings run between them in sorted order. Writing the
-    # sorted indices as c for creation and a for annihilation, "aacc" is a same-spin double and
-    # "acac" a double whose two spins share a pair of spatial orbitals; "ccaa" is "aacc" with the
-    # excitation reversed, which the swaps below normalise. The nested and crossed orderings
-    # "acca", "caac" and "caca" are not implemented. Under interleaved spin-orbital ordering only
-    # "aacc" ever occurred, which is why this used to be a simple comparison.
-    sorted_kinds = "".join(kind for _, kind in sorted(((k, "c"), (l, "c"), (i, "a"), (j, "a"))))
-    if sorted_kinds not in ("aacc", "acac", "ccaa"):
         raise ValueError(
-            f"Operator not implemented for this ordering of creation and annihilation indices, "
-            f"got {sorted_kinds} for k={k}, l={l}, i={i}, j={j}"
+            f"Double excitation needs four distinct spin orbitals, got k={k}, l={l}, i={i}, j={j}"
         )
-    n_alpha = 0
-    n_beta = 0
-    if i < num_orbs:
-        n_alpha += 1
-    else:
-        n_beta += 1
-    if j < num_orbs:
-        n_alpha += 1
-    else:
-        n_beta += 1
-    if k < num_orbs:
-        n_alpha += 1
-    else:
-        n_beta += 1
-    if l < num_orbs:
-        n_alpha += 1
-    else:
-        n_beta += 1
-    if n_alpha % 2 != 0 or n_beta % 2 != 0:
-        raise ValueError("Operator only implemented for spin conserving operators.")
-    fac = 1
-    if (k < num_orbs) == (l < num_orbs) and k < num_orbs and i >= num_orbs:
-        fac *= -1
-    if k > l:
-        l, k = k, l
-        fac *= -1
-    if i > j:
-        j, i = i, j
-        fac *= -1
-    if l < j:
-        l, j = j, l
-        fac *= -1
-    if k < i:
-        k, i = i, k
-        fac *= -1
-    # cnot ladder is easier to implement if the indices are sorted.
-    i_z, k_z, j_z, l_z = np.sort((k, l, i, j))
-    theta = 2 * theta * fac
-
-    qc.cx(l, k)
-    qc.cx(j, i)
-    qc.cx(l, j)
-
-    if l_z != j_z + 1:
-        for t in range(i_z + 1, k_z - 1):
-            qc.cx(t, t + 1)
-        if i_z + 1 != k_z:  # and j+1 != k and k-1 != j+1:
-            qc.cx(k_z - 1, j_z + 1)
-        # if j+1 != k:
-        for t in range(j_z + 1, l_z - 1):
-            qc.cx(t, t + 1)
-        qc.cz(l_z, l_z - 1)
-    elif i_z != k_z - 1:
-        for t in range(i_z + 1, k_z - 1):
-            qc.cx(t, t + 1)
-        qc.cz(l_z, k_z - 1)
-    qc.x(k)
-    qc.x(i)
-
-    qc.ry(theta / 8, l)
-    qc.h(k)
-    qc.cx(l, k)
-    qc.ry(-theta / 8, l)
-    qc.h(i)
-    qc.cx(l, i)
-    qc.ry(theta / 8, l)
-    qc.cx(l, k)
-    qc.ry(-theta / 8, l)
-    qc.h(j)
-    qc.cx(l, j)
-    qc.ry(theta / 8, l)
-    qc.cx(l, k)
-    qc.ry(-theta / 8, l)
-    qc.cx(l, i)
-    qc.ry(theta / 8, l)
-    qc.h(i)
-    qc.cx(l, k)
-    qc.ry(-theta / 8, l)
-    qc.h(k)
-    qc.cx(l, j)
-    qc.h(j)
-
-    qc.x(k)
-    qc.x(i)
-    if l_z != j_z + 1:
-        qc.cz(l_z, l_z - 1)
-        for t in range(l_z - 1, j_z + 1, -1):
-            qc.cx(t - 1, t)
-        if i_z + 1 != k_z:
-            qc.cx(k_z - 1, j_z + 1)
-        for t in range(k_z - 1, i_z + 1, -1):
-            qc.cx(t - 1, t)
-    elif i_z != k_z - 1:
-        qc.cz(l_z, k_z - 1)
-        for t in range(k_z - 1, i_z + 1, -1):
-            qc.cx(t - 1, t)
-    qc.cx(l, j)
-    qc.cx(l, k)
-    qc.cx(j, i)
+    sign = _jordan_wigner_sign([(k, True), (l, True), (j, False), (i, False)])
+    p0, p1, p2, p3 = sorted((k, l, i, j))
+    qc = _jordan_wigner_string(p0, p1, qc, uncompute=False)
+    qc = _jordan_wigner_string(p2, p3, qc, uncompute=False)
+    qc = _double_qubit_excitation(k, l, i, j, qc, sign * theta)
+    qc = _jordan_wigner_string(p2, p3, qc, uncompute=True)
+    qc = _jordan_wigner_string(p0, p1, qc, uncompute=True)
     return qc
 
 
