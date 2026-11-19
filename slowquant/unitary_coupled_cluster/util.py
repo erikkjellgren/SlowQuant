@@ -1,8 +1,6 @@
 from collections.abc import Generator, Sequence
 from typing import Any
 
-import numpy as np
-
 
 def iterate_t1_sa(
     active_occ_idx: Sequence[int],
@@ -75,6 +73,41 @@ def iterate_t1_sa_generalized(
         for a in range(i + 1, num_orbs):
             fac = 2 ** (-1 / 2)
             yield a, i, fac
+
+
+def iterate_t2_sa_generalized(
+    num_orbs: int,
+) -> Generator[tuple[int, int, int, int, float, int], None, None]:
+    """Iterate over T2 spin-adapted operators.
+
+    Args:
+        num_orbs: Number of active spatial orbitals.
+
+    Returns:
+        Spin-adapted T2 operator iteration.
+    """
+    for i in range(num_orbs):
+        for j in range(i, num_orbs):
+            for a in range(max(i, j) + 1, num_orbs):
+                for b in range(a, num_orbs):
+                    fac = 1.0
+                    if a == b:
+                        fac *= 2.0
+                    if i == j:
+                        fac *= 2.0
+                    fac = 1 / 2 * (fac) ** (-1 / 2)
+                    if i == j and a == b:
+                        yield a, i, b, j, fac, 1
+                    elif i == j:
+                        yield a, i, b, j, fac, 2
+                    elif a == b:
+                        yield a, i, b, j, fac, 3
+                    else:
+                        yield a, i, b, j, fac, 4
+                    if i == j or a == b:
+                        continue
+                    fac = 1 / (2 * 3 ** (1 / 2))
+                    yield a, i, b, j, fac, 5
 
 
 def iterate_t2_sa_generalized(
@@ -209,6 +242,127 @@ def iterate_t1_generalized(
             yield a, i
 
 
+def iterate_t1_generalized(
+    num_spin_orbs: int,
+) -> Generator[tuple[int, int], None, None]:
+    """Iterate over T1 spin-conserving operators.
+
+    Args:
+        num_spin_orbs: Number of spin orbitals.
+
+    Returns:
+        T1 operator iteration.
+    """
+    for i in range(num_spin_orbs):
+        for a in range(i + 1, num_spin_orbs):
+            num_alpha = 0
+            num_beta = 0
+            if a % 2 == 0:
+                num_alpha += 1
+            else:
+                num_beta += 1
+            if i % 2 == 0:
+                num_alpha -= 1
+            else:
+                num_beta -= 1
+            if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
+                continue
+            yield a, i
+
+
+# Includes ap(dagger)*ap (diagonal) excitations
+def iterate_t1_incl_diag(
+    active_occ_spin_idx: Sequence[int],
+    active_unocc_spin_idx: Sequence[int],
+    is_spin_conserving: bool = True,
+) -> Generator[tuple[int, int], None, None]:
+    """Iterate over T1 spin-conserving operators.
+
+    Args:
+        active_occ_spin_idx: Spin indices of strongly occupied orbitals.
+        active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
+        is_spin_conserving: If the operators are spin-conserving.
+
+    Returns:
+        T1 operator iteration.
+    """
+    for a in active_unocc_spin_idx:
+        for i in active_occ_spin_idx:
+            if a == active_unocc_spin_idx[0]:
+                yield i, i
+            num_alpha = 0
+            num_beta = 0
+            if a % 2 == 0:
+                num_alpha += 1
+            else:
+                num_beta += 1
+            if i % 2 == 0:
+                num_alpha -= 1
+            else:
+                num_beta -= 1
+            if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
+                continue
+            yield a, i
+
+
+def iterate_t1_generalized(
+    num_spin_orbs: int,
+    is_spin_conserving: bool = True,
+) -> Generator[tuple[int, int], None, None]:
+    """Iterate over T1 spin-conserving operators.
+
+    Args:
+        num_spin_orbs: Number of spin orbitals.
+        is_spin_conserving: If the operators are spin-conserving.
+
+    Returns:
+        T1 operator iteration.
+    """
+    for i in range(num_spin_orbs):
+        for a in range(i + 1, num_spin_orbs):
+            num_alpha = 0
+            num_beta = 0
+            if a % 2 == 0:
+                num_alpha += 1
+            else:
+                num_beta += 1
+            if i % 2 == 0:
+                num_alpha -= 1
+            else:
+                num_beta -= 1
+            if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
+                continue
+            yield a, i
+
+
+def iterate_t1_generalized(
+    num_spin_orbs: int,
+) -> Generator[tuple[int, int], None, None]:
+    """Iterate over T1 spin-conserving operators.
+
+    Args:
+        num_spin_orbs: Number of spin orbitals.
+
+    Returns:
+        T1 operator iteration.
+    """
+    for i in range(num_spin_orbs):
+        for a in range(i + 1, num_spin_orbs):
+            num_alpha = 0
+            num_beta = 0
+            if a % 2 == 0:
+                num_alpha += 1
+            else:
+                num_beta += 1
+            if i % 2 == 0:
+                num_alpha -= 1
+            else:
+                num_beta -= 1
+            if num_alpha != 0 or num_beta != 0:
+                continue
+            yield a, i
+
+
 def iterate_t2(
     active_occ_spin_idx: Sequence[int],
     active_unocc_spin_idx: Sequence[int],
@@ -287,6 +441,122 @@ def iterate_t2_generalized(
                     else:
                         num_beta -= 1
                     if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
+                        continue
+                    yield a, i, b, j
+
+
+def iterate_t2_generalized(
+    num_spin_orbs: int,
+) -> Generator[tuple[int, int, int, int], None, None]:
+    """Iterate over T2 spin-conserving operators.
+
+    Args:
+        num_spin_orbs: Number of spin orbitals.
+
+    Returns:
+        T2 operator iteration.
+    """
+    for i in range(num_spin_orbs):
+        for j in range(i, num_spin_orbs):
+            for a in range(max(i, j) + 1, num_spin_orbs):
+                for b in range(a, num_spin_orbs):
+                    num_alpha = 0
+                    num_beta = 0
+                    if a % 2 == 0:
+                        num_alpha += 1
+                    else:
+                        num_beta += 1
+                    if b % 2 == 0:
+                        num_alpha += 1
+                    else:
+                        num_beta += 1
+                    if i % 2 == 0:
+                        num_alpha -= 1
+                    else:
+                        num_beta -= 1
+                    if j % 2 == 0:
+                        num_alpha -= 1
+                    else:
+                        num_beta -= 1
+                    if (num_alpha != 0 or num_beta != 0) and is_spin_conserving: #Skal væk AE
+                         continue
+                    yield a, i, b, j
+
+
+def iterate_t2_generalized(
+    num_spin_orbs: int,
+    is_spin_conserving: bool = True,
+) -> Generator[tuple[int, int, int, int], None, None]:
+    """Iterate over T2 spin-conserving operators.
+
+    Args:
+        num_spin_orbs: Number of spin orbitals.
+        is_spin_conserving: If the operators are spin-conserving.
+
+    Returns:
+        T2 operator iteration.
+    """
+    for i in range(num_spin_orbs):
+        for j in range(num_spin_orbs):
+            for a in range(max(i, j) + 1, num_spin_orbs):
+                for b in range(max(i, j) + 1, num_spin_orbs):
+                    num_alpha = 0
+                    num_beta = 0
+                    if a % 2 == 0:
+                        num_alpha += 1
+                    else:
+                        num_beta += 1
+                    if b % 2 == 0:
+                        num_alpha += 1
+                    else:
+                        num_beta += 1
+                    if i % 2 == 0:
+                        num_alpha -= 1
+                    else:
+                        num_beta -= 1
+                    if j % 2 == 0:
+                        num_alpha -= 1
+                    else:
+                        num_beta -= 1
+                    if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
+                        continue
+                    yield a, i, b, j
+
+
+def iterate_t2_generalized(
+    num_spin_orbs: int,
+) -> Generator[tuple[int, int, int, int], None, None]:
+    """Iterate over T2 spin-conserving operators.
+
+    Args:
+        num_spin_orbs: Number of spin orbitals.
+
+    Returns:
+        T2 operator iteration.
+    """
+    for i in range(num_spin_orbs):
+        for j in range(i, num_spin_orbs):
+            for a in range(max(i, j) + 1, num_spin_orbs):
+                for b in range(a, num_spin_orbs):
+                    num_alpha = 0
+                    num_beta = 0
+                    if a % 2 == 0:
+                        num_alpha += 1
+                    else:
+                        num_beta += 1
+                    if b % 2 == 0:
+                        num_alpha += 1
+                    else:
+                        num_beta += 1
+                    if i % 2 == 0:
+                        num_alpha -= 1
+                    else:
+                        num_beta -= 1
+                    if j % 2 == 0:
+                        num_alpha -= 1
+                    else:
+                        num_beta -= 1
+                    if num_alpha != 0 or num_beta != 0:
                         continue
                     yield a, i, b, j
 
@@ -880,6 +1150,8 @@ class UpsStructure:
             for p in range(1, num_active_orbs - 1, 2):  # second column of brick-wall
                 # QNP does not have this single
                 if do_tups:
+                # QNP does not have this single
+                if do_tups:
                     # First single
                     self.excitation_operator_type.append("sa_single")
                     self.excitation_indices.append((p, p + 1))
@@ -986,8 +1258,11 @@ class UpsStructure:
             * GpD [bool]: Add generalized pair double excitations.
 
         Args:
-            num_orbs: Number of active spatial orbitals.
-            num_elec: Number of active electrons.
+            occ_idx: Strongly occupied spatial orbital indices.
+            unocc_idx: Weakly occupied spatial orbital indices.
+            occ_spin_idx: Stongly occupied spin orbital indices.
+            unocc_spin_idx: Weakly occupied spin orbital indices.
+            num_orbs: Number of spatial orbitals.
             ansatz_options: Ansatz options.
 
         Returns:
@@ -1018,12 +1293,18 @@ class UpsStructure:
             raise ValueError("fUCC require the option 'n_layers'")
         do_S = False
         do_GS = False
+        do_GS = False
         do_SAS = False
         do_SAGS = False
         do_D = False
         do_GD = False
+        do_GD = False
         do_pD = False
         do_GpD = False
+        do_T = False
+        do_Q = False
+        do_5 = False
+        do_6 = False
         do_T = False
         do_Q = False
         do_5 = False
@@ -1036,11 +1317,9 @@ class UpsStructure:
             if ansatz_options["GS"]:
                 do_GS = True
         if "SAS" in ansatz_options.keys():
-            if ansatz_options["SAS"]:
-                do_SAS = True
+            do_SAS = ansatz_options["SAS"]
         if "SAGS" in ansatz_options.keys():
-            if ansatz_options["SAGS"]:
-                do_SAGS = True
+            do_SAGS = ansatz_options["SAGS"]
         if "D" in ansatz_options.keys():
             if ansatz_options["D"]:
                 do_D = True
@@ -1048,8 +1327,7 @@ class UpsStructure:
             if ansatz_options["GD"]:
                 do_GD = True
         if "pD" in ansatz_options.keys():
-            if ansatz_options["pD"]:
-                do_pD = True
+            do_pD = ansatz_options["pD"]
         if "GpD" in ansatz_options.keys():
             if ansatz_options["GpD"]:
                 do_GpD = True
@@ -1114,6 +1392,7 @@ class UpsStructure:
                     self.n_params += 1
             if do_SAS:
                 for a, i, _ in iterate_t1_sa(occ_idx, unocc_idx):
+                for a, i, _ in iterate_t1_sa(occ_idx, unocc_idx):
                     self.excitation_operator_type.append("sa_single")
                     self.excitation_indices.append((i, a))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
@@ -1144,6 +1423,7 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_pD:
+                for a, i, b, j in iterate_pair_t2(occ_idx, unocc_idx):
                 for a, i, b, j in iterate_pair_t2(occ_idx, unocc_idx):
                     self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i, j, a, b))
@@ -1194,6 +1474,7 @@ class UpsStructure:
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
             if do_SAD:
                 for a, i, b, j, _, op_case in iterate_t2_sa(occ_idx, unocc_idx):
+                for a, i, b, j, _, op_case in iterate_t2_sa(occ_idx, unocc_idx):
                     self.excitation_operator_type.append(f"sa_double_{op_case}")
                     self.excitation_indices.append((i, j, a, b))
                     # Rotosolve not implemented for SA doubles
@@ -1201,7 +1482,15 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
 
-    def create_SDSfUCC(self, num_orbs: int, num_elec: int, ansatz_options: dict[str, Any]) -> None:
+    def create_SDSfUCC(
+        self,
+        occ_idx: list[int],
+        unocc_idx: list[int],
+        occ_spin_idx: list[int],
+        unocc_spin_idx: list[int],
+        num_orbs: int,
+        ansatz_options: dict[str, Any],
+    ) -> None:
         r"""Create SDS ordered factorized UCC.
 
         The operator ordering of this implementation is,
@@ -1221,8 +1510,11 @@ class UpsStructure:
             * GpD [bool]: Add generalized pair double excitations.
 
         Args:
-            num_orbs: Number of active spatial orbitals.
-            num_elec: Number of active electrons.
+            occ_idx: Strongly occupied spatial orbital indices.
+            unocc_idx: Weakly occupied spatial orbital indices.
+            occ_spin_idx: Stongly occupied spin orbital indices.
+            unocc_spin_idx: Weakly occupied spin orbital indices.
+            num_orbs: Number of spatial orbitals.
             ansatz_options: Ansatz options.
 
         Returns:
@@ -1241,32 +1533,19 @@ class UpsStructure:
         do_pD = False
         do_GpD = False
         if "D" in ansatz_options.keys():
-            if ansatz_options["D"]:
-                do_D = True
+            do_D = ansatz_options["D"]
         if "pD" in ansatz_options.keys():
-            if ansatz_options["pD"]:
-                do_pD = True
+            do_pD = ansatz_options["pD"]
         if "GpD" in ansatz_options.keys():
-            if ansatz_options["GpD"]:
-                do_GpD = True
+            do_GpD = ansatz_options["GpD"]
         if True not in (do_D, do_pD, do_GpD):
             raise ValueError("SDSfUCC requires some excitations got none.")
         n_layers = ansatz_options["n_layers"]
-        num_spin_orbs = 2 * num_orbs
-        occ = []
-        unocc = []
-        idx = 0
-        for _ in range(np.sum(num_elec)):
-            occ.append(idx)
-            idx += 1
-        for _ in range(num_spin_orbs - np.sum(num_elec)):
-            unocc.append(idx)
-            idx += 1
         # Layer loop
         for _ in range(n_layers):
             # Kind of D excitation determines indices for complete SDS block
             if do_D:
-                for a, i, b, j in iterate_t2(occ, unocc):
+                for a, i, b, j in iterate_t2(occ_spin_idx, unocc_spin_idx):
                     if i % 2 == a % 2:
                         self.excitation_indices.append((i, a))
                     else:
@@ -1289,8 +1568,8 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_pD:
-                for a, i, b, j in iterate_pair_t2(occ, unocc):
-                    self.excitation_operator_type.append("sa_single")
+                for a, i, b, j in iterate_pair_t2(occ_idx, unocc_idx):
+                    self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i // 2, a // 2))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")

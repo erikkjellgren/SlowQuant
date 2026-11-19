@@ -23,15 +23,11 @@ def test_H2_631g_naive():
     # HF
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
     )
     WF.run_wf_optimization_1step("BFGS", True)
@@ -52,15 +48,8 @@ def test_H2_631g_naive():
     assert abs(LR.excitation_energies[4] - 1.831196) < thresh
     assert abs(LR.excitation_energies[5] - 2.581273) < thresh
 
-    # Calculate dipole integrals
-    dipole_integrals = (
-        SQobj.integral.get_multipole_matrix([1, 0, 0]),
-        SQobj.integral.get_multipole_matrix([0, 1, 0]),
-        SQobj.integral.get_multipole_matrix([0, 0, 1]),
-    )
-
     # Get oscillator strength for each excited state
-    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    osc_strengths = LR.get_oscillator_strength()
     assert abs(osc_strengths[0] - 0.6338) < thresh
     assert abs(osc_strengths[1] - 0.0) < thresh
     assert abs(osc_strengths[2] - 0.0) < thresh
@@ -69,7 +58,7 @@ def test_H2_631g_naive():
     assert abs(osc_strengths[5] - 0.0) < thresh
 
     # Compare generic and working equation implementation
-    osc_strengths_generic = genericLR.get_oscillator_strength(dipole_integrals)
+    osc_strengths_generic = genericLR.get_oscillator_strength()
     assert np.allclose(osc_strengths, osc_strengths_generic, atol=thresh)
 
 
@@ -86,15 +75,11 @@ def test_LiH_sto3g_naive():
     # HF
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     # oo-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
     )
     WF.run_wf_optimization_1step("BFGS", True)
@@ -122,15 +107,8 @@ def test_LiH_sto3g_naive():
     assert abs(LR.excitation_energies[11] - 2.455124) < thresh
     assert abs(LR.excitation_energies[12] - 2.9543838) < thresh
 
-    # Calculate dipole integrals
-    dipole_integrals = (
-        SQobj.integral.get_multipole_matrix([1, 0, 0]),
-        SQobj.integral.get_multipole_matrix([0, 1, 0]),
-        SQobj.integral.get_multipole_matrix([0, 0, 1]),
-    )
-
     # Get oscillator strength for each excited state
-    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    osc_strengths = LR.get_oscillator_strength()
     assert abs(osc_strengths[0] - 0.049952) < thresh
     assert abs(osc_strengths[1] - 0.241200) < thresh
     assert abs(osc_strengths[2] - 0.241200) < thresh
@@ -146,7 +124,7 @@ def test_LiH_sto3g_naive():
     assert abs(osc_strengths[12] - 0.003907) < thresh
 
     # Compare generic and working equation implementation
-    osc_strengths_generic = genericLR.get_oscillator_strength(dipole_integrals)
+    osc_strengths_generic = genericLR.get_oscillator_strength()
     assert np.allclose(osc_strengths, osc_strengths_generic, atol=thresh)
 
 
@@ -163,15 +141,11 @@ def test_H2_631g_projLR():
     # HF
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
     )
     WF.run_wf_optimization_1step("BFGS", True)
@@ -191,15 +165,8 @@ def test_H2_631g_projLR():
     assert abs(LR.excitation_energies[4] - 1.831196) < thresh
     assert abs(LR.excitation_energies[5] - 2.581273) < thresh
 
-    # Calculate dipole integrals
-    dipole_integrals = (
-        SQobj.integral.get_multipole_matrix([1, 0, 0]),
-        SQobj.integral.get_multipole_matrix([0, 1, 0]),
-        SQobj.integral.get_multipole_matrix([0, 0, 1]),
-    )
-
     # Get oscillator strength for each excited state
-    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    osc_strengths = LR.get_oscillator_strength()
     assert abs(osc_strengths[0] - 0.6338231953094923) < thresh
     assert abs(osc_strengths[1] - 0.0) < thresh
     assert abs(osc_strengths[2] - 0.0) < thresh
@@ -221,15 +188,11 @@ def test_LiH_sto3g_proj():
     # HF
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     # oo-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
     )
     WF.run_wf_optimization_1step("BFGS", True)
@@ -254,15 +217,8 @@ def test_LiH_sto3g_proj():
     assert abs(LR.excitation_energies[11] - 2.455124) < thresh
     assert abs(LR.excitation_energies[12] - 2.9543838) < thresh
 
-    # Calculate dipole integrals
-    dipole_integrals = (
-        SQobj.integral.get_multipole_matrix([1, 0, 0]),
-        SQobj.integral.get_multipole_matrix([0, 1, 0]),
-        SQobj.integral.get_multipole_matrix([0, 0, 1]),
-    )
-
     # Get oscillator strength for each excited state
-    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    osc_strengths = LR.get_oscillator_strength()
     assert abs(osc_strengths[0] - 0.049919878841153974) < thresh
     assert abs(osc_strengths[1] - 0.24118483531266577) < thresh
     assert abs(osc_strengths[2] - 0.24118483534591598) < thresh
@@ -291,15 +247,11 @@ def test_H2_631g_STLR():
     # HF
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
     )
     WF.run_wf_optimization_1step("BFGS", True)
@@ -321,15 +273,8 @@ def test_H2_631g_STLR():
     assert abs(LR.excitation_energies[4] - 1.831196) < thresh
     assert abs(LR.excitation_energies[5] - 2.581273) < thresh
 
-    # Calculate dipole integrals
-    dipole_integrals = (
-        SQobj.integral.get_multipole_matrix([1, 0, 0]),
-        SQobj.integral.get_multipole_matrix([0, 1, 0]),
-        SQobj.integral.get_multipole_matrix([0, 0, 1]),
-    )
-
     # Get oscillator strength for each excited state
-    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    osc_strengths = LR.get_oscillator_strength()
     assert abs(osc_strengths[0] - 0.6338231953094933) < thresh
     assert abs(osc_strengths[1] - 0.0) < thresh
     assert abs(osc_strengths[2] - 0.0) < thresh
@@ -351,15 +296,11 @@ def test_LiH_sto3g_st():
     # HF
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
     )
     WF.run_wf_optimization_1step("BFGS", True)
@@ -388,15 +329,8 @@ def test_LiH_sto3g_st():
     assert abs(LR.excitation_energies[11] - 2.455124) < thresh
     assert abs(LR.excitation_energies[12] - 2.9543838) < thresh
 
-    # Calculate dipole integrals
-    dipole_integrals = (
-        SQobj.integral.get_multipole_matrix([1, 0, 0]),
-        SQobj.integral.get_multipole_matrix([0, 1, 0]),
-        SQobj.integral.get_multipole_matrix([0, 0, 1]),
-    )
-
     # Get oscillator strength for each excited state
-    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    osc_strengths = LR.get_oscillator_strength()
     assert abs(osc_strengths[0] - 0.0499198684945157) < thresh
     assert abs(osc_strengths[1] - 0.2411848353126639) < thresh
     assert abs(osc_strengths[2] - 0.24118483534591595) < thresh
@@ -425,15 +359,11 @@ def test_H2_631g_allST():
     # HF
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
     )
     WF.run_wf_optimization_1step("BFGS", True)
@@ -453,15 +383,8 @@ def test_H2_631g_allST():
     assert abs(LR.excitation_energies[2] - 1.63445659) < thresh
     assert abs(LR.excitation_energies[3] - 1.64921366) < thresh
 
-    # Calculate dipole integrals
-    dipole_integrals = (
-        SQobj.integral.get_multipole_matrix([1, 0, 0]),
-        SQobj.integral.get_multipole_matrix([0, 1, 0]),
-        SQobj.integral.get_multipole_matrix([0, 0, 1]),
-    )
-
     # Get oscillator strength for each excited state
-    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    osc_strengths = LR.get_oscillator_strength()
     assert abs(osc_strengths[0] - 0.650294311) < thresh
     assert abs(osc_strengths[1] - 0.0) < thresh
     assert abs(osc_strengths[2] - 6.23019972e-02) < thresh
@@ -481,15 +404,11 @@ def test_LiH_sto3g_allST():
     # HF
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
     )
     WF.run_wf_optimization_1step("BFGS", True)
@@ -520,15 +439,8 @@ def test_LiH_sto3g_allST():
 
     assert np.allclose(LR.excitation_energies, solutions, atol=thresh)
 
-    # Calculate dipole integrals
-    dipole_integrals = (
-        SQobj.integral.get_multipole_matrix([1, 0, 0]),
-        SQobj.integral.get_multipole_matrix([0, 1, 0]),
-        SQobj.integral.get_multipole_matrix([0, 0, 1]),
-    )
-
     # Get oscillator strength for each excited state
-    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    osc_strengths = LR.get_oscillator_strength()
     assert abs(osc_strengths[0] - 0.06668878) < thresh
     assert abs(osc_strengths[1] - 0.33360367) < thresh
     assert abs(osc_strengths[2] - 0.33360367) < thresh

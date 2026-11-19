@@ -1,7 +1,7 @@
 [tool.ruff]
 line-length = 110
 indent-width = 4
-target-version = "py313"
+target-version = "py314"
 
 # Enable rules to cover flake8, isort, pylint, pydocstyle, etc.
 lint.select = [
@@ -33,6 +33,7 @@ lint.ignore = [
   "PLR0912",  # too-many-branches
   "PLR0913",  # too-many-arguments
   "PLR0915",  # too-many-statements
+  "PLR0917",  # too-many-positional-arguments
   "PLR2004",  # magic-value-comparison
   "PLW2901",  # redefined-loop-name
   "RUF010",   # explicit-f-string-type-conversion

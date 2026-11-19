@@ -6,8 +6,7 @@ from collections import defaultdict
 from typing import Any
 
 import numpy as np
-from qiskit import QuantumCircuit
-from qiskit.circuit import ClassicalRegister
+from qiskit.circuit import ClassicalRegister, QuantumCircuit
 from qiskit.primitives import (
     BaseEstimatorV1,
     BaseEstimatorV2,
@@ -15,14 +14,15 @@ from qiskit.primitives import (
     BaseSamplerV2,
 )
 from qiskit.quantum_info import SparsePauliOp
-from qiskit.transpiler import PassManager
+from qiskit.transpiler import PassManager, StagedPassManager
+from qiskit.transpiler.passes import Optimize1qGatesDecomposition
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_nature.second_q.circuit.library import HartreeFock
 from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
-from slowquant.qiskit_interface.custom_ansatz import SDSfUCC, fUCC, tUPS
+from slowquant.qiskit_interface.operators_circuits import upslayout2circuit
 from slowquant.qiskit_interface.util import (
     Clique,
     MitigationFlags,
@@ -33,10 +33,12 @@ from slowquant.qiskit_interface.util import (
     get_determinant_superposition_reference,
     get_reordering_sign,
     layout_conserving_compose,
+    pauliop_to_dict,
     postselection,
     to_CBS_measurement,
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
+from slowquant.unitary_coupled_cluster.util import UpsStructure
 
 
 class QuantumInterface:
@@ -48,12 +50,12 @@ class QuantumInterface:
     def __init__(
         self,
         primitive: BaseSamplerV1 | BaseSamplerV2,
-        ansatz: str | QuantumCircuit,
+        ansatz: str | QuantumCircuit | UpsStructure,
         mapper: FermionicMapper,
         ISA: bool = False,
         pass_manager_options: dict[str, Any] | None = None,
         ansatz_options: dict[str, Any] | None = None,
-        shots: None | int = None,
+        shots: int | None = None,
         max_shots_per_run: int = 100000,
         do_M_mitigation: bool = False,
         do_M_ansatz0: bool = False,
@@ -79,24 +81,26 @@ class QuantumInterface:
         if ansatz_options is None:
             ansatz_options = {}
         allowed_ansatz = (
-            "fpUCCD",
-            "fUCCD",
-            "tUPS",
-            "fUCCSD",
-            "QNP",
-            "kSAfUpCCGSD",
-            "SDSfUCCSD",
-            "kSASDSfUpCCGSD",
-            "fUCC",
-            "SDSfUCC",
-            "HF",
+            "fuccpd",
+            "fuccd",
+            "tups",
+            "fuccsd",
+            "qnp",
+            "ksafupccgsd",
+            "sdsfuccsd",
+            "ksasdsfupccgsd",
+            "fucc",
+            "hf",
         )
-        if not isinstance(ansatz, QuantumCircuit) and ansatz not in allowed_ansatz:
-            raise ValueError(
-                "The chosen Ansatz is not available. Choose from: ",
-                allowed_ansatz,
-                "or pass custom QuantumCircuit object",
-            )
+        if isinstance(ansatz, str):
+            if ansatz.lower() not in allowed_ansatz:
+                raise ValueError(
+                    "The chosen Ansatz is not available. Choose from: ",
+                    allowed_ansatz,
+                )
+
+        elif not isinstance(ansatz, (QuantumCircuit, UpsStructure)):
+            raise TypeError(f"Got unknown ansatz type: {type(ansatz)}")
         if pass_manager_options is None:
             pass_manager_options = {}
         if isinstance(primitive, (BaseEstimatorV1, BaseEstimatorV2)):
@@ -128,11 +132,23 @@ class QuantumInterface:
         self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
         self._M_shots = None  # define a separate number of shots for M
 
-    def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int]) -> None:
+    def construct_circuit(
+        self,
+        occ_idx: list[int],
+        unocc_idx: list[int],
+        occ_spin_idx: list[int],
+        unocc_spin_idx: list[int],
+        num_orbs: int,
+        num_elec: tuple[int, int],
+    ) -> None:
         """Construct qiskit circuit.
 
         Args:
-            num_orbs: Number of orbitals in spatial basis.
+            occ_idx: Strongly occupied spatial orbital indices.
+            unocc_idx: Weakly occupied spatial orbital indices.
+            occ_spin_idx: Stongly occupied spin orbital indices.
+            unocc_spin_idx: Weakly occupied spin orbital indices.
+            num_orbs: Number of spatial orbitals.
             num_elec: Number of electrons (alpha, beta).
         """
         self.num_orbs = num_orbs
@@ -147,18 +163,36 @@ class QuantumInterface:
             self.state_circuit: QuantumCircuit = QuantumCircuit(
                 self.ansatz.num_qubits
             )  # empty state as custom circuit is passed
-        elif self.ansatz == "tUPS" and "do_pp" in self.ansatz_options.keys() and self.ansatz_options["do_pp"]:
+        elif "do_pp" in self.ansatz_options.keys() and self.ansatz_options["do_pp"]:
             # HF in pp-tUPS ordering
             if not isinstance(self.mapper, JordanWignerMapper):
                 raise ValueError(f"pp-tUPS only implemented for JW mapper, got: {type(self.mapper)}")
-            if np.sum(num_elec) != num_orbs:
-                raise ValueError(
-                    f"pp-tUPS only implemented for number of electrons and number of orbitals being the same, got: ({np.sum(num_elec)}, {num_orbs}), (elec, orbs)"
-                )
-            self.state_circuit = QuantumCircuit(2 * num_orbs)
-            for p in range(0, 2 * num_orbs):
-                if p % 2 == 0:
-                    self.state_circuit.x(p)
+            # Obtain pp determinant
+            pp_det = ""
+            spin_orb = 0
+            elec_count = self.num_elec[0] + self.num_elec[1]
+            while spin_orb < self.num_spin_orbs:
+                if (
+                    elec_count >= 2
+                    and (self.num_spin_orbs - spin_orb) >= 4
+                    and elec_count <= (self.num_spin_orbs - spin_orb - 2)
+                ):
+                    pp_det += "1100"
+                    elec_count -= 2
+                    spin_orb += 4
+                elif elec_count == 0:
+                    pp_det += "0"
+                    spin_orb += 1
+                elif elec_count != 0:
+                    pp_det += "1"
+                    spin_orb += 1
+                    elec_count -= 1
+            print("State preparation: perfect-pairing determinant found as:", pp_det)
+            if len(pp_det) != self.num_spin_orbs or pp_det.count("1") != (
+                self.num_elec[0] + self.num_elec[1]
+            ):
+                raise ValueError("Perfect pairing determinant violates orbital or electron numbers")
+            self.state_circuit = get_determinant_reference(pp_det, self.num_orbs, self.mapper)
         else:
             self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
         self.num_qubits = self.state_circuit.num_qubits
@@ -169,65 +203,62 @@ class QuantumInterface:
                 "QI was initialized with a custom QuantumCircuit object. This is assumed to be the Ansatz (without state preparation circuit)"
             )
             self.circuit = self.ansatz
-        elif self.ansatz == "fpUCCD":
-            self.ansatz_options["pD"] = True
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
-        elif self.ansatz == "fUCCD":
-            self.ansatz_options["D"] = True
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
-        elif self.ansatz == "HF":
-            if len(self.ansatz_options) != 0:
-                raise ValueError(f"No options available for HF got {self.ansatz_options}")
-            self.circuit = QuantumCircuit(self.num_qubits)  # empty ansatz circuit
-        elif self.ansatz == "tUPS":
-            self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
-        elif self.ansatz == "QNP":
-            self.ansatz_options["do_qnp"] = True
-            self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
-        elif self.ansatz == "fUCCSD":
-            self.ansatz_options["S"] = True
-            self.ansatz_options["D"] = True
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
-        elif self.ansatz == "kSAfUpCCGSD":
-            self.ansatz_options["SAGS"] = True
-            self.ansatz_options["GpD"] = True
-            self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
-        elif self.ansatz == "SDSfUCCSD":
-            self.ansatz_options["D"] = True
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = SDSfUCC(
-                num_orbs, self.num_elec, self.mapper, self.ansatz_options
-            )
-        elif self.ansatz == "kSASDSfUpCCGSD":
-            self.ansatz_options["GpD"] = True
-            self.circuit, self.grad_param_R = SDSfUCC(
-                num_orbs, self.num_elec, self.mapper, self.ansatz_options
-            )
-        elif self.ansatz == "fUCC":
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
-        elif self.ansatz == "SDSfUCC":
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = SDSfUCC(
-                num_orbs, self.num_elec, self.mapper, self.ansatz_options
-            )
+        elif isinstance(self.ansatz, UpsStructure):
+            self.circuit, self.grad_param_R = upslayout2circuit(self.ansatz, self.num_orbs, self.mapper)
+        elif isinstance(self.ansatz, str):
+            ups_layout = UpsStructure()
+            if self.ansatz.lower() in ("fucc", "fuccpd", "fuccd", "fuccsd", "ksafupccgsd"):
+                if self.ansatz.lower() == "fuccpd":
+                    self.ansatz_options["pD"] = True
+                elif self.ansatz.lower() == "fuccd":
+                    self.ansatz_options["D"] = True
+                elif self.ansatz.lower() == "fuccsd":
+                    self.ansatz_options["S"] = True
+                    self.ansatz_options["D"] = True
+                elif self.ansatz.lower() == "ksafupccgsd":
+                    self.ansatz_options["SAGS"] = True
+                    self.ansatz_options["GpD"] = True
+                if "n_layers" not in self.ansatz_options.keys():
+                    # default option
+                    self.ansatz_options["n_layers"] = 1
+                ups_layout.create_fUCC(
+                    occ_idx,
+                    unocc_idx,
+                    occ_spin_idx,
+                    unocc_spin_idx,
+                    num_orbs,
+                    self.ansatz_options,
+                )
+            elif self.ansatz.lower() == "hf":
+                if len(self.ansatz_options) != 0:
+                    raise ValueError(f"No options available for HF got {self.ansatz_options}")
+            elif self.ansatz.lower() in ("tups", "qnp"):
+                if self.ansatz.lower() == "tups":
+                    self.ansatz_options["do_tups"] = True
+                elif self.ansatz.lower() == "qnp":
+                    self.ansatz_options["do_qnp"] = True
+                ups_layout.create_tiled(self.num_orbs, self.ansatz_options)
+            elif self.ansatz.lower() in ("sdsfuccsd", "ksasdsfupccgsd"):
+                if self.ansatz.lower() == "sdsfuccsd":
+                    self.ansatz_options["D"] = True
+                elif self.ansatz.lower() == "ksasdsfupccgsd":
+                    self.ansatz_options["GpD"] = True
+                if "n_layers" not in self.ansatz_options.keys():
+                    # default option
+                    self.ansatz_options["n_layers"] = 1
+                ups_layout.create_SDSfUCC(
+                    occ_idx,
+                    unocc_idx,
+                    occ_spin_idx,
+                    unocc_spin_idx,
+                    num_orbs,
+                    self.ansatz_options,
+                )
+            else:
+                raise ValueError(f"Unknown ansatz: {self.ansatz}")
+            self.circuit, self.grad_param_R = upslayout2circuit(ups_layout, self.num_orbs, self.mapper)
         else:
-            raise ValueError(f"Unknown ansatz: {self.ansatz}")
+            raise TypeError(f"Unknown ansatz type: {type(self.ansatz)}")
 
         # Check that R parameter for gradient is consistent with the paramter names.
         if len(self.grad_param_R) == 0:
@@ -367,7 +398,16 @@ class QuantumInterface:
         # In case of switching to new PassManager in later workflow
         if pass_manager_options is not None and hasattr(self, "circuit") and not redo_ISA:
             print("Change in PassManager. Reconstructing circuit.")
-            self.construct_circuit(self.num_orbs, self.num_elec)
+            self.construct_circuit(
+                self.occ_idx,
+                self.unocc_idx,
+                self.occ_spin_idx,
+                self.unocc_spin_idx,
+                self.num_orbs,
+                self.num_elec,
+            )
+            # Reset saver
+            self._reset_cliques()
 
     def redo_M_mitigation(self, shots: int | None = None) -> None:
         """Redo M_mitigation.
@@ -493,10 +533,14 @@ class QuantumInterface:
             )
 
         # Transpile X and Y measurement gates: only translation to basis gates and optimization.
-        self._transp_xy = [
-            self._pass_manager.optimization.run(self._pass_manager.translation.run(to_CBS_measurement("X"))),
-            self._pass_manager.optimization.run(self._pass_manager.translation.run(to_CBS_measurement("Y"))),
-        ]
+        backend = self.pass_manager_options.get("backend")
+        basis_gates = backend.operation_names if backend is not None else None
+        light_pass_manager = StagedPassManager(
+            stages=("translation", "optimization"),
+            translation=self._pass_manager.translation,
+            optimization=PassManager([Optimize1qGatesDecomposition(basis=basis_gates)]),
+        )
+        self._transp_xy = light_pass_manager.run([to_CBS_measurement("X"), to_CBS_measurement("Y")])
 
         return circuit_return
 
@@ -974,7 +1018,7 @@ class QuantumInterface:
         op: FermionicOperator | SparsePauliOp,
         run_circuit: QuantumCircuit | None = None,
         det: str | None = None,
-        circuit_M: None | QuantumCircuit = None,
+        circuit_M: QuantumCircuit | None = None,
         csfs_option: int = 1,
     ) -> complex:
         r"""Calculate expectation value of circuit and observables via Sampler.
@@ -1061,12 +1105,13 @@ class QuantumInterface:
                         ]
                     else:
                         self._apply_M_mitigation(distr_raw, run_circuit, circuit_M)
+                        # save mitigated results
+                        self.saver[det_int].update_distr(head_mit, distr_raw, M_only_flags)
 
                 if self.mitigation_flags.do_postselection:  # apply post-selection if requested
                     self._apply_postselection(distr_raw, head_mit)
-
-                # save mitigated results
-                self.saver[det_int].update_distr(head_mit, distr_raw, self.mitigation_flags)
+                    # save mitigated results
+                    self.saver[det_int].update_distr(head_mit, distr_raw, self.mitigation_flags)
 
         # Loop over all Pauli strings in observable and build final result with coefficients
         for pauli, coeff in zip(paulis_str, observables.coeffs):
@@ -1085,7 +1130,7 @@ class QuantumInterface:
         run_parameters: list[float] | list[complex],
         run_circuit: QuantumCircuit,
         do_cliques: bool = True,
-        circuit_M: None | QuantumCircuit = None,
+        circuit_M: QuantumCircuit | None = None,
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
@@ -1167,9 +1212,10 @@ class QuantumInterface:
         op: FermionicOperator | SparsePauliOp,
         do_cliques: bool = True,
         no_coeffs: bool = False,
-        custom_parameters: list[float] | list[complex] | None = None,
+        do_no_corr: bool = False,
+        custom_parameters: list[float] | None = None,
     ) -> float:
-        """Calculate variance (std**2) of expectation value of circuit and observables.
+        """Calculate sample variance (std**2) of expectation value of circuit and observables.
 
         This works either by accessing the saver distributions or by claculating each expectation value from scratch.
         If they are calculated from scratch, no error mitigation can be applied.
@@ -1178,6 +1224,7 @@ class QuantumInterface:
             op: SlowQuant fermionic operator.
             do_cliques: boolean if cliques are used. They are accessed via the saver.
             no_coeffs: boolean if coefficients of each Pauli string are used or all st to 1.
+            do_no_corr: If True, no correlation between Pauli strings in a clique is considered.
             custom_parameters: optional custom circuit parameters.
 
         Returns:
@@ -1206,24 +1253,62 @@ class QuantumInterface:
         # Loop over all Pauli strings in observable and build final result with coefficients
         result = 0.0
         paulis_str = [str(x) for x in observables.paulis]
-        for pauli, coeff in zip(paulis_str, observables.coeffs):
-            if no_coeffs:
-                coeff = 1
-            # Get distribution from cliques
-            if do_cliques:
+
+        if not do_cliques:
+            # No cliques are used (no QWC / grouping)
+            # Each pauli string measurement is independent random variable
+            for pauli, coeff in zip(paulis_str, observables.coeffs):
+                if no_coeffs:
+                    coeff = 1
+                p1 = self._sampler_distribution_p1(pauli, run_parameters)
+                var_p = 4 * coeff.real**2 * (p1 - p1**2)  # variance formula expressed in p1 probability
+                result += var_p
+        elif not do_no_corr:
+            # Pauli strings in a group are not independent.
+            # Use approach of defining group random variable
+
+            # loop over cliques
+            groups = self.saver[det_int].get_groups(paulis_str)
+            coeff_dict = pauliop_to_dict(observables)  # look-up for coeffs
+
+            result = 0.0
+            for group, group_paulis in groups.items():
+                # \sum_b p(b) (\sum_l c_l <b|P_l|b>)^2 - (\sum_b p(b) \sum_l c_l <b|P_l|b>)^2
+                # loop over each bitstring in group distribution (first sum over b)
+                sample_mean = 0.0
+                sample_mean_sq = 0.0
+                for key, value in (
+                    self.saver[det_int].get_distr_heads([group], self.mitigation_flags)[0].items()
+                ):  # get group/clique head distribution
+                    # loop over paulis in group (second sum over l): group random variable
+                    group_var = 0.0
+                    for pauli in group_paulis:
+                        group_var += coeff_dict[pauli] * get_bitstring_sign(
+                            pauli, key
+                        )  # \sum_l c_l <b|P_l|b>
+
+                    sample_mean += value * group_var  # \sum_b p(b) \sum_l c_l <b|P_l|b>
+                    sample_mean_sq += value * group_var**2  # \sum_b p(b) (\sum_l c_l <b|P_l|b>)^2
+                result += sample_mean_sq - sample_mean**2  # add group variances
+        else:
+            # Pauli strings in a group are considered independent.
+            # Loop over all Pauli strings in observable and build final result with coefficients
+            for pauli, coeff in zip(paulis_str, observables.coeffs):
+                if no_coeffs:
+                    coeff = 1
+                # Get distribution from cliques
                 dist = self.saver[det_int].get_distr(pauli, self.mitigation_flags)
                 # Calculate p1: Probability of measuring one
                 p1 = 0.0
                 for key, value in dist.items():
                     if get_bitstring_sign(pauli, key) == 1:
                         p1 += value
-            else:
-                p1 = self._sampler_distribution_p1(pauli, run_parameters)
-            if self.shots is None:
-                var_p = 4 * np.abs(coeff.real) ** 2 * np.abs(p1 - p1**2)
-            else:
-                var_p = 4 * np.abs(coeff.real) ** 2 * np.abs(p1 - p1**2) / (self.shots)
-            result += var_p
+                var_p = 4 * coeff.real**2 * (p1 - p1**2)
+                result += var_p
+
+        if self.shots is not None:
+            result = result / self.shots
+
         return result
 
     def _apply_M_mitigation(
@@ -1312,6 +1397,8 @@ class QuantumInterface:
             shots = self.shots
         if overwrite_shots is not None:
             print("Warning: Overwriting QI shots has been used.")
+            if self._circuit_multipl > 1:
+                print("Warning: Circuit multiplier is switched on to ", self._circuit_multipl)
             shots = overwrite_shots
 
         if isinstance(paulis, str):
@@ -1383,8 +1470,8 @@ class QuantumInterface:
             # Run sampler
             job = self._primitive.run(circuits, parameter_values=parameter_values, shots=shots)
 
-        if self.shots is not None:  # check if ideal simulator
-            self.total_shots_used += self.shots * num_paulis * num_circuits
+        if shots is not None:  # check if ideal simulator
+            self.total_shots_used += shots * self._circuit_multipl * num_paulis * num_circuits
         self.total_device_calls += 1
         self.total_paulis_evaluated += num_paulis * num_circuits
 
@@ -1491,7 +1578,7 @@ class QuantumInterface:
                 p1 += value
         return p1
 
-    def _make_Minv(self, shots: None | int = None, custom_ansatz: None | QuantumCircuit = None) -> np.ndarray:
+    def _make_Minv(self, shots: int | None = None, custom_ansatz: QuantumCircuit | None = None) -> np.ndarray:
         r"""Make inverse of read-out correlation matrix with one device call.
 
         The read-out correlation matrix is of the form (for two qubits):
@@ -1580,6 +1667,9 @@ class QuantumInterface:
         """
         with open(filename, "wb") as file:
             pickle.dump(self.saver, file)
+        with open(filename + "_info.txt", "w") as f:
+            f.write(self._info_string())
+            f.write(f"\nAnsatz parameters:\n{self.parameters}")
 
     def load_paulis_from_file(self, filename: str) -> None:
         """Load Pauli strings and their distributions from a file.
@@ -1591,12 +1681,12 @@ class QuantumInterface:
             self.saver = pickle.load(file)
         print(f"Loaded Pauli strings from {filename}.")
 
-    def get_info(self) -> None:
-        """Get infos about settings."""
+    def _info_string(self) -> str:
+        """Get infos about settings as string."""
         if isinstance(self.ansatz, QuantumCircuit):
             data = f"Your settings are:\n {'Ansatz:':<20} {'custom circuit'}\n {'Number of shots:':<20} {self.shots}\n"
         else:
-            data = f"Your settings are:\n {'Ansatz:':<20} {self.ansatz}\n {'Number of shots:':<20} {self.shots}\n"
+            data = f"Your settings are:\n {'Ansatz:':<20} {self.ansatz}\n {'Ansatz options:':<20} {self.ansatz_options}\n {'Number of shots:':<20} {self.shots}\n"
         data += f" {'ISA':<20} {self.ISA}\n {'Primitive:':<20} {self._primitive.__class__.__name__}"
         if self.ISA:
             if self._transpiled:
@@ -1617,5 +1707,9 @@ class QuantumInterface:
                     self._primitive.options, "twirling"
                 ):
                     data += f"\n {'Pauli twirling:':<20} {self._primitive.options.twirling.enable_gates}\n {'Dynamic decoupling:':<20} {self._primitive.options.dynamical_decoupling.enable}"
+        data += f"\nMitigation flags:\n{self.mitigation_flags.status_report()}"
+        return data
 
-        print(f"{data}\nMitigation flags:\n{self.mitigation_flags.status_report()}")
+    def get_info(self) -> None:
+        """Print infos about settings."""
+        print(f"{self._info_string()}")

@@ -182,7 +182,7 @@ def get_electronic_energy(
 def get_orbital_gradient(
     h_int: np.ndarray,
     g_int: np.ndarray,
-    kappa_idx: list[tuple[int, int]],
+    kappa_idx: np.ndarray,
     num_inactive_orbs: int,
     num_active_orbs: int,
     rdm1: np.ndarray,
@@ -234,7 +234,7 @@ def get_orbital_gradient(
 def get_orbital_gradient_response(
     h_int: np.ndarray,
     g_int: np.ndarray,
-    kappa_idx: list[tuple[int, int]],
+    kappa_idx: np.ndarray,
     num_inactive_orbs: int,
     num_active_orbs: int,
     rdm1: np.ndarray,
@@ -330,7 +330,7 @@ def get_orbital_gradient_response(
 
 @nb.jit(nopython=True)
 def get_orbital_response_metric_sigma(
-    kappa_idx: list[tuple[int, int]],
+    kappa_idx: np.ndarray,
     num_inactive_orbs: int,
     num_active_orbs: int,
     rdm1: np.ndarray,
@@ -361,7 +361,7 @@ def get_orbital_response_metric_sigma(
 
 @nb.jit(nopython=True)
 def get_orbital_response_vector_norm(
-    kappa_idx: list[list[int]],
+    kappa_idx: np.ndarray,
     num_inactive_orbs: int,
     num_active_orbs: int,
     rdm1: np.ndarray,
@@ -419,7 +419,7 @@ def get_orbital_response_vector_norm(
 @nb.jit(nopython=True)
 def get_orbital_response_property_gradient(
     x_mo: np.ndarray,
-    kappa_idx: list[tuple[int, int]],
+    kappa_idx: np.ndarray,
     num_inactive_orbs: int,
     num_active_orbs: int,
     rdm1: np.ndarray,
@@ -465,8 +465,8 @@ def get_orbital_response_property_gradient(
 def get_orbital_response_hessian_block(
     h: np.ndarray,
     g: np.ndarray,
-    kappa_idx1: list[tuple[int, int]],
-    kappa_idx2: list[tuple[int, int]],
+    kappa_idx1: np.ndarray,
+    kappa_idx2: np.ndarray,
     num_inactive_orbs: int,
     num_active_orbs: int,
     rdm1: np.ndarray,

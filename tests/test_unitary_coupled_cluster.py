@@ -6,7 +6,6 @@ import slowquant.unitary_coupled_cluster.linear_response.naive as naivelr
 import slowquant.unitary_coupled_cluster.linear_response.selfconsistent as selfconsistentlr
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import (
     WaveFunctionUCC,
-    load_wavefunction,
 )
 
 
@@ -20,11 +19,9 @@ def test_heh_sto3g_hf() -> None:
         molecular_charge=1,
     )
     A.set_basis_set("sto-3g")
-    h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
-    g_eri = A.integral.electron_repulsion_tensor
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
-    WF = WaveFunctionUCC(A.molecule.number_electrons, (2, 1), S_sqrt, h_core, g_eri, "S")
+    WF = WaveFunctionUCC((2, 1), S_sqrt, A, "S")
     WF.run_wf_optimization_1step("BFGS", True)
     assert abs(WF.energy_elec - (-4.262632309847)) < 10**-8
 
@@ -38,11 +35,9 @@ def test_lih_sto3g_hf() -> None:
         distance_unit="bohr",
     )
     A.set_basis_set("sto-3g")
-    h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
-    g_eri = A.integral.electron_repulsion_tensor
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
-    WF = WaveFunctionUCC(A.molecule.number_electrons, (2, 1), S_sqrt, h_core, g_eri, "S")
+    WF = WaveFunctionUCC((2, 1), S_sqrt, A, "S")
     WF.run_wf_optimization_1step("BFGS", True)
     assert abs(WF.energy_elec - (-8.862246324082243)) < 10**-8
 
@@ -57,11 +52,9 @@ def test_heh_sto3g_uccs() -> None:
         molecular_charge=1,
     )
     A.set_basis_set("sto-3g")
-    h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
-    g_eri = A.integral.electron_repulsion_tensor
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
-    WF = WaveFunctionUCC(A.molecule.number_electrons, (2, 2), S_sqrt, h_core, g_eri, "S")
+    WF = WaveFunctionUCC((2, 2), S_sqrt, A, "S")
     WF.run_wf_optimization_1step("BFGS", False)
     assert abs(WF.energy_elec - (-4.262632309847)) < 10**-8
 
@@ -88,14 +81,10 @@ def test_h10_sto3g_uccsd() -> None:
     A.set_basis_set("sto-3g")
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
-    h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
-    g_eri = A.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        A.molecule.number_electrons,
         (2, 2),
         A.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        A,
         "SD",
     )
     WF.run_wf_optimization_1step("BFGS", False)
@@ -113,14 +102,10 @@ def test_h2_431g_oouccd() -> None:
     A.set_basis_set("4-31G")
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
-    h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
-    g_eri = A.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        A.molecule.number_electrons,
         (2, 2),
         A.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        A,
         "D",
         include_active_kappa=True,
     )
@@ -141,14 +126,10 @@ def test_h4_sto3g_oouccsd() -> None:
     A.set_basis_set("sto-3g")
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
-    h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
-    g_eri = A.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        A.molecule.number_electrons,
         (2, 2),
         A.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        A,
         "SD",
     )
     WF.run_wf_optimization_1step("BFGS", True)
@@ -168,14 +149,10 @@ def test_h4_sto3g_oouccd() -> None:
     A.set_basis_set("sto-3g")
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
-    h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
-    g_eri = A.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        A.molecule.number_electrons,
         (2, 2),
         A.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        A,
         "D",
         include_active_kappa=True,
     )
@@ -194,27 +171,18 @@ def test_h2_sto3g_uccsd_lr() -> None:
     SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
-    )
-    dipole_integrals = (
-        SQobj.integral.get_multipole_matrix([1, 0, 0]),
-        SQobj.integral.get_multipole_matrix([0, 1, 0]),
-        SQobj.integral.get_multipole_matrix([0, 0, 1]),
     )
     WF.run_wf_optimization_1step("BFGS", False)
     LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 1.015738) < 10**-4
     assert abs(LR.excitation_energies[1] - 1.719504) < 10**-4
-    transition_dipoles = LR.get_transition_dipole(dipole_integrals)
+    transition_dipoles = LR.get_transition_dipole()
     assert abs(abs(transition_dipoles[0, 2]) - 1.1440534325680685) < 10**-4
     assert abs(transition_dipoles[1, 2] - 0.0) < 10**-4
 
@@ -236,14 +204,10 @@ def test_h4_sto3g_uccdq() -> None:
     A.set_basis_set("sto-3g")
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
-    h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
-    g_eri = A.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        A.molecule.number_electrons,
         (4, 4),
         A.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        A,
         "DQ",
     )
     WF.run_wf_optimization_1step("BFGS", False)
@@ -261,28 +225,19 @@ def test_h2_631g_hf_lr() -> None:
     SQobj.set_basis_set("6-31G")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 1),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
     )
     WF.run_wf_optimization_1step("BFGS", True)
     LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
-    dipole_integrals = (
-        SQobj.integral.get_multipole_matrix([1, 0, 0]),
-        SQobj.integral.get_multipole_matrix([0, 1, 0]),
-        SQobj.integral.get_multipole_matrix([0, 0, 1]),
-    )
     assert abs(LR.excitation_energies[0] - 0.551961) < 10**-5
     assert abs(LR.excitation_energies[1] - 1.051638) < 10**-5
     assert abs(LR.excitation_energies[2] - 1.603563) < 10**-5
-    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    osc_strengths = LR.get_oscillator_strength()
     assert abs(osc_strengths[0] - 0.650948) < 10**-3
     assert abs(osc_strengths[1] - 0.0) < 10**-3
     assert abs(osc_strengths[2] - 0.063496) < 10**-3
@@ -299,31 +254,22 @@ def test_h2_631g_oouccsd_lr() -> None:
     SQobj.set_basis_set("6-31G")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
     )
     WF.run_wf_optimization_1step("BFGS", True, tol=10**-11)
     LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
-    dipole_integrals = (
-        SQobj.integral.get_multipole_matrix([1, 0, 0]),
-        SQobj.integral.get_multipole_matrix([0, 1, 0]),
-        SQobj.integral.get_multipole_matrix([0, 0, 1]),
-    )
     assert abs(LR.excitation_energies[0] - 0.574413) < 10**-5
     assert abs(LR.excitation_energies[1] - 1.043177) < 10**-5
     assert abs(LR.excitation_energies[2] - 1.139482) < 10**-5
     assert abs(LR.excitation_energies[3] - 1.365962) < 10**-5
     assert abs(LR.excitation_energies[4] - 1.831197) < 10**-5
     assert abs(LR.excitation_energies[5] - 2.581279) < 10**-5
-    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    osc_strengths = LR.get_oscillator_strength()
     assert abs(osc_strengths[0] - 0.633823) < 10**-3
     assert abs(osc_strengths[1] - 0.0) < 10**-3
     assert abs(osc_strengths[2] - 0.0) < 10**-3
@@ -345,24 +291,15 @@ def test_h4_sto3g_uccsd_lr_naive() -> None:
     SQobj.set_basis_set("STO-3G")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (4, 4),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
     )
     WF.run_wf_optimization_1step("BFGS", False)
     LR = naivelr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
-    dipole_integrals = (
-        SQobj.integral.get_multipole_matrix([1, 0, 0]),
-        SQobj.integral.get_multipole_matrix([0, 1, 0]),
-        SQobj.integral.get_multipole_matrix([0, 0, 1]),
-    )
     assert abs(LR.excitation_energies[0] - 0.162961) < 10**-5
     assert abs(LR.excitation_energies[1] - 0.418771) < 10**-5
     assert abs(LR.excitation_energies[2] - 0.550513) < 10**-5
@@ -377,7 +314,7 @@ def test_h4_sto3g_uccsd_lr_naive() -> None:
     assert abs(LR.excitation_energies[11] - 1.189881) < 10**-5
     assert abs(LR.excitation_energies[12] - 1.512350) < 10**-5
     assert abs(LR.excitation_energies[13] - 1.515402) < 10**-5
-    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    osc_strengths = LR.get_oscillator_strength()
     assert abs(osc_strengths[0] - 0.0) < 10**-3
     assert abs(osc_strengths[1] - 0.0) < 10**-3
     assert abs(osc_strengths[2] - 0.026095) < 10**-3
@@ -408,7 +345,7 @@ def test_h4_sto3g_uccsd_lr_naive() -> None:
     assert abs(LR.excitation_energies[11] - 1.189882) < 10**-5
     assert abs(LR.excitation_energies[12] - 1.512350) < 10**-5
     assert abs(LR.excitation_energies[13] - 1.515402) < 10**-5
-    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    osc_strengths = LR.get_oscillator_strength()
     assert abs(osc_strengths[0] - 0.0) < 10**-3
     assert abs(osc_strengths[1] - 0.0) < 10**-3
     assert abs(osc_strengths[2] - 0.007799) < 10**-3
@@ -435,24 +372,15 @@ def test_be_sto3g_uccsd_lr_naive() -> None:
     SQobj.set_basis_set("STO-3G")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
     )
     WF.run_wf_optimization_1step("BFGS", True)
     LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
-    dipole_integrals = (
-        SQobj.integral.get_multipole_matrix([1, 0, 0]),
-        SQobj.integral.get_multipole_matrix([0, 1, 0]),
-        SQobj.integral.get_multipole_matrix([0, 0, 1]),
-    )
     assert abs(LR.excitation_energies[0] - 0.000001) < 10**-5
     assert abs(LR.excitation_energies[1] - 0.000001) < 10**-5
     assert abs(LR.excitation_energies[2] - 0.246512) < 10**-5
@@ -463,7 +391,7 @@ def test_be_sto3g_uccsd_lr_naive() -> None:
     assert abs(LR.excitation_energies[7] - 4.168480) < 10**-5
     assert abs(LR.excitation_energies[8] - 4.188686) < 10**-5
     assert abs(LR.excitation_energies[9] - 4.401923) < 10**-5
-    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    osc_strengths = LR.get_oscillator_strength()
     assert abs(osc_strengths[0] - 0.0) < 10**-3
     assert abs(osc_strengths[1] - 0.0) < 10**-3
     assert abs(osc_strengths[2] - 0.358883) < 10**-3
@@ -486,7 +414,7 @@ def test_be_sto3g_uccsd_lr_naive() -> None:
     assert abs(LR.excitation_energies[7] - 4.168480) < 10**-5
     assert abs(LR.excitation_energies[8] - 4.188686) < 10**-5
     assert abs(LR.excitation_energies[9] - 4.401923) < 10**-5
-    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    osc_strengths = LR.get_oscillator_strength()
     assert abs(osc_strengths[0] - 0.0) < 10**-3
     assert abs(osc_strengths[1] - 0.0) < 10**-3
     assert abs(osc_strengths[2] - 0.358883) < 10**-3
@@ -513,20 +441,11 @@ def test_lih_sto3g_uccsd_lr_naive() -> None:
     SQobj.set_basis_set("STO-3G")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
-    )
-    dipole_integrals = (
-        SQobj.integral.get_multipole_matrix([1, 0, 0]),
-        SQobj.integral.get_multipole_matrix([0, 1, 0]),
-        SQobj.integral.get_multipole_matrix([0, 0, 1]),
     )
     WF.run_wf_optimization_1step("BFGS", True)
     LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
@@ -544,7 +463,7 @@ def test_lih_sto3g_uccsd_lr_naive() -> None:
     assert abs(LR.excitation_energies[10] - 2.137193) < 10**-4
     assert abs(LR.excitation_energies[11] - 2.455191) < 10**-4
     assert abs(LR.excitation_energies[12] - 2.954372) < 10**-4
-    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    osc_strengths = LR.get_oscillator_strength()
     assert abs(osc_strengths[0] - 0.049920) < 10**-3
     assert abs(osc_strengths[1] - 0.241184) < 10**-3
     assert abs(osc_strengths[2] - 0.241184) < 10**-3
@@ -573,7 +492,7 @@ def test_lih_sto3g_uccsd_lr_naive() -> None:
     assert abs(LR.excitation_energies[10] - 2.137193) < 10**-4
     assert abs(LR.excitation_energies[11] - 2.455191) < 10**-4
     assert abs(LR.excitation_energies[12] - 2.954372) < 10**-4
-    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    osc_strengths = LR.get_oscillator_strength()
     assert abs(osc_strengths[0] - 0.049920) < 10**-3
     assert abs(osc_strengths[1] - 0.241184) < 10**-3
     assert abs(osc_strengths[2] - 0.241184) < 10**-3
@@ -600,20 +519,11 @@ def test_LiH_sto3g_uccsd_lr() -> None:
     SQobj.set_basis_set("STO-3G")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
-    )
-    dipole_integrals = (
-        SQobj.integral.get_multipole_matrix([1, 0, 0]),
-        SQobj.integral.get_multipole_matrix([0, 1, 0]),
-        SQobj.integral.get_multipole_matrix([0, 0, 1]),
     )
     WF.run_wf_optimization_1step("BFGS", True)
     LR = naivelr.LinearResponse(WF, excitations="SD")
@@ -631,7 +541,7 @@ def test_LiH_sto3g_uccsd_lr() -> None:
     assert abs(LR.excitation_energies[10] - 2.137193) < 10**-4
     assert abs(LR.excitation_energies[11] - 2.455191) < 10**-4
     assert abs(LR.excitation_energies[12] - 2.954372) < 10**-4
-    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    osc_strengths = LR.get_oscillator_strength()
     assert abs(osc_strengths[0] - 0.049920) < 10**-3
     assert abs(osc_strengths[1] - 0.241184) < 10**-3
     assert abs(osc_strengths[2] - 0.241184) < 10**-3
@@ -660,7 +570,7 @@ def test_LiH_sto3g_uccsd_lr() -> None:
     assert abs(LR.excitation_energies[10] - 2.137193) < 10**-4
     assert abs(LR.excitation_energies[11] - 2.455191) < 10**-4
     assert abs(LR.excitation_energies[12] - 2.954372) < 10**-4
-    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    osc_strengths = LR.get_oscillator_strength()
     assert abs(osc_strengths[0] - 0.049920) < 10**-3
     assert abs(osc_strengths[1] - 0.241184) < 10**-3
     assert abs(osc_strengths[2] - 0.241184) < 10**-3
@@ -689,45 +599,11 @@ def test_H4_sto3g_uccsdtq() -> None:
     SQobj.set_basis_set("STO-3G")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (4, 4),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SDTQ",
     )
     WF.run_wf_optimization_1step("BFGS", False)
     assert abs(WF.energy_elec - (-3.714153922167)) < 10**-8
-
-
-def test_H2_sto3g_uccsd_saveload() -> None:
-    """Test if saving and loading of wave function works."""
-    SQobj = sq.SlowQuant()
-    SQobj.set_molecule(
-        """H  0.0  0.0  0.0;
-           H  0.0  1.8  0.0;""",
-        distance_unit="angstrom",
-    )
-    SQobj.set_basis_set("STO-3G")
-    SQobj.init_hartree_fock()
-    SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
-    WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
-        (2, 2),
-        SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
-        "SD",
-    )
-    WF.run_wf_optimization_1step("BFGS")
-    WF.save_wavefunction("test_h2_save", force_overwrite=True)
-    WF2 = load_wavefunction("test_h2_save")
-    LR = naivelr.LinearResponse(WF2, "SD")
-    LR.calc_excitation_energies()
-    assert abs(LR.excitation_energies[0] - 0.54127603) < 10**-5
-    assert abs(LR.excitation_energies[1] - 0.59557678) < 10**-5

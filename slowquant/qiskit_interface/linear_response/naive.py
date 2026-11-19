@@ -1,5 +1,3 @@
-from collections.abc import Sequence
-
 import numpy as np
 
 from slowquant.molecularintegrals.integralfunctions import (
@@ -61,10 +59,10 @@ class quantumLR(quantumLRBaseClass):
                 grad = np.zeros(2 * self.num_q)
                 for i, op in enumerate(self.q_ops):
                     grad[i] = self.wf.QI.quantum_expectation_value(
-                        (self.H_1i_1a * op).get_folded_operator(*self.orbs)
+                        (commutator(self.H_1i_1a, op)).get_folded_operator(*self.orbs)
                     )
                     grad[i + self.num_q] = self.wf.QI.quantum_expectation_value(
-                        (op.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                        (commutator(op.dagger, self.H_1i_1a)).get_folded_operator(*self.orbs)
                     )
         if do_gradients:
             if self.num_q != 0:
@@ -126,56 +124,36 @@ class quantumLR(quantumLRBaseClass):
                     for i, qI in enumerate(self.q_ops[j:], j):
                         # Make A
                         self.A[i, j] = self.A[j, i] = self.wf.QI.quantum_expectation_value(
-                            (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs)
-                        ) - self.wf.QI.quantum_expectation_value(
-                            (qI.dagger * qJ * self.H_2i_2a).get_folded_operator(*self.orbs)
+                            (double_commutator(qI.dagger, self.H_2i_2a, qJ)).get_folded_operator(*self.orbs)
                         )
                         # Make B
                         self.B[i, j] = self.B[j, i] = -(
                             self.wf.QI.quantum_expectation_value(
-                                (qI.dagger * qJ.dagger * self.H_2i_2a).get_folded_operator(*self.orbs)
+                                (double_commutator(qI.dagger, self.H_2i_2a, qJ.dagger)).get_folded_operator(
+                                    *self.orbs
+                                )
                             )
                         )
                         # Make Sigma
                         self.Sigma[i, j] = self.Sigma[j, i] = self.wf.QI.quantum_expectation_value(
-                            (qI.dagger * qJ).get_folded_operator(*self.orbs)
+                            (commutator(qI.dagger, qJ)).get_folded_operator(*self.orbs)
                         )
 
             # Gq
             for j, qJ in enumerate(self.q_ops):
                 for i, GI in enumerate(self.G_ops):
                     # Make A
-                    val = (
-                        self.wf.QI.quantum_expectation_value(
-                            (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
-                        )
-                        - 1
-                        / 2
-                        * self.wf.QI.quantum_expectation_value(
-                            (self.H_1i_1a * qJ * GI.dagger).get_folded_operator(*self.orbs)
-                        )
-                        - 1
-                        / 2
-                        * self.wf.QI.quantum_expectation_value(
-                            (self.H_1i_1a * GI.dagger * qJ).get_folded_operator(*self.orbs)
-                        )
+                    val = self.wf.QI.quantum_expectation_value(
+                        (
+                            double_commutator(GI.dagger, self.H_1i_1a, qJ, do_symmetrized=True)
+                        ).get_folded_operator(*self.orbs)
                     )
                     self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
                     # Make B
-                    val = (
-                        self.wf.QI.quantum_expectation_value(
-                            (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs)
-                        )
-                        - 1
-                        / 2
-                        * self.wf.QI.quantum_expectation_value(
-                            (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
-                        )
-                        - 1
-                        / 2
-                        * self.wf.QI.quantum_expectation_value(
-                            (qJ.dagger * GI.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
-                        )
+                    val = self.wf.QI.quantum_expectation_value(
+                        (
+                            double_commutator(qJ.dagger, self.H_1i_1a, GI.dagger, do_symmetrized=True)
+                        ).get_folded_operator(*self.orbs)
                     )
                     self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
 
@@ -463,19 +441,14 @@ class quantumLR(quantumLRBaseClass):
         self._analyze_std(A, B, Sigma, verbose=verbose, cv=cv, save=save)
         return A, B, Sigma
 
-    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_transition_dipole(self) -> np.ndarray:
         """Calculate transition dipole moment.
-
-        Args:
-            dipole_integrals: Dipole integrals ordered as (x,y,z).
 
         Returns:
             Transition dipole moment.
         """
-        if len(dipole_integrals) != 3:
-            raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
         number_excitations = len(self.excitation_energies)
-
+        dipole_integrals = self.wf.int_gen.electric_dipole
         mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
         muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
         muz = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[2])

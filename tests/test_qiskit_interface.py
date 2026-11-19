@@ -31,10 +31,10 @@ from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
 noise_model = NoiseModel()
-noise_model.add_all_qubit_quantum_error(depolarizing_error(0.005, 1), ["u1", "u2", "u3"])
-noise_model.add_all_qubit_quantum_error(depolarizing_error(0.02, 2), ["cx"])
-noise_model.add_all_qubit_quantum_error(amplitude_damping_error(0.02), ["u1", "u2", "u3"], warnings=False)
-noise_model.add_all_qubit_quantum_error(phase_damping_error(0.03), ["u1", "u2", "u3"], warnings=False)
+noise_model.add_all_qubit_quantum_error(depolarizing_error(0.005, 1), ["rz", "sx", "x"])
+noise_model.add_all_qubit_quantum_error(depolarizing_error(0.02, 2), ["cz"])
+noise_model.add_all_qubit_quantum_error(amplitude_damping_error(0.02), ["rz", "sx", "x"], warnings=False)
+noise_model.add_all_qubit_quantum_error(phase_damping_error(0.03), ["rz", "sx", "x"], warnings=False)
 noise_model.add_all_qubit_readout_error(ReadoutError([[0.95, 0.05], [0.1, 0.9]]))
 
 
@@ -50,11 +50,9 @@ def test_LiH_naive() -> None:
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         "SD",
     )
 
@@ -68,11 +66,9 @@ def test_LiH_naive() -> None:
     QI = QuantumInterface(sampler, "fUCCSD", mapper)
 
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         WF.c_mo,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
@@ -121,11 +117,9 @@ def test_LiH_projected() -> None:
 
     # Conventional UCC wave function
     WF = WaveFunctionUCC(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         "SD",
     )
     WF.run_wf_optimization_1step("BFGS", True)
@@ -138,11 +132,9 @@ def test_LiH_projected() -> None:
 
     # Pass converged UCC orbitals to circuit wave function but still do optimization (just a speed-up)
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         WF.c_mo,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
     qWF.run_wf_optimization_2step("rotosolve", True)
@@ -184,11 +176,9 @@ def test_LiH_allprojected() -> None:
 
     # Conventional UCC wave function
     WF = WaveFunctionUCC(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         "SD",
     )
 
@@ -203,11 +193,9 @@ def test_LiH_allprojected() -> None:
 
     # Pass converged UCC orbitals to circuit wave function but still do optimization (just a speed-up)
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         WF.c_mo,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
@@ -256,11 +244,9 @@ def test_LiH_naive_sampler_ISA() -> None:
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         "SD",
     )
 
@@ -274,11 +260,9 @@ def test_LiH_naive_sampler_ISA() -> None:
     QI = QuantumInterface(sampler, "fUCCSD", mapper, ISA=True)
 
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         WF.c_mo,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
@@ -319,15 +303,11 @@ def test_LiH_oscillator_strength() -> None:
     mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
     rhf = pyscf.scf.RHF(mol).run()
 
-    x, y, z = mol.intor("int1e_r", comp=3)
-
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         "SD",
     )
 
@@ -341,11 +321,9 @@ def test_LiH_oscillator_strength() -> None:
     QI = QuantumInterface(sampler, "fUCCSD", mapper)
 
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         WF.c_mo,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
@@ -356,7 +334,7 @@ def test_LiH_oscillator_strength() -> None:
     qLR_naive.run(do_rdm=True)
     qLR_naive.get_excitation_energies()
     qLR_naive.get_normed_excitation_vectors()
-    osc_strengths = qLR_naive.get_oscillator_strength([x, y, z])
+    osc_strengths = qLR_naive.get_oscillator_strength()
 
     solution = [
         0.04994476,
@@ -381,7 +359,7 @@ def test_LiH_oscillator_strength() -> None:
     qLR_proj.run(do_rdm=True)
     qLR_proj.get_excitation_energies()
     qLR_proj.get_normed_excitation_vectors()
-    osc_strengths = qLR_proj.get_oscillator_strength([x, y, z])
+    osc_strengths = qLR_proj.get_oscillator_strength()
 
     solution = [
         0.04994581,
@@ -406,7 +384,7 @@ def test_LiH_oscillator_strength() -> None:
     qLR_allproj.run()
     qLR_allproj.get_excitation_energies()
     qLR_allproj.get_normed_excitation_vectors()
-    osc_strengths = qLR_allproj.get_oscillator_strength([x, y, z])
+    osc_strengths = qLR_allproj.get_oscillator_strength()
 
     solution = [
         0.05010188,
@@ -442,11 +420,9 @@ def test_gradient_optimizer_H2() -> None:
     QI = QuantumInterface(sampler, "fUCCD", mapper)
 
     WF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
@@ -471,11 +447,9 @@ def test_sampler_changes() -> None:
     QI = QuantumInterface(sampler, "fUCCSD", mapper)
 
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
@@ -535,11 +509,9 @@ def test_shots() -> None:
     QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=10)
 
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
@@ -558,11 +530,9 @@ def test_fUCC_h2o() -> None:
     QI = QuantumInterface(sampler, "fUCCSD", mapper)
 
     WF = WaveFunctionCircuit(
-        mol.nelectron,
         (4, 4),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
@@ -591,11 +561,9 @@ def test_samplerV2() -> None:
     QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=10)
 
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
@@ -624,11 +592,9 @@ def test_samplerV2_ibm() -> None:
     QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=10)
 
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
@@ -652,11 +618,9 @@ def test_custom() -> None:
     QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=None)
 
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
     qWF.run_wf_optimization_2step("rotosolve", True, is_silent_subiterations=True)
@@ -674,7 +638,14 @@ def test_custom() -> None:
     QI = QuantumInterface(sampler, qc, mapper, shots=None)
 
     # Construct circuit
-    QI.construct_circuit(2, (1, 1))
+    QI.construct_circuit(
+        qWF.active_occ_idx_shifted,
+        qWF.active_unocc_idx_shifted,
+        qWF.active_occ_spin_idx_shifted,
+        qWF.active_unocc_spin_idx_shifted,
+        qWF.num_active_orbs,
+        (qWF.num_active_elec_alpha, qWF.num_active_elec_beta),
+    )
 
     # Define parameters
     QI.parameters = qc_param
@@ -699,19 +670,15 @@ def test_H2_sampler_layout() -> None:
     QI = QuantumInterface(sampler, "fUCCSD", mapper, ISA=True)
 
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
     qWF.run_wf_optimization_2step("rotosolve", True)
 
     QI.update_pass_manager({"backend": FakeTorino()})
-
-    QI._reset_cliques()
 
     assert np.allclose(qWF._calc_energy_elec(), -1.6303275411526188, atol=10**-6)
 
@@ -728,23 +695,22 @@ def test_mitigation_nocm() -> None:
     SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
 
     # Conventional UPS wave function
     WF = WaveFunctionUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
         include_active_kappa=True,
     )
     WF.run_wf_optimization_1step("BFGS", True)
 
-    sampler = SamplerAer(backend_options={"noise_model": noise_model})
+    sampler = SamplerAer(
+        backend_options={"noise_model": noise_model},
+        skip_transpilation=True,
+    )
     mapper = JordanWignerMapper()
     QI = QuantumInterface(
         sampler,
@@ -758,32 +724,30 @@ def test_mitigation_nocm() -> None:
     )
 
     qWF = WaveFunctionCircuit(
-        SQobj.molecule.number_electrons,
         (2, 2),
         WF.c_mo,
-        h_core,
-        g_eri,
+        SQobj,
         QI,
     )
     qWF.thetas = WF.thetas
 
-    assert abs(qWF._calc_energy_elec() - -9.418383329562078) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.631094873717291) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0]
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() - -9.602601639646656) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.695213772925092) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8]
 
     QI.update_mitigation_flags(do_postselection=False, do_M_ansatz0=True)
-    assert abs(qWF._calc_energy_elec() - -9.683988916881479) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.689807552229608) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3]
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() - -9.70319667962837) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.712408682894697) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11]
 
     QI.update_mitigation_flags(do_M_ansatz0_plus=True)
-    assert abs(qWF._calc_energy_elec() - -9.70319667962837) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.712408682894697) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11, 15]
 
 
@@ -791,31 +755,30 @@ def test_mitigation() -> None:
     """Test mitigations."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
-        """Li  0.0           0.0  0.0;
-        H  0.735           0.0  0.0;
+        """Li  0.0  0.0  0.0;
+        H  0.735  0.0  0.0;
         """,
         distance_unit="angstrom",
     )
     SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
 
     # Conventional UPS wave function
     WF = WaveFunctionUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
         include_active_kappa=True,
     )
     WF.run_wf_optimization_1step("BFGS", True)
 
-    sampler = SamplerAer(backend_options={"noise_model": noise_model})
+    sampler = SamplerAer(
+        backend_options={"noise_model": noise_model},
+        skip_transpilation=True,
+    )
     mapper = JordanWignerMapper()
     QI = QuantumInterface(
         sampler,
@@ -826,36 +789,40 @@ def test_mitigation() -> None:
         do_M_mitigation=False,
         do_M_ansatz0=False,
         do_postselection=False,
-        pass_manager_options={"backend": FakeTorino(), "seed_transpiler": 1234},
+        pass_manager_options={
+            "backend": FakeTorino(),
+            "initial_layout": [99, 98, 80, 92],
+            "optimization_level": 1,
+            "routing_method": "basic",
+            "seed_transpiler": 1234,
+        },
     )
 
     qWF = WaveFunctionCircuit(
-        SQobj.molecule.number_electrons,
         (2, 2),
         WF.c_mo,
-        h_core,
-        g_eri,
+        SQobj,
         QI,
     )
     qWF.thetas = WF.thetas
 
-    assert abs(qWF._calc_energy_elec() - -9.233747228500063) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.09907097331813) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0]
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() - -9.530550958752345) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.289142691443796) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8]
 
     QI.update_mitigation_flags(do_postselection=False, do_M_ansatz0=True)
-    assert abs(qWF._calc_energy_elec() - -9.66182116795791) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.499753131080157) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3]
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() - -9.712021766284208) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.55460043872056) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11]
 
     QI.update_mitigation_flags(do_M_ansatz0_plus=True)
-    assert abs(qWF._calc_energy_elec() - -9.712021766284208) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.55460043872056) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11, 15]
 
 
@@ -872,16 +839,11 @@ def test_state_average_layout() -> None:
     SQobj.init_hartree_fock()
 
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    c_mo = SQobj.hartree_fock.mo_coeff
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
 
     WF = WaveFunctionSAUPS(
-        SQobj.molecule.number_electrons,
         (2, 4),
-        c_mo,
-        h_core,
-        g_eri,
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
         (
             [
                 [1],
@@ -909,11 +871,9 @@ def test_state_average_layout() -> None:
     )
 
     QWF = WaveFunctionSACircuit(
-        SQobj.molecule.number_electrons,
         (2, 4),
-        c_mo,
-        h_core,
-        g_eri,
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
         (
             [
                 [1],
@@ -944,16 +904,11 @@ def test_state_average_M() -> None:
     SQobj.init_hartree_fock()
 
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    c_mo = SQobj.hartree_fock.mo_coeff
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
 
     WF = WaveFunctionSAUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
-        c_mo,
-        h_core,
-        g_eri,
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
         (
             [
                 [1],
@@ -969,7 +924,10 @@ def test_state_average_M() -> None:
     )
     WF.run_wf_optimization_1step("BFGS")
 
-    sampler = SamplerAer(backend_options={"noise_model": noise_model})
+    sampler = SamplerAer(
+        backend_options={"noise_model": noise_model},
+        skip_transpilation=True,
+    )
     mapper = JordanWignerMapper()
     QI = QuantumInterface(
         sampler,
@@ -980,15 +938,19 @@ def test_state_average_M() -> None:
         do_M_mitigation=True,
         do_M_ansatz0=True,
         do_postselection=True,
-        pass_manager_options={"backend": FakeTorino(), "seed_transpiler": 1234},
+        pass_manager_options={
+            "backend": FakeTorino(),
+            "initial_layout": [99, 98, 80, 92],
+            "optimization_level": 1,
+            "routing_method": "basic",
+            "seed_transpiler": 1234,
+        },
     )
 
     QWF = WaveFunctionSACircuit(
-        SQobj.molecule.number_electrons,
         (2, 2),
-        c_mo,
-        h_core,
-        g_eri,
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
         (
             [
                 [1],
@@ -1003,7 +965,7 @@ def test_state_average_M() -> None:
     )
     QWF.thetas = WF.thetas
 
-    assert abs(QWF._calc_energy_elec() + 1.4240939758312483) < 10**-6  # type: ignore
+    assert abs(QWF._calc_energy_elec() + 1.3749928877432358) < 10**-6  # type: ignore
 
 
 def test_state_average_Mplus() -> None:
@@ -1019,16 +981,11 @@ def test_state_average_Mplus() -> None:
     SQobj.init_hartree_fock()
 
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    c_mo = SQobj.hartree_fock.mo_coeff
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
 
     WF = WaveFunctionSAUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
-        c_mo,
-        h_core,
-        g_eri,
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
         (
             [
                 [1],
@@ -1049,11 +1006,9 @@ def test_state_average_Mplus() -> None:
     QI = QuantumInterface(sampler, "tUPS", mapper, ansatz_options={"n_layers": 1})
 
     QWF = WaveFunctionSACircuit(
-        SQobj.molecule.number_electrons,
         (2, 2),
-        c_mo,
-        h_core,
-        g_eri,
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
         (
             [
                 [1],
@@ -1070,29 +1025,40 @@ def test_state_average_Mplus() -> None:
 
     assert abs(WF._sa_energy - QWF._calc_energy_elec()) < 10**-6  # type: ignore
 
-    sampler = SamplerAer(backend_options={"noise_model": noise_model})
+    sampler = SamplerAer(
+        backend_options={"noise_model": noise_model},
+        skip_transpilation=True,
+    )
     QWF.change_primitive(sampler)
 
     QI.shots = None
     QI.ISA = True
-    QI.update_pass_manager({"backend": FakeTorino(), "seed_transpiler": 1234})
+    QI.update_pass_manager(
+        {
+            "backend": FakeTorino(),
+            "initial_layout": [99, 98, 80, 92],
+            "optimization_level": 1,
+            "routing_method": "basic",
+            "seed_transpiler": 1234,
+        }
+    )
 
     # No EM
     QI._reset_cliques()
-    assert abs(QWF._calc_energy_elec() + 9.436258997213987) < 10**-6  # type: ignore  # CSFs option 1
+    assert abs(QWF._calc_energy_elec() + 9.374249021996663) < 10**-6  # type: ignore  # CSFs option 1
 
     # EM with M_Ansatz0
     QI.update_mitigation_flags(do_M_mitigation=True, do_M_ansatz0=True)
 
-    assert abs(QWF._calc_energy_elec() + 9.596224644030176) < 10**-6  # type: ignore  # CSFs option 4
+    assert abs(QWF._calc_energy_elec() + 9.398404469079898) < 10**-6  # type: ignore  # CSFs option 4
 
     # EM with M_Ansatz0+
     QI.update_mitigation_flags(do_M_ansatz0_plus=True)
-    assert abs(QWF._calc_energy_elec() + 9.608563673328995) < 10**-6  # type: ignore  # CSFs option 1
+    assert abs(QWF._calc_energy_elec() + 9.426250418342013) < 10**-6  # type: ignore  # CSFs option 1
 
     # EM with M_Ansatz0 and postselection
     QI.update_mitigation_flags(do_postselection=True, do_M_ansatz0_plus=False)
-    assert abs(QWF._calc_energy_elec() + 9.638637411200133) < 10**-6  # type: ignore  # CSFs option 4
+    assert abs(QWF._calc_energy_elec() + 9.637857456768002) < 10**-6  # type: ignore  # CSFs option 4
 
 
 def test_no_saving() -> None:
@@ -1108,16 +1074,11 @@ def test_no_saving() -> None:
     SQobj.init_hartree_fock()
 
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    c_mo = SQobj.hartree_fock.mo_coeff
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
 
     WF = WaveFunctionSAUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
-        c_mo,
-        h_core,
-        g_eri,
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
         (
             [
                 [1],
@@ -1138,11 +1099,9 @@ def test_no_saving() -> None:
     QI = QuantumInterface(sampler, "tUPS", mapper, ansatz_options={"n_layers": 1})
 
     QWF = WaveFunctionSACircuit(
-        SQobj.molecule.number_electrons,
         (2, 2),
-        c_mo,
-        h_core,
-        g_eri,
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
         (
             [
                 [1],
@@ -1163,15 +1122,26 @@ def test_no_saving() -> None:
     QI._do_cliques = False
     assert abs(WF._sa_energy - QWF._calc_energy_elec()) < 10**-6  # type: ignore
 
-    sampler = SamplerAer(backend_options={"noise_model": noise_model})
+    sampler = SamplerAer(
+        backend_options={"noise_model": noise_model},
+        skip_transpilation=True,
+    )
     QWF.change_primitive(sampler)
 
     QI.shots = None
     QI.ISA = True
-    QI.update_pass_manager({"backend": FakeTorino(), "seed_transpiler": 1234})
+    QI.update_pass_manager(
+        {
+            "backend": FakeTorino(),
+            "initial_layout": [99, 98, 80, 92],
+            "optimization_level": 1,
+            "routing_method": "basic",
+            "seed_transpiler": 1234,
+        }
+    )
 
     QI.update_mitigation_flags(do_postselection=False, do_M_ansatz0=True)
-    assert abs(QWF._calc_energy_elec() + 9.596224644030176) < 10**-6  # type: ignore
+    assert abs(QWF._calc_energy_elec() + 9.398404469079898) < 10**-6  # type: ignore
 
 
 def test_variance_nocm() -> None:
@@ -1186,23 +1156,22 @@ def test_variance_nocm() -> None:
     SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
 
     # Conventional UPS wave function
     WF = WaveFunctionUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
         include_active_kappa=True,
     )
     WF.run_wf_optimization_1step("BFGS", True)
 
-    sampler = SamplerAer(backend_options={"noise_model": noise_model})
+    sampler = SamplerAer(
+        backend_options={"noise_model": noise_model},
+        skip_transpilation=True,
+    )
     mapper = JordanWignerMapper()
     QI = QuantumInterface(
         sampler,
@@ -1216,21 +1185,19 @@ def test_variance_nocm() -> None:
     )
 
     qWF = WaveFunctionCircuit(
-        SQobj.molecule.number_electrons,
         (2, 2),
         WF.c_mo,
-        h_core,
-        g_eri,
+        SQobj,
         QI,
     )
     qWF.thetas = WF.thetas
 
-    assert abs(qWF._calc_energy_elec() - -9.418383329562078) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.10213270381462243) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.631094873717291) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian(), do_no_corr=True) - 0.0567009117091328) < 10**-6  # type: ignore
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() - -9.602601639646656) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.052830412154174874) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.695213772925092) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian(), do_no_corr=True) - 0.028179912484011638) < 10**-6  # type: ignore
 
 
 def test_variance() -> None:
@@ -1245,23 +1212,22 @@ def test_variance() -> None:
     SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
 
     # Conventional UPS wave function
     WF = WaveFunctionUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
         include_active_kappa=True,
     )
     WF.run_wf_optimization_1step("BFGS", True)
 
-    sampler = SamplerAer(backend_options={"noise_model": noise_model})
+    sampler = SamplerAer(
+        backend_options={"noise_model": noise_model},
+        skip_transpilation=True,
+    )
     mapper = JordanWignerMapper()
     QI = QuantumInterface(
         sampler,
@@ -1272,22 +1238,54 @@ def test_variance() -> None:
         do_M_mitigation=False,
         do_M_ansatz0=False,
         do_postselection=False,
-        pass_manager_options={"backend": FakeTorino(), "seed_transpiler": 1234},
+        pass_manager_options={
+            "backend": FakeTorino(),
+            "initial_layout": [99, 98, 80, 92],
+            "optimization_level": 1,
+            "routing_method": "basic",
+            "seed_transpiler": 1234,
+        },
     )
 
     qWF = WaveFunctionCircuit(
-        SQobj.molecule.number_electrons,
         (2, 2),
         WF.c_mo,
-        h_core,
-        g_eri,
+        SQobj,
         QI,
     )
     qWF.thetas = WF.thetas
 
-    assert abs(qWF._calc_energy_elec() - -9.233747228500063) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.13667860748213662) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.09907097331813) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian(), do_no_corr=True) - 0.1531370657002356) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.16583651217084236) < 10**-6  # type: ignore
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() - -9.530550958752345) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.08149072047975339) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.289142691443796) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian(), do_no_corr=True) - 0.13591141770369639) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.16411873796330764) < 10**-6  # type: ignore
+
+
+def test_upslayout_input() -> None:
+    """Test LiH UPS layout as ansatz input."""
+    atom = "Li .0 .0 .0; H .0 .0 1.672"
+    basis = "sto-3g"
+    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
+    rhf = pyscf.scf.RHF(mol).run()
+    WF = WaveFunctionUPS(
+        (2, 2),
+        rhf.mo_coeff,
+        mol,
+        "fUCCSD",
+    )
+    WF.run_wf_optimization_1step("BFGS", False)
+    sampler = SamplerAer()
+    mapper = ParityMapper(num_particles=(1, 1))
+    QI = QuantumInterface(sampler, WF.ups_layout, mapper)
+    qWF = WaveFunctionCircuit(
+        (2, 2),
+        WF.c_mo,
+        mol,
+        QI,
+    )
+    qWF.thetas = WF.thetas
+    assert abs(qWF.energy_elec - WF.energy_elec) < 10**-10

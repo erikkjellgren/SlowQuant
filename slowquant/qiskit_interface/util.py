@@ -1,12 +1,14 @@
-import networkx as nx
+from collections import deque
+
 import numpy as np
-from qiskit import QuantumCircuit
+from qiskit.circuit import QuantumCircuit
+from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import CouplingMap, PassManager
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 
 
-def to_CBS_measurement(op: str, transpiled: None | list[QuantumCircuit] = None) -> QuantumCircuit:
+def to_CBS_measurement(op: str, transpiled: list[QuantumCircuit] | None = None) -> QuantumCircuit:
     r"""Convert a Pauli string to Pauli measurement circuit.
 
     This is achieved by the following transformation:
@@ -374,6 +376,33 @@ class Clique:
                 new_heads.append(clique_head.head)
         return new_heads
 
+    def get_groups(self, paulis: list[str]) -> dict[str, list[str]]:
+        """Return groups of commuting Pauli strings based on current cliques.
+
+        Args:
+            paulis: List of Pauli strings.
+
+        Returns:
+            List of groups of commuting Pauli strings.
+        """
+        groups: dict[str, list[str]] = {}
+        # Loop over Pauli strings (passed via observable) in reverse sorted order
+        for pauli in sorted(paulis, reverse=True):
+            # Loop over Clique heads simulated so far
+            for clique_head in self.cliques:
+                # Check if Pauli string belongs to any already simulated Clique head.
+                do_fit, head_fit = fit_in_clique(pauli, clique_head.head)
+                if do_fit:
+                    if head_fit != clique_head.head:
+                        raise ValueError(
+                            f"Found matching clique, but head will be mutated. Head; {clique_head.head}, Pauli; {pauli}"
+                        )
+                    groups[clique_head.head] = [*groups.get(clique_head.head, []), pauli]
+                    break
+            else:  # no break
+                raise ValueError(f"Could not find matching clique for Pauli, {pauli}")
+        return groups
+
     def update_distr(
         self,
         new_heads: list[str],
@@ -429,6 +458,25 @@ class Clique:
                     #     f"Head, {clique_head.head}, has no distribution for mitigation; {mitigation_flags}"
                     # )
                 return clique_head.distr.get_distr(mitigation_flags)
+        raise ValueError(f"Could not find matching clique for Pauli, {pauli}")
+
+    def get_head(self, pauli: str) -> str:
+        """Get clique head for a Pauli string.
+
+        Args:
+            pauli: Pauli string.
+
+        Returns:
+            Clique head for the Pauli string.
+        """
+        for clique_head in self.cliques:
+            do_fit, head_fit = fit_in_clique(pauli, clique_head.head)
+            if do_fit:
+                if clique_head.head != head_fit:
+                    raise ValueError(
+                        f"Found matching clique, but head will be mutated. Head; {clique_head.head}, Pauli; {pauli}"
+                    )
+                return clique_head.head
         raise ValueError(f"Could not find matching clique for Pauli, {pauli}")
 
     def get_empty_heads(self, mitigation_flags: MitigationFlags | None = None) -> list[str]:
@@ -503,13 +551,20 @@ class Clique:
         for clique_head in self.cliques:
             print(f"Head: {clique_head.head}, Distribution: {clique_head.distr.data}")
 
-    def print_clique_heads(self) -> None:
-        """Print all clique heads."""
-        print("Clique heads:")
+    def get_clique_heads(self) -> list[str]:
+        """Return all clique heads.
+
+        Returns:
+            List of clique heads.
+        """
         heads = []
         for clique_head in self.cliques:
             heads.append(clique_head.head)
-        print(heads)
+        return heads
+
+    def print_clique_heads(self) -> None:
+        """Print all clique heads."""
+        print(self.get_clique_heads())
 
 
 def fit_in_clique(pauli: str, head: str) -> tuple[bool, str]:
@@ -646,6 +701,9 @@ def correct_distribution_with_layout(
 def find_best_path(coupling_map: CouplingMap, start: int, target: int) -> list[int]:
     """Find the best path between two qubits using the coupling map.
 
+    The best path is found by performing a standard breath first search,
+    https://en.wikipedia.org/wiki/Breadth-first_search#Pseudocode
+
     Args:
         coupling_map: The coupling map defining valid connections.
         start: Starting qubit.
@@ -654,17 +712,36 @@ def find_best_path(coupling_map: CouplingMap, start: int, target: int) -> list[i
     Returns:
         List of qubits representing the path from start to target.
     """
-    # Convert the coupling map to a NetworkX graph
-    graph = nx.Graph()
-    graph.add_edges_from(coupling_map.get_edges())
+    if start == target:
+        return [start]
 
-    # Find the shortest path between start and target
-    try:
-        path = nx.shortest_path(graph, source=start, target=target)
-    except nx.NetworkXNoPath as e:
-        raise ValueError(f"No valid path between qubit {start} and qubit {target}") from e
+    # Build the adjacency map
+    adjacency_map: dict[int, list[int]] = {}
+    for u, v in coupling_map.get_edges():
+        adjacency_map.setdefault(u, []).append(v)
+        adjacency_map.setdefault(v, []).append(u)
 
-    return path
+    # Breadth-First Search to find the shortest path
+    queue = deque([start])
+    parent: dict[int, int | None] = {start: None}
+    while queue:
+        current = queue.popleft()
+        if current == target:
+            break
+        for neighbor in adjacency_map.get(current, []):
+            if neighbor not in parent:
+                parent[neighbor] = current
+                queue.append(neighbor)
+    else:
+        raise ValueError(f"No valid path between qubit {start} and qubit {target}")
+
+    # Reconstruct the path from target back to start
+    path = []
+    curr: int | None = target
+    while curr is not None:
+        path.append(curr)
+        curr = parent[curr]
+    return path[::-1]
 
 
 def add_permutation_gate(circuit: QuantumCircuit, permutation: list[int], coupling_map: CouplingMap) -> None:
@@ -1055,3 +1132,19 @@ def get_reordering_sign(det: str) -> int:
             if alphas % 2 == 1:
                 sign *= -1
     return sign
+
+
+def pauliop_to_dict(op: SparsePauliOp) -> dict[str, float]:
+    """Convert SparsePauliOp to dictionary.
+
+    Args:
+        op: SparsePauliOp object.
+
+    Returns:
+        Dictionary with Pauli strings as keys and coefficients as values.
+    """
+    pauli_dict = {}
+    for pauli, coeff in zip(op.paulis, op.coeffs):
+        pauli_str = pauli.to_label()
+        pauli_dict[pauli_str] = coeff.real
+    return pauli_dict
