@@ -10,6 +10,7 @@ These tests compare the circuit unitary with the exponential of the Jordan-Wigne
 generator, built with Qiskit's own mapper, so they check the circuits rather than restate them.
 """
 
+import functools
 import itertools
 
 import numpy as np
@@ -18,12 +19,15 @@ import scipy.linalg
 from qiskit import QuantumCircuit
 from qiskit.circuit import Parameter
 from qiskit.quantum_info import Operator
-from qiskit_nature.second_q.mappers import JordanWignerMapper
+from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
+from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
 from slowquant.qiskit_interface.operators_circuits import (
     _double_excitation_efficient,
     _single_excitation_efficient,
+    double_excitation,
+    single_excitation,
     upslayout2circuit,
 )
 from slowquant.unitary_coupled_cluster.spin_ordering import alpha_idx, beta_idx
@@ -81,20 +85,25 @@ UPS_ANSATZE = {
 }
 
 
-def exact_excitation(key: str, num_orbs: int, theta: float) -> np.ndarray:
-    """Build exp(theta*(T - T^dagger)) for an excitation, via Qiskit's Jordan-Wigner mapper.
+def exact_excitation(
+    key: str, num_orbs: int, theta: float, mapper: FermionicMapper | None = None
+) -> np.ndarray:
+    """Build exp(theta*(T - T^dagger)) for an excitation, via one of Qiskit's mappers.
 
     Args:
         key: Fermionic operator string in Qiskit's format.
         num_orbs: Number of spatial orbitals.
         theta: Excitation parameter.
+        mapper: Fermionic to qubit mapper, Jordan-Wigner if None.
 
     Returns:
         Unitary matrix.
     """
+    if mapper is None:
+        mapper = JordanWignerMapper()
     op = FermionicOp({key: 1.0}, num_spin_orbitals=2 * num_orbs)
     generator = op - op.adjoint()
-    matrix = JordanWignerMapper().map(generator.normal_order()).to_matrix()
+    matrix = mapper.map(generator.normal_order()).to_matrix()
     return scipy.linalg.expm(theta * np.asarray(matrix))
 
 
@@ -220,33 +229,39 @@ def test_excitation_circuits_reject_repeated_indices() -> None:
 
 
 @pytest.mark.parametrize(
-    "name",
+    ("name", "mapper_name"),
     [
         pytest.param(
             name,
+            mapper_name,
             marks=pytest.mark.xfail(
                 raises=ValueError,
                 strict=True,
-                reason="iterate_t2_generalized yields doubles with i == j or a == b, which are zero",
+                reason="iterate_t2_generalized yields doubles with i == j or a == b, which are zero; "
+                "the Jordan-Wigner circuits reject them, the Rustiq path builds an identity",
             ),
         )
-        if name == "fUCC_GS_GD"
-        else name
+        if name == "fUCC_GS_GD" and mapper_name == "JW"
+        else (name, mapper_name)
         for name in sorted(UPS_ANSATZE)
+        for mapper_name in ["JW", "Parity"]
     ],
 )
-def test_ansatz_circuit(name: str) -> None:
+def test_ansatz_circuit(name: str, mapper_name: str) -> None:
     """Test that an ansatz circuit is the ordered product of its exact excitation unitaries.
 
     This also checks that upslayout2circuit hands the indices of each excitation to the
-    circuits in the right roles.
+    circuits in the right roles, for the hand-written Jordan-Wigner circuits and for the
+    Rustiq-synthesized circuits used for every other mapper.
 
     Args:
         name: Key of the ansatz in UPS_ANSATZE.
+        mapper_name: Fermionic to qubit mapper to build the circuit with.
     """
+    mapper = JordanWignerMapper() if mapper_name == "JW" else ParityMapper()
     layout = UpsStructure()
     UPS_ANSATZE[name](layout)
-    qc, _ = upslayout2circuit(layout, NUM_ACTIVE_ORBS, JordanWignerMapper())
+    qc, _ = upslayout2circuit(layout, NUM_ACTIVE_ORBS, mapper)
     # Parameters are named p000000000, p000000001, ..., so their sorted order is the layout order.
     thetas = np.random.default_rng(1234).uniform(-np.pi, np.pi, qc.num_parameters)
     computed = Operator(qc.assign_parameters(dict(zip(qc.parameters, thetas)))).data
@@ -269,5 +284,35 @@ def test_ansatz_circuit(name: str) -> None:
         else:
             raise ValueError(f"Unexpected excitation type {exc_type}")
         for key in keys:
-            reference = exact_excitation(key, NUM_ACTIVE_ORBS, theta) @ reference
+            reference = exact_excitation(key, NUM_ACTIVE_ORBS, theta, mapper) @ reference
     assert np.allclose(computed, reference, atol=1e-10), name
+
+
+@pytest.mark.parametrize("num_orbs", [2, 3])
+def test_single_excitation_circuit_parity(num_orbs: int) -> None:
+    """Test the Rustiq-synthesized single excitation for every ordered pair of spin orbitals.
+
+    Args:
+        num_orbs: Number of spatial orbitals.
+    """
+    mapper = ParityMapper()
+    builder = functools.partial(single_excitation, mapper=mapper)
+    for k, i in itertools.permutations(range(2 * num_orbs), 2):
+        computed = circuit_unitary(builder, (i, k), num_orbs, THETA)
+        reference = exact_excitation(f"+_{k} -_{i}", num_orbs, THETA, mapper)
+        assert np.allclose(computed, reference, atol=1e-10), f"k={k} i={i}"
+
+
+@pytest.mark.parametrize("num_orbs", [2, 3])
+def test_double_excitation_circuit_parity(num_orbs: int) -> None:
+    """Test the Rustiq-synthesized double excitation for every ordered quadruple of spin orbitals.
+
+    Args:
+        num_orbs: Number of spatial orbitals.
+    """
+    mapper = ParityMapper()
+    builder = functools.partial(double_excitation, mapper=mapper)
+    for k, l, i, j in itertools.permutations(range(2 * num_orbs), 4):
+        computed = circuit_unitary(builder, (i, j, k, l), num_orbs, THETA)
+        reference = exact_excitation(f"+_{k} +_{l} -_{j} -_{i}", num_orbs, THETA, mapper)
+        assert np.allclose(computed, reference, atol=1e-10), f"k={k} l={l} i={i} j={j}"

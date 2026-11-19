@@ -1,12 +1,14 @@
 import numpy as np
 from qiskit.circuit import Parameter, ParameterExpression, QuantumCircuit
 from qiskit.circuit.library import PauliEvolutionGate
-from qiskit.quantum_info import Pauli
+from qiskit.quantum_info import SparsePauliOp
+from qiskit.transpiler.passes.synthesis.hls_plugins import PauliEvolutionSynthesisRustiq
 from qiskit_nature.second_q.circuit.library import HartreeFock
 from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
+from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.operators import a_op_spin
 from slowquant.unitary_coupled_cluster.spin_ordering import alpha_idx, beta_idx
 from slowquant.unitary_coupled_cluster.util import UpsStructure
@@ -380,6 +382,47 @@ def _sa_single_excitation_efficient(
     return qc
 
 
+def _excitation_trotter(
+    op: FermionicOperator,
+    num_orbs: int,
+    qc: QuantumCircuit,
+    theta: Parameter | ParameterExpression,
+    mapper: FermionicMapper,
+) -> QuantumCircuit:
+    r"""Get an excitation as one Pauli evolution synthesized by Rustiq.
+
+    Implementation of the following operator,
+
+    .. math::
+       \boldsymbol{U} = \exp\left(\theta\left(\hat{T} - \hat{T}^\dagger\right)\right)
+       = \exp\left(-i\theta\hat{H}\right)
+
+    with the Hermitian :math:`\hat{H} = i\left(\hat{T} - \hat{T}^\dagger\right)` mapped to a sum of
+    Pauli strings. The Pauli strings of one excitation commute, so the product of their
+    exponentials is exact in any order, not a Trotter approximation. Rustiq synthesizes them
+    together and shares CNOTs between strings, instead of building each string's CNOT ladder
+    on its own. Rustiq is part of Qiskit.
+
+    #. 10.48550/arXiv.2404.03280 (Rustiq)
+
+    Args:
+        op: Fermionic excitation operator, :math:`\hat{T}`.
+        num_orbs: Number of spatial orbitals.
+        qc: Quantum circuit.
+        theta: Circuit parameter.
+        mapper: Fermionic to qubit mapper.
+
+    Returns:
+        Excitation circuit.
+    """
+    T = op - op.dagger
+    op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(), 2 * num_orbs))
+    H = SparsePauliOp(op_mapped.paulis, np.array([(1.0j * x).real for x in op_mapped.coeffs]))
+    circuit = PauliEvolutionSynthesisRustiq().run(PauliEvolutionGate(H, theta))
+    qc.compose(circuit, inplace=True)
+    return qc
+
+
 def _single_excitation_trotter(
     i: int,
     a: int,
@@ -388,10 +431,7 @@ def _single_excitation_trotter(
     theta: Parameter | ParameterExpression,
     mapper: FermionicMapper,
 ) -> QuantumCircuit:
-    """Get single excitation as a trotterized fermionic operator.
-
-    The Pauli string from the mapped fermionic operator are sorted
-    lexicographically to make the circuit shorter from gate cancelation.
+    """Get single excitation circuit for any fermion to qubit mapper.
 
     Args:
         i: Strongly occupied spin orbital index.
@@ -402,24 +442,10 @@ def _single_excitation_trotter(
         mapper: Fermionic to qubit mapper.
 
     Returns:
-        Trotterized fermionic single excitation circuit.
+        Single excitation circuit.
     """
-    num_spin_orbs = 2 * num_orbs
     op = a_op_spin(a, True) * a_op_spin(i, False)
-    T = op - op.dagger
-    op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(), num_spin_orbs))
-    ops = np.array([str(pauli) for pauli in op_mapped.paulis])
-    factors = np.array([(1.0j * x).real for x in op_mapped.coeffs])
-    sort_idx = np.argsort(ops)
-    ops = ops[sort_idx]
-    factors = factors[sort_idx]
-    num_qubits = qc.num_qubits
-    for pauli, fac in zip(ops, factors):
-        qc.append(
-            PauliEvolutionGate(Pauli(pauli), fac * theta),
-            np.linspace(0, num_qubits - 1, num_qubits, dtype=int).tolist(),
-        )
-    return qc
+    return _excitation_trotter(op, num_orbs, qc, theta, mapper)
 
 
 def _double_excitation_trotter(
@@ -432,10 +458,7 @@ def _double_excitation_trotter(
     theta: Parameter | ParameterExpression,
     mapper: FermionicMapper,
 ) -> QuantumCircuit:
-    """Get double excitation as a trotterized fermionic operator.
-
-    The Pauli string from the mapped fermionic operator are sorted
-    lexicographically to make the circuit shorter from gate cancellation.
+    """Get double excitation circuit for any fermion to qubit mapper.
 
     Args:
         i: Strongly occupied spin orbital index.
@@ -448,26 +471,10 @@ def _double_excitation_trotter(
         mapper: Fermionic to qubit mapper.
 
     Returns:
-        Trotterized fermionic double excitation circuit.
+        Double excitation circuit.
     """
-    num_spin_orbs = 2 * num_orbs
-    ops = []
-    factors = []
     op = a_op_spin(a, True) * a_op_spin(b, True) * a_op_spin(j, False) * a_op_spin(i, False)
-    T = op - op.dagger
-    op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(), num_spin_orbs))
-    ops = np.array([str(pauli) for pauli in op_mapped.paulis])
-    factors = np.array([(1.0j * x).real for x in op_mapped.coeffs])
-    sort_idx = np.argsort(ops)
-    ops = ops[sort_idx]
-    factors = factors[sort_idx]
-    num_qubits = qc.num_qubits
-    for pauli, fac in zip(ops, factors):
-        qc.append(
-            PauliEvolutionGate(Pauli(pauli), fac * theta),
-            np.linspace(0, num_qubits - 1, num_qubits, dtype=int).tolist(),
-        )
-    return qc
+    return _excitation_trotter(op, num_orbs, qc, theta, mapper)
 
 
 def _sa_single_excitation_trotter(

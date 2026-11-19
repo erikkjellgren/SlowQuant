@@ -87,6 +87,12 @@ PYTHONPATH=/home/kjellgren/gitreps/SlowQuant_claude python script.py
   (`_jordan_wigner_string`), which flips the rotation angle when the string's parity is odd.
   Drop the sign or put the CZ on a qubit the excitation does not flip and only some orderings go
   wrong; `tests/test_excitation_circuits.py` checks every ordering against the exact exponential.
+- **Every other mapper goes through `_excitation_trotter`:** the mapped generator becomes one
+  `PauliEvolutionGate`, synthesized by Rustiq (part of Qiskit, not an extra dependency). That is
+  exact because the Pauli strings of one excitation commute. `PauliEvolutionGate(H, t)` is
+  `exp(-itH)`, so the coefficients are `(1j*c).real` of the anti-Hermitian generator; drop the `1j`
+  and θ silently changes sign. Unlike the JW circuits it does not reject repeated indices — a zero
+  excitation becomes an identity.
 - Numba is set to **1 thread at import** (`operator_state_algebra._init`). `propagate_state`
   picks its serial/threaded kernel from `nb.get_num_threads()`.
 - `do_unsafe=True` tolerates determinants falling outside the CI space; leaving it `False`
