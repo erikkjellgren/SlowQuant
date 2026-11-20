@@ -22,6 +22,11 @@ from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
+from qiskit.transpiler import StagedPassManager
+from qiskit.transpiler.passes import Optimize1qGatesDecomposition
+from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
+
+
 from slowquant.qiskit_interface.generalized_custom_ansatz import SDSfUCC, fUCC, gtUPS, tUPS
 from slowquant.qiskit_interface.util import (
     Clique,
@@ -515,10 +520,14 @@ class QuantumInterface:
             )
 
         # Transpile X and Y measurement gates: only translation to basis gates and optimization.
-        self._transp_xy = [
-            self._pass_manager.optimization.run(self._pass_manager.translation.run(to_CBS_measurement("X"))),
-            self._pass_manager.optimization.run(self._pass_manager.translation.run(to_CBS_measurement("Y"))),
-        ]
+        backend = self.pass_manager_options.get("backend")
+        basis_gates = backend.operation_names if backend is not None else None
+        light_pass_manager = StagedPassManager(
+            stages=("translation", "optimization"),
+            translation=self._pass_manager.translation,
+            optimization=PassManager([Optimize1qGatesDecomposition(basis=basis_gates)]),
+        )
+        self._transp_xy = light_pass_manager.run([to_CBS_measurement("X"), to_CBS_measurement("Y")])
 
         return circuit_return
 
@@ -1089,7 +1098,7 @@ class QuantumInterface:
                         self.saver[det_int].update_distr(head_mit, distr_raw, M_only_flags)
 
                 if self.mitigation_flags.do_postselection:  # apply post-selection if requested
-                    self._apply_postselection(distr_raw, head_mit)
+                    self._apply_postselection(distr_raw, head_mit, self.ansatz_options)
                     # save mitigated results
                     self.saver[det_int].update_distr(head_mit, distr_raw, self.mitigation_flags)
 
