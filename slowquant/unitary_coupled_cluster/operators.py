@@ -102,7 +102,6 @@ def Eminuspq(p: int, q: int) -> FermionicOperator:
     op -= Epq(q, p)
     return op
 
-
 def commutator(A: FermionicOperator, B: FermionicOperator) -> FermionicOperator:
     r"""Construct operator commutator.
 
@@ -145,6 +144,7 @@ def double_commutator(
     if do_symmetrized:
         return 1 / 2 * (commutator(A, commutator(B, C)) + commutator(commutator(A, B), C))
     return commutator(A, commutator(B, C))
+
 
 
 def G1(i: int, a: int, return_anti_hermitian: bool = False) -> FermionicOperator:

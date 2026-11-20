@@ -20,13 +20,12 @@ from slowquant.molecularintegrals.integralfunctions import generalized_one_elect
 
 def test_efg_dipmom_PC_HF():
     """.........."""
-    from pyscf.gto.basis import load
+    import basis_set_exchange as bse
     import pyscf.gto as gto
     mol = gto.M(
                 atom = """H  0.0  0.0  0.91680 ;
                   F  0.000000   0.000000       0.000000""",
-                basis = {'H': gto.uncontract(load('../x2c-SVPall.nw', 'H')),
-                'F': gto.uncontract(load('../x2c-SVPall.nw', 'F'))},
+                basis = 'uncx2c-sv(p)all',
                 charge = 0,
                 spin = 0,
     )

@@ -25,7 +25,6 @@ def test_ups_h3() -> None:
             mol,
             "fUCCSD",
             False, #Do x2c
-            False,
             {"n_layers": 1, "is_spin_conserving" : False},
             include_active_kappa=True,
         )
@@ -53,7 +52,6 @@ def test_ups_h2() -> None:
             coeff,
             mol,
             "fUCCSD",
-            False,
             False, #Do x2c
             {"n_layers": 1, "is_spin_conserving" : False},
             include_active_kappa=True,
@@ -88,7 +86,6 @@ def test_gtups_h3() -> None:
             coeff,
             mol,
             "gtups",
-            False,
             False,
             {"n_layers": 1, "is_spin_conserving" : False},
             include_active_kappa=True,
@@ -125,7 +122,6 @@ def test_gtups_h2() -> None:
             mol,
             "gtups",
             False, #Do x2c
-            False,
             {"n_layers": 1, "is_spin_conserving" : False},
             include_active_kappa=True,
         )
@@ -159,7 +155,6 @@ def test_gtups_h3_no_oo() -> None:
             mol,
             "gtups",
             False, #Do x2c
-            False,
             {"n_layers": 1, "is_spin_conserving" : False},
             include_active_kappa=True,
         )

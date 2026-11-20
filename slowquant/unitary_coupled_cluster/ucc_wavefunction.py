@@ -210,7 +210,7 @@ class WaveFunctionUCC:
         # Construct UCC Structure
         self._excitations = excitations  # Needed for saving the wave function
         self.ucc_layout = UccStructure()
-        if "s" in excitations.lower():
+        if "s" in excitations.lower(): # OBS!! Should it be add_singles here?
             self.ucc_layout.add_sa_singles(self.active_occ_idx_shifted, self.active_unocc_idx_shifted)
         if "d" in excitations.lower():
             self.ucc_layout.add_sa_doubles(self.active_occ_idx_shifted, self.active_unocc_idx_shifted)

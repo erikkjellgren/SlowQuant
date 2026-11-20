@@ -176,42 +176,6 @@ def iterate_t1(
                 continue
             yield a, i
 
-
-# Includes ap(dagger)*ap (diagonal) excitations
-def iterate_t1_incl_diag(
-    active_occ_spin_idx: Sequence[int],
-    active_unocc_spin_idx: Sequence[int],
-    is_spin_conserving: bool = True,
-) -> Generator[tuple[int, int], None, None]:
-    """Iterate over T1 spin-conserving operators.
-
-    Args:
-        active_occ_spin_idx: Spin indices of strongly occupied orbitals.
-        active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
-        is_spin_conserving: If the operators are spin-conserving.
-
-    Returns:
-        T1 operator iteration.
-    """
-    for a in active_unocc_spin_idx:
-        for i in active_occ_spin_idx:
-            if a == active_unocc_spin_idx[0]:
-                yield i, i
-            num_alpha = 0
-            num_beta = 0
-            if a % 2 == 0:
-                num_alpha += 1
-            else:
-                num_beta += 1
-            if i % 2 == 0:
-                num_alpha -= 1
-            else:
-                num_beta -= 1
-            if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
-                continue
-            yield a, i
-
-
 def iterate_t1_generalized(
     num_spin_orbs: int,
     is_spin_conserving: bool = True,
@@ -238,127 +202,6 @@ def iterate_t1_generalized(
             else:
                 num_beta -= 1
             if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
-                continue
-            yield a, i
-
-
-def iterate_t1_generalized(
-    num_spin_orbs: int,
-) -> Generator[tuple[int, int], None, None]:
-    """Iterate over T1 spin-conserving operators.
-
-    Args:
-        num_spin_orbs: Number of spin orbitals.
-
-    Returns:
-        T1 operator iteration.
-    """
-    for i in range(num_spin_orbs):
-        for a in range(i + 1, num_spin_orbs):
-            num_alpha = 0
-            num_beta = 0
-            if a % 2 == 0:
-                num_alpha += 1
-            else:
-                num_beta += 1
-            if i % 2 == 0:
-                num_alpha -= 1
-            else:
-                num_beta -= 1
-            if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
-                continue
-            yield a, i
-
-
-# Includes ap(dagger)*ap (diagonal) excitations
-def iterate_t1_incl_diag(
-    active_occ_spin_idx: Sequence[int],
-    active_unocc_spin_idx: Sequence[int],
-    is_spin_conserving: bool = True,
-) -> Generator[tuple[int, int], None, None]:
-    """Iterate over T1 spin-conserving operators.
-
-    Args:
-        active_occ_spin_idx: Spin indices of strongly occupied orbitals.
-        active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
-        is_spin_conserving: If the operators are spin-conserving.
-
-    Returns:
-        T1 operator iteration.
-    """
-    for a in active_unocc_spin_idx:
-        for i in active_occ_spin_idx:
-            if a == active_unocc_spin_idx[0]:
-                yield i, i
-            num_alpha = 0
-            num_beta = 0
-            if a % 2 == 0:
-                num_alpha += 1
-            else:
-                num_beta += 1
-            if i % 2 == 0:
-                num_alpha -= 1
-            else:
-                num_beta -= 1
-            if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
-                continue
-            yield a, i
-
-
-def iterate_t1_generalized(
-    num_spin_orbs: int,
-    is_spin_conserving: bool = True,
-) -> Generator[tuple[int, int], None, None]:
-    """Iterate over T1 spin-conserving operators.
-
-    Args:
-        num_spin_orbs: Number of spin orbitals.
-        is_spin_conserving: If the operators are spin-conserving.
-
-    Returns:
-        T1 operator iteration.
-    """
-    for i in range(num_spin_orbs):
-        for a in range(i + 1, num_spin_orbs):
-            num_alpha = 0
-            num_beta = 0
-            if a % 2 == 0:
-                num_alpha += 1
-            else:
-                num_beta += 1
-            if i % 2 == 0:
-                num_alpha -= 1
-            else:
-                num_beta -= 1
-            if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
-                continue
-            yield a, i
-
-
-def iterate_t1_generalized(
-    num_spin_orbs: int,
-) -> Generator[tuple[int, int], None, None]:
-    """Iterate over T1 spin-conserving operators.
-
-    Args:
-        num_spin_orbs: Number of spin orbitals.
-
-    Returns:
-        T1 operator iteration.
-    """
-    for i in range(num_spin_orbs):
-        for a in range(i + 1, num_spin_orbs):
-            num_alpha = 0
-            num_beta = 0
-            if a % 2 == 0:
-                num_alpha += 1
-            else:
-                num_beta += 1
-            if i % 2 == 0:
-                num_alpha -= 1
-            else:
-                num_beta -= 1
-            if num_alpha != 0 or num_beta != 0:
                 continue
             yield a, i
 
@@ -441,122 +284,6 @@ def iterate_t2_generalized(
                     else:
                         num_beta -= 1
                     if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
-                        continue
-                    yield a, i, b, j
-
-
-def iterate_t2_generalized(
-    num_spin_orbs: int,
-) -> Generator[tuple[int, int, int, int], None, None]:
-    """Iterate over T2 spin-conserving operators.
-
-    Args:
-        num_spin_orbs: Number of spin orbitals.
-
-    Returns:
-        T2 operator iteration.
-    """
-    for i in range(num_spin_orbs):
-        for j in range(i, num_spin_orbs):
-            for a in range(max(i, j) + 1, num_spin_orbs):
-                for b in range(a, num_spin_orbs):
-                    num_alpha = 0
-                    num_beta = 0
-                    if a % 2 == 0:
-                        num_alpha += 1
-                    else:
-                        num_beta += 1
-                    if b % 2 == 0:
-                        num_alpha += 1
-                    else:
-                        num_beta += 1
-                    if i % 2 == 0:
-                        num_alpha -= 1
-                    else:
-                        num_beta -= 1
-                    if j % 2 == 0:
-                        num_alpha -= 1
-                    else:
-                        num_beta -= 1
-                    if (num_alpha != 0 or num_beta != 0) and is_spin_conserving: #Skal væk AE
-                         continue
-                    yield a, i, b, j
-
-
-def iterate_t2_generalized(
-    num_spin_orbs: int,
-    is_spin_conserving: bool = True,
-) -> Generator[tuple[int, int, int, int], None, None]:
-    """Iterate over T2 spin-conserving operators.
-
-    Args:
-        num_spin_orbs: Number of spin orbitals.
-        is_spin_conserving: If the operators are spin-conserving.
-
-    Returns:
-        T2 operator iteration.
-    """
-    for i in range(num_spin_orbs):
-        for j in range(num_spin_orbs):
-            for a in range(max(i, j) + 1, num_spin_orbs):
-                for b in range(max(i, j) + 1, num_spin_orbs):
-                    num_alpha = 0
-                    num_beta = 0
-                    if a % 2 == 0:
-                        num_alpha += 1
-                    else:
-                        num_beta += 1
-                    if b % 2 == 0:
-                        num_alpha += 1
-                    else:
-                        num_beta += 1
-                    if i % 2 == 0:
-                        num_alpha -= 1
-                    else:
-                        num_beta -= 1
-                    if j % 2 == 0:
-                        num_alpha -= 1
-                    else:
-                        num_beta -= 1
-                    if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
-                        continue
-                    yield a, i, b, j
-
-
-def iterate_t2_generalized(
-    num_spin_orbs: int,
-) -> Generator[tuple[int, int, int, int], None, None]:
-    """Iterate over T2 spin-conserving operators.
-
-    Args:
-        num_spin_orbs: Number of spin orbitals.
-
-    Returns:
-        T2 operator iteration.
-    """
-    for i in range(num_spin_orbs):
-        for j in range(i, num_spin_orbs):
-            for a in range(max(i, j) + 1, num_spin_orbs):
-                for b in range(a, num_spin_orbs):
-                    num_alpha = 0
-                    num_beta = 0
-                    if a % 2 == 0:
-                        num_alpha += 1
-                    else:
-                        num_beta += 1
-                    if b % 2 == 0:
-                        num_alpha += 1
-                    else:
-                        num_beta += 1
-                    if i % 2 == 0:
-                        num_alpha -= 1
-                    else:
-                        num_beta -= 1
-                    if j % 2 == 0:
-                        num_alpha -= 1
-                    else:
-                        num_beta -= 1
-                    if num_alpha != 0 or num_beta != 0:
                         continue
                     yield a, i, b, j
 
@@ -892,6 +619,19 @@ class UccStructure:
             self.excitation_operator_type.append("single")
             self.n_params += 1
 
+    def add_sa_singles(self, active_occ_idx: Sequence[int], active_unocc_idx: Sequence[int]) -> None:
+        """Add spin-adapted singles.
+
+        Args:
+            active_occ_idx: Active strongly occupied spatial orbital indices.
+            active_unocc_idx: Active weakly occupied spatial orbital indices.
+        """
+        for a, i, _ in iterate_t1_sa(active_occ_idx, active_unocc_idx):
+            self.excitation_indices.append((i, a))
+            self.excitation_operator_type.append("sa_single")
+            self.n_params += 1
+
+
     def add_sa_doubles(self, active_occ_idx: Sequence[int], active_unocc_idx: Sequence[int]) -> None:
         """Add spin-adapted doubles.
 
@@ -936,7 +676,6 @@ class UccStructure:
             # elif op_type == 5:
             #     self.excitation_operator_type.append("double_5")
             # self.n_params += 1
-
 
     def add_triples(self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int], is_spin_conserving) -> None:
         """Add alpha-number and beta-number conserving triples.
@@ -1148,8 +887,6 @@ class UpsStructure:
                     self.n_params += 1
 
             for p in range(1, num_active_orbs - 1, 2):  # second column of brick-wall
-                # QNP does not have this single
-                if do_tups:
                 # QNP does not have this single
                 if do_tups:
                     # First single
@@ -1392,7 +1129,6 @@ class UpsStructure:
                     self.n_params += 1
             if do_SAS:
                 for a, i, _ in iterate_t1_sa(occ_idx, unocc_idx):
-                for a, i, _ in iterate_t1_sa(occ_idx, unocc_idx):
                     self.excitation_operator_type.append("sa_single")
                     self.excitation_indices.append((i, a))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
@@ -1423,7 +1159,6 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_pD:
-                for a, i, b, j in iterate_pair_t2(occ_idx, unocc_idx):
                 for a, i, b, j in iterate_pair_t2(occ_idx, unocc_idx):
                     self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i, j, a, b))
@@ -1473,7 +1208,6 @@ class UpsStructure:
                     self.excitation_indices.append((i, j, k, l, m, n, a, b, c, d, e, f))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
             if do_SAD:
-                for a, i, b, j, _, op_case in iterate_t2_sa(occ_idx, unocc_idx):
                 for a, i, b, j, _, op_case in iterate_t2_sa(occ_idx, unocc_idx):
                     self.excitation_operator_type.append(f"sa_double_{op_case}")
                     self.excitation_indices.append((i, j, a, b))

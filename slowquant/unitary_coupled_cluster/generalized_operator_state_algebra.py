@@ -242,15 +242,8 @@ def generalized_propagate_state(
             # loop over all strings of annihilation operators in FermionicOperator sum
             for fermi_label in op_folded.operators.keys():
                 # Separate each annihilation operator string in creation and annihilation indices
-                anni_idx = []
-                create_idx = []
-                for fermi_op in fermi_label:
-                    if fermi_op[1]:
-                        create_idx.append(fermi_op[0])
-                    else:
-                        anni_idx.append(fermi_op[0])
-                anni_idx = np.array(anni_idx, dtype=np.int64)
-                create_idx = np.array(create_idx, dtype=np.int64)
+                create_idx = np.array(fermi_label[0], dtype=np.int64)
+                anni_idx = np.array(fermi_label[1], dtype=np.int64)
                 tmp_state = generalized_apply_operator(
                     new_state,
                     anni_idx,
@@ -295,15 +288,8 @@ def generalized_build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, d
     # loop over all strings of annihilation operators in FermionicOperator sum
     for fermi_label in op.operators.keys():
         # Separate each annihilation operator string in creation and annihilation indices
-        anni_idx = []
-        create_idx = []
-        for fermi_op in fermi_label:
-            if fermi_op[1]:
-                create_idx.append(fermi_op[0])
-            else:
-                anni_idx.append(fermi_op[0])
-        anni_idx = np.array(anni_idx, dtype=np.int64)
-        create_idx = np.array(create_idx, dtype=np.int64)
+        create_idx = np.array(fermi_label[0], dtype=np.int64)
+        anni_idx = np.array(fermi_label[1], dtype=np.int64)
         op_mat = generalized_add_operator_matrix(
             op_mat,
             anni_idx,

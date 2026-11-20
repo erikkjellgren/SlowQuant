@@ -151,6 +151,10 @@ class QuantumInterface:
             num_orbs: Number of spatial orbitals.
             num_elec: Number of electrons (alpha, beta).
         """
+        self.occ_idx = occ_idx.copy()
+        self.unocc_idx = unocc_idx.copy()
+        self.occ_spin_idx = occ_spin_idx.copy()
+        self.unocc_spin_idx = unocc_spin_idx.copy()
         self.num_orbs = num_orbs
         self.num_spin_orbs = 2 * num_orbs
         self.num_elec = num_elec

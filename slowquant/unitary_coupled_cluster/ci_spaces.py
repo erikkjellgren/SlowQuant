@@ -131,9 +131,7 @@ def get_indexing_generalized(
     det2idx = {}
     num_active_elec = num_active_elec_alpha + num_active_elec_beta
     # Loop over all possible particle conserving determinants
-    for string in multiset_permutations(
-        [1] * num_active_elec + [0] * (num_active_spin_orbs - num_active_elec)
-    ):
+    for string in reversed(list(generate_spin_strings(num_active_spin_orbs, num_active_elec))):
         det_str = ""
         for occ in string:
             det_str += str(occ)
@@ -165,9 +163,7 @@ def get_indexing_DHF(
     det2idx = {}
     num_active_elec = num_active_elec_alpha + num_active_elec_beta
     # Loop over all possible particle conserving determinants
-    for string in multiset_permutations(
-        [1] * num_active_elec + [0] * (num_active_spin_orbs - num_active_elec)
-    ):
+    for string in generate_spin_strings(num_active_spin_orbs, num_active_elec):
         det_str = ""
         for occ in string:
             det_str += str(occ)
