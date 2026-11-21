@@ -85,6 +85,7 @@ class WaveFunctionUPS:
         self._h_mo = None
         self._g_mo = None
         self._energy_elec: float | None = None
+        self._ansatz = ansatz.lower()
         self.ansatz_options = ansatz_options
         self.num_energy_evals = 0
         # Used when converting to circuit wavefunction.
@@ -310,6 +311,10 @@ class WaveFunctionUPS:
                 self.num_active_orbs,
                 self.ansatz_options,
             )
+        elif ansatz.lower() == "cas":
+            # CAS uses the complete determinant basis directly rather than a
+            # parametrized unitary-product-state layout.
+            self._set_cas_ground_state()
         elif ansatz.lower() == "none":
             print("UPS wave function with no Ansatz was chosen.")
         else:
@@ -360,12 +365,15 @@ class WaveFunctionUPS:
         self._rdm4 = None
         self._energy_elec = None
         self._thetas = theta_vals.copy()
-        self.ci_coeffs = construct_ups_state(
-            self.csf_coeffs,
-            self.ci_info,
-            self.thetas,
-            self.ups_layout,
-        )
+        if self._ansatz == "cas":
+            self._set_cas_ground_state()
+        else:
+            self.ci_coeffs = construct_ups_state(
+                self.csf_coeffs,
+                self.ci_info,
+                self.thetas,
+                self.ups_layout,
+            )
 
     @property
     def c_mo(self) -> np.ndarray:
@@ -807,6 +815,21 @@ class WaveFunctionUPS:
         """
         return build_operator_matrix(self._get_hamiltonian(), self.ci_info)  # type: ignore
 
+    def _set_cas_ground_state(self) -> float:
+        """Diagonalize the active-space Hamiltonian and store its ground state.
+
+        Returns:
+            Ground-state electronic energy.
+        """
+        energies, states = np.linalg.eigh(self._get_hamiltonian_matrix())
+        self.ci_coeffs = states[:, 0]
+        self._rdm1 = None
+        self._rdm2 = None
+        self._rdm3 = None
+        self._rdm4 = None
+        self._energy_elec = float(energies[0])
+        return self._energy_elec
+
     def run_wf_optimization_2step(
         self,
         optimizer_name: str,
@@ -918,6 +941,85 @@ class WaveFunctionUPS:
                 break
 
             e_new = res.fun
+            time_str = f"{time.time() - full_start:7.2f}"
+            e_str = f"{e_new:3.12f}"
+            print(
+                f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {str(self.num_energy_evals).center(11)}"
+            )
+            if abs(e_new - e_old) < tol:
+                break
+            e_old = e_new
+        self._energy_elec = e_new
+
+    def run_orbital_optimization(
+        self,
+        tol: float = 1e-10,
+        maxiter: int = 1000,
+        is_silent_subiterations: bool = False,
+    ) -> None:
+        """Optimize only the molecular orbitals.
+
+        For a CAS wave function, the active-space Hamiltonian is diagonalized
+        for every set of orbitals. Thus, applying this method to CAS performs
+        a CASSCF calculation.
+
+        Args:
+            tol: Convergence tolerance.
+            maxiter: Maximum number of macro and optimizer iterations.
+            is_silent_subiterations: Silence optimizer subiterations.
+        """
+        if len(self.kappa) == 0:
+            raise ValueError(
+                "No orbital optimization can be performed because there are no non-redundant "
+                "orbital parameters."
+            )
+
+        print("### Parameters information:")
+        print(f"### Number kappa: {len(self.kappa)}")
+        print("Orbital optimization")
+        print("Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #")
+        e_old = 1e12
+        e_new = self.energy_elec
+        for full_iter in range(int(maxiter)):
+            full_start = time.time()
+            if not is_silent_subiterations:
+                print("--------Orbital optimization")
+                print(
+                    "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+                )
+            energy_oo = partial(
+                self._calc_energy_optimization,
+                theta_optimization=False,
+                kappa_optimization=True,
+            )
+            gradient_oo = partial(
+                self._calc_gradient_optimization,
+                theta_optimization=False,
+                kappa_optimization=True,
+            )
+            optimizer = Optimizers(
+                energy_oo,
+                "l-bfgs-b",
+                grad=gradient_oo,
+                maxiter=maxiter,
+                tol=tol,
+                is_silent=is_silent_subiterations,
+                energy_eval_callback=lambda: self.num_energy_evals,
+            )
+            self._old_opt_parameters = np.zeros(len(self.kappa_idx)) + 10**20
+            self._E_opt_old = 0.0
+            res = optimizer.minimize([0.0] * len(self.kappa_idx))
+
+            # The kappa setter has already folded the final rotation into
+            # _c_mo. Reset the coordinates around that new expansion point.
+            for i in range(len(self.kappa)):
+                self._kappa[i] = 0.0
+                self._kappa_old[i] = 0.0
+
+            if self._ansatz == "cas":
+                e_new = self._set_cas_ground_state()
+            else:
+                e_new = float(res.fun)
             time_str = f"{time.time() - full_start:7.2f}"
             e_str = f"{e_new:3.12f}"
             print(
@@ -1050,12 +1152,20 @@ class WaveFunctionUPS:
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
-            # RDM is more expensive than evaluation of the Hamiltonian.
-            # Thus only construct these if orbital-optimization is turned on,
-            # since the RDMs will be reused in the oo gradient calculation.
-            E = get_electronic_energy(
-                self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.rdm1, self.rdm2
-            )
+            if self._ansatz == "cas":
+                E = self._set_cas_ground_state()
+            else:
+                # RDM is more expensive than evaluation of the Hamiltonian.
+                # Thus only construct these if orbital-optimization is turned on,
+                # since the RDMs will be reused in the oo gradient calculation.
+                E = get_electronic_energy(
+                    self.h_mo,
+                    self.g_mo,
+                    self.num_inactive_orbs,
+                    self.num_active_orbs,
+                    self.rdm1,
+                    self.rdm2,
+                )
         else:
             E = expectation_value(
                 self.ci_coeffs,
@@ -1089,6 +1199,8 @@ class WaveFunctionUPS:
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
+            if self._ansatz == "cas":
+                self._set_cas_ground_state()
             gradient[:num_kappa] = get_orbital_gradient(
                 self.h_mo,
                 self.g_mo,
