@@ -72,9 +72,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     hf.remove_overlap_zero_eigenvalue = False
     mf = scf.dhf.DHF(mol)
-    mf.conv_tol = 1e-10        # Energy convergence (Hartree)
-    mf.conv_tol_grad = 1e-8   # Optional: gradient convergence
-    mf.max_cycle = 1000
+    mf.conv_tol = Etol        # Energy convergence (Hartree)
+    mf.conv_tol_grad = Gtol   # Optional: gradient convergence
+    mf.max_cycle = Maxiter_DHF
 
     print("PySCF settings:")
     print("Energy tolerance:", Etol)
