@@ -164,15 +164,19 @@ class LinearResponse(LinearResponseBaseClass):
                     * self.wf.energy_elec
                 )
                 # - 1/2*<0| GId |0> * <0| H GJ |0>
-                val -= 0.5 * self._G_expect[i] * self._HG_expect[j]
+                fac = 0.5 if self.case == 2 else 1
+                val -= fac * self._G_expect[i] * self._HG_expect[j]
                 # - 1/2*<0| GJ |0> * <0| GId H |0>
-                val -= 0.5 * self._G_expect[j] * self._HG_expect[i]
+                fac = 0.5 if self.case == 2 else 0
+                val -= fac * self._G_expect[j] * self._HG_expect[i]
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
                 # Make B
                 # 1/2<0| GId H |0> * <0| GJd |0>
-                val = 0.5 * self._HG_expect[i] * self._G_expect[j]
+                fac = 0.5 if self.case == 2 else 1
+                val = fac * self._HG_expect[i] * self._G_expect[j]
                 # 1/2<0| GJd H |0> * <0| GId |0>
-                val += 0.5 * self._HG_expect[j] * self._G_expect[i]
+                fac = 0.5 if self.case == 2 else 0
+                val += fac * self._HG_expect[j] * self._G_expect[i]
                 # - <0| GId |0> * <0| GJd |0> * E
                 val -= self._G_expect[i] * self._G_expect[j] * self.wf.energy_elec
                 self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
@@ -399,11 +403,17 @@ class LinearResponse(LinearResponseBaseClass):
                 sigma_plus[num_q + i, root] += self.wf.energy_elec * self._G_expect[i] * (Gsp_expect - Gsp_expect.conjugate())
                 sigma_minus[num_q + i, root] += self.wf.energy_elec * self._G_expect[i] * (Gsm_expect + Gsm_expect.conjugate())
                 # - 0.5 ( 1 - h ) <0| GId |0> <0| H Gs |0>
-                sigma_plus[num_q + i, root] -= 0.5 * self._G_expect[i] * (HGsp_expect - HGsp_expect.conjugate())
-                sigma_minus[num_q + i, root] -= 0.5 * self._G_expect[i] * (HGsm_expect + HGsm_expect.conjugate())
+                if self.case == 2:
+                    sigma_plus[num_q + i, root] -= 0.5 * self._G_expect[i] * (HGsp_expect - HGsp_expect.conjugate())
+                    sigma_minus[num_q + i, root] -= 0.5 * self._G_expect[i] * (HGsm_expect + HGsm_expect.conjugate())
                 # - 0.5 ( 1 - h ) <0| Gs |0> <0| GId H |0>
-                sigma_plus[num_q + i, root] -= 0.5 * (Gsp_expect - Gsp_expect.conjugate()) * self._HG_expect[i]
-                sigma_minus[num_q + i, root] -= 0.5 * (Gsm_expect + Gsm_expect.conjugate()) * self._HG_expect[i]
+                    sigma_plus[num_q + i, root] -= 0.5 * (Gsp_expect - Gsp_expect.conjugate()) * self._HG_expect[i]
+                    sigma_minus[num_q + i, root] -= 0.5 * (Gsm_expect + Gsm_expect.conjugate()) * self._HG_expect[i]
+                else:
+                    sigma_plus[num_q + i, root] -= self._G_expect[i] * HGsp_expect
+                    sigma_minus[num_q + i, root] -= self._G_expect[i] * HGsm_expect
+                    sigma_plus[num_q + i, root] += Gsp_expect.conjugate() * self._HG_expect[i]
+                    sigma_minus[num_q + i, root] -= Gsm_expect.conjugate() * self._HG_expect[i]
                 # <0| GId Gs |0>
                 tau_plus[num_q + i, root] += expectation_value(
                     GI_ket,
